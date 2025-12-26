@@ -41,6 +41,10 @@ Sensor Support (Extensible):
 - Ultrasonic distance sensor (template)
 - Custom sensors via ISensor interface
 
+## Documentation
+
+- Generated API reference (Doxygen): [docs/html/index.html](docs/html/index.html)
+
 ## Architecture
 
 ### Sensor Interface Pattern
