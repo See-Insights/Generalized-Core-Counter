@@ -105,6 +105,7 @@ void sysStatusData::initialize() {
     sysStatus.set_openTime(0);
     sysStatus.set_closeTime(24);                                           // New standard with v20
     sysStatus.set_lastConnectionDuration(0);                               // New measure
+    sysStatus.set_lastDailyCleanup(0);                                     // No cleanup has run yet
     
     // ********** Operating Mode Defaults **********
     sysStatus.set_countingMode(COUNTING);                                  // Default to counting mode
@@ -244,6 +245,13 @@ bool sysStatusData::get_serialConnected() const  {
 }
 void sysStatusData::set_serialConnected(bool value) {
     setValue<bool>(offsetof(SysData,serialConnected), value);
+}
+
+time_t sysStatusData::get_lastDailyCleanup() const  {
+    return getValue<time_t>(offsetof(SysData,lastDailyCleanup));
+}
+void sysStatusData::set_lastDailyCleanup(time_t value) {
+    setValue<time_t>(offsetof(SysData, lastDailyCleanup), value);
 }
 
 // ********** Operating Mode Configuration Get/Set Functions **********

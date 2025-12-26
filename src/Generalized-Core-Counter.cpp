@@ -147,7 +147,6 @@ void setup() {
   
   Log.info("===== Firmware Version %s =====", FIRMWARE_VERSION);
   Log.info("===== Release Notes: %s =====", FIRMWARE_RELEASE_NOTES);
-  Log.info("sysStatus sensorType at startup: %d", (int)sysStatus.get_sensorType());
   
   System.on(out_of_memory,
             outOfMemoryHandler); // Enabling an out of memory handler is a good
@@ -175,8 +174,6 @@ void setup() {
   initializePinModes(); // Initialize the pin modes
 
   sysStatus.setup();    // Initialize persistent storage
-  sysStatus.set_verboseMode(true); // Force verbose logging on for debugging
-  sysStatus.set_sensorType(1);     // Force PIR sensor type for now
   sensorConfig.setup(); // Initialize the sensor configuration
   current.setup();      // Initialize the current status data
 
@@ -214,12 +211,6 @@ void setup() {
     sysStatus.initialize();          // Restore factory defaults
     sysStatus.set_lowPowerMode(false);           // Ensure not in low-power mode
     sysStatus.set_operatingMode(CONNECTED);      // Persist CONNECTED operating mode
-  }
-
-  // Daily rollover based on last connection date
-  if (Time.day(sysStatus.get_lastConnection() != Time.day())) {
-    Log.info("New day, resetting counts");
-    dailyCleanup();
   }
 
   if (!Time.isValid()) {
@@ -374,12 +365,21 @@ void loop() {
   case REPORTING_STATE: { // Build and send periodic report
     if (state != oldState)
       publishStateTransition();
+    time_t now = Time.now();
     sysStatus.set_lastReport(
-        Time.now()); // We are only going to report once each hour from the IDLE
+      now); // We are only going to report once each hour from the IDLE
                      // state.  We may or may not connect to Particle
     measure.loop();  // Take measurements here for reporting
-    if (Time.hour() == sysStatus.get_openTime())
-      dailyCleanup(); // Once a day, clean house and publish to Google Sheets
+
+    // Run daily cleanup once per calendar day at park opening hour
+    if (Time.isValid() && Time.hour() == sysStatus.get_openTime()) {
+      time_t lastCleanup = sysStatus.get_lastDailyCleanup();
+      if (lastCleanup == 0 || Time.day(now) != Time.day(lastCleanup)) {
+        Log.info("Opening hour reached and daily cleanup not run today - running now");
+        dailyCleanup();
+        sysStatus.set_lastDailyCleanup(now);
+      }
+    }
     publishData(); // Publish hourly but not at opening time as there is nothing
                    // to publish
     state = IDLE_STATE; // Since we are using PublishQueuePosixRK, we don't need

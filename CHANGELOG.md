@@ -20,3 +20,6 @@ All notable changes to this project will be documented in this file.
 ## 3.05 – 2025-12-24
 - MVP for a PIR person counter
 
+## 3.06 – 2025-12-26
+- Fixing cleanups and logging
+

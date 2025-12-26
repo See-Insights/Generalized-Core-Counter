@@ -165,6 +165,7 @@ public:
 		uint16_t reportingInterval;                       // How often do we report in to the Particle cloud - in seconds
 		bool disconnectedMode;                            // Are we in disconnected mode - this is used to prevent the device from trying to connect to the Particle cloud - for Development and testing purposes
 		bool serialConnected;							  // Is the serial port connected - used to determine if we should wait for a serial connection before starting the device
+		time_t lastDailyCleanup;                           // Last time dailyCleanup() successfully ran
 		
 		// ********** Operating Mode Configuration **********
 		uint8_t countingMode;                             // 0=COUNTING (count events), 1=OCCUPANCY (track occupied state)
@@ -262,6 +263,9 @@ public:
 	bool get_serialConnected() const;
 	void set_serialConnected(bool value);
 
+	time_t get_lastDailyCleanup() const;
+	void set_lastDailyCleanup(time_t value);
+
 	// ********** Operating Mode Configuration Get/Set Functions **********
 	
 	uint8_t get_countingMode() const;
@@ -316,7 +320,7 @@ protected:
 
     //Since these variables are only used internally - They can be private. 
 	static const uint32_t SYS_DATA_MAGIC = 0x20a15e75;
-	static const uint16_t SYS_DATA_VERSION = 1;
+	static const uint16_t SYS_DATA_VERSION = 2;
 
 };  // End of sysStatusData class
 
