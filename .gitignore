@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Particle / build outputs
+firmware*.bin
+boron_firmware_*.bin
+
+# Local build artifacts
+/target/
+
+# Doxygen / docs output
+/docs/html/
+/docs/xml/
+
+# Temporary / backup files
+*~
+*.swp
+*.swo

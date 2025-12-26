@@ -1,0 +1,59 @@
+# Doxyfile for Generalized-Core-Counter
+
+PROJECT_NAME           = "Generalized-Core-Counter"
+PROJECT_BRIEF          = "Particle-based generalized core counter firmware"
+PROJECT_NUMBER         = "3.05"
+
+# Where to put generated docs
+OUTPUT_DIRECTORY       = docs
+CREATE_SUBDIRS         = NO
+
+# Input sources
+INPUT                  = src README.md
+RECURSIVE              = YES
+FILE_PATTERNS          = *.h \
+                         *.cpp \
+                         *.md
+
+# Use README as the main page
+USE_MDFILE_AS_MAINPAGE = README.md
+
+# Parsing and extraction
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = NO
+EXTRACT_LOCAL_CLASSES  = YES
+EXTRACT_LOCAL_METHODS  = NO
+EXTRACT_ANON_NSPACES   = YES
+
+OPTIMIZE_OUTPUT_FOR_C  = NO
+OPTIMIZE_OUTPUT_JAVA   = NO
+OPTIMIZE_FOR_FORTRAN   = NO
+OPTIMIZE_OUTPUT_VHDL   = NO
+
+# Source browser options
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+
+# Warnings
+WARN_IF_UNDOCUMENTED   = NO
+WARN_IF_DOC_ERROR      = YES
+
+# HTML output
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+
+# Disable LaTeX/PDF by default
+GENERATE_LATEX         = NO
+
+# Diagrams (can be enabled later if you install Graphviz)
+HAVE_DOT               = NO
+
+# Misc
+QUIET                  = NO
+JAVADOC_AUTOBRIEF      = YES
+SORT_BRIEF_DOCS        = YES
+SORT_MEMBER_DOCS       = YES
+GENERATE_TREEVIEW      = YES
