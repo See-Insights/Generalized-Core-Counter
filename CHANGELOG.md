@@ -23,3 +23,6 @@ All notable changes to this project will be documented in this file.
 ## 3.06 – 2025-12-26
 - Fixing cleanups and logging
 
+## 3.07 – 2025-12-27
+- Now publishes to Ubidots and Ledger
+

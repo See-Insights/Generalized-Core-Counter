@@ -96,6 +96,53 @@ static bool isWithinOpenHours() {
   }
 }
 
+// Helper to compute seconds until next park opening time (local time)
+static int secondsUntilNextOpen() {
+  if (!Time.isValid()) {
+    // Fallback: 1 hour if time is not yet valid
+    return 3600;
+  }
+
+  uint8_t openHour = sysStatus.get_openTime();
+  uint8_t closeHour = sysStatus.get_closeTime();
+
+  LocalTimeConvert tempConv;
+  tempConv.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
+  uint32_t secondsOfDay = tempConv.getLocalTimeHMS().toSeconds();
+
+  uint32_t openSec = (uint32_t)openHour * 3600;
+  uint32_t closeSec = (uint32_t)closeHour * 3600;
+
+  // Normalize: if we're currently within opening hours, next open is tomorrow
+  if (isWithinOpenHours()) {
+    return (int)((24 * 3600UL - secondsOfDay) + openSec);
+  }
+
+  if (openHour < closeHour) {
+    // Simple daytime window, closed before open or after close
+    if (secondsOfDay < openSec) {
+      // Before opening today
+      return (int)(openSec - secondsOfDay);
+    } else {
+      // After closing, next open is tomorrow
+      return (int)((24 * 3600UL - secondsOfDay) + openSec);
+    }
+  } else if (openHour > closeHour) {
+    // Overnight window; closed between closeHour and openHour
+    if (secondsOfDay < openSec && secondsOfDay >= closeSec) {
+      // During the closed gap today
+      return (int)(openSec - secondsOfDay);
+    } else {
+      // Otherwise next open is later today or tomorrow, but isWithinOpenHours()
+      // was already false so this path will generally be rare; fall back to 1 hour
+      return 3600;
+    }
+  } else {
+    // openHour == closeHour: always open; should not normally reach here
+    return 3600;
+  }
+}
+
 // ********** Mode-Specific Handler Functions **********
 void handleCountingMode();      // Process sensor events in counting mode
 void handleOccupancyMode();     // Process sensor events in occupancy mode
@@ -117,13 +164,12 @@ enum State {
   IDLE_STATE,
   SLEEPING_STATE,
   CONNECTING_STATE,
-  DISCONNECTING_STATE,
   REPORTING_STATE,
-  RESP_WAIT_STATE
+  FIRMWARE_UPDATE_STATE
 };
-char stateNames[8][16] = {"Initialize", "Error",        "Idle",
-                          "Sleeping",   "Connecting",   "Disconnecting",
-                          "Reporting",  "Response Wait"};
+char stateNames[7][16] = {"Initialize", "Error",     "Idle",
+                          "Sleeping",   "Connecting", "Reporting",
+                          "Fw Update"};
 State state = INITIALIZATION_STATE;
 State oldState = INITIALIZATION_STATE;
 
@@ -153,17 +199,15 @@ void setup() {
                                  // safety tip. If we run out of memory a
                                  // System.reset() is done.
 
-  // Configure and start network connectivity.
-  // Compile-time macros ensure the correct API is used per platform.
+  // Configure network stack but keep radio OFF at startup.
+  // In SEMI_AUTOMATIC mode we explicitly control when the radio is turned on
+  // by calling Particle.connect() from CONNECTING_STATE.
 #if Wiring_WiFi
-  Log.info("Platform connectivity: WiFi");
-  // Pre-configure WiFi credentials to speed up connection (skip scanning).
-  // NOTE: WiFi credentials should be configured using Particle's setup tools
-  // (e.g. mobile app or CLI). Do not hard-code SSIDs or passwords in firmware.
-  WiFi.connect();  // Start WiFi connection immediately
+  Log.info("Platform connectivity: WiFi (radio off until CONNECTING_STATE)");
+  WiFi.off(); // Ensure WiFi module is powered down on boot
 #elif Wiring_Cellular
-  Log.info("Platform connectivity: Cellular");
-  Cellular.connect(); // Start cellular connection; cloud is handled via Particle.connect()
+  Log.info("Platform connectivity: Cellular (radio off until CONNECTING_STATE)");
+  Cellular.off(); // Ensure cellular modem is powered down on boot
 #else
   Log.info("Platform connectivity: default (Particle.connect only)");
   // Fallback: rely on Particle.connect() in CONNECTING_STATE
@@ -189,15 +233,16 @@ void setup() {
 
   PublishQueuePosix::instance().setup(); // Initialize the publish queue
 
+  // Initialize AB1805 RTC and watchdog
   ab1805.withFOUT(D8).setup();                 // Initialize AB1805 RTC
   ab1805.setWDT(AB1805::WATCHDOG_MAX_SECONDS); // Enable watchdog
 
   Cloud::instance().setup(); // Initialize the cloud functions
 
-  // Check if we need to connect for configuration updates
+  // Check if we need to enter firmware/config update mode
   if (sysStatus.get_updatesPending()) {
-    Log.info("Configuration updates pending, will start in CONNECTING_STATE");
-    state = CONNECTING_STATE; // Override the default state to force connection
+    Log.info("Configuration updates pending - starting in FIRMWARE_UPDATE_STATE");
+    state = FIRMWARE_UPDATE_STATE; // Override the default state to force update mode
   }
 
   // Service-mode override: hold the user button at startup to
@@ -261,7 +306,7 @@ void setup() {
                             // behaviours / modes
 
   if (state == INITIALIZATION_STATE)
-    state = CONNECTING_STATE; // Connect unless otherwise from above code
+    state = IDLE_STATE; // Default to IDLE; CONNECTING only when explicitly requested
   Log.info("Startup complete");
   digitalWrite(BLUE_LED, LOW); // Signal the end of startup
 }
@@ -316,21 +361,46 @@ void loop() {
         break;
       }
     }
-    int wakeInSeconds =
-        constrain(wakeBoundary - Time.now() % wakeBoundary, 1, wakeBoundary) +
-        1;
-    ; // Figure out how long to sleep
     // Notify sensor layer we are entering deep sleep so sensors and
     // indicator LEDs can be powered down.
     SensorManager::instance().onEnterSleep();
 
+    if (!isWithinOpenHours()) {
+      // ********** Night sleep (outside opening hours) **********
+      int sleepSec = secondsUntilNextOpen();
+      if (sleepSec <= 0) {
+        sleepSec = 3600; // Fallback
+      }
+
+      Log.info("Outside opening hours - entering NIGHT HIBERNATE sleep for %d seconds", sleepSec);
+
+      ab1805.stopWDT();
+      config.mode(SystemSleepMode::HIBERNATE)
+            .gpio(BUTTON_PIN, CHANGE)
+            .duration((uint32_t)sleepSec * 1000UL);
+
+      // HIBERNATE resets the device on wake, so execution should not resume here
+      System.sleep(config);
+
+      // Fallback in case hibernate did not reset as expected
+      ab1805.resumeWDT();
+      Log.error("HIBERNATE sleep returned unexpectedly - forcing System.reset()");
+      System.reset();
+    }
+
+    // ********** Daytime nap sleep (within opening hours) **********
+    int wakeInSeconds =
+        constrain(wakeBoundary - Time.now() % wakeBoundary, 1, wakeBoundary) +
+        1; // Figure out how long to sleep until next reporting boundary
+
     config.mode(SystemSleepMode::ULTRA_LOW_POWER)
         .gpio(BUTTON_PIN, CHANGE)
+        .gpio(intPin, RISING)
         .duration(wakeInSeconds * 1000L);
+
     ab1805.stopWDT(); // No watchdogs interrupting our slumber
     SystemSleepResult result =
-        System.sleep(config); // Put the device to sleep device continues
-                              // operations from here
+        System.sleep(config); // Put the device to sleep; execution resumes here
     ab1805.resumeWDT();       // Wakey Wakey - WDT can resume
     if (result.wakeupPin() ==
       BUTTON_PIN) { // If the user woke the device we need to get up - device
@@ -380,48 +450,66 @@ void loop() {
         sysStatus.set_lastDailyCleanup(now);
       }
     }
-    publishData(); // Publish hourly but not at opening time as there is nothing
-                   // to publish
-    state = IDLE_STATE; // Since we are using PublishQueuePosixRK, we don't need
-                        // to wait for a response from the webhook
+    publishData(); // Queue hourly report; actual send depends on connectivity policy
 
-    if (Particle.connected() || sysStatus.get_disconnectedMode()) {
-      state = IDLE_STATE; // Default behaviour would be to connect and send
-                          // report to Ubidots
-      Log.info("Going back to IDLE_STATE - %s",
-               sysStatus.get_disconnectedMode() ? "disconnected mode"
-               : Particle.connected()           ? "already connected"
-                                                : "NULL");
+    // After each hourly report, reset the hourly counter so
+    // the next report contains only the counts for that hour.
+    if (sysStatus.get_countingMode() == COUNTING) {
+      Log.info("Resetting hourlyCount after report (was %d)", current.get_hourlyCount());
+      current.set_hourlyCount(0);
     }
-    // If we are in low power mode, we may bail if battery is too low and we
-    // need to reduce reporting frequency
-    if (sysStatus.get_lowPowerMode()) { // Low power mode
-      if (current.get_stateOfCharge() > 65) {
-        Log.info("Sufficient battery power connecting");
-      } else if (current.get_stateOfCharge() <= 50 &&
-                 (Time.hour() % 4)) { // If the battery level is <50%, only
-                                      // connect every fourth hour
-        Log.info("Not connecting - <50%% charge - four hour schedule");
-        state = IDLE_STATE; // Will send us to connecting state - and it will
-                            // send us back here
-      } // Leave this state and go connect - will return only if we are
-        // successful in connecting
-      else if (current.get_stateOfCharge() <= 65 &&
-               (Time.hour() % 2)) { // If the battery level is 50% -  65%, only
-                                    // connect every other hour
-        Log.info("Not connecting - 50-65%% charge - two hour schedule");
-        state = IDLE_STATE; // Will send us to connecting state - and it will
-                            // send us back here
-        break; // Leave this state and go connect - will return only if we are
-               // successful in connecting
-      } else if (!digitalRead(BUTTON_PIN)) { // Active-low user button
-        Log.info("User switch pressed - connecting to Particle");
-        state = CONNECTING_STATE; // Go to connecting state
-      } else {
-        Log.info("Not connecting - low power mode and user switch not pressed");
-        state = IDLE_STATE; // Will send us to connecting state - and it will
-                            // send us back here
+
+    // ********** Connectivity Decision (SoC-tiered) **********
+    bool shouldConnect = true;
+
+    // Explicit disconnected mode: never auto-connect
+    if (sysStatus.get_disconnectedMode()) {
+      shouldConnect = false;
+      Log.info("Disconnected mode enabled - not connecting after report");
+    } else {
+      // Apply SoC-based tiers when in low-power mode
+      if (sysStatus.get_lowPowerMode()) {
+        int soc = current.get_stateOfCharge();
+        int hour = Time.isValid() ? Time.hour() : -1;
+
+        shouldConnect = false; // Start from conservative default
+
+        if (soc > 65) {
+          Log.info("SoC %d%% > 65 - connecting this hour", soc);
+          shouldConnect = true; // Normal behaviour: connect every hour
+        } else if (soc > 50) {
+          if (hour < 0 || (hour % 2) == 0) {
+            Log.info("SoC %d%% in 50-65%% tier - connecting on 2-hour cadence", soc);
+            shouldConnect = true;
+          } else {
+            Log.info("SoC %d%% in 50-65%% tier - skipping this hour", soc);
+          }
+        } else if (soc > 35) {
+          if (hour < 0 || (hour % 4) == 0) {
+            Log.info("SoC %d%% in 35-50%% tier - connecting on 4-hour cadence", soc);
+            shouldConnect = true;
+          } else {
+            Log.info("SoC %d%% in 35-50%% tier - skipping this hour", soc);
+          }
+        } else if (soc > 20) {
+          Log.info("SoC %d%% in 20-35%% tier - store-only, no auto-connect", soc);
+        } else {
+          Log.info("SoC %d%% <= 20%% - emergency-only, no auto-connect", soc);
+        }
       }
+
+      // User button override (active-low): always allow service connection
+      if (!digitalRead(BUTTON_PIN)) {
+        Log.info("User button override - forcing connection");
+        shouldConnect = true;
+      }
+    }
+
+    if (shouldConnect && !Particle.connected()) {
+      Log.info("Transitioning to CONNECTING_STATE after report");
+      state = CONNECTING_STATE;
+    } else {
+      state = IDLE_STATE; // Either already connected or intentionally staying offline
     }
   } break;
 
@@ -469,6 +557,45 @@ void loop() {
     } // We go round the main loop again
   } break;
 
+  case FIRMWARE_UPDATE_STATE: { // Stay connected for firmware/config updates
+    if (state != oldState) {
+      publishStateTransition();
+      Log.info("Entering FIRMWARE_UPDATE_STATE - keeping device connected for updates");
+
+      // In update mode, force connected operating mode and disable low power
+      sysStatus.set_lowPowerMode(false);
+      sysStatus.set_operatingMode(CONNECTED);
+
+      // Ensure cloud connection is requested
+      if (!Particle.connected()) {
+        Particle.connect();
+      }
+    }
+
+    // Once connected, ensure configuration is loaded at least once
+    if (Particle.connected()) {
+      static bool configLoadedInUpdateMode = false;
+      if (!configLoadedInUpdateMode) {
+        Log.info("Connected in FIRMWARE_UPDATE_STATE - loading configuration from cloud");
+        Cloud::instance().loadConfigurationFromCloud();
+        configLoadedInUpdateMode = true;
+      }
+
+      // If no updates are pending anymore and no OTA in progress, exit update mode
+      if (!sysStatus.get_updatesPending() && !System.updatesPending()) {
+        Log.info("No updates pending - leaving FIRMWARE_UPDATE_STATE to IDLE_STATE");
+        configLoadedInUpdateMode = false;
+        state = IDLE_STATE;
+      }
+    }
+
+    // Optional escape hatch: user button can also exit update mode
+    if (!digitalRead(BUTTON_PIN)) { // Active-low user button
+      Log.info("User button pressed - exiting FIRMWARE_UPDATE_STATE to IDLE_STATE");
+      state = IDLE_STATE;
+    }
+  } break;
+
     case ERROR_STATE: { // Simple error-handling: log and reset after timeout
       static unsigned long resetTimer = 0;
       if (state != oldState) {
@@ -510,81 +637,50 @@ void loop() {
 } // End of loop
 
 /**
- * @brief Publish sensor data to the cloud based on current operating mode
- * 
- * @details Creates JSON payload with mode-specific data:
- *          - COUNTING mode: hourly and daily counts
- *          - OCCUPANCY mode: occupied status, duration, total occupied time
- *          Also includes battery, signal strength, and system health data
+ * @brief Publish sensor data to Ubidots webhook and device-data ledger.
+ *
+ * @details
+ * 1) Builds a compact JSON payload expected by the Ubidots webhook template
+ *    and enqueues it via PublishQueuePosix to the "Ubidots-Parking-Hook-v1" event.
+ * 2) Updates the Particle Ledger "device-data" with a richer JSON snapshot
+ *    via Cloud::publishDataToLedger() for Console visibility.
  */
 void publishData() {
-    static char deviceIdBuf[25];  // Static buffer for deviceID (24 chars + null), allocated once
-    char str[512];  // Stack buffer for JSON (512 bytes is acceptable for this use case)
-    JSONBufferWriter writer(str, sizeof(str));
-    
-    writer.beginObject();
-    
-    // ********** Common System Data **********
-    writer.name("timestamp").value((int)Time.now());
-    
-    // Get deviceID once into static buffer to avoid String allocation on each call
-    if (deviceIdBuf[0] == '\0') {  // Only fetch once
-        String id = System.deviceID();  // Temporary String, only created once
-        strncpy(deviceIdBuf, id.c_str(), sizeof(deviceIdBuf) - 1);
-        deviceIdBuf[sizeof(deviceIdBuf) - 1] = '\0';
-    }
-    writer.name("deviceId").value(deviceIdBuf);
-    
-    writer.name("battery").value(current.get_stateOfCharge(), 1);
-    writer.name("temp").value(current.get_internalTempC(), 1);
-    
-    // ********** Mode-Specific Data **********
-    if (sysStatus.get_countingMode() == COUNTING) {
-        // Counting Mode Data
-        writer.name("mode").value("counting");
-        writer.name("hourlyCount").value(current.get_hourlyCount());
-        writer.name("dailyCount").value(current.get_dailyCount());
-        writer.name("lastCount").value((int)current.get_lastCountTime());
-        
-        Log.info("Publishing COUNTING data - Hourly: %d, Daily: %d", 
-                 current.get_hourlyCount(), current.get_dailyCount());
-        
-    } else if (sysStatus.get_countingMode() == OCCUPANCY) {
-        // Occupancy Mode Data
-        writer.name("mode").value("occupancy");
-        writer.name("occupied").value(current.get_occupied());
-        
-        if (current.get_occupied()) {
-            // Calculate current session duration
-            uint32_t sessionDuration = Time.now() - current.get_occupancyStartTime();
-            writer.name("sessionDuration").value(sessionDuration);
-            writer.name("occupancyStart").value((int)current.get_occupancyStartTime());
-        }
-        
-        writer.name("totalOccupiedSec").value(current.get_totalOccupiedSeconds());
-        writer.name("debounceMs").value(sysStatus.get_occupancyDebounceMs());
-        
-        Log.info("Publishing OCCUPANCY data - Occupied: %s, Total: %lu sec", 
-                 current.get_occupied() ? "YES" : "NO", 
-                 current.get_totalOccupiedSeconds());
-    }
-    
-    // ********** Operating Configuration **********
-    writer.name("powerMode").value(sysStatus.get_operatingMode() == CONNECTED ? "connected" : "lowPower");
-    writer.name("triggerMode").value(sysStatus.get_triggerMode() == INTERRUPT ? "interrupt" : "scheduled");
-    
-    writer.endObject();
-    
-    // Publish to cloud via webhook (for Ubidots real-time integration)
-    if (writer.buffer()) {
-        PublishQueuePosix::instance().publish("sensor-data", str, PRIVATE);
-        Log.info("Published to webhook: %s", str);
-        
-        // Also update device-data ledger for Console visibility
-        Cloud::instance().publishDataToLedger();
-    } else {
-        Log.warn("Failed to create JSON for sensor data");
-    }
+  // Legacy Ubidots context strings describing battery state
+  static const char *batteryContext[7] = {
+    "Unknown", "Not Charging", "Charging",
+    "Charged", "Discharging", "Fault",
+    "Diconnected"
+  };
+
+  char data[256];
+
+  // Map fields from current/sysStatus into legacy payload shape
+  uint16_t daily      = current.get_dailyCount();
+  uint16_t countingIn = current.get_hourlyCount();   // Count during this reporting interval
+  int      battery    = (int) current.get_stateOfCharge();
+  uint8_t  battState  = current.get_batteryState();
+  if (battState > 6) {
+    battState = 0; // Bounds check for safety
+  }
+  const char *key1    = batteryContext[battState];
+
+  int tempC           = (int) current.get_internalTempC();
+  uint8_t resets      = sysStatus.get_resetCount();
+  int alerts          = current.get_alertCode();
+  uint16_t connTime   = sysStatus.get_lastConnectionDuration();
+  unsigned long ts    = Time.now();
+
+  // Note: "maxmin" field ignored per current requirements; set to 0 if needed later.
+  snprintf(data, sizeof(data),
+       "{\"daily\":%u, \"countingin\":%u,\"battery\":%d,\"key1\":\"%s\",\"temp\":%d, \"resets\":%u, \"alerts\":%d,\"connecttime\":%u,\"timestamp\":%lu000}",
+       daily, countingIn, battery, key1, tempC, resets, alerts, connTime, ts);
+
+  PublishQueuePosix::instance().publish("Ubidots-Counter-Hook-v1", data, PRIVATE | WITH_ACK);
+  Log.info("Parking Lot Webhook: %s", data);
+
+  // Also update device-data ledger with structured JSON snapshot
+  Cloud::instance().publishDataToLedger();
 }
 
 void UbidotsHandler(const char *event, const char *data) {

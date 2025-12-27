@@ -68,6 +68,9 @@ void AB1805::loop() {
 
             // Reset the watchdog timer
             setWDT();
+
+            // Temporary debug logging so we can see when the watchdog is being pet
+            _log.info("petting watchdog at %lu ms", (unsigned long) lastWatchdogMillis);
         }
     }
 }
