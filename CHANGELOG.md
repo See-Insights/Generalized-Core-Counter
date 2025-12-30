@@ -26,3 +26,9 @@ All notable changes to this project will be documented in this file.
 ## 3.07 – 2025-12-27
 - Now publishes to Ubidots and Ledger
 
+## 3.08 – 2025-12-29
+- MVP on Sleeping - Testing intervals
+
+## 3.09 – 2025-12-30
+- MVP starting to optimize
+

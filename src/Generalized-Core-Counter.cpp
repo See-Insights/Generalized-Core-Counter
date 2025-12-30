@@ -33,6 +33,8 @@
 #include "SensorFactory.h"
 #include "SensorDefinitions.h"
 #include "Version.h"
+#include "StateMachine.h"
+#include "StateHandlers.h"
 
 // Forward declarations in case Version.h is not picked up correctly
 // by the build system in this translation unit.
@@ -60,18 +62,19 @@ extern const char* FIRMWARE_RELEASE_NOTES;
 
 // Forward declarations
 void publishData();           // Publish the data to the cloud
-void publishStateTransition(); // Log state changes (useful for debugging)
 void userSwitchISR();         // Interrupt for the user switch
 void sensorISR();             // Interrupt for legacy tire-counting sensor
 void countSignalTimerISR();   // Timer ISR to turn off BLUE LED
 void dailyCleanup();          // Reset daily counters and housekeeping
 void softDelay(uint32_t t);   // Non-blocking delay helper
+void UbidotsHandler(const char *event, const char *data); // Webhook response handler
+void publishStartupStatus();  // One-time status summary at boot
 
 // Helper to determine whether current *local* time is within park open hours.
 // Local time is derived from LocalTimeRK using the configured timezone.
 // If time is not yet valid, we treat it as "open" so the device can start
 // sensing while it acquires time and configuration.
-static bool isWithinOpenHours() {
+bool isWithinOpenHours() {
   if (!Time.isValid()) {
     return true;
   }
@@ -97,7 +100,7 @@ static bool isWithinOpenHours() {
 }
 
 // Helper to compute seconds until next park opening time (local time)
-static int secondsUntilNextOpen() {
+int secondsUntilNextOpen() {
   if (!Time.isValid()) {
     // Fallback: 1 hour if time is not yet valid
     return 3600;
@@ -143,11 +146,6 @@ static int secondsUntilNextOpen() {
   }
 }
 
-// ********** Mode-Specific Handler Functions **********
-void handleCountingMode();      // Process sensor events in counting mode
-void handleOccupancyMode();     // Process sensor events in occupancy mode
-void updateOccupancyState();    // Update occupancy state based on debounce timer
-
 // Sleep configuration
 SystemSleepConfiguration config; // Sleep 2.0 configuration
 void outOfMemoryHandler(system_event_t event, int param);
@@ -158,15 +156,6 @@ AB1805 ab1805(Wire);   // AB1805 RTC / Watchdog
 int outOfMemory = -1; // Set by outOfMemoryHandler when heap is exhausted
 
 // ********** State Machine **********
-enum State {
-  INITIALIZATION_STATE,
-  ERROR_STATE,
-  IDLE_STATE,
-  SLEEPING_STATE,
-  CONNECTING_STATE,
-  REPORTING_STATE,
-  FIRMWARE_UPDATE_STATE
-};
 char stateNames[7][16] = {"Initialize", "Error",     "Idle",
                           "Sleeping",   "Connecting", "Reporting",
                           "Fw Update"};
@@ -179,12 +168,21 @@ volatile bool sensorDetect = false; // Flag for sensor interrupt
 bool dataInFlight =
     false; // Flag for whether we are waiting for a response from the webhook
 
+// Track first-connection queue behaviour for observability
+bool firstConnectionObserved = false;
+bool firstConnectionQueueDrainedLogged = false;
+
 // ********** Timing **********
 const int wakeBoundary = 1 * 3600;          // Reporting boundary (1 hour)
 const unsigned long stayAwakeLong = 90000;  // Stay awake after connect (ms)
 const unsigned long resetWait = 30000;      // Error state dwell before reset
 unsigned long stayAwakeTimeStamp = 0;       // Timestamp for stay-awake window
 unsigned long stayAwake = 0;                // How long to remain awake (ms)
+const unsigned long maxOnlineWorkMs = 5UL * 60UL * 1000UL; // Max time to stay online per low-power connection
+unsigned long onlineWorkStartMs = 0;       // When we first became cloud-connected this cycle
+bool forceSleepThisCycle = false;          // Force sleep even if publish queue is not yet empty
+bool lastLowPowerMode = false;             // Tracks previous lowPowerMode to detect transitions
+bool hibernateDisabledForSession = false; // Disable HIBERNATE after first failure
 
 void setup() {
   // Wait for serial connection for debugging (10 second timeout)
@@ -198,6 +196,15 @@ void setup() {
             outOfMemoryHandler); // Enabling an out of memory handler is a good
                                  // safety tip. If we run out of memory a
                                  // System.reset() is done.
+
+  // Subscribe to the Ubidots integration response event so we can track
+  // successful webhook deliveries and update lastHookResponse.
+  {
+    char responseTopic[125];
+    String deviceID = System.deviceID();
+    deviceID.toCharArray(responseTopic, sizeof(responseTopic));
+    Particle.subscribe(responseTopic, UbidotsHandler);
+  }
 
   // Configure network stack but keep radio OFF at startup.
   // In SEMI_AUTOMATIC mode we explicitly control when the radio is turned on
@@ -221,6 +228,19 @@ void setup() {
   sensorConfig.setup(); // Initialize the sensor configuration
   current.setup();      // Initialize the current status data
 
+  // Track how often the device has been resetting so the error supervisor
+  // can apply backoffs and avoid permanent reset loops. Only count resets
+  // that are likely to be recoverable by firmware (pin/user/watchdog).
+  switch (System.resetReason()) {
+  case RESET_REASON_PIN_RESET:
+  case RESET_REASON_USER:
+  case RESET_REASON_WATCHDOG:
+    sysStatus.set_resetCount(sysStatus.get_resetCount() + 1);
+    break;
+  default:
+    break;
+  }
+
   // Ensure sensor-board LED power default matches configured sensor type
   pinMode(ledPower, OUTPUT);
   SensorType configuredType = static_cast<SensorType>(sysStatus.get_sensorType());
@@ -238,6 +258,11 @@ void setup() {
   ab1805.setWDT(AB1805::WATCHDOG_MAX_SECONDS); // Enable watchdog
 
   Cloud::instance().setup(); // Initialize the cloud functions
+
+  // Enqueue a one-time status snapshot so the cloud can see
+  // firmware version, reset reason, and any outstanding alert
+  // soon after the first successful connection.
+  publishStartupStatus();
 
   // Check if we need to enter firmware/config update mode
   if (sysStatus.get_updatesPending()) {
@@ -286,6 +311,9 @@ void setup() {
   // ===== SENSOR ABSTRACTION LAYER =====
   // Initialize the sensor based on configuration using *local* time. This
   // runs after timezone configuration so open/close checks are correct.
+  Log.info("Initial lowPowerMode: %s",
+           sysStatus.get_lowPowerMode() ? "ON" : "OFF");
+
   if (!SensorManager::instance().isSensorReady()) {
     if (isWithinOpenHours()) {
       Log.info("Initializing sensor after timezone setup");
@@ -312,301 +340,45 @@ void setup() {
 }
 
 void loop() {
+  // Detect transitions into low-power mode so we can start a fresh online
+  // budget from the moment lowPowerMode is enabled, even if we were already
+  // connected beforehand.
+  bool currentLowPowerMode = sysStatus.get_lowPowerMode();
+  if (currentLowPowerMode && !lastLowPowerMode) {
+    if (Particle.connected()) {
+      onlineWorkStartMs = millis();
+    } else {
+      onlineWorkStartMs = 0;
+    }
+    forceSleepThisCycle = false;
+  }
+  lastLowPowerMode = currentLowPowerMode;
+
   // Main state machine driving sensing, reporting, power management
   switch (state) {
-  case IDLE_STATE: { // Awake, monitoring sensor and deciding what to do next
-    if (state != oldState)
-      publishStateTransition();
-    
-    // ********** Mode-Specific Sensor Handling **********
-    // Call the appropriate handler based on counting mode configuration
-    if (sysStatus.get_countingMode() == COUNTING) {
-      handleCountingMode();  // Count each sensor event
-    } else if (sysStatus.get_countingMode() == OCCUPANCY) {
-      handleOccupancyMode(); // Track occupied/unoccupied state
-    }
-    
-    // ********** Power Management **********
-    if (sysStatus.get_lowPowerMode() &&
-        (millis() - stayAwakeTimeStamp) > stayAwake)
-      state = SLEEPING_STATE; // When in low power mode, we can nap between taps
-    
-    // ********** Scheduled Reporting **********
-    if (Time.hour() != Time.hour(sysStatus.get_lastReport()))
-      state = REPORTING_STATE; // We want to report on the hour but not after
-                               // bedtime
-  } break;
+  case IDLE_STATE:
+    handleIdleState();
+    break;
 
-  case SLEEPING_STATE: { // Deep sleep between reporting intervals
-    bool radioOn = false; // Flag to indicate if the radio is on
-#if Wiring_WiFi
-    radioOn = WiFi.ready(); // Check if the WiFi is ready
-#elif Wiring_Cellular
-    radioOn = Cellular.ready(); // Check if the Cellular is ready
-#endif
+  case SLEEPING_STATE:
+    handleSleepingState();
+    break;
 
-    if (state != oldState)
-      publishStateTransition(); // We will apply the back-offs before sending to
-                                // ERROR state - so if we are here we will take
-                                // action
+  case REPORTING_STATE:
+    handleReportingState();
+    break;
 
-    if (Particle.connected() ||
-        radioOn) { // If we are connected to the cloud or the radio is on, we
-                   // will disconnect
-      if (!Particle_Functions::instance()
-               .disconnectFromParticle()) { // Disconnect cleanly from Particle
-                                            // and power down the modem
-        state = ERROR_STATE;
-        // current.alerts = 15;
-        break;
-      }
-    }
-    // Notify sensor layer we are entering deep sleep so sensors and
-    // indicator LEDs can be powered down.
-    SensorManager::instance().onEnterSleep();
+  case CONNECTING_STATE:
+    handleConnectingState();
+    break;
 
-    if (!isWithinOpenHours()) {
-      // ********** Night sleep (outside opening hours) **********
-      int sleepSec = secondsUntilNextOpen();
-      if (sleepSec <= 0) {
-        sleepSec = 3600; // Fallback
-      }
+  case FIRMWARE_UPDATE_STATE:
+    handleFirmwareUpdateState();
+    break;
 
-      Log.info("Outside opening hours - entering NIGHT HIBERNATE sleep for %d seconds", sleepSec);
-
-      ab1805.stopWDT();
-      config.mode(SystemSleepMode::HIBERNATE)
-            .gpio(BUTTON_PIN, CHANGE)
-            .duration((uint32_t)sleepSec * 1000UL);
-
-      // HIBERNATE resets the device on wake, so execution should not resume here
-      System.sleep(config);
-
-      // Fallback in case hibernate did not reset as expected
-      ab1805.resumeWDT();
-      Log.error("HIBERNATE sleep returned unexpectedly - forcing System.reset()");
-      System.reset();
-    }
-
-    // ********** Daytime nap sleep (within opening hours) **********
-    int wakeInSeconds =
-        constrain(wakeBoundary - Time.now() % wakeBoundary, 1, wakeBoundary) +
-        1; // Figure out how long to sleep until next reporting boundary
-
-    config.mode(SystemSleepMode::ULTRA_LOW_POWER)
-        .gpio(BUTTON_PIN, CHANGE)
-        .gpio(intPin, RISING)
-        .duration(wakeInSeconds * 1000L);
-
-    ab1805.stopWDT(); // No watchdogs interrupting our slumber
-    SystemSleepResult result =
-        System.sleep(config); // Put the device to sleep; execution resumes here
-    ab1805.resumeWDT();       // Wakey Wakey - WDT can resume
-    if (result.wakeupPin() ==
-      BUTTON_PIN) { // If the user woke the device we need to get up - device
-              // was sleeping so we need to reset opening hours
-      // User button always wakes sensor stack regardless of hours.
-      SensorManager::instance().onExitSleep();
-      Log.info("Woke with user button - Resetting hours and going to connect");
-      sysStatus.set_lowPowerMode(false);
-      sysStatus.set_operatingMode(CONNECTED); // Treat button wake as service/connected mode
-      userSwitchDetected = false;
-      stayAwake = stayAwakeLong;
-      stayAwakeTimeStamp = millis();
-      state = REPORTING_STATE;
-    } else { // In this state the device was awoken for hourly reporting
-      // Re-enable sensors only if within opening hours; otherwise they
-      // remain powered down to minimize sleep current.
-      if (isWithinOpenHours()) {
-        SensorManager::instance().onExitSleep();
-      } else {
-        Log.info("Woke outside opening hours; keeping sensors powered down");
-      }
-
-      softDelay(
-          2000); // Gives the device a couple seconds to get the battery reading
-      Log.info("Time is up at %s with %li free memory",
-               Time.format((Time.now() + wakeInSeconds), "%T").c_str(),
-               System.freeMemory());
-      state = IDLE_STATE;
-    }
-  } break;
-
-  case REPORTING_STATE: { // Build and send periodic report
-    if (state != oldState)
-      publishStateTransition();
-    time_t now = Time.now();
-    sysStatus.set_lastReport(
-      now); // We are only going to report once each hour from the IDLE
-                     // state.  We may or may not connect to Particle
-    measure.loop();  // Take measurements here for reporting
-
-    // Run daily cleanup once per calendar day at park opening hour
-    if (Time.isValid() && Time.hour() == sysStatus.get_openTime()) {
-      time_t lastCleanup = sysStatus.get_lastDailyCleanup();
-      if (lastCleanup == 0 || Time.day(now) != Time.day(lastCleanup)) {
-        Log.info("Opening hour reached and daily cleanup not run today - running now");
-        dailyCleanup();
-        sysStatus.set_lastDailyCleanup(now);
-      }
-    }
-    publishData(); // Queue hourly report; actual send depends on connectivity policy
-
-    // After each hourly report, reset the hourly counter so
-    // the next report contains only the counts for that hour.
-    if (sysStatus.get_countingMode() == COUNTING) {
-      Log.info("Resetting hourlyCount after report (was %d)", current.get_hourlyCount());
-      current.set_hourlyCount(0);
-    }
-
-    // ********** Connectivity Decision (SoC-tiered) **********
-    bool shouldConnect = true;
-
-    // Explicit disconnected mode: never auto-connect
-    if (sysStatus.get_disconnectedMode()) {
-      shouldConnect = false;
-      Log.info("Disconnected mode enabled - not connecting after report");
-    } else {
-      // Apply SoC-based tiers when in low-power mode
-      if (sysStatus.get_lowPowerMode()) {
-        int soc = current.get_stateOfCharge();
-        int hour = Time.isValid() ? Time.hour() : -1;
-
-        shouldConnect = false; // Start from conservative default
-
-        if (soc > 65) {
-          Log.info("SoC %d%% > 65 - connecting this hour", soc);
-          shouldConnect = true; // Normal behaviour: connect every hour
-        } else if (soc > 50) {
-          if (hour < 0 || (hour % 2) == 0) {
-            Log.info("SoC %d%% in 50-65%% tier - connecting on 2-hour cadence", soc);
-            shouldConnect = true;
-          } else {
-            Log.info("SoC %d%% in 50-65%% tier - skipping this hour", soc);
-          }
-        } else if (soc > 35) {
-          if (hour < 0 || (hour % 4) == 0) {
-            Log.info("SoC %d%% in 35-50%% tier - connecting on 4-hour cadence", soc);
-            shouldConnect = true;
-          } else {
-            Log.info("SoC %d%% in 35-50%% tier - skipping this hour", soc);
-          }
-        } else if (soc > 20) {
-          Log.info("SoC %d%% in 20-35%% tier - store-only, no auto-connect", soc);
-        } else {
-          Log.info("SoC %d%% <= 20%% - emergency-only, no auto-connect", soc);
-        }
-      }
-
-      // User button override (active-low): always allow service connection
-      if (!digitalRead(BUTTON_PIN)) {
-        Log.info("User button override - forcing connection");
-        shouldConnect = true;
-      }
-    }
-
-    if (shouldConnect && !Particle.connected()) {
-      Log.info("Transitioning to CONNECTING_STATE after report");
-      state = CONNECTING_STATE;
-    } else {
-      state = IDLE_STATE; // Either already connected or intentionally staying offline
-    }
-  } break;
-
-  case CONNECTING_STATE: { // Establish cloud connection, then load config
-    static unsigned long
-        connectionStartTimeStamp; // Time in Millis that helps us know how long
-                                  // it took to connect
-    char data[64];                // Holder for message strings
-
-    if (state != oldState) { // One-time actions when entering state
-        // Reset connection duration (will be updated once connected)
-        sysStatus.set_lastConnectionDuration(0);
-      publishStateTransition();
-      connectionStartTimeStamp =
-          millis(); // Have to use millis as the clock may get reset on connect
-      Particle.connect(); // Ask Device OS to connect; we'll poll status
-    }
-
-    sysStatus.set_lastConnectionDuration(
-        int((millis() - connectionStartTimeStamp) / 1000));
-
-    if (Particle.connected()) {
-      sysStatus.set_lastConnection(
-          Time.now()); // This is the last time we last connected
-        // Keep device awake for a while after connection for troubleshooting
-        stayAwake = stayAwakeLong;
-      stayAwakeTimeStamp = millis(); // Start the stay awake timer now
-      measure.getSignalStrength();   // Test signal strength while radio is on
-      snprintf(data, sizeof(data), "Connected in %i secs",
-               sysStatus.get_lastConnectionDuration()); // Make up connection
-                                                        // string and publish
-      Log.info(data);
-      if (sysStatus.get_verboseMode())
-        Particle.publish("Cellular", data, PRIVATE);
-      
-      // Load configuration from cloud ledgers after connecting
-      Cloud::instance().loadConfigurationFromCloud();
-      
-      state = IDLE_STATE; // Return to idle once connected and configured
-    } else if (sysStatus.get_lastConnectionDuration() >
-               600) {      // What happens if we do not connect
-      state = ERROR_STATE; // Note - not setting the ERROR timestamp to make
-                           // this go quickly
-    } else {
-    } // We go round the main loop again
-  } break;
-
-  case FIRMWARE_UPDATE_STATE: { // Stay connected for firmware/config updates
-    if (state != oldState) {
-      publishStateTransition();
-      Log.info("Entering FIRMWARE_UPDATE_STATE - keeping device connected for updates");
-
-      // In update mode, force connected operating mode and disable low power
-      sysStatus.set_lowPowerMode(false);
-      sysStatus.set_operatingMode(CONNECTED);
-
-      // Ensure cloud connection is requested
-      if (!Particle.connected()) {
-        Particle.connect();
-      }
-    }
-
-    // Once connected, ensure configuration is loaded at least once
-    if (Particle.connected()) {
-      static bool configLoadedInUpdateMode = false;
-      if (!configLoadedInUpdateMode) {
-        Log.info("Connected in FIRMWARE_UPDATE_STATE - loading configuration from cloud");
-        Cloud::instance().loadConfigurationFromCloud();
-        configLoadedInUpdateMode = true;
-      }
-
-      // If no updates are pending anymore and no OTA in progress, exit update mode
-      if (!sysStatus.get_updatesPending() && !System.updatesPending()) {
-        Log.info("No updates pending - leaving FIRMWARE_UPDATE_STATE to IDLE_STATE");
-        configLoadedInUpdateMode = false;
-        state = IDLE_STATE;
-      }
-    }
-
-    // Optional escape hatch: user button can also exit update mode
-    if (!digitalRead(BUTTON_PIN)) { // Active-low user button
-      Log.info("User button pressed - exiting FIRMWARE_UPDATE_STATE to IDLE_STATE");
-      state = IDLE_STATE;
-    }
-  } break;
-
-    case ERROR_STATE: { // Simple error-handling: log and reset after timeout
-      static unsigned long resetTimer = 0;
-      if (state != oldState) {
-        publishStateTransition();
-        Log.info("Error state - resetting");
-        resetTimer = millis();
-      }
-      if (millis() - resetTimer > resetWait) {
-        System.reset();
-      }
-    } break;
+  case ERROR_STATE:
+    handleErrorState();
+    break;
   }
 
   ab1805.loop(); // Keeps the RTC synchronized with the device clock
@@ -621,6 +393,9 @@ void loop() {
   // If an out-of-memory event occurred, go to error state
   if (outOfMemory >= 0) {
     Log.info("Resetting due to low memory");
+    // Out-of-memory is treated as a critical alert; only overwrite any
+    // existing alert if this is more severe.
+    current.raiseAlert(14);
     state = ERROR_STATE;
   }
 
@@ -655,32 +430,66 @@ void publishData() {
 
   char data[256];
 
-  // Map fields from current/sysStatus into legacy payload shape
-  uint16_t daily      = current.get_dailyCount();
-  uint16_t countingIn = current.get_hourlyCount();   // Count during this reporting interval
-  int      battery    = (int) current.get_stateOfCharge();
-  uint8_t  battState  = current.get_batteryState();
+  // Compute the timestamp as the last second of the previous hour so the
+  // webhook data aggregates correctly into hourly buckets in Ubidots.
+  unsigned long timeStampValue = Time.now() - (Time.minute() * 60L + Time.second() + 1L);
+
+  // Bounds check battery state index for safety
+  uint8_t battState = current.get_batteryState();
   if (battState > 6) {
-    battState = 0; // Bounds check for safety
+    battState = 0;
   }
-  const char *key1    = batteryContext[battState];
 
-  int tempC           = (int) current.get_internalTempC();
-  uint8_t resets      = sysStatus.get_resetCount();
-  int alerts          = current.get_alertCode();
-  uint16_t connTime   = sysStatus.get_lastConnectionDuration();
-  unsigned long ts    = Time.now();
-
-  // Note: "maxmin" field ignored per current requirements; set to 0 if needed later.
+  // Correct Ubidots webhook JSON structure
   snprintf(data, sizeof(data),
-       "{\"daily\":%u, \"countingin\":%u,\"battery\":%d,\"key1\":\"%s\",\"temp\":%d, \"resets\":%u, \"alerts\":%d,\"connecttime\":%u,\"timestamp\":%lu000}",
-       daily, countingIn, battery, key1, tempC, resets, alerts, connTime, ts);
+           "{\"hourly\":%i, \"daily\":%i, \"battery\":%4.2f,\"key1\":\"%s\", \"temp\":%4.2f, \"resets\":%i, \"alerts\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
+           current.get_hourlyCount(),
+           current.get_dailyCount(),
+           current.get_stateOfCharge(),
+           batteryContext[battState],
+           current.get_internalTempC(),
+           sysStatus.get_resetCount(),
+           current.get_alertCode(),
+           sysStatus.get_lastConnectionDuration(),
+           timeStampValue);
 
   PublishQueuePosix::instance().publish("Ubidots-Counter-Hook-v1", data, PRIVATE | WITH_ACK);
   Log.info("Parking Lot Webhook: %s", data);
 
   // Also update device-data ledger with structured JSON snapshot
-  Cloud::instance().publishDataToLedger();
+  if (!Cloud::instance().publishDataToLedger()) {
+    // Data ledger publish failure; escalate via alert so the error
+    // supervisor can decide on corrective action.
+    current.raiseAlert(42);
+  }
+}
+
+/**
+ * @brief Enqueue a one-time startup status event summarizing
+ *        firmware version, reset reason, and any active alert.
+ *
+ * This uses PublishQueuePosix so the event will be delivered
+ * after the next successful cloud connection, even if called
+ * before the radio is brought up.
+ */
+void publishStartupStatus() {
+  char status[192];
+
+  int resetReason = System.resetReason();
+  uint32_t resetReasonData = System.resetReasonData();
+  int8_t alertCode = current.get_alertCode();
+  time_t lastAlert = current.get_lastAlertTime();
+
+  snprintf(status, sizeof(status),
+           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld}",
+           FIRMWARE_VERSION,
+           resetReason,
+           (unsigned long)resetReasonData,
+           (int)alertCode,
+           (long)lastAlert);
+
+  PublishQueuePosix::instance().publish("status", status, PRIVATE | WITH_ACK);
+  Log.info("Startup status: %s", status);
 }
 
 void UbidotsHandler(const char *event, const char *data) {
@@ -695,6 +504,14 @@ void UbidotsHandler(const char *event, const char *data) {
         false; // We have received a response - so we can send another
     sysStatus.set_lastHookResponse(
         Time.now()); // Record the last successful Webhook Response
+
+    // If a webhook supervision alert (40) was active, clear it now that
+    // we have a confirmed successful response, so future reports reflect
+    // the healthy state.
+    if (current.get_alertCode() == 40) {
+      current.set_alertCode(0);
+      current.set_lastAlertTime(0);
+    }
   } else {
     snprintf(responseString, sizeof(responseString),
              "Unknown response recevied %i", atoi(data));
@@ -749,107 +566,6 @@ bool isParkOpen() {
            Time.hour() > sysStatus.get_closeTime());
 }
 
-// *************** Mode-Specific Handler Functions ***************
-
-/**
- * @brief Handle sensor events in COUNTING mode
- * 
- * @details In counting mode, each sensor detection increments counters.
- *          Counts are tracked hourly and daily.
- *          Used for: traffic counting, people counting, event tracking
- */
-void handleCountingMode() {
-  // Check if sensor has new data
-  if (SensorManager::instance().loop()) {
-    // Increment counters
-    current.set_hourlyCount(current.get_hourlyCount() + 1);
-    current.set_dailyCount(current.get_dailyCount() + 1);
-    current.set_lastCountTime(Time.now());
-
-    // Log the new count once per event
-    Log.info("Count detected - Hourly: %d, Daily: %d",
-             current.get_hourlyCount(), current.get_dailyCount());
-    
-    // Briefly flash the on-module BLUE LED as a visual count indicator.
-    digitalWrite(BLUE_LED, HIGH);
-    delay(200);
-    digitalWrite(BLUE_LED, LOW);
-
-    // Stay in IDLE_STATE; hourly reporting will publish aggregated counts.
-  }
-}
-
-/**
- * @brief Handle sensor events in OCCUPANCY mode
- * 
- * @details In occupancy mode, first detection marks space as "occupied".
- *          Space remains occupied until debounce timeout expires without new detections.
- *          Tracks total occupied time for reporting.
- *          Used for: room occupancy, parking space detection, resource availability
- */
-void handleOccupancyMode() {
-    // Check if sensor has new data
-    if (SensorManager::instance().loop()) {
-        // Sensor detected presence
-        if (!current.get_occupied()) {
-            // Transition from unoccupied to occupied
-            current.set_occupied(true);
-            current.set_occupancyStartTime(Time.now());
-            
-            Log.info("Space now OCCUPIED at %s", Time.timeStr().c_str());
-            digitalWrite(BLUE_LED, HIGH); // Visual indicator
-        }
-        
-        // Update last event time (resets debounce timer)
-        current.set_lastOccupancyEvent(millis());
-        
-        if (sysStatus.get_verboseMode()) {
-            uint32_t occupiedDuration = Time.now() - current.get_occupancyStartTime();
-            Log.info("Occupancy event - Duration: %lu seconds", occupiedDuration);
-        }
-    }
-    
-    // Check if we need to update occupancy state (timeout check)
-    updateOccupancyState();
-}
-
-/**
- * @brief Update occupancy state based on debounce timeout
- * 
- * @details If space is occupied and debounce timeout has expired without
- *          new sensor events, mark space as unoccupied.
- *          Accumulates total occupied time for daily reporting.
- */
-void updateOccupancyState() {
-    if (!current.get_occupied()) {
-        return; // Nothing to do if not occupied
-    }
-    
-    uint32_t debounceMs = sysStatus.get_occupancyDebounceMs();
-    uint32_t timeSinceLastEvent = millis() - current.get_lastOccupancyEvent();
-    
-    // Check if debounce timeout has expired
-    if (timeSinceLastEvent > debounceMs) {
-        // Calculate this occupancy session duration
-        uint32_t sessionDuration = Time.now() - current.get_occupancyStartTime();
-        
-        // Add to total occupied seconds for the day
-        uint32_t totalOccupied = current.get_totalOccupiedSeconds() + sessionDuration;
-        current.set_totalOccupiedSeconds(totalOccupied);
-        
-        // Mark as unoccupied
-        current.set_occupied(false);
-        current.set_occupancyStartTime(0);
-        
-        Log.info("Space now UNOCCUPIED - Session duration: %lu seconds, Total today: %lu seconds",
-                 sessionDuration, totalOccupied);
-        
-        digitalWrite(BLUE_LED, LOW); // Turn off visual indicator
-    }
-}
-
-// *************** End of Mode-Specific Functions ***************
-
 /**
  * @brief Cleanup function that is run at the beginning of the day.
  *
@@ -879,7 +595,7 @@ void dailyCleanup() {
  * @details takes a single unsigned long input in millis
  *
  */
-inline void softDelay(uint32_t t) {
+void softDelay(uint32_t t) {
   // Non-blocking delay that still services Particle cloud background tasks
   for (uint32_t ms = millis(); millis() - ms < t; Particle.process()) {
   }

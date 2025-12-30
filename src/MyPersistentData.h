@@ -46,35 +46,33 @@
 /**
  * @brief Counting mode defines how the device processes sensor events
  * 
- * COUNTING: Each sensor event increments a counter. Reports hourly/daily totals.
- * OCCUPANCY: First event marks space as "occupied" until timeout or new session.
+ * COUNTING:   Interrupt-driven event counting.
+ * OCCUPANCY:  Interrupt-driven occupied/unoccupied tracking.
+ * SCHEDULED:  Non-interrupt, time-based sampling.
  */
 enum CountingMode {
-    COUNTING = 0,    // Count each detection event
-    OCCUPANCY = 1    // Track occupied/unoccupied state with debounce
+	COUNTING   = 0,  // Count each detection event (interrupt-driven)
+	OCCUPANCY = 1,  // Track occupied/unoccupied state with debounce (interrupt-driven)
+	SCHEDULED = 2   // Time-based polling (non-interrupt)
 };
 
 /**
  * @brief Operating mode defines power and connectivity behavior
  * 
- * CONNECTED: Device stays connected to cloud, reports frequently
- * LOW_POWER: Device disconnects between reports to save battery
+ * CONNECTED:     Device stays connected to cloud, reports frequently.
+ * LOW_POWER:     Device disconnects between reports to save battery.
+ * DISCONNECTED:  Device never auto-connects (test / bench mode).
  */
 enum OperatingMode {
-    CONNECTED = 0,   // Always connected, frequent reporting
-    LOW_POWER = 1    // Disconnect and sleep between reports
+	CONNECTED    = 0,  // Always connected, frequent reporting
+	LOW_POWER    = 1,  // Disconnect and sleep between reports
+	DISCONNECTED = 2   // Stay offline unless manually overridden
 };
 
-/**
- * @brief Trigger mode defines how the sensor wakes/operates
- * 
- * INTERRUPT: Sensor wakes device via hardware interrupt (event-driven)
- * SCHEDULED: Device wakes on schedule to poll sensor (time-driven)
- */
-enum TriggerMode {
-    INTERRUPT = 0,   // Hardware interrupt driven
-    SCHEDULED = 1    // Time-based polling
-};
+// NOTE: TriggerMode has been deprecated in favor of using
+// CountingMode (COUNTING/OCCUPANCY/SCHEDULED) as the single
+// source of truth for behavioral mode. The legacy TriggerMode
+// enum and associated storage have been removed.
 
 /**
  * This class is a singleton; you do not create one as a global, on the stack, or with new.
@@ -168,9 +166,8 @@ public:
 		time_t lastDailyCleanup;                           // Last time dailyCleanup() successfully ran
 		
 		// ********** Operating Mode Configuration **********
-		uint8_t countingMode;                             // 0=COUNTING (count events), 1=OCCUPANCY (track occupied state)
-		uint8_t operatingMode;                            // 0=CONNECTED (always on), 1=LOW_POWER (sleep between reports) - NOTE: duplicates lowPowerMode for clarity
-		uint8_t triggerMode;                              // 0=INTERRUPT (hardware interrupt), 1=SCHEDULED (time-based polling)
+		uint8_t countingMode;                             // 0=COUNTING, 1=OCCUPANCY, 2=SCHEDULED (time-based)
+		uint8_t operatingMode;                            // 0=CONNECTED, 1=LOW_POWER, 2=DISCONNECTED
 		uint32_t occupancyDebounceMs;                     // Milliseconds to wait before marking space as unoccupied (occupancy mode only)
 		uint16_t connectedReportingIntervalSec;           // Reporting interval in seconds when in CONNECTED mode
 		uint16_t lowPowerReportingIntervalSec;            // Reporting interval in seconds when in LOW_POWER mode
@@ -274,9 +271,6 @@ public:
 	uint8_t get_operatingMode() const;
 	void set_operatingMode(uint8_t value);
 
-	uint8_t get_triggerMode() const;
-	void set_triggerMode(uint8_t value);
-
 	uint32_t get_occupancyDebounceMs() const;
 	void set_occupancyDebounceMs(uint32_t value);
 
@@ -320,7 +314,7 @@ protected:
 
     //Since these variables are only used internally - They can be private. 
 	static const uint32_t SYS_DATA_MAGIC = 0x20a15e75;
-	static const uint16_t SYS_DATA_VERSION = 2;
+	static const uint16_t SYS_DATA_VERSION = 3;
 
 };  // End of sysStatusData class
 
@@ -593,6 +587,16 @@ public:
 
 	int8_t get_alertCode() const;
 	void set_alertCode(int8_t value);
+
+	/**
+	 * @brief Raise an alert, keeping the highest severity code when multiple occur.
+	 *
+	 * If an alert is already set, this helper compares the severity of the
+	 * existing code to the new one and only overwrites when the new alert is
+	 * more severe. This prevents a later, less serious warning from masking a
+	 * prior critical condition.
+	 */
+	void raiseAlert(int8_t value);
 
 	time_t get_lastAlertTime() const;
 	void set_lastAlertTime(time_t value);

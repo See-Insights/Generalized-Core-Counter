@@ -110,10 +110,9 @@ void sysStatusData::initialize() {
     // ********** Operating Mode Defaults **********
     sysStatus.set_countingMode(COUNTING);                                  // Default to counting mode
     sysStatus.set_operatingMode(CONNECTED);                                // Default to connected mode
-    sysStatus.set_triggerMode(INTERRUPT);                                  // Default to interrupt-driven
-    sysStatus.set_occupancyDebounceMs(300000);                            // Default 5 minutes (300,000 ms)
-    sysStatus.set_connectedReportingIntervalSec(300);                     // Default 5 minutes when connected
-    sysStatus.set_lowPowerReportingIntervalSec(3600);                     // Default 1 hour when in low power
+    sysStatus.set_occupancyDebounceMs(300000);                             // Default 5 minutes (300,000 ms)
+    sysStatus.set_connectedReportingIntervalSec(300);                      // Default 5 minutes when connected
+    sysStatus.set_lowPowerReportingIntervalSec(3600);                      // Default 1 hour when in low power
 }
 
 uint8_t sysStatusData::get_structuresVersion() const {
@@ -268,13 +267,6 @@ uint8_t sysStatusData::get_operatingMode() const {
 }
 void sysStatusData::set_operatingMode(uint8_t value) {
     setValue<uint8_t>(offsetof(SysData,operatingMode), value);
-}
-
-uint8_t sysStatusData::get_triggerMode() const {
-    return getValue<uint8_t>(offsetof(SysData,triggerMode));
-}
-void sysStatusData::set_triggerMode(uint8_t value) {
-    setValue<uint8_t>(offsetof(SysData,triggerMode), value);
 }
 
 uint32_t sysStatusData::get_occupancyDebounceMs() const {
@@ -519,11 +511,52 @@ void currentStatusData::set_alertCode(int8_t value) {
 }
 
 time_t currentStatusData::get_lastAlertTime() const {
-    return getValue<int8_t>(offsetof(CurrentData,lastAlertTime));
+    // lastAlertTime is stored as time_t in CurrentData; retrieve with correct type
+    return getValue<time_t>(offsetof(CurrentData,lastAlertTime));
 }
 
 void currentStatusData::set_lastAlertTime(time_t value) {
     setValue<time_t>(offsetof(CurrentData,lastAlertTime),value);
+}
+
+// Local helper to convert an alert code into a coarse severity bucket.
+// Higher numbers indicate more severe conditions.
+static int getAlertSeverity(int8_t code) {
+    if (code <= 0) {
+        return 0; // no alert
+    }
+
+    // Map known codes into tiers. This is intentionally simple and can be
+    // extended as new alert codes are added over time.
+    switch (code) {
+        case 14: // out-of-memory
+        case 15: // modem / disconnect failure
+        case 16: // repeated sleep failures (HIBERNATE / ULP)
+            return 3; // critical
+
+        case 30: // connectivity timeout with radio up
+        case 31: // failed to connect to cloud
+        case 32: // connect taking too long
+        case 40: // repeated webhook failures
+        case 41: // configuration/ledger apply failure
+        case 42: // data ledger publish failure
+        case 43: // publish queue not drained before forced sleep
+            return 2; // major
+        default:
+            return 1; // minor / warning
+    }
+}
+
+void currentStatusData::raiseAlert(int8_t value) {
+    if (value <= 0) {
+        return; // ignore attempts to "raise" a non-alert here
+    }
+
+    int8_t existing = get_alertCode();
+    if (getAlertSeverity(value) > getAlertSeverity(existing)) {
+        set_alertCode(value);
+        set_lastAlertTime(Time.now());
+    }
 }
 
 float currentStatusData::get_stateOfCharge() const  {

@@ -61,6 +61,22 @@ New sensors are added via `SensorFactory.h` without modifying core code.
 - INITIALIZATION → IDLE → SLEEPING → IDLE (low-power mode)
 - ERROR handling with cloud reporting (no reset loops)
 
+### Application State Machine & Handlers
+
+The main application logic is implemented as a small, explicit state machine:
+
+- **Core states** (see src/StateMachine.h): INITIALIZATION, IDLE, CONNECTING,
+  REPORTING, SLEEPING, FIRMWARE_UPDATE, ERROR.
+- **State handlers** (see src/StateHandlers.cpp) encapsulate behaviour for each
+  state (e.g. connection policy, publish cadence, sleep scheduling, and
+  firmware/config update flows).
+- **State driver** (see src/Generalized-Core-Counter.cpp) selects the current
+  state in `loop()` and logs transitions via `publishStateTransition()`.
+
+This split keeps the outer `setup()/loop()` structure simple while allowing the
+per-state behaviour to evolve independently as new modes or error conditions
+are added.
+
 ### Persistent Storage
 Three storage structures:
 - `sysStatus`: System configuration and state

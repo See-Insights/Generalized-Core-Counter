@@ -8,6 +8,7 @@ const char *batteryContext[7] = {"Unknown",    "Not Charging", "Charging",
 #include "SensorManager.h"
 #include "MyPersistentData.h"  // Access sysStatus/sensorConfig
 #include "SensorFactory.h"
+#include "device_pinout.h"     // TMP36_SENSE_PIN for enclosure temperature
 
 // Device-specific includes and definitions
 // Use Particle feature detection for automatic platform identification
@@ -151,44 +152,167 @@ float SensorManager::tmp36TemperatureC(int adcValue) {
 
 bool SensorManager::batteryState() {
 
-  // fuelGauge.quickStart();                                               //
-  // May help us re-establish a baseline for SoC softDelay(1000);
+#if HAL_PLATFORM_CELLULAR || PLATFORM_ID == PLATFORM_ARGON
+  // Boron (cellular) and Argon (Wi-Fi) Gen 3 devices:
+  // Use built-in System battery APIs backed by the fuel gauge
+  // (and a BQ24195 PMIC on Boron only).
+  current.set_batteryState(System.batteryState());
+  current.set_stateOfCharge(System.batteryCharge());
 
-  /*
-  current.set_batteryState(System.batteryState());                      // Call
-  before isItSafeToCharge() as it may overwrite the context
-  current.set_stateOfCharge(System.batteryCharge());                   // Assign
-  to system value
-  */
+#elif PLATFORM_ID == 32 || PLATFORM_ID == 34
+  // Photon 2 and P2:
+  // Measure battery voltage (VBAT_MEAS on Photon 2, or same pin on P2
+  // carrier) using A6 as described in the Photon 2 battery voltage docs.
 
-  // if (current.get_stateOfCharge() > 60) return true;
-  // else return false;
+  int raw = analogRead(A6);
+  float voltage = raw / 819.2f; // Map ADC count (0-4095) to 0-5V
 
-  return true;
+  // Approximate state-of-charge from voltage for a LiPo battery.
+  // Treat 3.0V as 0% and 4.2V as 100%.
+  float soc = (voltage - 3.0f) * (100.0f / (4.2f - 3.0f));
+  if (soc < 0.0f) {
+    soc = 0.0f;
+  } else if (soc > 100.0f) {
+    soc = 100.0f;
+  }
+  current.set_stateOfCharge(soc);
+
+  // Coarse battery state: we don't have a reliable CHG pin on Photon 2/P2
+  // (per docs), so infer from voltage only.
+  uint8_t battState = 0; // Unknown
+  if (voltage >= 4.1f) {
+    battState = 3; // "Charged"
+  } else if (voltage >= 3.6f) {
+    battState = 2; // "Charging/Normal"
+  } else if (voltage > 0.1f) {
+    battState = 4; // "Discharging / Low"
+  }
+  current.set_batteryState(battState);
+
+#else
+  // Other Wi-Fi / SoM platforms: leave battery fields unchanged for now.
+#endif
+
+#if PLATFORM_ID == 32 || PLATFORM_ID == 34
+  // Photon 2 and P2 development platforms:
+  // There is no TMP36 wired to an ADC-capable pin on the Photon 2 dev
+  // carrier, so we cannot take a real analog temperature reading here.
+  // Instead, use whatever value has been stored in internalTempC (for
+  // example, set manually for testing), falling back to 25C if unset.
+
+  float tempC = current.get_internalTempC();
+  if (!(tempC > -50.0f && tempC < 120.0f)) {
+    tempC = 25.0f;
+  }
+
+  if (sysStatus.get_verboseMode()) {
+    Log.info("P2/Photon2 stub: using internalTempC=%4.2f C (no TMP36 ADC)", (double)tempC);
+  }
+
+  current.set_internalTempC(tempC);
+
+#else
+  // Measure enclosure temperature using the TMP36 on the carrier board
+  // (connected to TMP36_SENSE_PIN, typically A4).
+  // Take multiple samples and average to reduce noise, and explicitly
+  // detect the "sensor missing / grounded" case (very low ADC reading).
+  pinMode(TMP36_SENSE_PIN, INPUT);
+
+  const int TMP36_SAMPLES = 8;
+  int tmpRawSum = 0;
+  int tmpRaw = 0;
+  for (int i = 0; i < TMP36_SAMPLES; i++) {
+    int v = analogRead(TMP36_SENSE_PIN);
+    tmpRawSum += v;
+    // Short settle delay between samples; keeps cloud serviced via
+    // background System threads so we can use delay() safely here.
+    delay(5);
+  }
+  tmpRaw = tmpRawSum / TMP36_SAMPLES;
+
+  // Consider extremely low readings as "sensor not present". With a TMP36,
+  // even very cold temperatures should still be around 100mV (roughly 120
+  // ADC counts on a 3.3V/12-bit ADC), so an average below ~50 counts is
+  // effectively 0V at the pin.
+  bool sensorOk = (tmpRaw > 50 && tmpRaw < 4000);
+  float tempC = tmp36TemperatureC(tmpRaw);
+
+  // If the TMP36 reading is clearly out of a plausible enclosure range
+  // (for example, -50C from a raw 0 reading), or the sensor appears to be
+  // disconnected, fall back to a prior stored value or a conservative
+  // default so that charging guard rails and telemetry still operate with
+  // a realistic value.
+  if (!sensorOk || tempC < -20.0f || tempC > 80.0f) {
+    float prev = current.get_internalTempC();
+    float fallback = 25.0f; // conservative room-temperature default
+
+    if (prev > -20.0f && prev < 80.0f) {
+      fallback = prev;
+    }
+
+    Log.warn("TMP36 reading invalid or out of range (tmp36=%4.2f C, raw=%d, sensorOk=%s) - falling back to %4.2f C",
+             (double)tempC, tmpRaw, sensorOk ? "true" : "false", (double)fallback);
+    tempC = fallback;
+  }
+
+  current.set_internalTempC(tempC);
+
+  // Optional debug: log enclosure temperature when verbose logging is enabled
+  if (sysStatus.get_verboseMode()) {
+    Log.info("Enclosure temperature (effective): %4.2f C (raw=%d)", (double)tempC, tmpRaw);
+  }
+
+#endif // PLATFORM_ID == 32 || PLATFORM_ID == 34
+
+  // Apply temperature-based charging guard rails (see reference implementation).
+  // On cellular platforms this will enable/disable PMIC charging based on
+  // current.get_internalTempC(); on others it is a no-op.
+  isItSafeToCharge();
+
+  // Convenience: indicate whether battery is in a healthy range.
+  return current.get_stateOfCharge() > 20.0f;
 }
 
 bool SensorManager::isItSafeToCharge() // Returns a true or false if the battery
-                                       // is in a safe charging range - only
-                                       // works for Boron
+                                       // is in a safe charging range based on
+                                       // enclosure temperature
 {
+  float temp = current.get_internalTempC();
+
+  // Reference range based on typical LiPo specs (0C to 45C). Below 0C,
+  // most manufacturers recommend no charging at all.
+  bool safe = !(temp < 0.0f || temp > 45.0f);
+
 #if HAL_PLATFORM_CELLULAR
+  // On Boron (cellular Gen 3), a BQ24195 PMIC is available so we
+  // actually enable/disable charging based on the enclosure
+  // temperature.
   PMIC pmic(true);
-  if (current.get_internalTempC() < 0 ||
-      current.get_internalTempC() >
-          37) {             // Reference: (32 to 113 but with safety)
-    pmic.disableCharging(); // It is too cold or too hot to safely charge the
-                            // battery
-    current.set_batteryState(1); // Overwrites the values from the batteryState
-                                 // API to reflect that we are "Not Charging"
-    return false;
+
+  if (!safe) {
+    pmic.disableCharging();
+    current.set_batteryState(1); // Reflect that we are "Not Charging"
+
+    Log.warn("Charging disabled due to enclosure temperature: %4.2f C", (double)temp);
   } else {
-    pmic.enableCharging(); // It is safe to charge the battery
-    return true;
+    pmic.enableCharging();
+
+    if (sysStatus.get_verboseMode()) {
+      Log.info("Charging enabled; enclosure temperature: %4.2f C", (double)temp);
+    }
   }
 #else
-  return true; // If we are not using the cellular radio, then we charge
-               // regardless of temperature
+  // On platforms without a PMIC API (such as Argon, Photon 2 / P2), we
+  // do not control charging, but we still evaluate and log whether it
+  // would be considered safe based on the same temperature range.
+  if (!safe) {
+    Log.warn("Charging would be disabled due to enclosure temperature: %4.2f C (no PMIC on this platform)", (double)temp);
+  } else if (sysStatus.get_verboseMode()) {
+    Log.info("Charging would be enabled; enclosure temperature: %4.2f C (no PMIC on this platform)", (double)temp);
+  }
 #endif
+
+  return safe;
 }
 
 void SensorManager::getSignalStrength() {

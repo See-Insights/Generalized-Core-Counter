@@ -63,12 +63,6 @@ extern const pin_t TMP36_SENSE_PIN;   // Carrier board temperature sensor (A4)
 extern const pin_t BLUE_LED;          // On-module blue status LED (D7)
 extern const pin_t WAKEUP_PIN;        // Wake pin connected to watchdog timer
 
-// Convenience aliases for carrier functions
-extern const pin_t tmp36Pin;          // Alias for TMP36_SENSE_PIN
-extern const pin_t wakeUpPin;         // Alias for WAKEUP_PIN
-extern const pin_t blueLED;           // Alias for BLUE_LED
-extern const pin_t userSwitch;        // Alias for BUTTON_PIN
-
 // ---------------------------------------------------------------------------
 // Sensor-specific logical pins (PIR-on-carrier configuration)
 // ---------------------------------------------------------------------------

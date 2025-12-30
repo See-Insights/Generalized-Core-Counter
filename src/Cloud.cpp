@@ -27,7 +27,7 @@ Cloud &Cloud::instance() {
     return *_instance;
 }
 
-Cloud::Cloud() : ledgersSynced(false) {
+Cloud::Cloud() : ledgersSynced(false), lastApplySuccess(true) {
     lastPublishedStatus = "";
 }
 
@@ -82,10 +82,13 @@ void Cloud::mergeConfiguration() {
     // Start with defaults as base
     mergedConfig = defaults;
     
-    // Manually merge sensor thresholds, but only the keys we care about
-    // (threshold1 and threshold2). This avoids pulling in unexpected stale keys
-    // like facethr/gesturethr from older schemas, and also supports simple
-    // top-level override keys for robustness.
+    // Manually merge sensor thresholds using a simple, consistent schema.
+    //
+    // Supported keys:
+    //   defaults.sensor.threshold1 / threshold2
+    //   defaults.sensorThreshold   (applies to both thresholds)
+    //   device.sensor.threshold1 / threshold2
+    //   device.sensorThreshold     (applies to both thresholds)
     {
         // Start from sensible defaults; these will be overridden by
         // ledger values from defaults and then device.
@@ -104,24 +107,12 @@ void Cloud::mergeConfiguration() {
             }
         }
 
-        // Allow defaults to also specify simple top-level keys
-        if (defaults.has("sensorThreshold1")) {
-            int base1 = defaults.get("sensorThreshold1").toInt();
-            threshold1 = base1;
-        }
-        if (defaults.has("sensorThreshold2")) {
-            int base2 = defaults.get("sensorThreshold2").toInt();
-            threshold2 = base2;
-        }
-
-        // Also accept really simple top-level default keys "threshold1/2"
-        if (defaults.has("threshold1")) {
-            int base1 = defaults.get("threshold1").toInt();
-            threshold1 = base1;
-        }
-        if (defaults.has("threshold2")) {
-            int base2 = defaults.get("threshold2").toInt();
-            threshold2 = base2;
+        // Allow a single generic default threshold that applies
+        // to both channels when more specific keys are not used.
+        if (defaults.has("sensorThreshold")) {
+            int base = defaults.get("sensorThreshold").toInt();
+            threshold1 = base;
+            threshold2 = base;
         }
 
         if (haveDeviceSensor) {
@@ -135,27 +126,10 @@ void Cloud::mergeConfiguration() {
                 threshold2 = override2;
             }
         }
-
-        // Also allow simple top-level override keys in device-settings
-        // so we don't depend on the nested sensor map ever being updated.
-        if (device.has("sensorThreshold1")) {
-            int override1 = device.get("sensorThreshold1").toInt();
-            threshold1 = override1;
-        }
-        if (device.has("sensorThreshold2")) {
-            int override2 = device.get("sensorThreshold2").toInt();
-            threshold2 = override2;
-        }
-
-        // And finally accept really simple top-level override keys
-        // "threshold1/2" on the device-settings ledger.
-        if (device.has("threshold1")) {
-            int override1 = device.get("threshold1").toInt();
-            threshold1 = override1;
-        }
-        if (device.has("threshold2")) {
-            int override2 = device.get("threshold2").toInt();
-            threshold2 = override2;
+        if (device.has("sensorThreshold")) {
+            int override = device.get("sensorThreshold").toInt();
+            threshold1 = override;
+            threshold2 = override;
         }
 
         // Build a minimal merged sensor object with only the supported keys
@@ -175,15 +149,16 @@ void Cloud::mergeConfiguration() {
     
     Log.info("Merged config: %s", mergedConfig.toJSON().c_str());
     Log.info("Configuration merged - applying to device");
-    applyConfigurationFromLedger();
+    lastApplySuccess = applyConfigurationFromLedger();
 }
 
 bool Cloud::loadConfigurationFromCloud() {
     Log.info("Loading configuration from cloud ledgers");
     
-    // Trigger merge - onSync callbacks will update when cloud pushes new data
+    // Trigger merge and apply configuration. mergeConfiguration() will update
+    // lastApplySuccess based on the result of applyConfigurationFromLedger().
     mergeConfiguration();
-    return true;
+    return lastApplySuccess;
 }
 
 bool Cloud::applyConfigurationFromLedger() {
@@ -236,12 +211,6 @@ bool Cloud::applyMessagingConfig() {
         bool verboseMode = messaging.get("verboseMode").toBool();
         sysStatus.set_verboseMode(verboseMode);
         Log.info("Verbose: %s", verboseMode ? "ON" : "OFF");
-    }
-
-    if (messaging.has("disconnectedMode")) {
-        bool disconnectedMode = messaging.get("disconnectedMode").toBool();
-        sysStatus.set_disconnectedMode(disconnectedMode);
-        Log.info("Disconnected mode: %s", disconnectedMode ? "ON" : "OFF");
     }
 
     return success;
@@ -327,12 +296,6 @@ bool Cloud::applyPowerConfig() {
 
     bool success = true;
 
-    if (power.has("lowPowerMode")) {
-        bool lowPowerMode = power.get("lowPowerMode").toBool();
-        sysStatus.set_lowPowerMode(lowPowerMode);
-        Log.info("Low power mode: %s", lowPowerMode ? "ON" : "OFF");
-    }
-
     if (power.has("solarPowerMode")) {
         bool solarPowerMode = power.get("solarPowerMode").toBool();
         sysStatus.set_solarPowerMode(solarPowerMode);
@@ -407,37 +370,59 @@ bool Cloud::applyModesConfig() {
     
     bool success = true;
 
-    // Counting mode: 0=COUNTING (count events), 1=OCCUPANCY (track occupied time)
+    // Counting mode: 0=COUNTING, 1=OCCUPANCY, 2=SCHEDULED (time-based)
     if (modes.has("countingMode")) {
         int countingMode = modes.get("countingMode").asInt();
-        if (validateRange(countingMode, 0, 1, "countingMode")) {
+        if (validateRange(countingMode, 0, 2, "countingMode")) {
             sysStatus.set_countingMode(static_cast<CountingMode>(countingMode));
-            Log.info("Counting mode set to: %d (%s)", countingMode, 
-                     countingMode == 0 ? "COUNTING" : "OCCUPANCY");
+
+            const char *modeStr = "UNKNOWN";
+            switch (countingMode) {
+            case COUNTING:
+                modeStr = "COUNTING";
+                break;
+            case OCCUPANCY:
+                modeStr = "OCCUPANCY";
+                break;
+            case SCHEDULED:
+                modeStr = "SCHEDULED";
+                break;
+            }
+
+            Log.info("Counting mode set to: %d (%s)", countingMode, modeStr);
         } else {
             success = false;
         }
     }
 
-    // Operating mode: 0=CONNECTED (stay connected), 1=LOW_POWER (sleep between reports)
+    // Operating mode: 0=CONNECTED, 1=LOW_POWER, 2=DISCONNECTED
     if (modes.has("operatingMode")) {
         int operatingMode = modes.get("operatingMode").asInt();
-        if (validateRange(operatingMode, 0, 1, "operatingMode")) {
+        if (validateRange(operatingMode, 0, 2, "operatingMode")) {
             sysStatus.set_operatingMode(static_cast<OperatingMode>(operatingMode));
-            Log.info("Operating mode set to: %d (%s)", operatingMode,
-                     operatingMode == 0 ? "CONNECTED" : "LOW_POWER");
-        } else {
-            success = false;
-        }
-    }
 
-    // Trigger mode: 0=INTERRUPT (event-driven), 1=SCHEDULED (periodic polling)
-    if (modes.has("triggerMode")) {
-        int triggerMode = modes.get("triggerMode").asInt();
-        if (validateRange(triggerMode, 0, 1, "triggerMode")) {
-            sysStatus.set_triggerMode(static_cast<TriggerMode>(triggerMode));
-            Log.info("Trigger mode set to: %d (%s)", triggerMode,
-                     triggerMode == 0 ? "INTERRUPT" : "SCHEDULED");
+            // Keep legacy booleans in sync so the rest of the
+            // firmware can continue to use lowPowerMode and
+            // disconnectedMode without change.
+            switch (operatingMode) {
+            case CONNECTED:
+                sysStatus.set_lowPowerMode(false);
+                sysStatus.set_disconnectedMode(false);
+                Log.info("Operating mode set to CONNECTED");
+                break;
+
+            case LOW_POWER:
+                sysStatus.set_lowPowerMode(true);
+                sysStatus.set_disconnectedMode(false);
+                Log.info("Operating mode set to LOW_POWER");
+                break;
+
+            case DISCONNECTED:
+                sysStatus.set_lowPowerMode(false);
+                sysStatus.set_disconnectedMode(true);
+                Log.info("Operating mode set to DISCONNECTED");
+                break;
+            }
         } else {
             success = false;
         }
@@ -510,6 +495,9 @@ bool Cloud::writeDeviceStatusToCloud() {
     writer.name("modes").beginObject();
     writer.name("countingMode").value((int)sysStatus.get_countingMode());
     writer.name("operatingMode").value((int)sysStatus.get_operatingMode());
+    writer.name("occupancyDebounceMs").value((int)sysStatus.get_occupancyDebounceMs());
+    writer.name("connectedReportingIntervalSec").value((int)sysStatus.get_connectedReportingIntervalSec());
+    writer.name("lowPowerReportingIntervalSec").value((int)sysStatus.get_lowPowerReportingIntervalSec());
     writer.endObject();
 
     // Firmware release metadata
@@ -556,14 +544,22 @@ bool Cloud::publishDataToLedger() {
     writer.beginObject();
     writer.name("timestamp").value((int)Time.now());
     
-    if (sysStatus.get_countingMode() == COUNTING) {
+    uint8_t countingMode = sysStatus.get_countingMode();
+
+    if (countingMode == COUNTING) {
         writer.name("mode").value("counting");
         writer.name("hourlyCount").value(current.get_hourlyCount());
         writer.name("dailyCount").value(current.get_dailyCount());
-    } else {
+    } else if (countingMode == OCCUPANCY) {
         writer.name("mode").value("occupancy");
         writer.name("occupied").value(current.get_occupied());
         writer.name("totalOccupiedSec").value(current.get_totalOccupiedSeconds());
+    } else { // SCHEDULED or any future modes
+        writer.name("mode").value("scheduled");
+        // In scheduled mode we still track counts; include them so
+        // device-data mirrors the webhook payload for analytics.
+        writer.name("hourlyCount").value(current.get_hourlyCount());
+        writer.name("dailyCount").value(current.get_dailyCount());
     }
     
     writer.name("battery").value(current.get_stateOfCharge(), 1);

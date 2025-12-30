@@ -8,16 +8,23 @@
 // ---------------------------------------------------------------------------
 // Carrier-board common pins (same logical role on all platforms)
 // ---------------------------------------------------------------------------
+// TMP36 temperature sensor:
+//  - On Boron carrier, wired to A4.
+//  - On Photon 2 / P2 carrier, silk is "S4"; map explicitly for that
+//    platform so we don't rely on A4 aliasing.
+
+#if PLATFORM_ID == PLATFORM_P2
+const pin_t TMP36_SENSE_PIN   = S4;
+#else
 const pin_t TMP36_SENSE_PIN   = A4;
+#endif
+
 const pin_t BUTTON_PIN        = D4;
 const pin_t BLUE_LED          = D7;
 const pin_t WAKEUP_PIN        = D8;
 
 // Convenience aliases for carrier functions
-const pin_t tmp36Pin          = TMP36_SENSE_PIN; // Carrier temp sensor
-const pin_t wakeUpPin         = WAKEUP_PIN;      // Watchdog wake pin
-const pin_t blueLED           = BLUE_LED;        // Status LED
-const pin_t userSwitch        = BUTTON_PIN;      // Front-panel button
+// (No additional aliases; use the base names directly in application code.)
 
 // ---------------------------------------------------------------------------
 // Sensor-specific pins (PIR-on-carrier) with platform-specific mapping
@@ -49,7 +56,7 @@ const pin_t ledPower      = MISO;
 bool initializePinModes() {
     Log.info("Initalizing the pinModes");
     // Define as inputs or outputs
-    pinMode(BUTTON_PIN, INPUT);    // User button on the carrier board - active LOW
+    pinMode(BUTTON_PIN, INPUT);    // User button on the carrier board - external pull-up on carrier
     pinMode(WAKEUP_PIN, INPUT);    // Watchdog wake line (active HIGH)
     pinMode(BLUE_LED, OUTPUT);     // On-module status LED
      return true;

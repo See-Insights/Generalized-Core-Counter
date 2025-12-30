@@ -215,6 +215,14 @@ private:
      */
     String lastPublishedStatus;
 
+    /**
+     * @brief Tracks success of last applyConfigurationFromLedger() call
+     * 
+     * Used by loadConfigurationFromCloud() to report whether configuration
+     * was successfully applied during the most recent merge.
+     */
+    bool lastApplySuccess;
+
 protected:
     /**
      * @brief The constructor is protected because the class is a singleton

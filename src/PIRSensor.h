@@ -144,7 +144,12 @@ public:
      * @brief Wake sensor from deep sleep: power up and re-attach ISR.
      */
     bool onWake() override {
-        // Re-enable power and LED
+        // For ULTRA_LOW_POWER naps we normally keep the PIR powered
+        // and its interrupt attached across sleep so it can wake the
+        // MCU. In that case we should NOT clear the motion flag here,
+        // otherwise the wake-causing event is lost before the main
+        // loop can count it.
+
         pinMode(disableModule, OUTPUT);
         pinMode(ledPower, OUTPUT);
         pinMode(intPin, INPUT_PULLDOWN);
@@ -154,7 +159,6 @@ public:
 
         attachInterrupt(intPin, pirISR, RISING);
 
-        reset();
         _isReady = true;
         return true;
     }
