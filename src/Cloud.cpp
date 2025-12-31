@@ -461,6 +461,17 @@ bool Cloud::applyModesConfig() {
         }
     }
 
+    // Maximum connection-attempt budget per wake (seconds)
+    if (modes.has("connectAttemptBudgetSec")) {
+        int connectAttemptBudgetSec = modes.get("connectAttemptBudgetSec").asInt();
+        if (validateRange(connectAttemptBudgetSec, 30, 900, "connectAttemptBudgetSec")) {
+            sysStatus.set_connectAttemptBudgetSec((uint16_t)connectAttemptBudgetSec);
+            Log.info("Connect attempt budget set to: %d seconds", connectAttemptBudgetSec);
+        } else {
+            success = false;
+        }
+    }
+
     return success;
 }
 
@@ -498,6 +509,7 @@ bool Cloud::writeDeviceStatusToCloud() {
     writer.name("occupancyDebounceMs").value((int)sysStatus.get_occupancyDebounceMs());
     writer.name("connectedReportingIntervalSec").value((int)sysStatus.get_connectedReportingIntervalSec());
     writer.name("lowPowerReportingIntervalSec").value((int)sysStatus.get_lowPowerReportingIntervalSec());
+    writer.name("connectAttemptBudgetSec").value((int)sysStatus.get_connectAttemptBudgetSec());
     writer.endObject();
 
     // Firmware release metadata
@@ -577,7 +589,23 @@ bool Cloud::publishDataToLedger() {
     int result = deviceDataLedger.set(data);
     
     if (result == SYSTEM_ERROR_NONE) {
-        Log.info("Sensor data published to cloud");
+        // Log the key counters and any active alert code so we
+        // can correlate what was actually written to device-data.
+        int mode = sysStatus.get_countingMode();
+        if (mode == COUNTING || mode == SCHEDULED) {
+            Log.info("Sensor data published to cloud - mode=%s hourly=%d daily=%d alert=%d",
+                     (mode == COUNTING ? "counting" : "scheduled"),
+                     (int)current.get_hourlyCount(),
+                     (int)current.get_dailyCount(),
+                     (int)current.get_alertCode());
+        } else if (mode == OCCUPANCY) {
+            Log.info("Sensor data published to cloud - mode=occupancy occupied=%d totalSec=%lu alert=%d",
+                     (int)current.get_occupied(),
+                     (unsigned long)current.get_totalOccupiedSeconds(),
+                     (int)current.get_alertCode());
+        } else {
+            Log.info("Sensor data published to cloud - mode=unknown alert=%d", (int)current.get_alertCode());
+        }
         return true;
     } else {
         Log.warn("Failed to publish sensor data: %d", result);

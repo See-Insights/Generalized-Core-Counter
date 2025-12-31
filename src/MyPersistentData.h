@@ -171,6 +171,7 @@ public:
 		uint32_t occupancyDebounceMs;                     // Milliseconds to wait before marking space as unoccupied (occupancy mode only)
 		uint16_t connectedReportingIntervalSec;           // Reporting interval in seconds when in CONNECTED mode
 		uint16_t lowPowerReportingIntervalSec;            // Reporting interval in seconds when in LOW_POWER mode
+		uint16_t connectAttemptBudgetSec;                 // Max seconds to spend attempting a cloud connect per wake
 
 	};
 
@@ -279,6 +280,9 @@ public:
 
 	uint16_t get_lowPowerReportingIntervalSec() const;
 	void set_lowPowerReportingIntervalSec(uint16_t value);
+
+	uint16_t get_connectAttemptBudgetSec() const;
+	void set_connectAttemptBudgetSec(uint16_t value);
 
 
 	//Members here are internal only and therefore protected

@@ -100,7 +100,7 @@ void sysStatusData::initialize() {
     sysStatus.set_lowBatteryMode(false);
     sysStatus.set_solarPowerMode(true);
     sysStatus.set_lowPowerMode(false);          // This should be changed to true once we have tested
-    sysStatus.set_timeZoneStr("SGT-8");        // Default to Singapore Time (no DST)
+    sysStatus.set_timeZoneStr("SGT-8");        // Default to Singapore Time (POSIX TZ string for UTC+8, no DST)
     sysStatus.set_sensorType(1);                // PIR sensor
     sysStatus.set_openTime(0);
     sysStatus.set_closeTime(24);                                           // New standard with v20
@@ -110,9 +110,10 @@ void sysStatusData::initialize() {
     // ********** Operating Mode Defaults **********
     sysStatus.set_countingMode(COUNTING);                                  // Default to counting mode
     sysStatus.set_operatingMode(CONNECTED);                                // Default to connected mode
-    sysStatus.set_occupancyDebounceMs(300000);                             // Default 5 minutes (300,000 ms)
+    sysStatus.set_occupancyDebounceMs(0);                                  // Default 0 ms; only used in OCCUPANCY mode
     sysStatus.set_connectedReportingIntervalSec(300);                      // Default 5 minutes when connected
     sysStatus.set_lowPowerReportingIntervalSec(3600);                      // Default 1 hour when in low power
+    sysStatus.set_connectAttemptBudgetSec(300);                            // Default 300s (5 minutes) max connect attempt per wake
 }
 
 uint8_t sysStatusData::get_structuresVersion() const {
@@ -288,6 +289,13 @@ uint16_t sysStatusData::get_lowPowerReportingIntervalSec() const {
 }
 void sysStatusData::set_lowPowerReportingIntervalSec(uint16_t value) {
     setValue<uint16_t>(offsetof(SysData,lowPowerReportingIntervalSec), value);
+}
+
+uint16_t sysStatusData::get_connectAttemptBudgetSec() const {
+    return getValue<uint16_t>(offsetof(SysData,connectAttemptBudgetSec));
+}
+void sysStatusData::set_connectAttemptBudgetSec(uint16_t value) {
+    setValue<uint16_t>(offsetof(SysData,connectAttemptBudgetSec), value);
 }
 
 // End of sysStatusData class

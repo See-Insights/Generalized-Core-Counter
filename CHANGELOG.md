@@ -32,3 +32,12 @@ All notable changes to this project will be documented in this file.
 ## 3.09 – 2025-12-30
 - MVP starting to optimize
 
+## 3.10 – 2025-12-31
+- Firmware ready to start testing on Boron
+
+## 3.10 – 2025-12-31
+- Changes from Claude Sonnet 4.5 Code review - ready to test
+
+## 3.11 – 2025-12-31
+- Increased PublishQueue depth to 30 days
+

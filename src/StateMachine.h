@@ -34,6 +34,7 @@ extern bool dataInFlight;
 extern const unsigned long stayAwakeLong;
 extern const unsigned long resetWait;
 extern const unsigned long maxOnlineWorkMs;
+extern const unsigned long maxConnectAttemptMs;
 extern unsigned long stayAwakeTimeStamp;
 extern unsigned long stayAwake;
 extern unsigned long onlineWorkStartMs;
@@ -47,6 +48,9 @@ extern bool hibernateDisabledForSession;
 bool isWithinOpenHours();
 int secondsUntilNextOpen();
 void publishStateTransition();
+
+// Shared software timer for BLUE_LED visibility on count events
+extern Timer countSignalTimer;
 
 // Application-level helpers implemented in Generalized-Core-Counter.cpp
 void dailyCleanup();

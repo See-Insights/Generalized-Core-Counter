@@ -117,22 +117,28 @@ Three storage structures:
         "threshold2": 60
     },
     "timing": {
-        "closeHour": 22,
-        "openHour": 6,
-        "pollingRateSec": 0,
-        "reportingIntervalSec": 3600,
-        "timezone": "PST8PDT"
-    },
+      "closeHour": 22,
+      "openHour": 6,
+      "pollingRateSec": 0,
+      "reportingIntervalSec": 3600,
+      "timezone": "SGT-8"   
+  },
     "modes": {
         "countingMode": 0,
         "operatingMode": 0,
         "triggerMode": 0,
-        "occupancyDebounceMs": 300000,
+        "occupancyDebounceMs": 0,
         "connectedReportingIntervalSec": 300,
-        "lowPowerReportingIntervalSec": 3600
+      "lowPowerReportingIntervalSec": 3600,
+      "connectAttemptBudgetSec": 300
     }
 }
 ```
+
+  **Timezone notes:**
+  - `timing.timezone` must be a POSIX timezone string (not an IANA name like "Asia/Singapore").
+  - Example for Singapore (UTC+8, no DST): `"SGT-8"`.
+  - See the LocalTimeRK documentation for examples and guidance on building POSIX strings for major cities: https://rickkas7.github.io/LocalTimeRK/
 
 ### Mode Values
 
@@ -435,6 +441,14 @@ case MYNEWSENSOR:
 - Static buffers for frequently-used data (deviceID)
 - Stack allocation for JSON (512 bytes acceptable)
 - Persistent storage auto-managed by StorageHelperRK
+
+## Offline Data Retention & Firmware Updates
+
+- **Persistent publish queue**: All cloud publishes go through PublishQueuePosixRK, which buffers events in RAM and on the `/usr` flash filesystem.
+- **30+ days of hourly data**: The firmware configures a file-backed queue size of 800 events, allowing at least 30 days of hourly reports to be retained during extended network outages before the oldest events are discarded.
+- **Guaranteed retry on reconnect**: Buffered events are sent on subsequent connections with `WITH_ACK` enabled; events are only removed from the queue after successful delivery.
+- **Sleep-aware queue handling**: The state machine checks that the publish queue is in a sleep-safe state before entering long low-power sleeps, avoiding data loss due to mid-flight publishes.
+- **Bounded firmware-update mode**: The FIRMWARE_UPDATE state is time-limited (5 minutes by default). If no updates are applied within this window, the device exits update mode and returns toward its normal connect/report/sleep cycle to protect battery life.
 
 ## Error Handling
 

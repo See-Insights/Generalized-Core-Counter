@@ -115,14 +115,18 @@ bool SensorManager::isSensorReady() const {
 
 void SensorManager::onEnterSleep() {
   if (_sensor) {
-    Log.info("SensorManager entering sleep; notifying sensor %s", _sensor->getSensorType());
+    if (sysStatus.get_verboseMode()) {
+      Log.info("SensorManager entering sleep; notifying sensor %s", _sensor->getSensorType());
+    }
     _sensor->onSleep();
   }
 }
 
 void SensorManager::onExitSleep() {
   if (_sensor) {
-    Log.info("SensorManager exiting sleep; waking sensor %s", _sensor->getSensorType());
+    if (sysStatus.get_verboseMode()) {
+      Log.info("SensorManager exiting sleep; waking sensor %s", _sensor->getSensorType());
+    }
     if (!_sensor->onWake()) {
       Log.error("Sensor %s failed to wake correctly", _sensor->getSensorType());
     }
@@ -278,10 +282,20 @@ bool SensorManager::isItSafeToCharge() // Returns a true or false if the battery
                                        // enclosure temperature
 {
   float temp = current.get_internalTempC();
+  // Apply simple hysteresis around the recommended LiPo charge range
+  // to avoid rapid toggling near the temperature boundaries. When
+  // charging is currently allowed, we disable if temp < 0C or > 45C.
+  // When charging is currently disallowed, we only re-enable once
+  // temp has returned to a tighter 2C-43C window.
+  static bool lastSafe = true;
 
-  // Reference range based on typical LiPo specs (0C to 45C). Below 0C,
-  // most manufacturers recommend no charging at all.
-  bool safe = !(temp < 0.0f || temp > 45.0f);
+  bool safe;
+  if (lastSafe) {
+    safe = !(temp < 0.0f || temp > 45.0f);
+  } else {
+    safe = !(temp < 2.0f || temp > 43.0f);
+  }
+  lastSafe = safe;
 
 #if HAL_PLATFORM_CELLULAR
   // On Boron (cellular Gen 3), a BQ24195 PMIC is available so we

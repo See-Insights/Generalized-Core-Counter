@@ -9,6 +9,12 @@
 #include "SensorDefinitions.h"
 #include "StateHandlers.h"
 
+// Maximum amount of time to remain in FIRMWARE_UPDATE_STATE before
+// giving up and returning to normal low-power operation. Mirrors the
+// Wake-Publish-Sleep Cellular example, which uses a 5 minute budget
+// for firmware updates before going back to sleep.
+static const unsigned long firmwareUpdateMaxMs = 5UL * 60UL * 1000UL;
+
 // Forward declaration for internal error supervisor helper
 static int resolveErrorAction();
 
@@ -117,6 +123,15 @@ void handleIdleState() {
     }
 
     if (!updatesPending && canSleepGate) {
+      // If a sensor event is still pending or the BLUE LED timer is
+      // active from a recent count, defer transitioning into the
+      // SLEEPING_STATE. This avoids rapid Idle<->Sleeping ping-pong
+      // and the associated extra logging while still honouring the
+      // low-power policy once the indication has finished.
+      if (sensorDetect || countSignalTimer.isActive()) {
+        return;
+      }
+
       size_t pending = PublishQueuePosix::instance().getNumEvents();
       if (!Particle.connected() && pending > 0) {
         Log.info("Low-power idle: offline with %u queued event(s) - sleeping and will flush on next connect",
@@ -239,6 +254,15 @@ void handleSleepingState() {
     wakeInSeconds = (int)intervalSec;
   }
 
+  // If a sensor event is pending or the BLUE LED timer is still
+  // active from a recent count, defer entering deep sleep so we
+  // don't cut off in-progress events or visible indications.
+  if (sensorDetect || countSignalTimer.isActive()) {
+    Log.info("Deferring sleep - sensor event or LED timer active");
+    state = IDLE_STATE;
+    return;
+  }
+
   config.mode(SystemSleepMode::ULTRA_LOW_POWER)
     .gpio(BUTTON_PIN, CHANGE)
     .gpio(intPin, RISING)
@@ -338,10 +362,12 @@ void handleSleepingState() {
       }
     }
 
-    // If this wake was from PIR, turn off the BLUE LED now that we've
-    // completed post-wake housekeeping.
+    // If this wake was from PIR, keep the BLUE LED on using the
+    // same software timer used for normal count events so the
+    // visible behaviour is consistent.
     if (pirWake) {
-      digitalWrite(BLUE_LED, LOW);
+      digitalWrite(BLUE_LED, HIGH);
+      countSignalTimer.reset();
     }
     state = IDLE_STATE;
   }
@@ -354,19 +380,36 @@ void handleReportingState() {
   }
 
   time_t now = Time.now();
-  // If this is the first report after a calendar day boundary, run the
-  // daily cleanup once to reset daily counters and housekeeping.
+  // If this is the first report after a calendar *local* day boundary,
+  // run the daily cleanup once to reset daily counters and housekeeping.
   if (Time.isValid()) {
     time_t lastReport = sysStatus.get_lastReport();
-    if (lastReport != 0 && Time.day(now) != Time.day(lastReport)) {
-      Log.info("New day detected (last report day=%d, current day=%d) - running dailyCleanup",
-               Time.day(lastReport), Time.day(now));
-      dailyCleanup();
-      sysStatus.set_lastDailyCleanup(now);
+    if (lastReport != 0) {
+      LocalTimeConvert convNow;
+      convNow.withConfig(LocalTime::instance().getConfig()).withTime(now).convert();
+      LocalTimeConvert convLast;
+      convLast.withConfig(LocalTime::instance().getConfig()).withTime(lastReport).convert();
+
+      LocalTimeYMD ymdNow = convNow.getLocalTimeYMD();
+      LocalTimeYMD ymdLast = convLast.getLocalTimeYMD();
+
+      if (ymdNow.getYear() != ymdLast.getYear() ||
+          ymdNow.getMonth() != ymdLast.getMonth() ||
+          ymdNow.getDay() != ymdLast.getDay()) {
+        Log.info("New local day detected (last=%04d-%02d-%02d, current=%04d-%02d-%02d) - running dailyCleanup",
+                 ymdLast.getYear(), ymdLast.getMonth(), ymdLast.getDay(),
+                 ymdNow.getYear(), ymdNow.getMonth(), ymdNow.getDay());
+        dailyCleanup();
+        sysStatus.set_lastDailyCleanup(now);
+      }
     }
   }
 
   sysStatus.set_lastReport(now);
+
+  // Read battery state BEFORE connectivity decision so SoC-tiered
+  // logic below uses fresh data, not stale values from a previous
+  // cycle or from during an active radio session.
   measure.loop();         // Take sensor measurements for reporting
   measure.batteryState(); // Update battery SoC/state and enclosure temperature
 
@@ -381,12 +424,14 @@ void handleReportingState() {
   }
 
   // Webhook supervision: if we have not seen a successful webhook
-  // response in more than 3 hours, raise alert 40 so the error
-  // supervisor can evaluate and potentially reset the device.
+  // response in more than 6 hours, raise alert 40 so the error
+  // supervisor can evaluate and potentially reset. Threshold is set
+  // higher for remote/solar units in poor reception where intermittent
+  // connectivity is expected.
   if (Time.isValid()) {
     time_t lastHook = sysStatus.get_lastHookResponse();
-    if (lastHook != 0 && (now - lastHook) > (3 * 3600L)) {
-      Log.info("No successful webhook response for >3 hours (last=%ld, now=%ld) - raising alert 40",
+    if (lastHook != 0 && (now - lastHook) > (6 * 3600L)) {
+      Log.info("No successful webhook response for >6 hours (last=%ld, now=%ld) - raising alert 40",
                (long)lastHook, (long)now);
       current.raiseAlert(40);
     }
@@ -458,17 +503,37 @@ void handleReportingState() {
 // CONNECTING_STATE: Establish cloud connection, then load config
 void handleConnectingState() {
   static unsigned long connectionStartTimeStamp; // Time helps us know how long it took to connect
+  // Persist whether we entered from REPORTING_STATE so we can avoid
+  // immediately overwriting the just-published hourlyCount in the
+  // device-data ledger.
+  static bool lastEnteredFromReporting = false;
   char data[64];                                  // Holder for message strings
 
   if (state != oldState) { // One-time actions when entering state
+    lastEnteredFromReporting = (oldState == REPORTING_STATE);
+
     // Reset connection duration (will be updated once connected)
     sysStatus.set_lastConnectionDuration(0);
     publishStateTransition();
     connectionStartTimeStamp = millis(); // Use millis as the clock may get reset on connect
+
+    // Log signal strength at start of connection attempt for field
+    // correlation with connectivity failures (alert 31). On cellular
+    // platforms this gives us a baseline RSSI before the modem fully
+    // connects, helping diagnose poor-reception issues.
+#if Wiring_Cellular
+    CellularSignal sig = Cellular.RSSI();
+    float strengthPct = sig.getStrength();
+    float qualityPct = sig.getQuality();
+    Log.info("Starting connection attempt - Signal: S=%2.0f%% Q=%2.0f%%",
+             (double)strengthPct, (double)qualityPct);
+#endif
+
     Particle.connect();                  // Ask Device OS to connect; we'll poll status
   }
 
-  sysStatus.set_lastConnectionDuration(int((millis() - connectionStartTimeStamp) / 1000));
+  unsigned long elapsedMs = millis() - connectionStartTimeStamp;
+  sysStatus.set_lastConnectionDuration(int(elapsedMs / 1000));
 
   if (Particle.connected()) {
     sysStatus.set_lastConnection(Time.now()); // This is the last time we last connected
@@ -499,8 +564,16 @@ void handleConnectingState() {
     // After a successful connect, publish the latest counters and
     // temperature to the device-data ledger so the cloud view reflects
     // current state even if a regular hourly report has not yet run.
-    if (!Cloud::instance().publishDataToLedger()) {
-      current.raiseAlert(42); // data ledger publish failure
+    //
+    // However, if we *just* came from REPORTING_STATE, publishData()
+    // has already updated the device-data ledger with the correct
+    // hourlyCount and then reset the in-memory hourly counter to 0.
+    // Calling publishDataToLedger() again here would overwrite the
+    // freshly published hourlyCount with 0, which is not desired.
+    if (!lastEnteredFromReporting) {
+      if (!Cloud::instance().publishDataToLedger()) {
+        current.raiseAlert(42); // data ledger publish failure
+      }
     }
 
     // Log the current publish queue depth so we can observe whether
@@ -525,20 +598,35 @@ void handleConnectingState() {
     } else {
       state = IDLE_STATE; // Return to idle once connected and configured
     }
-  } else if (sysStatus.get_lastConnectionDuration() > 600) {
-    // What happens if we do not connect
-    // Connection timeout; record a connectivity alert and let the error
-    // handler decide what to do next. If multiple alerts are present, the
-    // highest-severity one is preserved.
-    current.raiseAlert(31);
-    state = ERROR_STATE; // Note - not setting the ERROR timestamp to make this go quickly
   } else {
-    // Remain in CONNECTING_STATE and loop
+    // Use a ledger-configured budget when available; otherwise fall back
+    // to the compiled default maxConnectAttemptMs constant.
+    unsigned long budgetMs = maxConnectAttemptMs;
+    uint16_t budgetSec = sysStatus.get_connectAttemptBudgetSec();
+    if (budgetSec >= 30 && budgetSec <= 900) {
+      budgetMs = (unsigned long)budgetSec * 1000UL;
+    }
+
+    if (elapsedMs > budgetMs) {
+      // Connection timeout based on per-wake budget; record a connectivity
+      // alert and let the error handler decide what to do next. If multiple
+      // alerts are present, the highest-severity one is preserved.
+      Log.warn("Connection attempt exceeded budget (%lu ms > %lu ms) - raising alert 31",
+               (unsigned long)elapsedMs, (unsigned long)budgetMs);
+      current.raiseAlert(31);
+      state = ERROR_STATE; // Note - not setting the ERROR timestamp to make this go quickly
+    }
+    // Otherwise, remain in CONNECTING_STATE and loop
   }
 }
 
 // FIRMWARE_UPDATE_STATE: Stay connected for firmware/config updates
 void handleFirmwareUpdateState() {
+  // Track how long we've been in update mode so we can mirror the
+  // Particle Wake-Publish-Sleep example behaviour: bound the time
+  // spent waiting for an update before going back to sleep.
+  static unsigned long firmwareUpdateStartMs = 0;
+
   if (state != oldState) {
     publishStateTransition();
     Log.info("Entering FIRMWARE_UPDATE_STATE - keeping device connected for updates");
@@ -546,6 +634,8 @@ void handleFirmwareUpdateState() {
     // In update mode, force connected operating mode and disable low power
     sysStatus.set_lowPowerMode(false);
     sysStatus.set_operatingMode(CONNECTED);
+
+    firmwareUpdateStartMs = millis();
 
     // Ensure cloud connection is requested
     if (!Particle.connected()) {
@@ -567,6 +657,7 @@ void handleFirmwareUpdateState() {
       Log.info("No updates pending - leaving FIRMWARE_UPDATE_STATE to IDLE_STATE");
       configLoadedInUpdateMode = false;
       state = IDLE_STATE;
+      return;
     }
   }
 
@@ -574,6 +665,17 @@ void handleFirmwareUpdateState() {
   if (!digitalRead(BUTTON_PIN)) { // Active-low user button
     Log.info("User button pressed - exiting FIRMWARE_UPDATE_STATE to IDLE_STATE");
     state = IDLE_STATE;
+    return;
+  }
+
+  // Firmware update timeout: if we've spent more than firmwareUpdateMaxMs
+  // in this state, mirror the reference example and go to sleep so we can
+  // try again in a future cycle instead of keeping the modem on
+  // indefinitely.
+  if (firmwareUpdateStartMs != 0 && (millis() - firmwareUpdateStartMs) > firmwareUpdateMaxMs) {
+    Log.info("Firmware update timed out after %lu ms in FIRMWARE_UPDATE_STATE - transitioning to SLEEPING_STATE",
+             (unsigned long)(millis() - firmwareUpdateStartMs));
+    state = SLEEPING_STATE;
   }
 }
 
@@ -727,11 +829,11 @@ void handleCountingMode() {
     Log.info("Count detected - Hourly: %d, Daily: %d",
              current.get_hourlyCount(), current.get_dailyCount());
 
-    // Flash the on-module BLUE LED for 1 second as a
-    // visual count indicator (more visible in daylight).
+    // Flash the on-module BLUE LED for ~1 second as a
+    // visual count indicator using a software timer so we
+    // don't block the main loop.
     digitalWrite(BLUE_LED, HIGH);
-    softDelay(1000);
-    digitalWrite(BLUE_LED, LOW);
+    countSignalTimer.reset();
 
     // Stay in IDLE_STATE; hourly reporting will publish aggregated counts.
   }

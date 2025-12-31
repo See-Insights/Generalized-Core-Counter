@@ -146,16 +146,23 @@ bool Particle_Functions::
       30000); // As per TAN004:
               // https://support.particle.io/hc/en-us/articles/1260802113569-TAN004-Power-off-Recommendations-for-SARA-R410M-Equipped-Devices
   Particle.process();
-  if (Cellular
-          .isOn()) { // At this point, if cellular is not off, we have a problem
-    Log.info("Failed to turn off the Cellular modem");
-    return (false); // Let the calling function know that we were not able to
-                    // turn off the cellular modem
-  } else {
-    Log.info("Turned off the cellular modem in %i seconds",
-             (int)(Time.now() - startTime));
-    return true;
+
+  // After the 30s timeout, check once more before declaring failure.
+  // In rare cases the modem may have powered down at ~31s and we'd
+  // raise alert 15 unnecessarily if we only check Cellular.isOn().
+  if (Cellular.isOn()) {
+    delay(1000);  // Brief settle delay
+    Particle.process();
+    if (Cellular.isOn()) {
+      Log.info("Failed to turn off the Cellular modem after 31s");
+      return (false); // Let the calling function know that we were not able to
+                      // turn off the cellular modem
+    }
   }
+
+  Log.info("Turned off the cellular modem in %i seconds",
+           (int)(Time.now() - startTime));
+  return true;
 #elif Wiring_WiFi
   Log.info("Disconnecting from WiFi network");
   WiFi.disconnect();          // Disconnect from the WiFi network

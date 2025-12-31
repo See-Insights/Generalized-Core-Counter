@@ -35,6 +35,7 @@
 #include "Version.h"
 #include "StateMachine.h"
 #include "StateHandlers.h"
+#include "ProjectConfig.h"
 
 // Forward declarations in case Version.h is not picked up correctly
 // by the build system in this translation unit.
@@ -74,6 +75,10 @@ void publishStartupStatus();  // One-time status summary at boot
 // Local time is derived from LocalTimeRK using the configured timezone.
 // If time is not yet valid, we treat it as "open" so the device can start
 // sensing while it acquires time and configuration.
+// One-shot software timer to keep BLUE_LED on long enough
+// to be visible for each count or PIR-triggered wake event.
+Timer countSignalTimer(1000, countSignalTimerISR, true);
+
 bool isWithinOpenHours() {
   if (!Time.isValid()) {
     return true;
@@ -157,8 +162,7 @@ int outOfMemory = -1; // Set by outOfMemoryHandler when heap is exhausted
 
 // ********** State Machine **********
 char stateNames[7][16] = {"Initialize", "Error",     "Idle",
-                          "Sleeping",   "Connecting", "Reporting",
-                          "Fw Update"};
+                          "Sleeping",   "Connecting", "Reporti34
 State state = INITIALIZATION_STATE;
 State oldState = INITIALIZATION_STATE;
 
@@ -179,6 +183,7 @@ const unsigned long resetWait = 30000;      // Error state dwell before reset
 unsigned long stayAwakeTimeStamp = 0;       // Timestamp for stay-awake window
 unsigned long stayAwake = 0;                // How long to remain awake (ms)
 const unsigned long maxOnlineWorkMs = 5UL * 60UL * 1000UL; // Max time to stay online per low-power connection
+const unsigned long maxConnectAttemptMs = 5UL * 60UL * 1000UL; // Max time to spend trying to connect per wake
 unsigned long onlineWorkStartMs = 0;       // When we first became cloud-connected this cycle
 bool forceSleepThisCycle = false;          // Force sleep even if publish queue is not yet empty
 bool lastLowPowerMode = false;             // Tracks previous lowPowerMode to detect transitions
@@ -251,7 +256,13 @@ void setup() {
     digitalWrite(ledPower, LOW);
   }
 
-  PublishQueuePosix::instance().setup(); // Initialize the publish queue
+  // Configure publish queue to retain ~30+ days of hourly reports
+  // across all supported platforms (P2, Boron, Argon). With an
+  // hourly reporting interval, 800 file-backed events provide
+  // headroom over the 720 events needed for a full 30 days.
+  PublishQueuePosix::instance()
+      .withFileQueueSize(800)
+      .setup(); // Initialize the publish queue
 
   // Initialize AB1805 RTC and watchdog
   ab1805.withFOUT(D8).setup();                 // Initialize AB1805 RTC
@@ -453,7 +464,13 @@ void publishData() {
            sysStatus.get_lastConnectionDuration(),
            timeStampValue);
 
-  PublishQueuePosix::instance().publish("Ubidots-Counter-Hook-v1", data, PRIVATE | WITH_ACK);
+  // Explicitly log the counts and alert code used in this report
+  Log.info("Report payload: hourly=%d daily=%d alert=%d",
+           (int)current.get_hourlyCount(),
+           (int)current.get_dailyCount(),
+           (int)current.get_alertCode());
+
+  PublishQueuePosix::instance().publish(ProjectConfig::webhookEventName(), data, PRIVATE | WITH_ACK);
   Log.info("Parking Lot Webhook: %s", data);
 
   // Also update device-data ledger with structured JSON snapshot
