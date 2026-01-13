@@ -55,10 +55,6 @@ void Cloud::setup() {
     Log.info("  device-data: Sensor readings (Device→Cloud)");
 }
 
-void Cloud::loop() {
-    // No loop processing needed
-}
-
 // Static callbacks
 void Cloud::onDefaultSettingsSync(Ledger ledger) {
     Log.info("default-settings synced from cloud");
@@ -472,6 +468,28 @@ bool Cloud::applyModesConfig() {
         }
     }
 
+    // Maximum time to wait for cloud disconnect before treating as an error (seconds)
+    if (modes.has("cloudDisconnectBudgetSec")) {
+        int cloudDisconnectBudgetSec = modes.get("cloudDisconnectBudgetSec").asInt();
+        if (validateRange(cloudDisconnectBudgetSec, 5, 120, "cloudDisconnectBudgetSec")) {
+            sysStatus.set_cloudDisconnectBudgetSec((uint16_t)cloudDisconnectBudgetSec);
+            Log.info("Cloud disconnect budget set to: %d seconds", cloudDisconnectBudgetSec);
+        } else {
+            success = false;
+        }
+    }
+
+    // Maximum time to wait for modem power-down before treating as an error (seconds)
+    if (modes.has("modemOffBudgetSec")) {
+        int modemOffBudgetSec = modes.get("modemOffBudgetSec").asInt();
+        if (validateRange(modemOffBudgetSec, 5, 120, "modemOffBudgetSec")) {
+            sysStatus.set_modemOffBudgetSec((uint16_t)modemOffBudgetSec);
+            Log.info("Modem off budget set to: %d seconds", modemOffBudgetSec);
+        } else {
+            success = false;
+        }
+    }
+
     return success;
 }
 
@@ -510,6 +528,8 @@ bool Cloud::writeDeviceStatusToCloud() {
     writer.name("connectedReportingIntervalSec").value((int)sysStatus.get_connectedReportingIntervalSec());
     writer.name("lowPowerReportingIntervalSec").value((int)sysStatus.get_lowPowerReportingIntervalSec());
     writer.name("connectAttemptBudgetSec").value((int)sysStatus.get_connectAttemptBudgetSec());
+    writer.name("cloudDisconnectBudgetSec").value((int)sysStatus.get_cloudDisconnectBudgetSec());
+    writer.name("modemOffBudgetSec").value((int)sysStatus.get_modemOffBudgetSec());
     writer.endObject();
 
     // Firmware release metadata

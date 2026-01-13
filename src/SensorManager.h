@@ -113,12 +113,6 @@ public:
      */
     void getSignalStrength();
 
-    /**
-     * @brief Cooperative delay that keeps system services responsive.
-     *
-     * @param t Delay time in milliseconds.
-     */
-    void softDelay(uint32_t t);
     ///@}
     
 protected:

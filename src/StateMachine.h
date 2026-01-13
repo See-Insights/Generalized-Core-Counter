@@ -55,4 +55,3 @@ extern Timer countSignalTimer;
 // Application-level helpers implemented in Generalized-Core-Counter.cpp
 void dailyCleanup();
 void publishData();
-void softDelay(uint32_t t);

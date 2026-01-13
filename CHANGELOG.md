@@ -41,3 +41,6 @@ All notable changes to this project will be documented in this file.
 ## 3.11 – 2025-12-31
 - Increased PublishQueue depth to 30 days
 
+## 3.11 – 2026-01-13
+- Updated connection with phases to unblock connections
+

@@ -21,6 +21,10 @@
 
 // Include Particle Device OS APIs
 #include "Particle.h"
+
+// Firmware version recognized by Particle Product firmware management
+// Bump this integer whenever you cut a new production release.
+PRODUCT_VERSION(3);
 #include "AB1805_RK.h"
 #include "Cloud.h"
 #include "LocalTimeRK.h"
@@ -67,7 +71,6 @@ void userSwitchISR();         // Interrupt for the user switch
 void sensorISR();             // Interrupt for legacy tire-counting sensor
 void countSignalTimerISR();   // Timer ISR to turn off BLUE LED
 void dailyCleanup();          // Reset daily counters and housekeeping
-void softDelay(uint32_t t);   // Non-blocking delay helper
 void UbidotsHandler(const char *event, const char *data); // Webhook response handler
 void publishStartupStatus();  // One-time status summary at boot
 
@@ -162,7 +165,8 @@ int outOfMemory = -1; // Set by outOfMemoryHandler when heap is exhausted
 
 // ********** State Machine **********
 char stateNames[7][16] = {"Initialize", "Error",     "Idle",
-                          "Sleeping",   "Connecting", "Reporti34
+                          "Sleeping",   "Connecting", "Reporting",
+                          "FirmwareUpdate"};
 State state = INITIALIZATION_STATE;
 State oldState = INITIALIZATION_STATE;
 
@@ -417,9 +421,6 @@ void loop() {
     state = REPORTING_STATE;
   }
 
-  // Handle any cloud configuration updates (currently no-op)
-  Cloud::instance().loop();
-
 } // End of loop
 
 /**
@@ -577,12 +578,6 @@ void sensorISR() {
 
 void countSignalTimerISR() { digitalWrite(BLUE_LED, LOW); }
 
-// Helper kept for backwards compatibility; current logic does not use it
-bool isParkOpen() {
-  return !(Time.hour() < sysStatus.get_openTime() ||
-           Time.hour() > sysStatus.get_closeTime());
-}
-
 /**
  * @brief Cleanup function that is run at the beginning of the day.
  *
@@ -603,17 +598,4 @@ void dailyCleanup() {
   }
   current
       .resetEverything(); // If so, we need to Zero the counts for the new day
-}
-
-/**
- * @brief soft delay let's us process Particle functions and service the sensor
- * interrupts while pausing
- *
- * @details takes a single unsigned long input in millis
- *
- */
-void softDelay(uint32_t t) {
-  // Non-blocking delay that still services Particle cloud background tasks
-  for (uint32_t ms = millis(); millis() - ms < t; Particle.process()) {
-  }
 }

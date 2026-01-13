@@ -361,15 +361,3 @@ void SensorManager::getSignalStrength() {
   Log.info(signalStr);
 #endif
 }
-
-/**
- * @brief soft delay let's us process Particle functions and service the sensor
- * interrupts while pausing
- *
- * @details takes a single unsigned long input in millis
- *
- */
-inline void SensorManager::softDelay(uint32_t t) {
-  for (uint32_t ms = millis(); millis() - ms < t; Particle.process())
-    ; //  safer than a delay()
-}

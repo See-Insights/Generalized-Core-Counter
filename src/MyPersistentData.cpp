@@ -114,6 +114,8 @@ void sysStatusData::initialize() {
     sysStatus.set_connectedReportingIntervalSec(300);                      // Default 5 minutes when connected
     sysStatus.set_lowPowerReportingIntervalSec(3600);                      // Default 1 hour when in low power
     sysStatus.set_connectAttemptBudgetSec(300);                            // Default 300s (5 minutes) max connect attempt per wake
+    sysStatus.set_cloudDisconnectBudgetSec(15);                            // Default 15s max wait for cloud disconnect
+    sysStatus.set_modemOffBudgetSec(30);                                   // Default 30s max wait for modem power-down
 }
 
 uint8_t sysStatusData::get_structuresVersion() const {
@@ -296,6 +298,20 @@ uint16_t sysStatusData::get_connectAttemptBudgetSec() const {
 }
 void sysStatusData::set_connectAttemptBudgetSec(uint16_t value) {
     setValue<uint16_t>(offsetof(SysData,connectAttemptBudgetSec), value);
+}
+
+uint16_t sysStatusData::get_cloudDisconnectBudgetSec() const {
+    return getValue<uint16_t>(offsetof(SysData,cloudDisconnectBudgetSec));
+}
+void sysStatusData::set_cloudDisconnectBudgetSec(uint16_t value) {
+    setValue<uint16_t>(offsetof(SysData,cloudDisconnectBudgetSec), value);
+}
+
+uint16_t sysStatusData::get_modemOffBudgetSec() const {
+    return getValue<uint16_t>(offsetof(SysData,modemOffBudgetSec));
+}
+void sysStatusData::set_modemOffBudgetSec(uint16_t value) {
+    setValue<uint16_t>(offsetof(SysData,modemOffBudgetSec), value);
 }
 
 // End of sysStatusData class

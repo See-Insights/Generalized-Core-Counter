@@ -44,9 +44,6 @@
  * 
  * From global application setup you must call:
  * Cloud::instance().setup();
- * 
- * From global application loop you must call:
- * Cloud::instance().loop();
  */
 class Cloud {
 public:
@@ -63,13 +60,6 @@ public:
      * You typically use Cloud::instance().setup();
      */
     void setup();
-
-    /**
-     * @brief Perform application loop operations; call this from global application loop()
-     * 
-     * You typically use Cloud::instance().loop();
-     */
-    void loop();
 
     /**
      * @brief Load and apply configuration from cloud ledgers

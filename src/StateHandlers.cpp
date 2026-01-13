@@ -2,7 +2,6 @@
 #include "Cloud.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
-#include "Particle_Functions.h"
 #include "PublishQueuePosixRK.h"
 #include "SensorManager.h"
 #include "device_pinout.h"
@@ -145,7 +144,25 @@ void handleIdleState() {
   }
 }
 
-// SLEEPING_STATE: Deep sleep between reporting intervals
+/**
+ * @brief SLEEPING_STATE: deep sleep between reporting intervals.
+ *
+ * @details Performs a non-blocking, phased disconnect before entering
+ *          Device OS sleep modes. While connected (or with the radio
+ *          still on) it gates sleep on the publish queue being in a
+ *          sleep-safe state unless forceSleepThisCycle is set. The
+ *          disconnect sequence uses an internal DisconnectPhase state
+ *          machine to:
+ *            - Request cloud disconnect and wait up to
+ *              cloudDisconnectBudgetSec (from sysStatus / Ledger).
+ *            - Power down the modem (Cellular/WiFi) and wait up to
+ *              modemOffBudgetSec.
+ *          If either budget is exceeded, alert 15 is raised and
+ *          control transfers to ERROR_STATE so the error supervisor
+ *          can decide on recovery. Once offline, the handler selects
+ *          HIBERNATE or ULTRA_LOW_POWER based on opening hours and
+ *          validates that long night sleeps are honoured.
+ */
 void handleSleepingState() {
   bool radioOn = false; // Flag to indicate if the radio is on
 #if Wiring_WiFi
@@ -173,16 +190,124 @@ void handleSleepingState() {
     state = IDLE_STATE;
     return;
   }
+  
+  // ********** Non-blocking disconnect sequence **********
+  // If we are connected to the cloud or the radio is still on, perform a
+  // phased disconnect with explicit timeouts so we never block the
+  // application thread. If already offline with radio off, skip straight
+  // to sleep configuration.
+  enum DisconnectPhase {
+    DISC_PHASE_IDLE,
+    DISC_PHASE_REQUEST_DISCONNECT,
+    DISC_PHASE_WAIT_CLOUD_OFF,
+    DISC_PHASE_REQUEST_MODEM_OFF,
+    DISC_PHASE_WAIT_MODEM_OFF,
+    DISC_PHASE_DONE
+  };
 
-  if (Particle.connected() || radioOn) {
-    // If we are connected to the cloud or the radio is on, we will disconnect
-    if (!Particle_Functions::instance().disconnectFromParticle()) {
-      // Modem or disconnect failure; raise an alert and transition to error
-      // handling. If another alert is already active, a higher-severity
-      // code will win.
-      current.raiseAlert(15);
-      state = ERROR_STATE;
+  static DisconnectPhase disconnectPhase = DISC_PHASE_IDLE;
+  static unsigned long discPhaseStartMs = 0;
+
+  // Use ledger-configured budgets for disconnect phases when available,
+  // falling back to conservative defaults if values are out of range.
+  uint16_t cloudBudgetSec = sysStatus.get_cloudDisconnectBudgetSec();
+  if (cloudBudgetSec < 5 || cloudBudgetSec > 120) {
+    cloudBudgetSec = 15; // default 15 seconds
+  }
+  const unsigned long cloudDisconnectBudgetMs = (unsigned long)cloudBudgetSec * 1000UL;
+
+  uint16_t modemBudgetSec = sysStatus.get_modemOffBudgetSec();
+  if (modemBudgetSec < 5 || modemBudgetSec > 120) {
+    modemBudgetSec = 30; // default 30 seconds
+  }
+  const unsigned long modemOffBudgetMs = (unsigned long)modemBudgetSec * 1000UL;
+
+  bool needDisconnect = Particle.connected() || radioOn;
+
+  if (state != oldState) {
+    // Reset phase machine on first entry to SLEEPING_STATE
+    disconnectPhase = DISC_PHASE_IDLE;
+  }
+
+  if (needDisconnect) {
+    switch (disconnectPhase) {
+    case DISC_PHASE_IDLE:
+      // Start by requesting a cloud disconnect if currently connected
+      if (Particle.connected()) {
+        Log.info("Requesting Particle cloud disconnect before sleep");
+        Particle.disconnect();
+      }
+      discPhaseStartMs = millis();
+      disconnectPhase = DISC_PHASE_WAIT_CLOUD_OFF;
+      return; // Allow state machine to advance on subsequent loop iterations
+
+    case DISC_PHASE_WAIT_CLOUD_OFF:
+      if (!Particle.connected()) {
+        // Cloud is disconnected; proceed to modem power down if radio is on
+#if Wiring_Cellular || Wiring_WiFi
+        if (radioOn) {
+          Log.info("Cloud disconnected - powering down modem before sleep");
+          discPhaseStartMs = millis();
+          disconnectPhase = DISC_PHASE_REQUEST_MODEM_OFF;
+          return;
+        }
+#endif
+        // No radio to power down; disconnect complete
+        disconnectPhase = DISC_PHASE_DONE;
+        break;
+      }
+
+      if (millis() - discPhaseStartMs > cloudDisconnectBudgetMs) {
+        Log.warn("Cloud disconnect exceeded budget (%lu ms) - raising alert 15",
+                 (unsigned long)(millis() - discPhaseStartMs));
+        current.raiseAlert(15);
+        state = ERROR_STATE;
+        disconnectPhase = DISC_PHASE_IDLE;
+        return;
+      }
+      return; // Still waiting for cloud to disconnect
+
+    case DISC_PHASE_REQUEST_MODEM_OFF:
+#if Wiring_Cellular
+      Log.info("Disconnecting from cellular network and powering down modem");
+      Cellular.disconnect();
+      Cellular.off();
+#elif Wiring_WiFi
+      Log.info("Disconnecting from WiFi network and powering down modem");
+      WiFi.disconnect();
+      WiFi.off();
+#endif
+      discPhaseStartMs = millis();
+      disconnectPhase = DISC_PHASE_WAIT_MODEM_OFF;
       return;
+
+    case DISC_PHASE_WAIT_MODEM_OFF: {
+      bool modemOff = true;
+#if Wiring_Cellular
+      modemOff = !Cellular.isOn();
+#elif Wiring_WiFi
+      modemOff = !WiFi.isOn();
+#endif
+      if (modemOff) {
+        Log.info("Modem powered down successfully before sleep");
+        disconnectPhase = DISC_PHASE_DONE;
+        break;
+      }
+
+      if (millis() - discPhaseStartMs > modemOffBudgetMs) {
+        Log.warn("Modem power-down exceeded budget (%lu ms) - raising alert 15",
+                 (unsigned long)(millis() - discPhaseStartMs));
+        current.raiseAlert(15);
+        state = ERROR_STATE;
+        disconnectPhase = DISC_PHASE_IDLE;
+        return;
+      }
+      return; // Still waiting for modem to power down
+    }
+
+    case DISC_PHASE_DONE:
+      // Disconnect completed; fall through to sleep configuration below.
+      break;
     }
   }
 
@@ -500,23 +625,66 @@ void handleReportingState() {
   }
 }
 
-// CONNECTING_STATE: Establish cloud connection, then load config
+/**
+ * @brief CONNECTING_STATE: establish cloud connection using a phased,
+ *        non-blocking state machine.
+ *
+ * @details Uses an internal ConnectPhase enum to break connection
+ *          into small steps that each complete within a single loop()
+ *          iteration:
+ *            - CONN_PHASE_START: log signal strength and request
+ *              Particle.connect().
+ *            - CONN_PHASE_WAIT_CLOUD: poll Particle.connected() up to
+ *              connectAttemptBudgetSec (from sysStatus / Ledger),
+ *              raising alert 31 on timeout.
+ *            - CONN_PHASE_LOAD_CONFIG: load configuration from cloud
+ *              ledgers and raise alert 41 on failure.
+ *            - CONN_PHASE_PUBLISH_LEDGER: optionally publish
+ *              device-data to the ledger (skipped when entered from
+ *              REPORTING_STATE to avoid clobbering hourlyCount), log
+ *              queue depth, and transition to FIRMWARE_UPDATE_STATE
+ *              when updates are pending or back to IDLE_STATE.
+ *          Connection duration is tracked in sysStatus so budgets and
+ *          field behaviour can be analysed from device-status data.
+ */
 void handleConnectingState() {
-  static unsigned long connectionStartTimeStamp; // Time helps us know how long it took to connect
-  // Persist whether we entered from REPORTING_STATE so we can avoid
-  // immediately overwriting the just-published hourlyCount in the
-  // device-data ledger.
-  static bool lastEnteredFromReporting = false;
-  char data[64];                                  // Holder for message strings
+  static unsigned long connectionStartTimeStamp; // When this connect attempt started
+  static bool lastEnteredFromReporting = false;  // Whether we came from REPORTING_STATE
 
-  if (state != oldState) { // One-time actions when entering state
-    lastEnteredFromReporting = (oldState == REPORTING_STATE);
+  enum ConnectPhase {
+    CONN_PHASE_IDLE,
+    CONN_PHASE_START,
+    CONN_PHASE_WAIT_CLOUD,
+    CONN_PHASE_LOAD_CONFIG,
+    CONN_PHASE_PUBLISH_LEDGER,
+    CONN_PHASE_COMPLETE
+  };
 
-    // Reset connection duration (will be updated once connected)
-    sysStatus.set_lastConnectionDuration(0);
+  static ConnectPhase connectPhase = CONN_PHASE_IDLE;
+  char data[64]; // Holder for message strings
+
+  if (state != oldState) {
+    // One-time actions when entering CONNECTING_STATE
     publishStateTransition();
-    connectionStartTimeStamp = millis(); // Use millis as the clock may get reset on connect
+    lastEnteredFromReporting = (oldState == REPORTING_STATE);
+    sysStatus.set_lastConnectionDuration(0);
+    connectionStartTimeStamp = millis();
+    connectPhase = CONN_PHASE_START;
+  }
 
+  unsigned long elapsedMs = millis() - connectionStartTimeStamp;
+  sysStatus.set_lastConnectionDuration(int(elapsedMs / 1000));
+
+  // Use a ledger-configured budget when available; otherwise fall back
+  // to the compiled default maxConnectAttemptMs constant.
+  unsigned long budgetMs = maxConnectAttemptMs;
+  uint16_t budgetSec = sysStatus.get_connectAttemptBudgetSec();
+  if (budgetSec >= 30 && budgetSec <= 900) {
+    budgetMs = (unsigned long)budgetSec * 1000UL;
+  }
+
+  switch (connectPhase) {
+  case CONN_PHASE_START: {
     // Log signal strength at start of connection attempt for field
     // correlation with connectivity failures (alert 31). On cellular
     // platforms this gives us a baseline RSSI before the modem fully
@@ -529,30 +697,45 @@ void handleConnectingState() {
              (double)strengthPct, (double)qualityPct);
 #endif
 
-    Particle.connect();                  // Ask Device OS to connect; we'll poll status
+    Log.info("Requesting Particle cloud connection");
+    Particle.connect(); // Ask Device OS to connect; we'll poll status
+    connectPhase = CONN_PHASE_WAIT_CLOUD;
+    break;
   }
 
-  unsigned long elapsedMs = millis() - connectionStartTimeStamp;
-  sysStatus.set_lastConnectionDuration(int(elapsedMs / 1000));
+  case CONN_PHASE_WAIT_CLOUD:
+    if (Particle.connected()) {
+      // Connection established within budget
+      sysStatus.set_lastConnection(Time.now());
+      stayAwake = stayAwakeLong;
+      stayAwakeTimeStamp = millis();
+      measure.getSignalStrength();
+      measure.batteryState();
+      Log.info("Enclosure temperature at connect: %4.2f C", (double)current.get_internalTempC());
+      snprintf(data, sizeof(data), "Connected in %i secs", sysStatus.get_lastConnectionDuration());
+      Log.info(data);
+      if (sysStatus.get_verboseMode()) {
+        Particle.publish("Cellular", data, PRIVATE);
+      }
 
-  if (Particle.connected()) {
-    sysStatus.set_lastConnection(Time.now()); // This is the last time we last connected
-    // Keep device awake for a while after connection for troubleshooting
-    stayAwake = stayAwakeLong;
-    stayAwakeTimeStamp = millis(); // Start the stay awake timer now
-    measure.getSignalStrength();   // Test signal strength while radio is on
-    measure.batteryState();        // Refresh SoC and enclosure temperature on connect
-    Log.info("Enclosure temperature at connect: %4.2f C", (double)current.get_internalTempC());
-    snprintf(data, sizeof(data), "Connected in %i secs", sysStatus.get_lastConnectionDuration());
-    Log.info(data);
-    if (sysStatus.get_verboseMode()) {
-      Particle.publish("Cellular", data, PRIVATE);
+      // Track when we first became cloud-connected for this connection cycle
+      onlineWorkStartMs = millis();
+      forceSleepThisCycle = false;
+
+      connectPhase = CONN_PHASE_LOAD_CONFIG;
+    } else if (elapsedMs > budgetMs) {
+      // Connection timeout based on per-wake budget; record a connectivity
+      // alert and let the error handler decide what to do next. If multiple
+      // alerts are present, the highest-severity one is preserved.
+      Log.warn("Connection attempt exceeded budget (%lu ms > %lu ms) - raising alert 31",
+               (unsigned long)elapsedMs, (unsigned long)budgetMs);
+      current.raiseAlert(31);
+      state = ERROR_STATE;
+      connectPhase = CONN_PHASE_IDLE;
     }
+    break;
 
-    // Track when we first became cloud-connected for this connection cycle
-    onlineWorkStartMs = millis();
-    forceSleepThisCycle = false;
-
+  case CONN_PHASE_LOAD_CONFIG: {
     // Load configuration from cloud ledgers after connecting
     bool configOk = Cloud::instance().loadConfigurationFromCloud();
     if (!configOk) {
@@ -560,7 +743,11 @@ void handleConnectingState() {
       // the error supervisor can evaluate and potentially reset.
       current.raiseAlert(41);
     }
+    connectPhase = CONN_PHASE_PUBLISH_LEDGER;
+    break;
+  }
 
+  case CONN_PHASE_PUBLISH_LEDGER: {
     // After a successful connect, publish the latest counters and
     // temperature to the device-data ledger so the cloud view reflects
     // current state even if a regular hourly report has not yet run.
@@ -598,25 +785,16 @@ void handleConnectingState() {
     } else {
       state = IDLE_STATE; // Return to idle once connected and configured
     }
-  } else {
-    // Use a ledger-configured budget when available; otherwise fall back
-    // to the compiled default maxConnectAttemptMs constant.
-    unsigned long budgetMs = maxConnectAttemptMs;
-    uint16_t budgetSec = sysStatus.get_connectAttemptBudgetSec();
-    if (budgetSec >= 30 && budgetSec <= 900) {
-      budgetMs = (unsigned long)budgetSec * 1000UL;
-    }
 
-    if (elapsedMs > budgetMs) {
-      // Connection timeout based on per-wake budget; record a connectivity
-      // alert and let the error handler decide what to do next. If multiple
-      // alerts are present, the highest-severity one is preserved.
-      Log.warn("Connection attempt exceeded budget (%lu ms > %lu ms) - raising alert 31",
-               (unsigned long)elapsedMs, (unsigned long)budgetMs);
-      current.raiseAlert(31);
-      state = ERROR_STATE; // Note - not setting the ERROR timestamp to make this go quickly
-    }
-    // Otherwise, remain in CONNECTING_STATE and loop
+    connectPhase = CONN_PHASE_COMPLETE;
+    break;
+  }
+
+  case CONN_PHASE_COMPLETE:
+  case CONN_PHASE_IDLE:
+  default:
+    // Nothing to do; state transition will move us out of CONNECTING_STATE.
+    break;
   }
 }
 

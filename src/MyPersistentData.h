@@ -128,14 +128,6 @@ public:
 	 */
 	void initialize();
 
-	/**
-     * @brief Disconnects from the Particle network completely
-     * 
-     * @return true 
-     * @return false 
-     */
-    bool disconnectFromParticle();
-
 
 
 	class SysData {
@@ -172,6 +164,8 @@ public:
 		uint16_t connectedReportingIntervalSec;           // Reporting interval in seconds when in CONNECTED mode
 		uint16_t lowPowerReportingIntervalSec;            // Reporting interval in seconds when in LOW_POWER mode
 		uint16_t connectAttemptBudgetSec;                 // Max seconds to spend attempting a cloud connect per wake
+		uint16_t cloudDisconnectBudgetSec;                // Max seconds to wait for cloud disconnect before error
+		uint16_t modemOffBudgetSec;                       // Max seconds to wait for modem power-down before error
 
 	};
 
@@ -283,6 +277,12 @@ public:
 
 	uint16_t get_connectAttemptBudgetSec() const;
 	void set_connectAttemptBudgetSec(uint16_t value);
+
+	uint16_t get_cloudDisconnectBudgetSec() const;
+	void set_cloudDisconnectBudgetSec(uint16_t value);
+
+	uint16_t get_modemOffBudgetSec() const;
+	void set_modemOffBudgetSec(uint16_t value);
 
 
 	//Members here are internal only and therefore protected

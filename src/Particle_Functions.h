@@ -11,16 +11,12 @@
 #define __PARTICLE_FUNCTIONS_H
 
 #include "Particle.h"
-#include "Cloud.h"
 
 /**
  * This class is a singleton; you do not create one as a global, on the stack, or with new.
  * 
  * From global application setup you must call:
  * Particle_Functions::instance().setup();
- * 
- * From global application loop you must call:
- * Particle_Functions::instance().loop();
  */
 class Particle_Functions {
 public:
@@ -37,37 +33,6 @@ public:
      * You typically use Particle_Functions::instance().setup();
      */
     void setup();
-
-    /**
-     * @brief Perform application loop operations; call this from global application loop()
-     * 
-     * You typically use Particle_Functions::instance().loop();
-     */
-    void loop();
-
-    /**
-     * @brief Connect to the Particle cloud and load configuration
-     * 
-     * This function connects to cloud and triggers configuration loading
-     * Called when device needs to get/update configuration
-     */
-    void connectToCloudAndLoadConfig();
-    
-    /**
-     * @brief Connect to the Particle cloud
-     * 
-     * This function connects to the Particle cloud
-     * Called when device needs to connect to cloud
-     */
-    void connectToCloud();
-    
-    /**
-     * @brief Disconnects from the Particle network completely
-     * 
-     * @return true 
-     * @return false 
-     */
-    bool disconnectFromParticle();
 
 protected:
     /**
