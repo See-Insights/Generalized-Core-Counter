@@ -78,11 +78,20 @@ bool sysStatusData::validate(size_t dataSize) {
     if (valid) {
         // If test1 < 0 or test1 > 100, then the data is invalid
 
-        if (sysStatus.get_openTime() < 0 || sysStatus.get_openTime() > 12) {
+        // openTime is an hour-of-day in local time (0-23)
+        if (sysStatus.get_openTime() > 23) {
             Log.info("data not valid open time =%d", sysStatus.get_openTime());
             valid = false;
         }
-        else if (sysStatus.get_lastConnection() < 0 || sysStatus.get_lastConnectionDuration() > 900) {
+
+        // closeTime is allowed to be 24 as a sentinel for "always open"
+        if (sysStatus.get_closeTime() > 24) {
+            Log.info("data not valid close time =%d", sysStatus.get_closeTime());
+            valid = false;
+        }
+
+        // Last connection duration sanity check (seconds)
+        if (sysStatus.get_lastConnectionDuration() > 900) {
             Log.info("data not valid last connection duration =%d", sysStatus.get_lastConnectionDuration());
             valid = false;
         }

@@ -50,3 +50,6 @@ All notable changes to this project will be documented in this file.
 ## 3.12 – 2026-01-14
 - Watchdogs for resilency and reconnection
 
+## 3.13 – 2026-01-14
+- hardware testing with optimizations
+

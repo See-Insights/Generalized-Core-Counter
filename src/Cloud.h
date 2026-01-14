@@ -90,6 +90,15 @@ public:
      */
     bool publishDataToLedger();
 
+    /**
+     * @brief Service deferred cloud work; call from main loop.
+     *
+     * Used to keep any ledger/status publishing out of callback context
+     * and to avoid stacking multiple expensive operations in a single
+     * loop() iteration.
+     */
+    void loop();
+
 private:
     /**
      * @brief Apply configuration from DeviceInfoLedger to persistent storage
@@ -212,6 +221,10 @@ private:
      * was successfully applied during the most recent merge.
      */
     bool lastApplySuccess;
+
+    // Deferred work flags
+    bool pendingStatusPublish;
+    bool pendingConfigApply;
 
 protected:
     /**

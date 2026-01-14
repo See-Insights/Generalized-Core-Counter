@@ -43,6 +43,8 @@ Sensor Support (Extensible):
 
 ## Documentation
 
+- Bench validation checklist: [docs/bench-validation.md](docs/bench-validation.md)
+
 - Generated API reference (Doxygen): [docs/html/index.html](docs/html/index.html)
 
 ## Architecture

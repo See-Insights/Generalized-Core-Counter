@@ -177,14 +177,17 @@ void handleIdleState() {
  *          validates that long night sleeps are honoured.
  */
 void handleSleepingState() {
+  bool enteredState = (state != oldState);
   bool radioOn = false; // Flag to indicate if the radio is on
 #if Wiring_WiFi
-  radioOn = WiFi.ready(); // Check if the WiFi is ready
+  // Use isOn() (power state), not ready() (network-ready), so we never
+  // accidentally skip powering down a modem that is still consuming power.
+  radioOn = WiFi.isOn();
 #elif Wiring_Cellular
-  radioOn = Cellular.ready(); // Check if the Cellular is ready
+  radioOn = Cellular.isOn();
 #endif
 
-  if (state != oldState) {
+  if (enteredState) {
     publishStateTransition();
   }
 
@@ -237,7 +240,7 @@ void handleSleepingState() {
 
   bool needDisconnect = Particle.connected() || radioOn;
 
-  if (state != oldState) {
+  if (enteredState) {
     // Reset phase machine on first entry to SLEEPING_STATE
     disconnectPhase = DISC_PHASE_IDLE;
   }
@@ -425,9 +428,7 @@ void handleSleepingState() {
   // When debugging over USB, the host often disconnects/reconnects the
   // serial port across ULTRA_LOW_POWER sleep. Give it a brief window to
   // reattach before emitting logs so wake events are visible.
-  if (sysStatus.get_serialConnected()) {
-    waitFor(Serial.isConnected, 5000);
-  }
+  // Non-blocking: do not wait for Serial; log immediately when available.
 
   time_t sleepEnd = Time.isValid() ? Time.now() : 0;
 
@@ -740,6 +741,18 @@ void handleConnectingState() {
       Log.warn("Connection attempt exceeded budget (%lu ms > %lu ms) - raising alert 31",
                (unsigned long)elapsedMs, (unsigned long)budgetMs);
       current.raiseAlert(31);
+
+      // Safety: ensure we don't leave the modem powered unintentionally after
+      // a failed/partial connect attempt. These calls are non-blocking.
+      Particle.disconnect();
+    #if Wiring_Cellular
+      Cellular.disconnect();
+      Cellular.off();
+    #elif Wiring_WiFi
+      WiFi.disconnect();
+      WiFi.off();
+    #endif
+
       state = ERROR_STATE;
       connectPhase = CONN_PHASE_IDLE;
     }
@@ -957,6 +970,18 @@ void handleErrorState() {
 
   if (state != oldState) {
     publishStateTransition();
+
+    // Safety: regardless of recovery choice, do not leave radio/modem powered
+    // while we sit in ERROR_STATE waiting for reset/backoff.
+    Particle.disconnect();
+#if Wiring_Cellular
+    Cellular.disconnect();
+    Cellular.off();
+#elif Wiring_WiFi
+    WiFi.disconnect();
+    WiFi.off();
+#endif
+
     resolution = resolveErrorAction();
     Log.info("Entering ERROR_STATE with alert=%d, resetCount=%u, resolution=%d",
              current.get_alertCode(), sysStatus.get_resetCount(), resolution);

@@ -51,8 +51,8 @@ Particle_Functions::Particle_Functions() {}
 Particle_Functions::~Particle_Functions() {}
 
 void Particle_Functions::setup() {
-  if (sysStatus.get_serialConnected())
-    waitFor(Serial.isConnected, 10000); // Wait for serial connection
+  // Do not block waiting for USB serial; if a host is connected, logs
+  // will be visible. This firmware is designed to run unattended.
 
   Log.info(
       "Initializing Particle functions and variables"); // Note: Don't have to

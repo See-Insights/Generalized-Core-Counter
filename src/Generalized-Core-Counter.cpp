@@ -75,6 +75,11 @@ void UbidotsHandler(const char *event, const char *data); // Webhook response ha
 void publishStartupStatus();  // One-time status summary at boot
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE); // Safe diagnostic publish with queue guard
 
+// ApplicationWatchdog expects a plain function pointer.
+static void appWatchdogHandler() {
+  System.reset();
+}
+
 // Helper to determine whether current *local* time is within park open hours.
 // Local time is derived from LocalTimeRK using the configured timezone.
 // If time is not yet valid, we treat it as "open" so the device can start
@@ -195,9 +200,9 @@ bool lastLowPowerMode = false;             // Tracks previous lowPowerMode to de
 bool hibernateDisabledForSession = false; // Disable HIBERNATE after first failure
 
 void setup() {
-  // Wait for serial connection for debugging (10 second timeout)
-  waitFor(Serial.isConnected, 10000);
-  delay(1000); // Give USB serial a moment before logging
+  // Do not block on USB serial in production firmware. If a host is
+  // connected, logs will appear; otherwise the device proceeds immediately.
+  // (Strict requirement: main loop must not block >100 ms.)
   
   Log.info("===== Firmware Version %s =====", FIRMWARE_VERSION);
   Log.info("===== Release Notes: %s =====", FIRMWARE_RELEASE_NOTES);
@@ -211,7 +216,7 @@ void setup() {
   // This catches state machine hangs, blocking operations, and cellular/cloud
   // stalls that exceed our non-blocking design intent. The AB1805 hardware
   // watchdog (124s) provides ultimate backstop if this software watchdog fails.
-  static ApplicationWatchdog appWatchdog(60000, System.reset, 1536);
+  static ApplicationWatchdog appWatchdog(60000, appWatchdogHandler, 1536);
   Log.info("Application watchdog enabled: 60s timeout");
 
   // Subscribe to the Ubidots integration response event so we can track
@@ -424,6 +429,10 @@ void loop() {
   // Housekeeping for each transit of the main loop
   current.loop();
   sysStatus.loop();
+  sensorConfig.loop();
+
+  // Service deferred cloud work (ledger status publishes, etc.)
+  Cloud::instance().loop();
 
   // Service outgoing publish queue
   PublishQueuePosix::instance().loop();

@@ -29,6 +29,8 @@ Cloud &Cloud::instance() {
 
 Cloud::Cloud() : ledgersSynced(false), lastApplySuccess(true) {
     lastPublishedStatus = "";
+    pendingStatusPublish = false;
+    pendingConfigApply = false;
 }
 
 Cloud::~Cloud() {
@@ -58,14 +60,18 @@ void Cloud::setup() {
 // Static callbacks
 void Cloud::onDefaultSettingsSync(Ledger ledger) {
     Log.info("default-settings synced from cloud");
-    Cloud::instance().mergeConfiguration();
+    // Do not merge/apply inside async callbacks; keep expensive work
+    // in the main application thread/state machine.
     Cloud::instance().ledgersSynced = true;
+    Cloud::instance().pendingConfigApply = true;
 }
 
 void Cloud::onDeviceSettingsSync(Ledger ledger) {
     Log.info("device-settings synced from cloud");
-    Cloud::instance().mergeConfiguration();
+    // Do not merge/apply inside async callbacks; keep expensive work
+    // in the main application thread/state machine.
     Cloud::instance().ledgersSynced = true;
+    Cloud::instance().pendingConfigApply = true;
 }
 
 void Cloud::mergeConfiguration() {
@@ -143,7 +149,9 @@ void Cloud::mergeConfiguration() {
     if (device.has("messaging")) mergedConfig.set("messaging", device.get("messaging"));
     if (device.has("modes")) mergedConfig.set("modes", device.get("modes"));
     
-    Log.info("Merged config: %s", mergedConfig.toJSON().c_str());
+    if (sysStatus.get_verboseMode()) {
+        Log.info("Merged config: %s", mergedConfig.toJSON().c_str());
+    }
     Log.info("Configuration merged - applying to device");
     lastApplySuccess = applyConfigurationFromLedger();
 }
@@ -170,25 +178,39 @@ bool Cloud::applyConfigurationFromLedger() {
     success &= applyModesConfig();
     
     if (success) {
-        // Force immediate write of all configuration changes to storage.
-        // The default 100ms delay is fine for normal runtime updates, but
-        // after receiving cloud configuration we need to guarantee the new
-        // values are persisted before any potential reset or power loss.
-        sysStatus.flush(true);
-        sensorConfig.flush(true);
-        
-        Log.info("Configuration successfully applied to persistent storage");
+        // Do not force synchronous storage flushes here; they can exceed the
+        // 100 ms loop budget. Persistence is handled by sysStatus.loop() and
+        // sensorConfig.loop() (called from the main loop).
+        Log.info("Configuration successfully applied (persistence deferred)");
         sysStatus.validate(sizeof(sysStatus));
         sensorConfig.validate(sizeof(sensorConfig));
 
-        // After applying configuration, publish the current settings
-        // to the device-status ledger so the cloud view stays in sync.
-        writeDeviceStatusToCloud();
+        // Defer device-status publishing to Cloud::loop() so it doesn't
+        // execute inside CONNECTING_STATE or async callbacks.
+        pendingStatusPublish = true;
     } else {
         Log.warn("Some configuration sections failed to apply");
     }
     
     return success;
+}
+
+void Cloud::loop() {
+    // Apply any newly-synced configuration outside callback context.
+    // Do at most one deferred operation per loop() pass.
+    if (pendingConfigApply && Particle.connected()) {
+        pendingConfigApply = false;
+        mergeConfiguration();
+        return;
+    }
+
+    // Publish device-status updates opportunistically when connected.
+    // Do at most one deferred operation per loop() pass.
+    if (pendingStatusPublish && Particle.connected()) {
+        if (writeDeviceStatusToCloud()) {
+            pendingStatusPublish = false;
+        }
+    }
 }
 
 bool Cloud::applyMessagingConfig() {
