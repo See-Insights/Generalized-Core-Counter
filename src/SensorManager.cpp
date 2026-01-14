@@ -218,21 +218,30 @@ bool SensorManager::batteryState() {
 #else
   // Measure enclosure temperature using the TMP36 on the carrier board
   // (connected to TMP36_SENSE_PIN, typically A4).
-  // Take multiple samples and average to reduce noise, and explicitly
-  // detect the "sensor missing / grounded" case (very low ADC reading).
+  // Non-blocking sampling: spread 8 samples across multiple batteryState()
+  // calls to avoid blocking the main loop. Each call takes one sample (~5µs ADC
+  // read) until all samples are collected, then computes the average.
   pinMode(TMP36_SENSE_PIN, INPUT);
 
   const int TMP36_SAMPLES = 8;
-  int tmpRawSum = 0;
-  int tmpRaw = 0;
-  for (int i = 0; i < TMP36_SAMPLES; i++) {
+  static int sampleIndex = 0;     // Tracks how many samples taken this cycle
+  static int tmpRawSum = 0;       // Running sum of ADC readings
+
+  if (sampleIndex < TMP36_SAMPLES) {
+    // Take one ADC sample per call, accumulate into sum
     int v = analogRead(TMP36_SENSE_PIN);
     tmpRawSum += v;
-    // Short settle delay between samples; keeps cloud serviced via
-    // background System threads so we can use delay() safely here.
-    delay(5);
+    sampleIndex++;
+    
+    // Not done yet; use previous temperature value and return early.
+    // Caller can call batteryState() again on next loop to continue sampling.
+    return current.get_stateOfCharge() > 20.0f;
   }
-  tmpRaw = tmpRawSum / TMP36_SAMPLES;
+
+  // All samples collected; compute average and reset for next cycle
+  int tmpRaw = tmpRawSum / TMP36_SAMPLES;
+  sampleIndex = 0;
+  tmpRawSum = 0;
 
   // Consider extremely low readings as "sensor not present". With a TMP36,
   // even very cold temperatures should still be around 100mV (roughly 120

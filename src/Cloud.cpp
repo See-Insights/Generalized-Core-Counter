@@ -170,6 +170,13 @@ bool Cloud::applyConfigurationFromLedger() {
     success &= applyModesConfig();
     
     if (success) {
+        // Force immediate write of all configuration changes to storage.
+        // The default 100ms delay is fine for normal runtime updates, but
+        // after receiving cloud configuration we need to guarantee the new
+        // values are persisted before any potential reset or power loss.
+        sysStatus.flush(true);
+        sensorConfig.flush(true);
+        
         Log.info("Configuration successfully applied to persistent storage");
         sysStatus.validate(sizeof(sysStatus));
         sensorConfig.validate(sizeof(sensorConfig));

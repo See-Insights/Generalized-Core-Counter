@@ -34,6 +34,9 @@
 
 #include "MyPersistentData.h"
 
+// Forward declaration for safe diagnostic publishing (defined in Generalized-Core-Counter.cpp)
+bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE);
+
 // *******************  SysStatus Storage Object **********************
 //
 // ********************************************************************
@@ -93,7 +96,7 @@ void sysStatusData::initialize() {
 
     const char message[26] = "Loading System Defaults";
     Log.info(message);
-    if (Particle.connected()) Particle.publish("Mode",message, PRIVATE);
+    if (Particle.connected()) publishDiagnosticSafe("Mode", message, PRIVATE);
     Log.info("Loading system defaults");
     sysStatus.set_structuresVersion(1);
     sysStatus.set_verboseMode(false);

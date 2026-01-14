@@ -14,8 +14,9 @@
 // for firmware updates before going back to sleep.
 static const unsigned long firmwareUpdateMaxMs = 5UL * 60UL * 1000UL;
 
-// Forward declaration for internal error supervisor helper
+// Forward declarations
 static int resolveErrorAction();
+extern bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags);
 
 // IDLE_STATE: Awake, monitoring sensor and deciding what to do next
 void handleIdleState() {
@@ -23,12 +24,10 @@ void handleIdleState() {
     publishStateTransition();
   }
 
-  // ********** Counting Mode / Trigger Behaviour **********
-  // COUNTING and OCCUPANCY use interrupt-driven handlers.
-  // SCHEDULED uses time-based sampling (non-interrupt).
-  uint8_t countingMode = sysStatus.get_countingMode();
-
-  if (countingMode == SCHEDULED) {
+  // ********** Scheduled Mode Sampling **********
+  // SCHEDULED mode uses time-based sampling (non-interrupt).
+  // Interrupt-driven modes (COUNTING/OCCUPANCY) are handled centrally in main loop().
+  if (sysStatus.get_countingMode() == SCHEDULED) {
     if (Time.isValid()) {
       static time_t lastScheduledSample = 0;
       uint16_t intervalSec = sysStatus.get_reportingInterval();
@@ -42,14 +41,6 @@ void handleIdleState() {
         Log.info("Scheduled trigger sample - battery SoC: %4.2f%%", (double)current.get_stateOfCharge());
         lastScheduledSample = now;
       }
-    }
-  } else {
-    // ********** Mode-Specific Sensor Handling (Interrupt-driven) **********
-    // Call the appropriate handler based on counting mode configuration
-    if (countingMode == COUNTING) {
-      handleCountingMode();  // Count each sensor event
-    } else if (countingMode == OCCUPANCY) {
-      handleOccupancyMode(); // Track occupied/unoccupied state
     }
   }
 
@@ -79,6 +70,28 @@ void handleIdleState() {
     time_t lastReport = sysStatus.get_lastReport();
     if (lastReport == 0 || (now - lastReport) >= intervalSec) {
       state = REPORTING_STATE;
+      return;
+    }
+  }
+
+  // ********** Cumulative Offline Watchdog **********
+  // During open hours in CONNECTED mode with adequate battery, enforce
+  // a maximum offline duration to prevent prolonged disconnection from
+  // draining battery or losing critical events. This complements the
+  // per-attempt connectAttemptBudgetSec by catching cumulative failures.
+  if (Time.isValid() && isWithinOpenHours() && 
+      sysStatus.get_operatingMode() == CONNECTED && 
+      current.get_stateOfCharge() > 35) {
+    
+    time_t lastConn = sysStatus.get_lastConnection();
+    time_t now = Time.now();
+    const time_t maxOfflineSec = 3 * 3600L; // 3 hours
+    
+    if (lastConn != 0 && (now - lastConn) > maxOfflineSec && !Particle.connected()) {
+      Log.error("Offline for >3 hours during open hours (last=%ld, now=%ld) - forcing connection",
+                (long)lastConn, (long)now);
+      current.raiseAlert(44); // New alert: prolonged offline
+      state = REPORTING_STATE; // Force report + connect
       return;
     }
   }
@@ -421,18 +434,15 @@ void handleSleepingState() {
   Log.info("Woke from ULTRA_LOW_POWER sleep: reason=%d, pin=%d",
            (int)result.wakeupReason(), (int)result.wakeupPin());
 
-  // Detect clearly abnormal ULTRA_LOW_POWER wakes during the long
-  // night-sleep window: we requested a long nightSleepSec duration
-  // but the wall-clock time advanced by less than a minute. This
-  // indicates that deep sleep is not being honoured and we should
-  // escalate to the error supervisor instead of looping.
-  if (!isWithinOpenHours() && nightSleepSec > 0 &&
-      wakeInSeconds == nightSleepSec &&
-      sleepStart != 0 && sleepEnd != 0) {
+  // Detect abnormal ULTRA_LOW_POWER wakes: if we requested a sleep
+  // duration >5 minutes but wall-clock time advanced by <1 minute,
+  // deep sleep is not being honoured. This catches platform issues
+  // early and prevents rapid wake/sleep battery drain.
+  if (sleepStart != 0 && sleepEnd != 0 && wakeInSeconds > 300) {
     time_t slept = sleepEnd - sleepStart;
     if (slept < 60) {
-      Log.error("Unexpected short ULTRA_LOW_POWER sleep during night window (slept=%ld s, expected=%d s) - raising alert 16",
-                (long)slept, wakeInSeconds);
+      Log.error("Sleep failure: requested %d s but only slept %ld s - raising alert 16",
+                wakeInSeconds, (long)slept);
       current.raiseAlert(16);
       onlineWorkStartMs = 0;
       forceSleepThisCycle = false;
@@ -715,7 +725,7 @@ void handleConnectingState() {
       snprintf(data, sizeof(data), "Connected in %i secs", sysStatus.get_lastConnectionDuration());
       Log.info(data);
       if (sysStatus.get_verboseMode()) {
-        Particle.publish("Cellular", data, PRIVATE);
+        publishDiagnosticSafe("Cellular", data, PRIVATE);
       }
 
       // Track when we first became cloud-connected for this connection cycle
@@ -887,6 +897,7 @@ static int resolveErrorAction() {
 
   case 15: // modem or disconnect failure
   case 31: // failed to connect to cloud
+  case 44: // prolonged offline (>3 hours during open hours)
     if (resets >= 4) {
       Log.info("Connectivity alert %d with reset count=%u; suppressing further resets", alert, resets);
       return 0;

@@ -73,6 +73,7 @@ void countSignalTimerISR();   // Timer ISR to turn off BLUE LED
 void dailyCleanup();          // Reset daily counters and housekeeping
 void UbidotsHandler(const char *event, const char *data); // Webhook response handler
 void publishStartupStatus();  // One-time status summary at boot
+bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE); // Safe diagnostic publish with queue guard
 
 // Helper to determine whether current *local* time is within park open hours.
 // Local time is derived from LocalTimeRK using the configured timezone.
@@ -206,6 +207,13 @@ void setup() {
                                  // safety tip. If we run out of memory a
                                  // System.reset() is done.
 
+  // Application watchdog: reset if loop() doesn't execute within 60 seconds.
+  // This catches state machine hangs, blocking operations, and cellular/cloud
+  // stalls that exceed our non-blocking design intent. The AB1805 hardware
+  // watchdog (124s) provides ultimate backstop if this software watchdog fails.
+  static ApplicationWatchdog appWatchdog(60000, System.reset, 1536);
+  Log.info("Application watchdog enabled: 60s timeout");
+
   // Subscribe to the Ubidots integration response event so we can track
   // successful webhook deliveries and update lastHookResponse.
   {
@@ -245,6 +253,13 @@ void setup() {
   case RESET_REASON_USER:
   case RESET_REASON_WATCHDOG:
     sysStatus.set_resetCount(sysStatus.get_resetCount() + 1);
+    break;
+  case RESET_REASON_UPDATE:
+    // After OTA firmware update, force connection to reload
+    // configuration from ledger. This ensures device-settings
+    // (operatingMode, etc.) override any stale FRAM values.
+    Log.info("OTA update detected - forcing connection to reload config");
+    state = CONNECTING_STATE;
     break;
   default:
     break;
@@ -301,8 +316,16 @@ void setup() {
   if (!Time.isValid()) {
     Log.info("Time is invalid -  %s so connecting", Time.timeStr().c_str());
     state = CONNECTING_STATE;
-  } else
+  } else {
     Log.info("Time is valid - %s", Time.timeStr().c_str());
+    
+    // In CONNECTED operating mode, always connect on boot to reload
+    // configuration from ledger and prevent stuck-in-IDLE power drain.
+    if (sysStatus.get_operatingMode() == CONNECTED) {
+      Log.info("CONNECTED mode - connecting on boot to reload config");
+      state = CONNECTING_STATE;
+    }
+  }
 
   // Setup local time from persisted timezone string (POSIX TZ format).
   // Example values:
@@ -421,6 +444,18 @@ void loop() {
     state = REPORTING_STATE;
   }
 
+  // ********** Centralized sensor event handling **********
+  // Service sensor interrupts regardless of current state. This ensures
+  // counts are captured even during long-running operations like cellular
+  // connection attempts (which can take minutes) or firmware updates.
+  // SCHEDULED mode is time-based (handled in IDLE only), not interrupt-driven.
+  uint8_t countingMode = sysStatus.get_countingMode();
+  if (countingMode == COUNTING) {
+    handleCountingMode();  // Count each sensor event
+  } else if (countingMode == OCCUPANCY) {
+    handleOccupancyMode(); // Track occupied/unoccupied state
+  }
+
 } // End of loop
 
 /**
@@ -535,7 +570,7 @@ void UbidotsHandler(const char *event, const char *data) {
              "Unknown response recevied %i", atoi(data));
   }
   if (sysStatus.get_verboseMode() && Particle.connected()) {
-    Particle.publish("Ubidots Hook", responseString, PRIVATE);
+    publishDiagnosticSafe("Ubidots Hook", responseString, PRIVATE);
   }
   Log.info(responseString);
 }
@@ -543,6 +578,37 @@ void UbidotsHandler(const char *event, const char *data) {
 /**
  * @brief Publish a state transition to the log handler.
  */
+/**
+ * @brief Safely publish diagnostic message through queue with depth guard.
+ *
+ * @details Routes low-priority diagnostic messages through PublishQueuePosix
+ *          only when queue depth is below threshold, preventing displacement
+ *          of critical telemetry data during tight loops or error conditions.
+ *
+ * @param eventName The event name for the publish.
+ * @param data The event data payload.
+ * @param flags Particle publish flags (e.g., PRIVATE).
+ *
+ * @return true if message was queued or published, false if queue was too full.
+ */
+bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags) {
+  // Guard: only add diagnostics when queue has capacity for them.
+  // Reserve headroom for critical data payloads (hourly reports, alerts).
+  // Threshold: allow diagnostics if queue has <10 events pending.
+  const size_t DIAGNOSTIC_QUEUE_THRESHOLD = 10;
+  
+  size_t queueDepth = PublishQueuePosix::instance().getNumEvents();
+  
+  if (queueDepth >= DIAGNOSTIC_QUEUE_THRESHOLD) {
+    Log.info("Diagnostic publish skipped (queue depth=%u): %s", (unsigned)queueDepth, eventName);
+    return false;
+  }
+  
+  // Queue has capacity; safe to add diagnostic message
+  PublishQueuePosix::instance().publish(eventName, data, flags | WITH_ACK);
+  return true;
+}
+
 void publishStateTransition() {
   char stateTransitionString[256];
   if (state == IDLE_STATE) {
@@ -587,8 +653,7 @@ void countSignalTimerISR() { digitalWrite(BLUE_LED, LOW); }
  */
 void dailyCleanup() {
   if (Particle.connected())
-    Particle.publish("Daily Cleanup", "Running",
-                     PRIVATE); // Make sure this is being run
+    publishDiagnosticSafe("Daily Cleanup", "Running", PRIVATE);
   Log.info("Running Daily Cleanup");
   // Leave verbose mode enabled for now to aid debugging
   if (sysStatus.get_solarPowerMode() ||
