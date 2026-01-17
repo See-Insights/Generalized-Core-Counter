@@ -1,0 +1,37 @@
+var _state_machine_8h =
+[
+    [ "State", "_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8", [
+      [ "INITIALIZATION_STATE", "_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8ae6345fad0beb5f8f70fed55dcdae6003", null ],
+      [ "ERROR_STATE", "_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aa07813f3418b83dc769daa78689fb9c3", null ],
+      [ "IDLE_STATE", "_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aeca4500f6f729608a014643f8c8f4003", null ],
+      [ "SLEEPING_STATE", "_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24", null ],
+      [ "CONNECTING_STATE", "_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a549bd89b38411c3eb84cead55c7df867", null ],
+      [ "REPORTING_STATE", "_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a927b7910140065b2cef01ac3557b91a6", null ],
+      [ "FIRMWARE_UPDATE_STATE", "_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a6d4ca25a3d420813862ff4e2e874373e", null ]
+    ] ],
+    [ "dailyCleanup", "_state_machine_8h.html#a496510658b21d252547ca67ae1035445", null ],
+    [ "isWithinOpenHours", "_state_machine_8h.html#adaf14f9ee408635f2c952b99aaeda484", null ],
+    [ "publishData", "_state_machine_8h.html#a6e8d6c80794e3a266d4ef6b976e9c27c", null ],
+    [ "publishStateTransition", "_state_machine_8h.html#afb2932b86bac021e349213b370798543", null ],
+    [ "secondsUntilNextOpen", "_state_machine_8h.html#a4a15e91d0d4e7c61469be195601b2fe8", null ],
+    [ "ab1805", "_state_machine_8h.html#aa2fc2ac89f9c96bbbad1d4086a8b296d", null ],
+    [ "config", "_state_machine_8h.html#ab71602050f3582f2f394acb7c5e97606", null ],
+    [ "connectedStartMs", "_state_machine_8h.html#aae28e5f0c49a70c0b58808040acb0649", null ],
+    [ "countSignalTimer", "_state_machine_8h.html#acf7db90684edac6c3b280478fcc07db6", null ],
+    [ "dataInFlight", "_state_machine_8h.html#a6330a318d9634e00ad5fcee1ec97de86", null ],
+    [ "firstConnectionObserved", "_state_machine_8h.html#a57045c549f822ef4962889d1c333d055", null ],
+    [ "firstConnectionQueueDrainedLogged", "_state_machine_8h.html#a5b6e97ba4faba12de811107fb3e7813f", null ],
+    [ "hibernateDisabledForSession", "_state_machine_8h.html#ac2b04988d07864c6c31e1d15b9d1198c", null ],
+    [ "lastLowPowerMode", "_state_machine_8h.html#a50961227057a75c28af6af508bee601b", null ],
+    [ "maxConnectAttemptMs", "_state_machine_8h.html#ae7dc3360f1628536873428f3d0694415", null ],
+    [ "maxOnlineWorkMs", "_state_machine_8h.html#ae6b11a059587dd45cfba4c3633790ca3", null ],
+    [ "oldState", "_state_machine_8h.html#a0840b91aed028ae09ab1d7a4238569ec", null ],
+    [ "outOfMemory", "_state_machine_8h.html#a98dbb1ba2c2de8358c8e27e2fa03859c", null ],
+    [ "resetWait", "_state_machine_8h.html#a51c21d3aa0797826d2cfcf9de5c1082d", null ],
+    [ "sensorDetect", "_state_machine_8h.html#a9ae784228f6b9b5ec7d14839274b3448", null ],
+    [ "state", "_state_machine_8h.html#a876b486d3a5241a126bd5751c5f70f79", null ],
+    [ "stateNames", "_state_machine_8h.html#abcd5d33fa869a1d746ac85a5f6ac720b", null ],
+    [ "stayAwakeLong", "_state_machine_8h.html#a0fe07b60c166917b09995113865cf1b1", null ],
+    [ "userSwitchDetected", "_state_machine_8h.html#a8e11b98139fe014f3e8a660d91905438", null ],
+    [ "wakeBoundary", "_state_machine_8h.html#a3c07c9394207388fc074bbbe0075b99c", null ]
+];

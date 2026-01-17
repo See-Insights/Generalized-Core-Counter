@@ -1,0 +1,22 @@
+var searchData=
+[
+  ['secondary_0',['secondary',['../struct_sensor_data.html#a944686597d4cb47e8f9f8609aa6b3398',1,'SensorData']]],
+  ['sensor_5fdata_5fmagic_1',['SENSOR_DATA_MAGIC',['../classsensor_config_data.html#a211ef7fefd06c1d09d5e1ece1cdf6519',1,'sensorConfigData']]],
+  ['sensor_5fdata_5fversion_2',['SENSOR_DATA_VERSION',['../classsensor_config_data.html#ae141b85f451a1dedb1ba205f02da8626',1,'sensorConfigData']]],
+  ['sensordata_3',['sensorData',['../classsensor_config_data.html#ac23b86df417c05e36285218bc38e73bd',1,'sensorConfigData']]],
+  ['sensordetect_4',['sensorDetect',['../_generalized-_core-_counter_8cpp.html#a9ae784228f6b9b5ec7d14839274b3448',1,'sensorDetect:&#160;Generalized-Core-Counter.cpp'],['../_state_machine_8h.html#a9ae784228f6b9b5ec7d14839274b3448',1,'sensorDetect:&#160;Generalized-Core-Counter.cpp']]],
+  ['sensorheader_5',['sensorHeader',['../classsensor_config_data_1_1_sensor_data.html#ab28d000cd5e1c320bcdd154242ab552c',1,'sensorConfigData::SensorData']]],
+  ['sensortype_6',['sensorType',['../struct_sensor_data.html#a9b93648e0f8948636a4f8145e62833fe',1,'SensorData::sensorType'],['../classsys_status_data_1_1_sys_data.html#a35642ac84c4d8a5c1b88801fb21a6b79',1,'sysStatusData::SysData::sensorType']]],
+  ['serialconnected_7',['serialConnected',['../classsys_status_data_1_1_sys_data.html#a933291d945971f75c0fff30787b6c264',1,'sysStatusData::SysData']]],
+  ['signalstr_8',['signalStr',['../_sensor_manager_8h.html#a84ebd72a65f97fd1c2abf69b7414794c',1,'SensorManager.h']]],
+  ['solarpowermode_9',['solarPowerMode',['../classsys_status_data_1_1_sys_data.html#ad037a9c8a26bd2a9a36c6cb932f05e7b',1,'sysStatusData::SysData']]],
+  ['state_10',['state',['../_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79',1,'state:&#160;Generalized-Core-Counter.cpp'],['../_state_machine_8h.html#a876b486d3a5241a126bd5751c5f70f79',1,'state:&#160;Generalized-Core-Counter.cpp']]],
+  ['statenames_11',['stateNames',['../_generalized-_core-_counter_8cpp.html#abcd5d33fa869a1d746ac85a5f6ac720b',1,'stateNames:&#160;Generalized-Core-Counter.cpp'],['../_state_machine_8h.html#abcd5d33fa869a1d746ac85a5f6ac720b',1,'stateNames:&#160;Generalized-Core-Counter.cpp']]],
+  ['stateofcharge_12',['stateOfCharge',['../classcurrent_status_data_1_1_current_data.html#a82063c1108d32895c6354c2b9b5265e4',1,'currentStatusData::CurrentData']]],
+  ['stayawakelong_13',['stayAwakeLong',['../_state_machine_8h.html#a0fe07b60c166917b09995113865cf1b1',1,'StateMachine.h']]],
+  ['structuresversion_14',['structuresVersion',['../classsys_status_data_1_1_sys_data.html#a4595625ff422e5883ae59676ada79e6e',1,'sysStatusData::SysData']]],
+  ['sys_5fdata_5fmagic_15',['SYS_DATA_MAGIC',['../classsys_status_data.html#a8cf8d65d626ec2425d8771291009d0be',1,'sysStatusData']]],
+  ['sys_5fdata_5fversion_16',['SYS_DATA_VERSION',['../classsys_status_data.html#ab59d43806c6ae14717057ae37bac77c3',1,'sysStatusData']]],
+  ['sysdata_17',['sysData',['../classsys_status_data.html#aa9330d4fc33ab22aee26f90182266b46',1,'sysStatusData']]],
+  ['sysheader_18',['sysHeader',['../classsys_status_data_1_1_sys_data.html#aa481142f43bddd33da6a5795e90c0a06',1,'sysStatusData::SysData']]]
+];
