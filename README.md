@@ -45,7 +45,8 @@ Sensor Support (Extensible):
 
 - Bench validation checklist: [docs/bench-validation.md](docs/bench-validation.md)
 
-- Generated API reference (Doxygen): [docs/html/index.html](docs/html/index.html)
+- Generated API reference (Doxygen): [View in repository](https://github.com/See-Insights/Generalized-Core-Counter/tree/main/docs/html)
+  - To browse locally: Clone the repo and open `docs/html/index.html` in your browser
 
 ## Architecture
 

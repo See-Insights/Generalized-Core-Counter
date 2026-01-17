@@ -111,7 +111,7 @@ void sysStatusData::initialize() {
     sysStatus.set_verboseMode(false);
     sysStatus.set_lowBatteryMode(false);
     sysStatus.set_solarPowerMode(true);
-    sysStatus.set_lowPowerMode(false);          // This should be changed to true once we have tested
+    sysStatus.set_lowPowerMode(false);          // Legacy flag - kept for storage compatibility
     sysStatus.set_timeZoneStr("SGT-8");        // Default to Singapore Time (POSIX TZ string for UTC+8, no DST)
     sysStatus.set_sensorType(1);                // PIR sensor
     sysStatus.set_openTime(0);

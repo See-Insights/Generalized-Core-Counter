@@ -10,12 +10,9 @@
  */
 
 #include "Cloud.h"
-#include "Version.h"
 
-// Forward declarations in case Version.h is not picked up correctly
-// by the build system in this translation unit.
+// External firmware version string (defined in Version.cpp)
 extern const char* FIRMWARE_VERSION;
-extern const char* FIRMWARE_RELEASE_NOTES;
 
 Cloud *Cloud::_instance;
 
@@ -154,6 +151,10 @@ void Cloud::mergeConfiguration() {
     }
     Log.info("Configuration merged - applying to device");
     lastApplySuccess = applyConfigurationFromLedger();
+
+    if (!lastApplySuccess) {
+        Log.warn("Configuration apply failed");
+    }
 }
 
 bool Cloud::loadConfigurationFromCloud() {
@@ -167,10 +168,9 @@ bool Cloud::loadConfigurationFromCloud() {
 
 bool Cloud::applyConfigurationFromLedger() {
     Log.info("Applying merged configuration from DeviceConfigLedger");
-    
+
     bool success = true;
-    
-    // Apply each configuration section
+
     success &= applySensorConfig();
     success &= applyTimingConfig();
     success &= applyPowerConfig();
@@ -425,29 +425,9 @@ bool Cloud::applyModesConfig() {
         int operatingMode = modes.get("operatingMode").asInt();
         if (validateRange(operatingMode, 0, 2, "operatingMode")) {
             sysStatus.set_operatingMode(static_cast<OperatingMode>(operatingMode));
-
-            // Keep legacy booleans in sync so the rest of the
-            // firmware can continue to use lowPowerMode and
-            // disconnectedMode without change.
-            switch (operatingMode) {
-            case CONNECTED:
-                sysStatus.set_lowPowerMode(false);
-                sysStatus.set_disconnectedMode(false);
-                Log.info("Operating mode set to CONNECTED");
-                break;
-
-            case LOW_POWER:
-                sysStatus.set_lowPowerMode(true);
-                sysStatus.set_disconnectedMode(false);
-                Log.info("Operating mode set to LOW_POWER");
-                break;
-
-            case DISCONNECTED:
-                sysStatus.set_lowPowerMode(false);
-                sysStatus.set_disconnectedMode(true);
-                Log.info("Operating mode set to DISCONNECTED");
-                break;
-            }
+            Log.info("Operating mode set to: %d (%s)", operatingMode,
+                     operatingMode == 0 ? "CONNECTED" :
+                     operatingMode == 1 ? "LOW_POWER" : "DISCONNECTED");
         } else {
             success = false;
         }
@@ -529,6 +509,9 @@ bool Cloud::writeDeviceStatusToCloud() {
 
     writer.beginObject();
 
+    // Firmware version
+    writer.name("firmwareVersion").value(FIRMWARE_VERSION);
+
     // Sensor
     writer.name("sensor").beginObject();
     writer.name("threshold1").value(sensorConfig.get_threshold1());
@@ -557,16 +540,8 @@ bool Cloud::writeDeviceStatusToCloud() {
     writer.name("connectedReportingIntervalSec").value((int)sysStatus.get_connectedReportingIntervalSec());
     writer.name("lowPowerReportingIntervalSec").value((int)sysStatus.get_lowPowerReportingIntervalSec());
     writer.name("connectAttemptBudgetSec").value((int)sysStatus.get_connectAttemptBudgetSec());
-    writer.name("cloudDisconnectBudgetSec").value((int)sysStatus.get_cloudDisconnectBudgetSec());
-    writer.name("modemOffBudgetSec").value((int)sysStatus.get_modemOffBudgetSec());
-    writer.endObject();
 
-    // Firmware release metadata
-    writer.name("firmware").beginObject();
-    writer.name("version").value(FIRMWARE_VERSION);
-    writer.name("notes").value(FIRMWARE_RELEASE_NOTES);
     writer.endObject();
-
     writer.endObject();
 
     if (!writer.buffer()) {
@@ -604,7 +579,12 @@ bool Cloud::publishDataToLedger() {
     
     writer.beginObject();
     writer.name("timestamp").value((int)Time.now());
-    
+
+    // Boot/wake diagnostics: included here so it is visible in Console even
+    // when early USB logs are missed after HIBERNATE/cold boot.
+    writer.name("resetReason").value((int)System.resetReason());
+    writer.name("resetReasonData").value((unsigned long)System.resetReasonData());
+
     uint8_t countingMode = sysStatus.get_countingMode();
 
     if (countingMode == COUNTING) {

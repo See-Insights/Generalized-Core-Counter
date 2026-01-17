@@ -186,24 +186,17 @@ bool dataInFlight =
 bool firstConnectionObserved = false;
 bool firstConnectionQueueDrainedLogged = false;
 
+bool hibernateDisabledForSession = false;
+
+// Track when we connected to enforce max connected time in LOW_POWER/DISCONNECTED modes
+unsigned long connectedStartMs = 0;
+
 // ********** Timing **********
 const int wakeBoundary = 1 * 3600;          // Reporting boundary (1 hour)
-const unsigned long stayAwakeLong = 90000;  // Stay awake after connect (ms)
 const unsigned long resetWait = 30000;      // Error state dwell before reset
-unsigned long stayAwakeTimeStamp = 0;       // Timestamp for stay-awake window
-unsigned long stayAwake = 0;                // How long to remain awake (ms)
-const unsigned long maxOnlineWorkMs = 5UL * 60UL * 1000UL; // Max time to stay online per low-power connection
 const unsigned long maxConnectAttemptMs = 5UL * 60UL * 1000UL; // Max time to spend trying to connect per wake
-unsigned long onlineWorkStartMs = 0;       // When we first became cloud-connected this cycle
-bool forceSleepThisCycle = false;          // Force sleep even if publish queue is not yet empty
-bool lastLowPowerMode = false;             // Tracks previous lowPowerMode to detect transitions
-bool hibernateDisabledForSession = false; // Disable HIBERNATE after first failure
 
 void setup() {
-  // Do not block on USB serial in production firmware. If a host is
-  // connected, logs will appear; otherwise the device proceeds immediately.
-  // (Strict requirement: main loop must not block >100 ms.)
-  
   Log.info("===== Firmware Version %s =====", FIRMWARE_VERSION);
   Log.info("===== Release Notes: %s =====", FIRMWARE_RELEASE_NOTES);
   
@@ -233,10 +226,12 @@ void setup() {
   // by calling Particle.connect() from CONNECTING_STATE.
 #if Wiring_WiFi
   Log.info("Platform connectivity: WiFi (radio off until CONNECTING_STATE)");
-  WiFi.off(); // Ensure WiFi module is powered down on boot
+  WiFi.disconnect();
+  WiFi.off();
 #elif Wiring_Cellular
   Log.info("Platform connectivity: Cellular (radio off until CONNECTING_STATE)");
-  Cellular.off(); // Ensure cellular modem is powered down on boot
+  Cellular.disconnect();
+  Cellular.off();
 #else
   Log.info("Platform connectivity: default (Particle.connect only)");
   // Fallback: rely on Particle.connect() in CONNECTING_STATE
@@ -249,6 +244,13 @@ void setup() {
   sysStatus.setup();    // Initialize persistent storage
   sensorConfig.setup(); // Initialize the sensor configuration
   current.setup();      // Initialize the current status data
+
+  // Testing: clear sticky sleep-failure alert to avoid reset/deep-power loops.
+  if (current.get_alertCode() == 16) {
+    Log.info("Clearing alert 16 on boot");
+    current.set_alertCode(0);
+    current.set_lastAlertTime(0);
+  }
 
   // Track how often the device has been resetting so the error supervisor
   // can apply backoffs and avoid permanent reset loops. Only count resets
@@ -289,8 +291,27 @@ void setup() {
       .setup(); // Initialize the publish queue
 
   // Initialize AB1805 RTC and watchdog
+  const bool timeValidBeforeRtc = Time.isValid();
   ab1805.withFOUT(D8).setup();                 // Initialize AB1805 RTC
   ab1805.setWDT(AB1805::WATCHDOG_MAX_SECONDS); // Enable watchdog
+
+  time_t rtcTime = 0;
+  const bool rtcReadOk = ab1805.getRtcAsTime(rtcTime);
+  const bool timeValidAfterRtc = Time.isValid();
+  if (!timeValidBeforeRtc && timeValidAfterRtc) {
+    if (rtcReadOk) {
+      Log.info("RTC restored system time: %s (rtc=%s)",
+               Time.timeStr().c_str(),
+               Time.format(rtcTime, TIME_FORMAT_DEFAULT).c_str());
+    } else {
+      Log.info("RTC restored system time: %s (rtc read failed)",
+               Time.timeStr().c_str());
+    }
+  } else if (!timeValidAfterRtc) {
+    Log.warn("RTC did not restore time (rtcSet=%s rtcReadOk=%s)",
+             ab1805.isRTCSet() ? "true" : "false",
+             rtcReadOk ? "true" : "false");
+  }
 
   Cloud::instance().setup(); // Initialize the cloud functions
 
@@ -298,25 +319,6 @@ void setup() {
   // firmware version, reset reason, and any outstanding alert
   // soon after the first successful connection.
   publishStartupStatus();
-
-  // Check if we need to enter firmware/config update mode
-  if (sysStatus.get_updatesPending()) {
-    Log.info("Configuration updates pending - starting in FIRMWARE_UPDATE_STATE");
-    state = FIRMWARE_UPDATE_STATE; // Override the default state to force update mode
-  }
-
-  // Service-mode override: hold the user button at startup to
-  // force factory defaults and exit low-power operation. This
-  // guarantees the device comes up in CONNECTED mode so a
-  // field technician can reconfigure it even if previous
-  // settings put it into aggressive low-power behaviour.
-  if (!digitalRead(BUTTON_PIN)) { // Active-low user button
-    Log.info("User button pressed at startup - forcing CONNECTED, clearing low-power defaults");
-    state = CONNECTING_STATE;
-    sysStatus.initialize();          // Restore factory defaults
-    sysStatus.set_lowPowerMode(false);           // Ensure not in low-power mode
-    sysStatus.set_operatingMode(CONNECTED);      // Persist CONNECTED operating mode
-  }
 
   if (!Time.isValid()) {
     Log.info("Time is invalid -  %s so connecting", Time.timeStr().c_str());
@@ -350,12 +352,14 @@ void setup() {
   Log.info("Open hours %02u:00-%02u:00, currently: %s",
            sysStatus.get_openTime(), sysStatus.get_closeTime(),
            isWithinOpenHours() ? "OPEN" : "CLOSED");
+  Log.info("Sensor ready at startup: %s", SensorManager::instance().isSensorReady() ? "true" : "false");
 
   // ===== SENSOR ABSTRACTION LAYER =====
   // Initialize the sensor based on configuration using *local* time. This
   // runs after timezone configuration so open/close checks are correct.
-  Log.info("Initial lowPowerMode: %s",
-           sysStatus.get_lowPowerMode() ? "ON" : "OFF");
+  Log.info("Initial operatingMode: %d (%s)", sysStatus.get_operatingMode(),
+           sysStatus.get_operatingMode() == 0 ? "CONNECTED" :
+           sysStatus.get_operatingMode() == 1 ? "LOW_POWER" : "DISCONNECTED");
 
   if (!SensorManager::instance().isSensorReady()) {
     if (isWithinOpenHours()) {
@@ -368,6 +372,11 @@ void setup() {
       }
     } else {
       Log.info("Outside opening hours at startup; sensor will remain powered down");
+      // Ensure carrier sensor power rails are actually turned off even if
+      // we skipped sensor initialization while closed.
+      Log.info("Startup CLOSED: forcing sensor power down before sleep");
+      SensorManager::instance().onEnterSleep();
+      Log.info("Sensor ready after startup power-down: %s", SensorManager::instance().isSensorReady() ? "true" : "false");
     }
   }
   // ===================================
@@ -383,20 +392,6 @@ void setup() {
 }
 
 void loop() {
-  // Detect transitions into low-power mode so we can start a fresh online
-  // budget from the moment lowPowerMode is enabled, even if we were already
-  // connected beforehand.
-  bool currentLowPowerMode = sysStatus.get_lowPowerMode();
-  if (currentLowPowerMode && !lastLowPowerMode) {
-    if (Particle.connected()) {
-      onlineWorkStartMs = millis();
-    } else {
-      onlineWorkStartMs = 0;
-    }
-    forceSleepThisCycle = false;
-  }
-  lastLowPowerMode = currentLowPowerMode;
-
   // Main state machine driving sensing, reporting, power management
   switch (state) {
   case IDLE_STATE:
@@ -446,11 +441,11 @@ void loop() {
     state = ERROR_STATE;
   }
 
-  // If the user switch is pressed, force a report/connection
+  // If the user switch is pressed, force a connection to drain queue.
   if (userSwitchDetected) {
-    Log.info("User switch pressed - sending data");
+    Log.info("User switch pressed - connecting to drain queue");
     userSwitchDetected = false;
-    state = REPORTING_STATE;
+    state = CONNECTING_STATE;
   }
 
   // ********** Centralized sensor event handling **********
@@ -516,7 +511,7 @@ void publishData() {
            (int)current.get_alertCode());
 
   PublishQueuePosix::instance().publish(ProjectConfig::webhookEventName(), data, PRIVATE | WITH_ACK);
-  Log.info("Parking Lot Webhook: %s", data);
+  Log.info("Ubidots Webhook: %s", data);
 
   // Also update device-data ledger with structured JSON snapshot
   if (!Cloud::instance().publishDataToLedger()) {

@@ -99,6 +99,17 @@ public:
     float tmp36TemperatureC(int adcValue);
 
     /**
+     * @brief Read TMP112A temperature (I2C) in degrees Celsius.
+     *
+     * Intended for platforms/carriers (like Muon) that include an onboard
+     * TMP112A temperature sensor.
+     *
+     * @param[out] tempC Filled with temperature in degrees Celsius on success.
+     * @return true on success, false on I2C error or missing device.
+     */
+    bool readTmp112TemperatureC(float &tempC);
+
+    /**
      * @brief Determine whether the battery is present and not critically low.
      */
     bool batteryState();

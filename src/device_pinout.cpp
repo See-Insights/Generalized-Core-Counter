@@ -13,7 +13,11 @@
 //  - On Photon 2 / P2 carrier, silk is "S4"; map explicitly for that
 //    platform so we don't rely on A4 aliasing.
 
-#if PLATFORM_ID == PLATFORM_P2
+// Optional override (for example, a Muon carrier) that wires the TMP36 to a
+// different analog-capable pin.
+#if defined(MUON_TMP36_SENSE_PIN)
+const pin_t TMP36_SENSE_PIN   = MUON_TMP36_SENSE_PIN;
+#elif PLATFORM_ID == PLATFORM_P2
 const pin_t TMP36_SENSE_PIN   = S4;
 #else
 const pin_t TMP36_SENSE_PIN   = A4;

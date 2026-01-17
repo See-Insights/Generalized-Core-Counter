@@ -115,21 +115,29 @@ bool SensorManager::isSensorReady() const {
 
 void SensorManager::onEnterSleep() {
   if (_sensor) {
-    if (sysStatus.get_verboseMode()) {
-      Log.info("SensorManager entering sleep; notifying sensor %s", _sensor->getSensorType());
-    }
+    Log.info("SensorManager onEnterSleep: notifying sensor %s", _sensor->getSensorType());
     _sensor->onSleep();
+    return;
   }
+
+  // If a concrete sensor hasn't been initialized (common when booting while
+  // outside open hours), still force the carrier sensor power rails off.
+  Log.info("SensorManager onEnterSleep: no sensor instance; forcing sensor power rails OFF");
+  pinMode(disableModule, OUTPUT);
+  pinMode(ledPower, OUTPUT);
+  digitalWrite(disableModule, HIGH); // active-low enable
+  digitalWrite(ledPower, HIGH);      // active-low LED power
 }
 
 void SensorManager::onExitSleep() {
   if (_sensor) {
-    if (sysStatus.get_verboseMode()) {
-      Log.info("SensorManager exiting sleep; waking sensor %s", _sensor->getSensorType());
-    }
+    Log.info("SensorManager onExitSleep: waking sensor %s", _sensor->getSensorType());
     if (!_sensor->onWake()) {
       Log.error("Sensor %s failed to wake correctly", _sensor->getSensorType());
     }
+    Log.info("SensorManager onExitSleep: sensorReady=%s", _sensor->isReady() ? "true" : "false");
+  } else {
+    Log.info("SensorManager onExitSleep: no sensor instance (sensorReady=false)");
   }
 }
 
@@ -153,6 +161,66 @@ float SensorManager::tmp36TemperatureC(int adcValue) {
   // you'll get crazy inaccurate values!
   return (mV - 500) / 10;
 }
+
+bool SensorManager::readTmp112TemperatureC(float &tempC) {
+  // TMP112A default 7-bit I2C address is 0x48.
+  // Allow override at compile time for unusual board strapping.
+#if defined(MUON_TMP112_I2C_ADDR)
+  const uint8_t addr = (uint8_t)MUON_TMP112_I2C_ADDR;
+#else
+  const uint8_t addr = 0x48;
+#endif
+
+  // Temperature register pointer is 0x00.
+  const uint8_t tempReg = 0x00;
+
+  // Guard against interference with other I2C users (AB1805, FRAM, etc.).
+  Wire.lock();
+
+  Wire.beginTransmission(addr);
+  Wire.write(tempReg);
+  int status = Wire.endTransmission(false);
+  if (status != 0) {
+    Wire.unlock();
+    return false;
+  }
+
+  const uint8_t toRead = 2;
+  (void)Wire.requestFrom((int)addr, (int)toRead);
+  if (Wire.available() < toRead) {
+    Wire.unlock();
+    return false;
+  }
+
+  uint8_t msb = (uint8_t)Wire.read();
+  uint8_t lsb = (uint8_t)Wire.read();
+  Wire.unlock();
+
+  // TMP112A temperature is a signed 12-bit value left-justified in 16 bits.
+  // Resolution is 0.0625 C per LSB.
+  int16_t raw = (int16_t)((((uint16_t)msb) << 8) | (uint16_t)lsb);
+  raw = (int16_t)(raw >> 4);
+  // Sign-extend the 12-bit value (bit 11 is the sign after shifting).
+  if (raw & 0x0800) {
+    raw = (int16_t)(raw | 0xF000);
+  }
+
+  tempC = ((float)raw) * 0.0625f;
+  return true;
+}
+
+namespace {
+
+bool probeTmp112Present(uint8_t addr) {
+  // Probe device presence without changing its configuration.
+  Wire.lock();
+  Wire.beginTransmission(addr);
+  int status = Wire.endTransmission();
+  Wire.unlock();
+  return status == 0;
+}
+
+} // namespace
 
 bool SensorManager::batteryState() {
 
@@ -197,7 +265,55 @@ bool SensorManager::batteryState() {
   // Other Wi-Fi / SoM platforms: leave battery fields unchanged for now.
 #endif
 
-#if PLATFORM_ID == 32 || PLATFORM_ID == 34
+  // -------------------------------------------------------------------------
+  // Temperature source selection
+  // -------------------------------------------------------------------------
+  // Default behavior:
+  //  - If a TMP112A is present on the I2C bus (Muon), prefer it.
+  //  - Otherwise, use TMP36 (if wired) or platform-specific stub.
+  //
+  // Compile-time controls:
+  //  - Define MUON_HAS_TMP112 to force enable the TMP112A path.
+  //  - Define DISABLE_TMP112_AUTODETECT to skip probing for TMP112A.
+
+#if defined(MUON_TMP112_I2C_ADDR)
+  const uint8_t tmp112Addr = (uint8_t)MUON_TMP112_I2C_ADDR;
+#else
+  const uint8_t tmp112Addr = 0x48;
+#endif
+
+  static bool tmp112ProbeDone = false;
+  static bool tmp112Present = false;
+
+#if !defined(DISABLE_TMP112_AUTODETECT)
+  if (!tmp112ProbeDone) {
+    // Safe to call multiple times; ensures I2C is initialized even if nothing
+    // else has yet started Wire.
+    Wire.begin();
+    tmp112Present = probeTmp112Present(tmp112Addr);
+    tmp112ProbeDone = true;
+    if (sysStatus.get_verboseMode()) {
+      Log.info("TMP112A probe at 0x%02X: %s", tmp112Addr, tmp112Present ? "present" : "not found");
+    }
+  }
+#endif
+
+#if defined(MUON_HAS_TMP112)
+  tmp112Present = true;
+  tmp112ProbeDone = true;
+#endif
+
+  if (tmp112Present) {
+    float tempC;
+    if (!readTmp112TemperatureC(tempC) || !(tempC > -50.0f && tempC < 120.0f)) {
+      float prev = current.get_internalTempC();
+      tempC = (prev > -50.0f && prev < 120.0f) ? prev : 25.0f;
+      Log.warn("TMP112A read failed/invalid - falling back to %4.2f C", (double)tempC);
+    }
+    current.set_internalTempC(tempC);
+  }
+
+#if (PLATFORM_ID == 32 || PLATFORM_ID == 34) && !defined(MUON_HAS_TMP36)
   // Photon 2 and P2 development platforms:
   // There is no TMP36 wired to an ADC-capable pin on the Photon 2 dev
   // carrier, so we cannot take a real analog temperature reading here.
@@ -221,6 +337,12 @@ bool SensorManager::batteryState() {
   // Non-blocking sampling: spread 8 samples across multiple batteryState()
   // calls to avoid blocking the main loop. Each call takes one sample (~5µs ADC
   // read) until all samples are collected, then computes the average.
+  if (tmp112Present) {
+    // TMP112A already provided a temperature this cycle; skip TMP36 sampling.
+    // This avoids unnecessary ADC activity on boards where both might exist.
+    isItSafeToCharge();
+    return current.get_stateOfCharge() > 20.0f;
+  }
   pinMode(TMP36_SENSE_PIN, INPUT);
 
   const int TMP36_SAMPLES = 8;

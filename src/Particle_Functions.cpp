@@ -4,6 +4,7 @@
 #include "MyPersistentData.h"  // For sysStatus (serialConnected configuration)
 
 // Prototypes and System Mode calls
+SYSTEM_THREAD(ENABLED);
 SYSTEM_MODE(SEMI_AUTOMATIC); // This will enable user code to start executing
                              // automatically.
 STARTUP(System.enableFeature(FEATURE_RESET_INFO));

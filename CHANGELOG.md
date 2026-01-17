@@ -53,3 +53,6 @@ All notable changes to this project will be documented in this file.
 ## 3.13 – 2026-01-14
 - hardware testing with optimizations
 
+## 3.14 – 2026-01-17
+- Long-term test candidate
+

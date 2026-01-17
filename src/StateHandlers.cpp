@@ -18,10 +18,78 @@ static const unsigned long firmwareUpdateMaxMs = 5UL * 60UL * 1000UL;
 static int resolveErrorAction();
 extern bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags);
 
+static bool isRadioPoweredOn() {
+#if Wiring_WiFi
+  return WiFi.isOn();
+#elif Wiring_Cellular
+  return Cellular.isOn();
+#else
+  return false;
+#endif
+}
+
+static void requestRadioPowerOff() {
+#if Wiring_Cellular
+  Cellular.disconnect();
+  Cellular.off();
+#elif Wiring_WiFi
+  WiFi.disconnect();
+  WiFi.off();
+#endif
+}
+
+static void requestFullDisconnectAndRadioOff() {
+  Particle.disconnect();
+  requestRadioPowerOff();
+}
+
+static void ensureSensorEnabled(const char* context) {
+  if (SensorManager::instance().isSensorReady()) {
+    return;
+  }
+
+  Log.info("%s - enabling sensor", context);
+  SensorManager::instance().onExitSleep();
+  if (!SensorManager::instance().isSensorReady()) {
+    SensorManager::instance().initializeFromConfig();
+  }
+  Log.info("%s - sensorReady=%s", context, SensorManager::instance().isSensorReady() ? "true" : "false");
+}
+
 // IDLE_STATE: Awake, monitoring sensor and deciding what to do next
 void handleIdleState() {
   if (state != oldState) {
     publishStateTransition();
+  }
+
+  // If configuration changes (for example, device-settings ledger updates)
+  // move the park from CLOSED->OPEN while the device is already awake,
+  // ensure the sensor stack is enabled. Previously this only happened on
+  // wake from sleep, which caused "awake but not counting".
+  {
+    static bool enableAttemptedThisOpenWindow = false;
+    bool openNow = isWithinOpenHours();
+
+    if (!openNow) {
+      enableAttemptedThisOpenWindow = false;
+    } else if (!SensorManager::instance().isSensorReady() && !enableAttemptedThisOpenWindow) {
+      enableAttemptedThisOpenWindow = true;
+      ensureSensorEnabled("IDLE: park OPEN but sensorReady=false");
+    }
+  }
+
+  // ********** CONNECTED Mode Park-Hours Policy **********
+  // In CONNECTED operating mode, the device stays awake during park open hours.
+  // When the park is closed, it should disconnect, power down the sensor, and
+  // deep-sleep until the next opening time.
+  if (Time.isValid() && sysStatus.get_operatingMode() == CONNECTED) {
+    if (!isWithinOpenHours()) {
+      Log.info("CONNECTED mode: park CLOSED - transitioning to SLEEPING_STATE for overnight sleep");
+      state = SLEEPING_STATE;
+      return;
+    }
+    // Park is open: remain awake in CONNECTED mode.
+
   }
 
   // ********** Scheduled Mode Sampling **********
@@ -60,7 +128,7 @@ void handleIdleState() {
   // ********** Scheduled Reporting **********
   // Use the configured reportingIntervalSec to determine when to
   // generate a periodic report, regardless of trigger mode.
-  if (Time.isValid()) {
+  if (Time.isValid() && isWithinOpenHours()) {
     uint16_t intervalSec = sysStatus.get_reportingInterval();
     if (intervalSec == 0) {
       intervalSec = 3600; // Fallback to 1 hour
@@ -74,54 +142,32 @@ void handleIdleState() {
     }
   }
 
-  // ********** Cumulative Offline Watchdog **********
-  // During open hours in CONNECTED mode with adequate battery, enforce
-  // a maximum offline duration to prevent prolonged disconnection from
-  // draining battery or losing critical events. This complements the
-  // per-attempt connectAttemptBudgetSec by catching cumulative failures.
-  if (Time.isValid() && isWithinOpenHours() && 
-      sysStatus.get_operatingMode() == CONNECTED && 
-      current.get_stateOfCharge() > 35) {
-    
-    time_t lastConn = sysStatus.get_lastConnection();
-    time_t now = Time.now();
-    const time_t maxOfflineSec = 3 * 3600L; // 3 hours
-    
-    if (lastConn != 0 && (now - lastConn) > maxOfflineSec && !Particle.connected()) {
-      Log.error("Offline for >3 hours during open hours (last=%ld, now=%ld) - forcing connection",
-                (long)lastConn, (long)now);
-      current.raiseAlert(44); // New alert: prolonged offline
-      state = REPORTING_STATE; // Force report + connect
-      return;
-    }
-  }
-
   // ********** Power Management **********
-  if (sysStatus.get_lowPowerMode()) {
-    // Honour a post-wake or post-connect stay-awake window so that
-    // technicians have a brief period to interact with the user
-    // button or observe behaviour before the device immediately
-    // returns to low-power sleep.
-    if (stayAwake > 0 && (millis() - stayAwakeTimeStamp) < stayAwake) {
-      // Skip low-power sleep gating during this window.
-      return;
+  // In LOW_POWER (1) or DISCONNECTED (2) modes, manage connection lifecycle.
+  if (sysStatus.get_operatingMode() != CONNECTED) {
+    // In LOW_POWER or DISCONNECTED modes, enforce maximum connected time.
+    // Use connectAttemptBudgetSec as the max connected duration.
+    if (Particle.connected() && connectedStartMs != 0) {
+      uint16_t budgetSec = sysStatus.get_connectAttemptBudgetSec();
+      if (budgetSec >= 30 && budgetSec <= 900) {
+        unsigned long connectedMs = millis() - connectedStartMs;
+        unsigned long budgetMs = (unsigned long)budgetSec * 1000UL;
+        if (connectedMs > budgetMs) {
+          Log.info("Connection timeout (%lu ms > %lu ms) - returning to sleep",
+                   (unsigned long)connectedMs, (unsigned long)budgetMs);
+          connectedStartMs = 0;
+          state = SLEEPING_STATE;
+          return;
+        }
+      }
     }
-    bool updatesPending = sysStatus.get_updatesPending() || System.updatesPending();
 
-    // If we've been online longer than the allowed work window, treat this
-    // connection as best-effort complete and force a sleep so we don't
-    // remain connected indefinitely during backend outages.
-    if (onlineWorkStartMs != 0 && Particle.connected() &&
-        (millis() - onlineWorkStartMs) > maxOnlineWorkMs) {
-      size_t pending = PublishQueuePosix::instance().getNumEvents();
-      Log.warn("Online work window exceeded (%lu ms) with %u pending event(s) - forcing sleep",
-               (unsigned long)(millis() - onlineWorkStartMs),
-               (unsigned)pending);
-      forceSleepThisCycle = true;
-      current.raiseAlert(43); // publish queue not drained before forced sleep
-      state = SLEEPING_STATE;
+    // In CONNECTED mode during open hours, never auto-sleep.
+    if (Time.isValid() && sysStatus.get_operatingMode() == CONNECTED && isWithinOpenHours()) {
       return;
     }
+
+    bool updatesPending = System.updatesPending();
 
     // In low-power mode, once all work for this connection cycle is
     // complete (no updates pending), we can safely enter SLEEPING_STATE
@@ -163,7 +209,7 @@ void handleIdleState() {
  * @details Performs a non-blocking, phased disconnect before entering
  *          Device OS sleep modes. While connected (or with the radio
  *          still on) it gates sleep on the publish queue being in a
- *          sleep-safe state unless forceSleepThisCycle is set. The
+ *          sleep-safe state. The
  *          disconnect sequence uses an internal DisconnectPhase state
  *          machine to:
  *            - Request cloud disconnect and wait up to
@@ -178,152 +224,112 @@ void handleIdleState() {
  */
 void handleSleepingState() {
   bool enteredState = (state != oldState);
-  bool radioOn = false; // Flag to indicate if the radio is on
-#if Wiring_WiFi
-  // Use isOn() (power state), not ready() (network-ready), so we never
-  // accidentally skip powering down a modem that is still consuming power.
-  radioOn = WiFi.isOn();
-#elif Wiring_Cellular
-  radioOn = Cellular.isOn();
-#endif
+  bool ignoreDisconnectFailure = false;
 
   if (enteredState) {
     publishStateTransition();
+    // One-time diagnostic on entry so logs clearly show the device's view of park hours.
+    if (Time.isValid()) {
+      LocalTimeConvert conv;
+      conv.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
+      uint8_t hour = (uint8_t)(conv.getLocalTimeHMS().toSeconds() / 3600);
+      Log.info("SLEEP entry: parkHours %02u-%02u localHour=%02u => %s",
+               sysStatus.get_openTime(), sysStatus.get_closeTime(), hour,
+               isWithinOpenHours() ? "OPEN" : "CLOSED");
+    } else {
+      Log.info("SLEEP entry: Time invalid => treating as OPEN (per policy)");
+    }
+    Log.info("SLEEP entry: sensorReady=%s", SensorManager::instance().isSensorReady() ? "true" : "false");
   }
 
-  // If we are connected (or the radio is still on) and the publish
-  // queue is not yet in a sleep-safe state (events queued or a publish
-  // in progress), defer sleeping so we can finish delivering data while
-  // the radio is available. When forceSleepThisCycle is set, we bypass
-  // this gate to avoid staying online indefinitely during backend
-  // outages. When offline with the radio off, we allow sleep even with
-  // a non-zero queue; events will be flushed on the next connection.
-  bool gateOnQueue = !forceSleepThisCycle && (Particle.connected() || radioOn);
-  if (gateOnQueue && !PublishQueuePosix::instance().getCanSleep()) {
-    size_t pending = PublishQueuePosix::instance().getNumEvents();
-    Log.info("Deferring sleep - publish queue has %u pending event(s) or publish in progress",
-             (unsigned)pending);
+  // If a ledger update (or time progression) moves the park into OPEN hours
+  // while we are in SLEEPING_STATE, abort sleeping immediately in CONNECTED
+  // mode so we stay awake/connected and resume counting.
+  if (Time.isValid() && sysStatus.get_operatingMode() == CONNECTED && isWithinOpenHours()) {
+    ensureSensorEnabled("SLEEP abort: CONNECTED+OPEN");
     state = IDLE_STATE;
     return;
   }
-  
-  // ********** Non-blocking disconnect sequence **********
-  // If we are connected to the cloud or the radio is still on, perform a
-  // phased disconnect with explicit timeouts so we never block the
-  // application thread. If already offline with radio off, skip straight
-  // to sleep configuration.
-  enum DisconnectPhase {
-    DISC_PHASE_IDLE,
-    DISC_PHASE_REQUEST_DISCONNECT,
-    DISC_PHASE_WAIT_CLOUD_OFF,
-    DISC_PHASE_REQUEST_MODEM_OFF,
-    DISC_PHASE_WAIT_MODEM_OFF,
-    DISC_PHASE_DONE
-  };
 
-  static DisconnectPhase disconnectPhase = DISC_PHASE_IDLE;
-  static unsigned long discPhaseStartMs = 0;
+  // If we are connected and the publish queue is not yet in a sleep-safe
+  // state (events queued or a publish in progress), defer sleeping so we
+  // can finish delivering data. When offline, allow sleep immediately;
+  // queued events will be flushed on the next connection.
+  if (Particle.connected() && !PublishQueuePosix::instance().getCanSleep()) {
+    static size_t lastPendingLogged = (size_t)-1;
+    static unsigned long lastDeferralLogMs = 0;
 
-  // Use ledger-configured budgets for disconnect phases when available,
-  // falling back to conservative defaults if values are out of range.
-  uint16_t cloudBudgetSec = sysStatus.get_cloudDisconnectBudgetSec();
-  if (cloudBudgetSec < 5 || cloudBudgetSec > 120) {
-    cloudBudgetSec = 15; // default 15 seconds
+    size_t pending = PublishQueuePosix::instance().getNumEvents();
+    unsigned long nowMs = millis();
+    bool shouldLog = (pending != lastPendingLogged) || (nowMs - lastDeferralLogMs) > 5000UL;
+    if (shouldLog) {
+      Log.info("Deferring sleep - publish queue has %u pending event(s) or publish in progress",
+               (unsigned)pending);
+      lastPendingLogged = pending;
+      lastDeferralLogMs = nowMs;
+    }
+    // Stay in SLEEPING_STATE until the queue is sleep-safe.
+    return;
   }
-  const unsigned long cloudDisconnectBudgetMs = (unsigned long)cloudBudgetSec * 1000UL;
 
-  uint16_t modemBudgetSec = sysStatus.get_modemOffBudgetSec();
-  if (modemBudgetSec < 5 || modemBudgetSec > 120) {
-    modemBudgetSec = 30; // default 30 seconds
-  }
-  const unsigned long modemOffBudgetMs = (unsigned long)modemBudgetSec * 1000UL;
-
-  bool needDisconnect = Particle.connected() || radioOn;
+  // ********** Non-blocking disconnect + modem power-down **********
+  // Device OS already manages the asynchronous cloud session teardown once
+  // Particle.disconnect() has been requested. Here, we keep application
+  // logic minimal: request cloud disconnect and radio-off once, then wait
+  // (bounded) until both cloud and modem are actually off before sleeping.
+  static bool disconnectRequested = false;
+  static unsigned long disconnectRequestStartMs = 0;
 
   if (enteredState) {
-    // Reset phase machine on first entry to SLEEPING_STATE
-    disconnectPhase = DISC_PHASE_IDLE;
+    disconnectRequested = false;
+    disconnectRequestStartMs = 0;
   }
 
+  bool needDisconnect = Particle.connected() || isRadioPoweredOn();
   if (needDisconnect) {
-    switch (disconnectPhase) {
-    case DISC_PHASE_IDLE:
-      // Start by requesting a cloud disconnect if currently connected
-      if (Particle.connected()) {
-        Log.info("Requesting Particle cloud disconnect before sleep");
-        Particle.disconnect();
-      }
-      discPhaseStartMs = millis();
-      disconnectPhase = DISC_PHASE_WAIT_CLOUD_OFF;
-      return; // Allow state machine to advance on subsequent loop iterations
-
-    case DISC_PHASE_WAIT_CLOUD_OFF:
-      if (!Particle.connected()) {
-        // Cloud is disconnected; proceed to modem power down if radio is on
-#if Wiring_Cellular || Wiring_WiFi
-        if (radioOn) {
-          Log.info("Cloud disconnected - powering down modem before sleep");
-          discPhaseStartMs = millis();
-          disconnectPhase = DISC_PHASE_REQUEST_MODEM_OFF;
-          return;
-        }
-#endif
-        // No radio to power down; disconnect complete
-        disconnectPhase = DISC_PHASE_DONE;
-        break;
-      }
-
-      if (millis() - discPhaseStartMs > cloudDisconnectBudgetMs) {
-        Log.warn("Cloud disconnect exceeded budget (%lu ms) - raising alert 15",
-                 (unsigned long)(millis() - discPhaseStartMs));
-        current.raiseAlert(15);
-        state = ERROR_STATE;
-        disconnectPhase = DISC_PHASE_IDLE;
-        return;
-      }
-      return; // Still waiting for cloud to disconnect
-
-    case DISC_PHASE_REQUEST_MODEM_OFF:
-#if Wiring_Cellular
-      Log.info("Disconnecting from cellular network and powering down modem");
-      Cellular.disconnect();
-      Cellular.off();
-#elif Wiring_WiFi
-      Log.info("Disconnecting from WiFi network and powering down modem");
-      WiFi.disconnect();
-      WiFi.off();
-#endif
-      discPhaseStartMs = millis();
-      disconnectPhase = DISC_PHASE_WAIT_MODEM_OFF;
-      return;
-
-    case DISC_PHASE_WAIT_MODEM_OFF: {
-      bool modemOff = true;
-#if Wiring_Cellular
-      modemOff = !Cellular.isOn();
-#elif Wiring_WiFi
-      modemOff = !WiFi.isOn();
-#endif
-      if (modemOff) {
-        Log.info("Modem powered down successfully before sleep");
-        disconnectPhase = DISC_PHASE_DONE;
-        break;
-      }
-
-      if (millis() - discPhaseStartMs > modemOffBudgetMs) {
-        Log.warn("Modem power-down exceeded budget (%lu ms) - raising alert 15",
-                 (unsigned long)(millis() - discPhaseStartMs));
-        current.raiseAlert(15);
-        state = ERROR_STATE;
-        disconnectPhase = DISC_PHASE_IDLE;
-        return;
-      }
-      return; // Still waiting for modem to power down
+    // Use ledger-configured budgets when available, with conservative defaults.
+    uint16_t cloudBudgetSec = sysStatus.get_cloudDisconnectBudgetSec();
+    if (cloudBudgetSec < 5 || cloudBudgetSec > 120) {
+      cloudBudgetSec = 15;
     }
 
-    case DISC_PHASE_DONE:
-      // Disconnect completed; fall through to sleep configuration below.
-      break;
+    uint16_t modemBudgetSec = sysStatus.get_modemOffBudgetSec();
+    if (modemBudgetSec < 5 || modemBudgetSec > 120) {
+      modemBudgetSec = 30;
+    }
+
+    unsigned long budgetMs = (unsigned long)((modemBudgetSec > cloudBudgetSec) ? modemBudgetSec : cloudBudgetSec) * 1000UL;
+
+    if (!disconnectRequested) {
+      Log.info("SLEEP: requesting cloud disconnect + modem off");
+      requestFullDisconnectAndRadioOff();
+      disconnectRequested = true;
+      disconnectRequestStartMs = millis();
+      return;
+    }
+
+    bool stillOn = Particle.connected() || isRadioPoweredOn();
+    if (stillOn) {
+      if (disconnectRequestStartMs != 0 && (millis() - disconnectRequestStartMs) > budgetMs) {
+        if (sysStatus.get_operatingMode() != CONNECTED) {
+          Log.warn("SLEEP: disconnect/modem-off exceeded budget (%lu ms) - continuing to sleep",
+                   (unsigned long)(millis() - disconnectRequestStartMs));
+          ignoreDisconnectFailure = true;
+          disconnectRequested = false;
+          disconnectRequestStartMs = 0;
+        } else {
+          Log.warn("SLEEP: disconnect/modem-off exceeded budget (%lu ms) - raising alert 15",
+                   (unsigned long)(millis() - disconnectRequestStartMs));
+          current.raiseAlert(15);
+          state = ERROR_STATE;
+          disconnectRequested = false;
+          disconnectRequestStartMs = 0;
+          return;
+        }
+      }
+      if (!ignoreDisconnectFailure) {
+        return;
+      }
     }
   }
 
@@ -333,7 +339,9 @@ void handleSleepingState() {
     // indicator LEDs can be powered down. During daytime naps we keep
     // interrupt-driven sensors (like PIR) powered so they can wake the
     // device from ULTRA_LOW_POWER sleep.
+    Log.info("CLOSED-hours deep sleep: disabling sensor (onEnterSleep)");
     SensorManager::instance().onEnterSleep();
+    Log.info("CLOSED-hours deep sleep: sensorReady after disable=%s", SensorManager::instance().isSensorReady() ? "true" : "false");
 
     // ********** Night sleep (outside opening hours) **********
     nightSleepSec = secondsUntilNextOpen();
@@ -356,8 +364,11 @@ void handleSleepingState() {
       Log.info("Outside opening hours - entering NIGHT HIBERNATE sleep for %d seconds", nightSleepSec);
 
       ab1805.stopWDT();
+      // Reset sleep configuration so prior ULTRA_LOW_POWER GPIOs do not
+      // accidentally carry into HIBERNATE configuration.
+      config = SystemSleepConfiguration();
       config.mode(SystemSleepMode::HIBERNATE)
-        .gpio(BUTTON_PIN, CHANGE)
+        .gpio(BUTTON_PIN, FALLING)
         .duration((uint32_t)nightSleepSec * 1000UL);
 
       // HIBERNATE should reset the device on wake, so execution should
@@ -391,8 +402,19 @@ void handleSleepingState() {
     wakeInSeconds = nightSleepSec;
     Log.info("Outside opening hours - using ULTRA_LOW_POWER fallback sleep for %d seconds", wakeInSeconds);
   } else {
-    // Within opening hours, or we don't have a night window computed.
-    wakeInSeconds = (int)intervalSec;
+    // Within opening hours, align wake to the hour (or boundary) when possible.
+    if (Time.isValid() && wakeBoundary > 0) {
+      int boundary = wakeBoundary;
+      int aligned = (int)(boundary - (Time.now() % boundary));
+      if (aligned < 1) {
+        aligned = 1;
+      } else if (aligned > boundary) {
+        aligned = boundary;
+      }
+      wakeInSeconds = aligned;
+    } else {
+      wakeInSeconds = (int)intervalSec;
+    }
   }
 
   // If a sensor event is pending or the BLUE LED timer is still
@@ -404,14 +426,29 @@ void handleSleepingState() {
     return;
   }
 
+  if (digitalRead(BLUE_LED) == HIGH) {
+    digitalWrite(BLUE_LED, LOW);
+  }
+
+  // Reset sleep configuration on each sleep so GPIO selections do not
+  // accumulate across calls.
+  config = SystemSleepConfiguration();
+
+  Log.info("SLEEP duration: %d seconds", wakeInSeconds);
+
   config.mode(SystemSleepMode::ULTRA_LOW_POWER)
-    .gpio(BUTTON_PIN, CHANGE)
-    .gpio(intPin, RISING)
     .duration(wakeInSeconds * 1000L);
 
-  // Capture wall-clock time around sleep so we can detect ULTRA_LOW_POWER
-  // calls that return immediately during the long night window.
-  time_t sleepStart = Time.isValid() ? Time.now() : 0;
+  // Configure wake pins. Button wake is always enabled. PIR wake is only
+  // enabled during park open hours to avoid waking all night from floating
+  // pins or motion we intentionally ignore.
+  config.gpio(BUTTON_PIN, FALLING);
+  if (isWithinOpenHours()) {
+    Log.info("SLEEP config: arming button + PIR wake pins (open hours)");
+    config.gpio(intPin, RISING);
+  } else {
+    Log.info("SLEEP config: arming button wake pin only (closed hours)");
+  }
 
   ab1805.stopWDT(); // No watchdogs interrupting our slumber
   SystemSleepResult result = System.sleep(config); // Put the device to sleep
@@ -425,55 +462,51 @@ void handleSleepingState() {
     digitalWrite(BLUE_LED, HIGH);
   }
 
-  // When debugging over USB, the host often disconnects/reconnects the
-  // serial port across ULTRA_LOW_POWER sleep. Give it a brief window to
-  // reattach before emitting logs so wake events are visible.
-  // Non-blocking: do not wait for Serial; log immediately when available.
-
-  time_t sleepEnd = Time.isValid() ? Time.now() : 0;
-
   Log.info("Woke from ULTRA_LOW_POWER sleep: reason=%d, pin=%d",
            (int)result.wakeupReason(), (int)result.wakeupPin());
 
-  // Detect abnormal ULTRA_LOW_POWER wakes: if we requested a sleep
-  // duration >5 minutes but wall-clock time advanced by <1 minute,
-  // deep sleep is not being honoured. This catches platform issues
-  // early and prevents rapid wake/sleep battery drain.
-  if (sleepStart != 0 && sleepEnd != 0 && wakeInSeconds > 300) {
-    time_t slept = sleepEnd - sleepStart;
-    if (slept < 60) {
-      Log.error("Sleep failure: requested %d s but only slept %ld s - raising alert 16",
-                wakeInSeconds, (long)slept);
-      current.raiseAlert(16);
-      onlineWorkStartMs = 0;
-      forceSleepThisCycle = false;
-      state = ERROR_STATE;
-      return;
-    }
+  // Diagnostic: confirm open/closed decision at wake.
+  if (Time.isValid()) {
+    LocalTimeConvert convWake;
+    convWake.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
+    uint8_t hour = (uint8_t)(convWake.getLocalTimeHMS().toSeconds() / 3600);
+    Log.info("Wake eval: parkHours %02u-%02u localHour=%02u => %s",
+             sysStatus.get_openTime(), sysStatus.get_closeTime(), hour,
+             isWithinOpenHours() ? "OPEN" : "CLOSED");
+  } else {
+    Log.info("Wake eval: Time invalid => treating as OPEN (per policy)");
   }
 
-  // Reset per-connection online window and forced-sleep flag after waking
-  onlineWorkStartMs = 0;
-  forceSleepThisCycle = false;
-
   if (result.wakeupPin() == BUTTON_PIN) {
-    // If the user woke the device we need to get up - device
-    // was sleeping so we need to reset opening hours
-    // User button always wakes sensor stack regardless of hours.
+    // User button wake: go directly to CONNECTING_STATE.
     SensorManager::instance().onExitSleep();
-    Log.info("Woke with user button - Resetting hours and going to connect");
-    sysStatus.set_lowPowerMode(false);
-    sysStatus.set_operatingMode(CONNECTED); // Treat button wake as service/connected mode
+    Log.info("Button wake - connecting to sync and drain queue");
     userSwitchDetected = false;
-    stayAwake = stayAwakeLong;
-    stayAwakeTimeStamp = millis();
-    state = REPORTING_STATE;
+    state = CONNECTING_STATE;
+    return;
   } else {
     // In this state the device was awoken for hourly reporting or PIR
     // Re-enable sensors only if within opening hours; otherwise they
     // remain powered down to minimize sleep current.
     if (isWithinOpenHours()) {
+      // If the sensor stack was never initialized (for example, device booted
+      // while closed and remained asleep), onExitSleep() will be a no-op.
+      // Ensure we (re)initialize the active sensor when entering open hours.
+      Log.info("Wake: OPEN hours - enabling sensor (onExitSleep)");
       SensorManager::instance().onExitSleep();
+      if (!SensorManager::instance().isSensorReady()) {
+        Log.info("Wake: sensorReady=false - initializing from config");
+        SensorManager::instance().initializeFromConfig();
+      }
+      Log.info("Wake: sensorReady=%s", SensorManager::instance().isSensorReady() ? "true" : "false");
+
+      // In CONNECTED operating mode, the device should reconnect at the
+      // start of open hours so it can resume normal connected behavior.
+      if (sysStatus.get_operatingMode() == CONNECTED && !Particle.connected()) {
+        Log.info("Wake: CONNECTED mode - reconnecting to Particle (park OPEN)");
+        state = CONNECTING_STATE;
+        return;
+      }
     } else {
       Log.info("Woke outside opening hours; keeping sensors powered down");
     }
@@ -503,8 +536,38 @@ void handleSleepingState() {
     // visible behaviour is consistent.
     if (pirWake) {
       digitalWrite(BLUE_LED, HIGH);
-      countSignalTimer.reset();
+      if (countSignalTimer.isActive()) {
+        countSignalTimer.reset();
+      } else {
+        countSignalTimer.start();
+      }
     }
+
+    // If PIR woke us in LOW_POWER or DISCONNECTED mode, return immediately to sleep.
+    if (pirWake && sysStatus.get_operatingMode() != CONNECTED) {
+      state = SLEEPING_STATE;
+      return;
+    }
+
+    // Check if this wake is due to scheduled reporting interval.
+    // This ensures hourly (or configured-interval) reporting works even
+    // when no other wake conditions are present.
+    if (Time.isValid() && isWithinOpenHours()) {
+      uint16_t intervalSec = sysStatus.get_reportingInterval();
+      if (intervalSec == 0) {
+        intervalSec = 3600; // Fallback to 1 hour
+      }
+
+      time_t now = Time.now();
+      time_t lastReport = sysStatus.get_lastReport();
+      if (lastReport == 0 || (now - lastReport) >= intervalSec) {
+        Log.info("Wake: scheduled report due (now=%ld lastReport=%ld interval=%u)",
+                 (long)now, (long)lastReport, (unsigned)intervalSec);
+        state = REPORTING_STATE;
+        return;
+      }
+    }
+
     state = IDLE_STATE;
   }
 }
@@ -573,57 +636,14 @@ void handleReportingState() {
     }
   }
 
-  // ********** Connectivity Decision (SoC-tiered) **********
-  bool shouldConnect = true;
-
-  // Explicit disconnected mode: never auto-connect
-  if (sysStatus.get_disconnectedMode()) {
-    shouldConnect = false;
-    Log.info("Disconnected mode enabled - not connecting after report");
-  } else {
-    // Apply SoC-based tiers when in low-power mode
-    if (sysStatus.get_lowPowerMode()) {
-      int soc = current.get_stateOfCharge();
-      int hour = Time.isValid() ? Time.hour() : -1;
-
-      shouldConnect = false; // Start from conservative default
-
-      if (soc > 65) {
-        Log.info("SoC %d%% > 65 - connecting this hour", soc);
-        shouldConnect = true; // Normal behaviour: connect every hour
-      } else if (soc > 50) {
-        if (hour < 0 || (hour % 2) == 0) {
-          Log.info("SoC %d%% in 50-65%% tier - connecting on 2-hour cadence", soc);
-          shouldConnect = true;
-        } else {
-          Log.info("SoC %d%% in 50-65%% tier - skipping this hour", soc);
-        }
-      } else if (soc > 35) {
-        if (hour < 0 || (hour % 4) == 0) {
-          Log.info("SoC %d%% in 35-50%% tier - connecting on 4-hour cadence", soc);
-          shouldConnect = true;
-        } else {
-          Log.info("SoC %d%% in 35-50%% tier - skipping this hour", soc);
-        }
-      } else if (soc > 20) {
-        Log.info("SoC %d%% in 20-35%% tier - store-only, no auto-connect", soc);
-      } else {
-        Log.info("SoC %d%% <= 20%% - emergency-only, no auto-connect", soc);
-      }
-    }
-
-    // User button override (active-low): always allow service connection
-    if (!digitalRead(BUTTON_PIN)) {
-      Log.info("User button override - forcing connection");
-      shouldConnect = true;
-    }
-  }
-
-  if (shouldConnect && !Particle.connected()) {
+  // ********** Connectivity Decision **********
+  // In low-power mode, connect on every scheduled report to drain queue.
+  // User can control report frequency via reportingIntervalSec.
+  if (!Particle.connected()) {
     Log.info("Transitioning to CONNECTING_STATE after report");
     state = CONNECTING_STATE;
   } else {
-    state = IDLE_STATE; // Either already connected or intentionally staying offline
+    state = IDLE_STATE;
   }
 
   // If a webhook supervision alert (40) has been raised, we leave the
@@ -661,26 +681,16 @@ void handleReportingState() {
 void handleConnectingState() {
   static unsigned long connectionStartTimeStamp; // When this connect attempt started
   static bool lastEnteredFromReporting = false;  // Whether we came from REPORTING_STATE
-
-  enum ConnectPhase {
-    CONN_PHASE_IDLE,
-    CONN_PHASE_START,
-    CONN_PHASE_WAIT_CLOUD,
-    CONN_PHASE_LOAD_CONFIG,
-    CONN_PHASE_PUBLISH_LEDGER,
-    CONN_PHASE_COMPLETE
-  };
-
-  static ConnectPhase connectPhase = CONN_PHASE_IDLE;
-  char data[64]; // Holder for message strings
+  static bool connectRequested = false;
+  static bool postConnectDone = false;
 
   if (state != oldState) {
-    // One-time actions when entering CONNECTING_STATE
     publishStateTransition();
     lastEnteredFromReporting = (oldState == REPORTING_STATE);
     sysStatus.set_lastConnectionDuration(0);
     connectionStartTimeStamp = millis();
-    connectPhase = CONN_PHASE_START;
+    connectRequested = false;
+    postConnectDone = false;
   }
 
   unsigned long elapsedMs = millis() - connectionStartTimeStamp;
@@ -694,8 +704,7 @@ void handleConnectingState() {
     budgetMs = (unsigned long)budgetSec * 1000UL;
   }
 
-  switch (connectPhase) {
-  case CONN_PHASE_START: {
+  if (!connectRequested) {
     // Log signal strength at start of connection attempt for field
     // correlation with connectivity failures (alert 31). On cellular
     // platforms this gives us a baseline RSSI before the modem fully
@@ -707,117 +716,69 @@ void handleConnectingState() {
     Log.info("Starting connection attempt - Signal: S=%2.0f%% Q=%2.0f%%",
              (double)strengthPct, (double)qualityPct);
 #endif
-
     Log.info("Requesting Particle cloud connection");
-    Particle.connect(); // Ask Device OS to connect; we'll poll status
-    connectPhase = CONN_PHASE_WAIT_CLOUD;
-    break;
+    Particle.connect();
+    connectRequested = true;
   }
 
-  case CONN_PHASE_WAIT_CLOUD:
-    if (Particle.connected()) {
-      // Connection established within budget
+  if (Particle.connected()) {
+    if (!postConnectDone) {
+      connectedStartMs = millis();
       sysStatus.set_lastConnection(Time.now());
-      stayAwake = stayAwakeLong;
-      stayAwakeTimeStamp = millis();
+      if (current.get_alertCode() == 31) {
+        Log.info("Connection successful - clearing alert 31");
+        current.set_alertCode(0);
+      }
       measure.getSignalStrength();
       measure.batteryState();
       Log.info("Enclosure temperature at connect: %4.2f C", (double)current.get_internalTempC());
-      snprintf(data, sizeof(data), "Connected in %i secs", sysStatus.get_lastConnectionDuration());
-      Log.info(data);
       if (sysStatus.get_verboseMode()) {
+        char data[64];
+        snprintf(data, sizeof(data), "Connected in %i secs", sysStatus.get_lastConnectionDuration());
         publishDiagnosticSafe("Cellular", data, PRIVATE);
       }
 
-      // Track when we first became cloud-connected for this connection cycle
-      onlineWorkStartMs = millis();
-      forceSleepThisCycle = false;
-
-      connectPhase = CONN_PHASE_LOAD_CONFIG;
-    } else if (elapsedMs > budgetMs) {
-      // Connection timeout based on per-wake budget; record a connectivity
-      // alert and let the error handler decide what to do next. If multiple
-      // alerts are present, the highest-severity one is preserved.
-      Log.warn("Connection attempt exceeded budget (%lu ms > %lu ms) - raising alert 31",
-               (unsigned long)elapsedMs, (unsigned long)budgetMs);
-      current.raiseAlert(31);
-
-      // Safety: ensure we don't leave the modem powered unintentionally after
-      // a failed/partial connect attempt. These calls are non-blocking.
-      Particle.disconnect();
-    #if Wiring_Cellular
-      Cellular.disconnect();
-      Cellular.off();
-    #elif Wiring_WiFi
-      WiFi.disconnect();
-      WiFi.off();
-    #endif
-
-      state = ERROR_STATE;
-      connectPhase = CONN_PHASE_IDLE;
-    }
-    break;
-
-  case CONN_PHASE_LOAD_CONFIG: {
-    // Load configuration from cloud ledgers after connecting
-    bool configOk = Cloud::instance().loadConfigurationFromCloud();
-    if (!configOk) {
-      // Configuration or status ledger apply failure; record as an alert so
-      // the error supervisor can evaluate and potentially reset.
-      current.raiseAlert(41);
-    }
-    connectPhase = CONN_PHASE_PUBLISH_LEDGER;
-    break;
-  }
-
-  case CONN_PHASE_PUBLISH_LEDGER: {
-    // After a successful connect, publish the latest counters and
-    // temperature to the device-data ledger so the cloud view reflects
-    // current state even if a regular hourly report has not yet run.
-    //
-    // However, if we *just* came from REPORTING_STATE, publishData()
-    // has already updated the device-data ledger with the correct
-    // hourlyCount and then reset the in-memory hourly counter to 0.
-    // Calling publishDataToLedger() again here would overwrite the
-    // freshly published hourlyCount with 0, which is not desired.
-    if (!lastEnteredFromReporting) {
-      if (!Cloud::instance().publishDataToLedger()) {
-        current.raiseAlert(42); // data ledger publish failure
+      bool configOk = Cloud::instance().loadConfigurationFromCloud();
+      if (!configOk) {
+        Log.warn("Configuration apply failed (will raise alert 41)");
+        current.raiseAlert(41);
+      } else if (current.get_alertCode() == 41) {
+        Log.info("Configuration apply succeeded - clearing stale alert 41");
+        current.set_alertCode(0);
       }
+
+      if (!lastEnteredFromReporting) {
+        if (!Cloud::instance().publishDataToLedger()) {
+          current.raiseAlert(42); // data ledger publish failure
+        }
+      }
+
+      size_t pending = PublishQueuePosix::instance().getNumEvents();
+      Log.info("Publish queue depth after connect: %u event(s)", (unsigned)pending);
+
+      if (!firstConnectionObserved) {
+        firstConnectionObserved = true;
+        firstConnectionQueueDrainedLogged = false;
+      }
+
+      postConnectDone = true;
     }
 
-    // Log the current publish queue depth so we can observe whether
-    // events are being drained while connected.
-    size_t pending = PublishQueuePosix::instance().getNumEvents();
-    Log.info("Publish queue depth after connect: %u event(s)", (unsigned)pending);
-
-    // Mark that we've observed the first successful connection this
-    // boot so later we can log when any pending events have been
-    // fully flushed.
-    if (!firstConnectionObserved) {
-      firstConnectionObserved = true;
-      firstConnectionQueueDrainedLogged = false;
-    }
-
-    // If updates are pending for this device or an OTA is queued, enter
-    // FIRMWARE_UPDATE_STATE instead of going idle so we stay online until
-    // updates are handled.
-    if (System.updatesPending() || sysStatus.get_updatesPending()) {
+    if (System.updatesPending()) {
       Log.info("Updates pending after connect - transitioning to FIRMWARE_UPDATE_STATE");
       state = FIRMWARE_UPDATE_STATE;
     } else {
-      state = IDLE_STATE; // Return to idle once connected and configured
+      state = IDLE_STATE;
     }
-
-    connectPhase = CONN_PHASE_COMPLETE;
-    break;
+    return;
   }
 
-  case CONN_PHASE_COMPLETE:
-  case CONN_PHASE_IDLE:
-  default:
-    // Nothing to do; state transition will move us out of CONNECTING_STATE.
-    break;
+  if (elapsedMs > budgetMs) {
+    Log.warn("Connection attempt exceeded budget (%lu ms > %lu ms) - raising alert 31",
+             (unsigned long)elapsedMs, (unsigned long)budgetMs);
+    current.raiseAlert(31);
+    requestFullDisconnectAndRadioOff();
+    state = SLEEPING_STATE;
   }
 }
 
@@ -831,10 +792,6 @@ void handleFirmwareUpdateState() {
   if (state != oldState) {
     publishStateTransition();
     Log.info("Entering FIRMWARE_UPDATE_STATE - keeping device connected for updates");
-
-    // In update mode, force connected operating mode and disable low power
-    sysStatus.set_lowPowerMode(false);
-    sysStatus.set_operatingMode(CONNECTED);
 
     firmwareUpdateStartMs = millis();
 
@@ -854,7 +811,7 @@ void handleFirmwareUpdateState() {
     }
 
     // If no updates are pending anymore and no OTA in progress, exit update mode
-    if (!sysStatus.get_updatesPending() && !System.updatesPending()) {
+    if (!System.updatesPending()) {
       Log.info("No updates pending - leaving FIRMWARE_UPDATE_STATE to IDLE_STATE");
       configLoadedInUpdateMode = false;
       state = IDLE_STATE;
@@ -963,7 +920,7 @@ static int resolveErrorAction() {
   }
 }
 
-// ERROR_STATE: Error supervisor: decide recovery action with backoff
+// ERROR_STATE: Error supervisor: decide recovery action
 void handleErrorState() {
   static unsigned long resetTimer = 0;
   static int resolution = 0;
@@ -972,17 +929,23 @@ void handleErrorState() {
     publishStateTransition();
 
     // Safety: regardless of recovery choice, do not leave radio/modem powered
-    // while we sit in ERROR_STATE waiting for reset/backoff.
-    Particle.disconnect();
-#if Wiring_Cellular
-    Cellular.disconnect();
-    Cellular.off();
-#elif Wiring_WiFi
-    WiFi.disconnect();
-    WiFi.off();
-#endif
+    // while we sit in ERROR_STATE waiting for reset.
+    requestFullDisconnectAndRadioOff();
 
-    resolution = resolveErrorAction();
+    // In LOW_POWER or DISCONNECTED modes, avoid reset loops for connectivity/sleep alerts.
+    if (sysStatus.get_operatingMode() != CONNECTED) {
+      int8_t alert = current.get_alertCode();
+      if (alert == 15 || alert == 16 || alert == 31) {
+        Log.warn("Low-power mode: clearing alert %d to avoid reset loop", alert);
+        current.set_alertCode(0);
+        current.set_lastAlertTime(0);
+        resolution = 0;
+      } else {
+        resolution = resolveErrorAction();
+      }
+    } else {
+      resolution = resolveErrorAction();
+    }
     Log.info("Entering ERROR_STATE with alert=%d, resetCount=%u, resolution=%d",
              current.get_alertCode(), sysStatus.get_resetCount(), resolution);
     resetTimer = millis();
@@ -1008,9 +971,9 @@ void handleErrorState() {
   case 3:
     // Hard recovery using AB1805 deep power down after delay. This fully
     // power-cycles the device and modem but is limited by resolveErrorAction
-    // backoff to avoid thrashing.
+    // avoid thrashing.
     if (millis() - resetTimer > resetWait) {
-      Log.info("Executing deep power down from ERROR_STATE");
+      Log.info("Executing deep power down from ERROR_STATE (alert=%d)", current.get_alertCode());
       ab1805.deepPowerDown();
     }
     break;
@@ -1047,7 +1010,11 @@ void handleCountingMode() {
     // visual count indicator using a software timer so we
     // don't block the main loop.
     digitalWrite(BLUE_LED, HIGH);
-    countSignalTimer.reset();
+    if (countSignalTimer.isActive()) {
+      countSignalTimer.reset();
+    } else {
+      countSignalTimer.start();
+    }
 
     // Stay in IDLE_STATE; hourly reporting will publish aggregated counts.
   }

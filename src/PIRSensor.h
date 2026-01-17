@@ -160,6 +160,7 @@ public:
         attachInterrupt(intPin, pirISR, RISING);
 
         _isReady = true;
+        Log.info("PIR sensor powered up after wake (interrupt attached)");
         return true;
     }
 

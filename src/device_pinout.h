@@ -64,6 +64,28 @@ extern const pin_t BLUE_LED;          // On-module blue status LED (D7)
 extern const pin_t WAKEUP_PIN;        // Wake pin connected to watchdog timer
 
 // ---------------------------------------------------------------------------
+// Optional build-time hardware flags
+// ---------------------------------------------------------------------------
+// Some platforms (notably Photon 2 / P2 dev boards) may not have an analog
+// temperature sensor wired. In that case, SensorManager uses a stub value.
+//
+// If you are building for a carrier that *does* provide a TMP36 (for example,
+// a Muon carrier), define MUON_HAS_TMP36 (typically in your top-level .cpp or
+// in the Particle Workbench build defines) to force the TMP36 sampling path.
+//
+// You can also override which pin the carrier uses by defining
+// MUON_TMP36_SENSE_PIN to a valid pin name (for example: A4, A0, S4).
+//
+// Muon boards also include an onboard TMP112A I2C temperature sensor.
+// By default, the firmware will probe for it at runtime and prefer it when
+// present (Muon will "just work").
+//
+// Optional overrides:
+//   - MUON_HAS_TMP112: force-enable TMP112A path (skip probe)
+//   - DISABLE_TMP112_AUTODETECT: skip probing for TMP112A
+//   - MUON_TMP112_I2C_ADDR: 7-bit address (default 0x48)
+
+// ---------------------------------------------------------------------------
 // Sensor-specific logical pins (PIR-on-carrier configuration)
 // ---------------------------------------------------------------------------
 // NOTE: The actual hardware mapping (D13 vs S2 vs SCK, etc.) is handled in
