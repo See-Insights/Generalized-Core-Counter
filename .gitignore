@@ -5,8 +5,10 @@
 .vscode/
 
 # Particle / build outputs
+*.bin
 firmware*.bin
 boron_firmware_*.bin
+p2_firmware_*.bin
 
 # Local build artifacts
 /target/
