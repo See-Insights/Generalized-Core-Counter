@@ -11,6 +11,7 @@ var classsys_status_data_1_1_sys_data =
     [ "lastDailyCleanup", "classsys_status_data_1_1_sys_data.html#aa1598555fa6d88811493a867d908d771", null ],
     [ "lastHookResponse", "classsys_status_data_1_1_sys_data.html#ad3f38ef14a6418b0dfaf9656e4e84152", null ],
     [ "lastReport", "classsys_status_data_1_1_sys_data.html#a553a7a26ab8760a9d912476e1dfd837f", null ],
+    [ "lastTimeSync", "classsys_status_data_1_1_sys_data.html#afafd4b77d084a2e9f2e425bd7dc6868d", null ],
     [ "lowBatteryMode", "classsys_status_data_1_1_sys_data.html#a585c498d8e5c329844bee07dc696aa58", null ],
     [ "lowPowerMode", "classsys_status_data_1_1_sys_data.html#aebaa91e1d0c5b5a892a4d5d93e8914f3", null ],
     [ "lowPowerReportingIntervalSec", "classsys_status_data_1_1_sys_data.html#ad704f3db73c4681708c941e1884bd799", null ],

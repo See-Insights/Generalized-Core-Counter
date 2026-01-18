@@ -156,6 +156,7 @@ public:
 		bool disconnectedMode;                            // Are we in disconnected mode - this is used to prevent the device from trying to connect to the Particle cloud - for Development and testing purposes
 		bool serialConnected;							  // Is the serial port connected - used to determine if we should wait for a serial connection before starting the device
 		time_t lastDailyCleanup;                           // Last time dailyCleanup() successfully ran
+		time_t lastTimeSync;                               // Last time we synced time from Particle cloud
 		
 		// ********** Operating Mode Configuration **********
 		uint8_t countingMode;                             // 0=COUNTING, 1=OCCUPANCY, 2=SCHEDULED (time-based)
@@ -257,6 +258,9 @@ public:
 
 	time_t get_lastDailyCleanup() const;
 	void set_lastDailyCleanup(time_t value);
+
+	time_t get_lastTimeSync() const;
+	void set_lastTimeSync(time_t value);
 
 	// ********** Operating Mode Configuration Get/Set Functions **********
 	

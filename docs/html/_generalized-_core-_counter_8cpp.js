@@ -1,7 +1,7 @@
 var _generalized__core__counter_8cpp =
 [
     [ "ab1805", "_generalized-_core-_counter_8cpp.html#ac76c3827d7e201a452741421f4737990", null ],
-    [ "countSignalTimer", "_generalized-_core-_counter_8cpp.html#acc8846869443575f768d24829037eec4", null ],
+    [ "countSignalTimer", "_generalized-_core-_counter_8cpp.html#ace371ac8f4eb5b9c14b1e4a5f9da82e9", null ],
     [ "countSignalTimerISR", "_generalized-_core-_counter_8cpp.html#aafd752c276befe106eb6a9c6dc395962", null ],
     [ "dailyCleanup", "_generalized-_core-_counter_8cpp.html#a496510658b21d252547ca67ae1035445", null ],
     [ "isWithinOpenHours", "_generalized-_core-_counter_8cpp.html#adaf14f9ee408635f2c952b99aaeda484", null ],
@@ -33,6 +33,7 @@ var _generalized__core__counter_8cpp =
     [ "sensorDetect", "_generalized-_core-_counter_8cpp.html#a9ae784228f6b9b5ec7d14839274b3448", null ],
     [ "state", "_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79", null ],
     [ "stateNames", "_generalized-_core-_counter_8cpp.html#abcd5d33fa869a1d746ac85a5f6ac720b", null ],
+    [ "suppressAlert40ThisSession", "_generalized-_core-_counter_8cpp.html#a56da71c8fad275eebc0b43ee5d80b506", null ],
     [ "userSwitchDetected", "_generalized-_core-_counter_8cpp.html#a8e11b98139fe014f3e8a660d91905438", null ],
     [ "wakeBoundary", "_generalized-_core-_counter_8cpp.html#a3c07c9394207388fc074bbbe0075b99c", null ]
 ];

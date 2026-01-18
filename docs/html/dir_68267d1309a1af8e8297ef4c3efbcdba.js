@@ -2,7 +2,7 @@ var dir_68267d1309a1af8e8297ef4c3efbcdba =
 [
     [ "Cloud.cpp", "_cloud_8cpp.html", "_cloud_8cpp" ],
     [ "Cloud.h", "_cloud_8h.html", "_cloud_8h" ],
-    [ "Config.h", "_config_8h.html", null ],
+    [ "Config.h", "_config_8h.html", "_config_8h" ],
     [ "Connectivity.h", "_connectivity_8h.html", "_connectivity_8h" ],
     [ "device_pinout.cpp", "device__pinout_8cpp.html", "device__pinout_8cpp" ],
     [ "device_pinout.h", "device__pinout_8h.html", "device__pinout_8h" ],

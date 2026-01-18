@@ -22,6 +22,9 @@
 // Include Particle Device OS APIs
 #include "Particle.h"
 
+// Global configuration (includes DEBUG_SERIAL define)
+#include "Config.h"
+
 // Firmware version recognized by Particle Product firmware management
 // Bump this integer whenever you cut a new production release.
 PRODUCT_VERSION(3);
@@ -66,6 +69,7 @@ extern const char* FIRMWARE_RELEASE_NOTES;
  */
 
 // Forward declarations
+static void appWatchdogHandler(); // Application watchdog handler
 void publishData();           // Publish the data to the cloud
 void userSwitchISR();         // Interrupt for the user switch
 void sensorISR();             // Interrupt for legacy tire-counting sensor
@@ -75,90 +79,9 @@ void UbidotsHandler(const char *event, const char *data); // Webhook response ha
 void publishStartupStatus();  // One-time status summary at boot
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE); // Safe diagnostic publish with queue guard
 
-// ApplicationWatchdog expects a plain function pointer.
-static void appWatchdogHandler() {
-  System.reset();
-}
-
-// Helper to determine whether current *local* time is within park open hours.
-// Local time is derived from LocalTimeRK using the configured timezone.
-// If time is not yet valid, we treat it as "open" so the device can start
-// sensing while it acquires time and configuration.
 // One-shot software timer to keep BLUE_LED on long enough
 // to be visible for each count or PIR-triggered wake event.
-Timer countSignalTimer(1000, countSignalTimerISR, true);
-
-bool isWithinOpenHours() {
-  if (!Time.isValid()) {
-    return true;
-  }
-
-  uint8_t openHour = sysStatus.get_openTime();
-  uint8_t closeHour = sysStatus.get_closeTime();
-  // Use LocalTimeRK to convert UTC to local hour based on the
-  // configured timezone (see setup()).
-  LocalTimeConvert tempConv;
-  tempConv.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
-  uint8_t hour = (uint8_t)(tempConv.getLocalTimeHMS().toSeconds() / 3600);
-
-  if (openHour < closeHour) {
-    // Simple daytime window, e.g. 6 -> 22
-    return (hour >= openHour) && (hour < closeHour);
-  } else if (openHour > closeHour) {
-    // Overnight window, e.g. 20 -> 6
-    return (hour >= openHour) || (hour < closeHour);
-  } else {
-    // openHour == closeHour: treat as always open
-    return true;
-  }
-}
-
-// Helper to compute seconds until next park opening time (local time)
-int secondsUntilNextOpen() {
-  if (!Time.isValid()) {
-    // Fallback: 1 hour if time is not yet valid
-    return 3600;
-  }
-
-  uint8_t openHour = sysStatus.get_openTime();
-  uint8_t closeHour = sysStatus.get_closeTime();
-
-  LocalTimeConvert tempConv;
-  tempConv.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
-  uint32_t secondsOfDay = tempConv.getLocalTimeHMS().toSeconds();
-
-  uint32_t openSec = (uint32_t)openHour * 3600;
-  uint32_t closeSec = (uint32_t)closeHour * 3600;
-
-  // Normalize: if we're currently within opening hours, next open is tomorrow
-  if (isWithinOpenHours()) {
-    return (int)((24 * 3600UL - secondsOfDay) + openSec);
-  }
-
-  if (openHour < closeHour) {
-    // Simple daytime window, closed before open or after close
-    if (secondsOfDay < openSec) {
-      // Before opening today
-      return (int)(openSec - secondsOfDay);
-    } else {
-      // After closing, next open is tomorrow
-      return (int)((24 * 3600UL - secondsOfDay) + openSec);
-    }
-  } else if (openHour > closeHour) {
-    // Overnight window; closed between closeHour and openHour
-    if (secondsOfDay < openSec && secondsOfDay >= closeSec) {
-      // During the closed gap today
-      return (int)(openSec - secondsOfDay);
-    } else {
-      // Otherwise next open is later today or tomorrow, but isWithinOpenHours()
-      // was already false so this path will generally be rare; fall back to 1 hour
-      return 3600;
-    }
-  } else {
-    // openHour == closeHour: always open; should not normally reach here
-    return 3600;
-  }
-}
+Timer countSignalTimer(2000, countSignalTimerISR, true);
 
 // Sleep configuration
 SystemSleepConfiguration config; // Sleep 2.0 configuration
@@ -191,12 +114,21 @@ bool hibernateDisabledForSession = false;
 // Track when we connected to enforce max connected time in LOW_POWER/DISCONNECTED modes
 unsigned long connectedStartMs = 0;
 
+// Suppress alert 40 (webhook timeout) after waking from overnight closed-hours hibernate
+bool suppressAlert40ThisSession = false;
+
 // ********** Timing **********
 const int wakeBoundary = 1 * 3600;          // Reporting boundary (1 hour)
 const unsigned long resetWait = 30000;      // Error state dwell before reset
 const unsigned long maxConnectAttemptMs = 5UL * 60UL * 1000UL; // Max time to spend trying to connect per wake
 
 void setup() {
+  // Wait for serial connection when DEBUG_SERIAL is enabled
+#ifdef DEBUG_SERIAL
+  waitFor(Serial.isConnected, 10000);
+  delay(1000);
+#endif
+
   Log.info("===== Firmware Version %s =====", FIRMWARE_VERSION);
   Log.info("===== Release Notes: %s =====", FIRMWARE_RELEASE_NOTES);
   
@@ -268,6 +200,16 @@ void setup() {
     Log.info("OTA update detected - forcing connection to reload config");
     state = CONNECTING_STATE;
     break;
+  case RESET_REASON_POWER_MANAGEMENT:
+    // Waking from sleep. If current local hour matches opening hour (e.g., 07:00),
+    // we likely just woke from overnight closed-hours hibernate.
+    // Suppress alert 40 this session since 8+ hours without webhook responses
+    // during closed hours is expected, not an error.
+    // Error escalation/hard resets during other hours (08:00-22:00) will still
+    // correctly trigger alert 40 if there's a real connectivity issue.
+    // Note: Local time calculation happens after timezone setup, so we check this
+    // later in setup() rather than here where timezone isn't configured yet.
+    break;
   default:
     break;
   }
@@ -320,12 +262,40 @@ void setup() {
   // soon after the first successful connection.
   publishStartupStatus();
 
+  // ===== TIME AND TIMEZONE CONFIGURATION =====
+  // Setup local time from persisted timezone string (POSIX TZ format).
+  // This must be configured before we can make any open/close hour decisions.
+  String tz = sysStatus.get_timeZoneStr();
+  if (tz.length() == 0) {
+    tz = "SGT-8"; // Fallback default
+    sysStatus.set_timeZoneStr(tz.c_str());
+  }
+  LocalTime::instance().withConfig(LocalTimePosixTimezone(tz.c_str()));
+
+  // Validate time and configure local time converter
   if (!Time.isValid()) {
-    Log.info("Time is invalid -  %s so connecting", Time.timeStr().c_str());
+    Log.info("Time is invalid - %s so connecting", Time.timeStr().c_str());
     state = CONNECTING_STATE;
   } else {
     Log.info("Time is valid - %s", Time.timeStr().c_str());
     
+    // Now that time is valid, configure local time converter for timezone-aware operations
+    conv.withCurrentTime().convert();
+    Log.info("Timezone: %s, Local time: %s", tz.c_str(), conv.format(TIME_FORMAT_DEFAULT).c_str());
+    Log.info("Open hours %02u:00-%02u:00, currently: %s",
+             sysStatus.get_openTime(), sysStatus.get_closeTime(),
+             isWithinOpenHours() ? "OPEN" : "CLOSED");
+
+    // Check if waking from overnight hibernate - suppress alert 40 since
+    // 8+ hours without webhook during closed hours is expected, not an error.
+    if (System.resetReason() == RESET_REASON_POWER_MANAGEMENT) {
+      uint8_t localHour = (uint8_t)(conv.getLocalTimeHMS().toSeconds() / 3600);
+      if (localHour == sysStatus.get_openTime()) {
+        Log.info("Wake from overnight hibernate at opening hour - suppressing alert 40");
+        suppressAlert40ThisSession = true;
+      }
+    }
+
     // In CONNECTED operating mode, always connect on boot to reload
     // configuration from ledger and prevent stuck-in-IDLE power drain.
     if (sysStatus.get_operatingMode() == CONNECTED) {
@@ -334,24 +304,6 @@ void setup() {
     }
   }
 
-  // Setup local time from persisted timezone string (POSIX TZ format).
-  // Example values:
-  //   "SGT-8" for Singapore (no DST)
-  //   "EST5EDT,M3.2.0/2:00:00,M11.1.0/2:00:00" for US Eastern with DST
-  String tz = sysStatus.get_timeZoneStr();
-  if (tz.length() == 0) {
-    tz = "SGT-8"; // Fallback default
-    sysStatus.set_timeZoneStr(tz.c_str());
-  }
-  LocalTime::instance().withConfig(LocalTimePosixTimezone(tz.c_str()));
-  conv.withCurrentTime().convert();
-
-  // Log current local time, timezone, and whether we are within opening hours
-  Log.info("Timezone at startup: %s", tz.c_str());
-  Log.info("Local time at startup: %s", conv.format(TIME_FORMAT_DEFAULT).c_str());
-  Log.info("Open hours %02u:00-%02u:00, currently: %s",
-           sysStatus.get_openTime(), sysStatus.get_closeTime(),
-           isWithinOpenHours() ? "OPEN" : "CLOSED");
   Log.info("Sensor ready at startup: %s", SensorManager::instance().isSensorReady() ? "true" : "false");
 
   // ===== SENSOR ABSTRACTION LAYER =====
@@ -461,6 +413,89 @@ void loop() {
   }
 
 } // End of loop
+
+// ********** Helper Functions **********
+
+// ApplicationWatchdog expects a plain function pointer.
+static void appWatchdogHandler() {
+  System.reset();
+}
+
+// Helper to determine whether current *local* time is within park open hours.
+// Local time is derived from LocalTimeRK using the configured timezone.
+// If time is not yet valid, we treat it as "open" so the device can start
+// sensing while it acquires time and configuration.
+bool isWithinOpenHours() {
+  if (!Time.isValid()) {
+    return true;
+  }
+
+  uint8_t openHour = sysStatus.get_openTime();
+  uint8_t closeHour = sysStatus.get_closeTime();
+  // Use LocalTimeRK to convert UTC to local hour based on the
+  // configured timezone (see setup()).
+  LocalTimeConvert tempConv;
+  tempConv.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
+  uint8_t hour = (uint8_t)(tempConv.getLocalTimeHMS().toSeconds() / 3600);
+
+  if (openHour < closeHour) {
+    // Simple daytime window, e.g. 6 -> 22
+    return (hour >= openHour) && (hour < closeHour);
+  } else if (openHour > closeHour) {
+    // Overnight window, e.g. 20 -> 6
+    return (hour >= openHour) || (hour < closeHour);
+  } else {
+    // openHour == closeHour: treat as always open
+    return true;
+  }
+}
+
+// Helper to compute seconds until next park opening time (local time)
+int secondsUntilNextOpen() {
+  if (!Time.isValid()) {
+    // Fallback: 1 hour if time is not yet valid
+    return 3600;
+  }
+
+  uint8_t openHour = sysStatus.get_openTime();
+  uint8_t closeHour = sysStatus.get_closeTime();
+
+  LocalTimeConvert tempConv;
+  tempConv.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
+  uint32_t secondsOfDay = tempConv.getLocalTimeHMS().toSeconds();
+
+  uint32_t openSec = (uint8_t)openHour * 3600;
+  uint32_t closeSec = (uint8_t)closeHour * 3600;
+
+  // Normalize: if we're currently within opening hours, next open is tomorrow
+  if (isWithinOpenHours()) {
+    return (int)((24 * 3600UL - secondsOfDay) + openSec);
+  }
+
+  if (openHour < closeHour) {
+    // Simple daytime window, closed before open or after close
+    if (secondsOfDay < openSec) {
+      // Before opening today
+      return (int)(openSec - secondsOfDay);
+    } else {
+      // After closing, next open is tomorrow
+      return (int)((24 * 3600UL - secondsOfDay) + openSec);
+    }
+  } else if (openHour > closeHour) {
+    // Overnight window; closed between closeHour and openHour
+    if (secondsOfDay < openSec && secondsOfDay >= closeSec) {
+      // During the closed gap today
+      return (int)(openSec - secondsOfDay);
+    } else {
+      // Otherwise next open is later today or tomorrow, but isWithinOpenHours()
+      // was already false so this path will generally be rare; fall back to 1 hour
+      return 3600;
+    }
+  } else {
+    // openHour == closeHour: always open; should not normally reach here
+    return 3600;
+  }
+}
 
 /**
  * @brief Publish sensor data to Ubidots webhook and device-data ledger.
@@ -656,8 +691,15 @@ void countSignalTimerISR() { digitalWrite(BLUE_LED, LOW); }
  * house at the beginning of a new day.
  */
 void dailyCleanup() {
-  if (Particle.connected())
+  if (Particle.connected()) {
     publishDiagnosticSafe("Daily Cleanup", "Running", PRIVATE);
+    
+    // Force time sync once per day to prevent clock drift
+    Log.info("Daily time sync requested");
+    Particle.syncTime();
+    sysStatus.set_lastTimeSync(Time.now());
+  }
+  
   Log.info("Running Daily Cleanup");
   // Leave verbose mode enabled for now to aid debugging
   if (sysStatus.get_solarPowerMode() ||

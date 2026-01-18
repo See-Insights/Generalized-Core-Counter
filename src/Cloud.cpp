@@ -72,8 +72,6 @@ void Cloud::onDeviceSettingsSync(Ledger ledger) {
 }
 
 void Cloud::mergeConfiguration() {
-    Log.info("Merging default and device configurations");
-    
     // Get data from both ledgers
     LedgerData defaults = defaultSettingsLedger.get();
     LedgerData device = deviceSettingsLedger.get();
@@ -136,7 +134,6 @@ void Cloud::mergeConfiguration() {
         mergedSensor["threshold1"] = Variant(threshold1);
         mergedSensor["threshold2"] = Variant(threshold2);
 
-        Log.info("Final merged sensor thresholds: threshold1=%d, threshold2=%d", threshold1, threshold2);
         mergedConfig.set("sensor", Variant(mergedSensor));
     }
     
@@ -146,10 +143,6 @@ void Cloud::mergeConfiguration() {
     if (device.has("messaging")) mergedConfig.set("messaging", device.get("messaging"));
     if (device.has("modes")) mergedConfig.set("modes", device.get("modes"));
     
-    if (sysStatus.get_verboseMode()) {
-        Log.info("Merged config: %s", mergedConfig.toJSON().c_str());
-    }
-    Log.info("Configuration merged - applying to device");
     lastApplySuccess = applyConfigurationFromLedger();
 
     if (!lastApplySuccess) {
@@ -158,7 +151,7 @@ void Cloud::mergeConfiguration() {
 }
 
 bool Cloud::loadConfigurationFromCloud() {
-    Log.info("Loading configuration from cloud ledgers");
+    Log.info("Syncing configuration from cloud");
     
     // Trigger merge and apply configuration. mergeConfiguration() will update
     // lastApplySuccess based on the result of applyConfigurationFromLedger().
@@ -167,8 +160,6 @@ bool Cloud::loadConfigurationFromCloud() {
 }
 
 bool Cloud::applyConfigurationFromLedger() {
-    Log.info("Applying merged configuration from DeviceConfigLedger");
-
     bool success = true;
 
     success &= applySensorConfig();
@@ -181,7 +172,6 @@ bool Cloud::applyConfigurationFromLedger() {
         // Do not force synchronous storage flushes here; they can exceed the
         // 100 ms loop budget. Persistence is handled by sysStatus.loop() and
         // sensorConfig.loop() (called from the main loop).
-        Log.info("Configuration successfully applied (persistence deferred)");
         sysStatus.validate(sizeof(sysStatus));
         sensorConfig.validate(sizeof(sensorConfig));
 
@@ -214,51 +204,53 @@ void Cloud::loop() {
 }
 
 bool Cloud::applyMessagingConfig() {
-    Log.info("Applying messaging configuration");
-    
     if (!mergedConfig.has("messaging")) return true;
     Variant messaging = mergedConfig.get("messaging");
     
-    if (!messaging.isMap()) {
-        Log.info("No messaging configuration found");
-        return true;
-    }
+    if (!messaging.isMap()) return true;
 
     bool success = true;
+    bool changed = false;
 
     if (messaging.has("serial")) {
         bool serialEnabled = messaging.get("serial").toBool();
-        sysStatus.set_serialConnected(serialEnabled);
-        Log.info("Serial: %s", serialEnabled ? "ON" : "OFF");
+        if (sysStatus.get_serialConnected() != serialEnabled) {
+            sysStatus.set_serialConnected(serialEnabled);
+            Log.info("Config: Serial → %s", serialEnabled ? "ON" : "OFF");
+            changed = true;
+        }
     }
 
     if (messaging.has("verboseMode")) {
         bool verboseMode = messaging.get("verboseMode").toBool();
-        sysStatus.set_verboseMode(verboseMode);
-        Log.info("Verbose: %s", verboseMode ? "ON" : "OFF");
+        if (sysStatus.get_verboseMode() != verboseMode) {
+            sysStatus.set_verboseMode(verboseMode);
+            Log.info("Config: Verbose → %s", verboseMode ? "ON" : "OFF");
+            changed = true;
+        }
     }
 
+    if (changed) Log.info("Messaging config updated");
     return success;
 }
 
 bool Cloud::applyTimingConfig() {
-    Log.info("Applying timing configuration");
-    
     if (!mergedConfig.has("timing")) return true;
     Variant timing = mergedConfig.get("timing");
     
-    if (!timing.isMap()) {
-        Log.info("No timing configuration found");
-        return true;
-    }
+    if (!timing.isMap()) return true;
 
     bool success = true;
+    bool changed = false;
 
     if (timing.has("timezone")) {
         String timezone = timing.get("timezone").toString();
         if (timezone.length() > 0 && timezone.length() < 39) {
-            sysStatus.set_timeZoneStr(timezone.c_str());
-            Log.info("Timezone: %s", timezone.c_str());
+            if (strcmp(sysStatus.get_timeZoneStr(), timezone.c_str()) != 0) {
+                sysStatus.set_timeZoneStr(timezone.c_str());
+                Log.info("Config: Timezone → %s", timezone.c_str());
+                changed = true;
+            }
         } else {
             Log.warn("Invalid timezone length: %d", timezone.length());
             success = false;
@@ -268,8 +260,11 @@ bool Cloud::applyTimingConfig() {
     if (timing.has("reportingIntervalSec")) {
         int reportingInterval = timing.get("reportingIntervalSec").toInt();
         if (validateRange(reportingInterval, 300, 86400, "timing.reportingIntervalSec")) {
-            sysStatus.set_reportingInterval(reportingInterval);
-            Log.info("Reporting interval: %ds", reportingInterval);
+            if (sysStatus.get_reportingInterval() != reportingInterval) {
+                sysStatus.set_reportingInterval(reportingInterval);
+                Log.info("Config: Reporting interval → %ds", reportingInterval);
+                changed = true;
+            }
         } else {
             success = false;
         }
@@ -278,8 +273,11 @@ bool Cloud::applyTimingConfig() {
     if (timing.has("pollingRateSec")) {
         int pollingRate = timing.get("pollingRateSec").toInt();
         if (validateRange(pollingRate, 0, 3600, "timing.pollingRateSec")) {
-            sensorConfig.set_pollingRate(pollingRate);
-            Log.info("Polling rate: %ds", pollingRate);
+            if (sensorConfig.get_pollingRate() != pollingRate) {
+                sensorConfig.set_pollingRate(pollingRate);
+                Log.info("Config: Polling rate → %ds", pollingRate);
+                changed = true;
+            }
         } else {
             success = false;
         }
@@ -288,8 +286,11 @@ bool Cloud::applyTimingConfig() {
     if (timing.has("openHour")) {
         int openHour = timing.get("openHour").toInt();
         if (validateRange(openHour, 0, 23, "timing.openHour")) {
-            sysStatus.set_openTime(openHour);
-            Log.info("Open hour: %d", openHour);
+            if (sysStatus.get_openTime() != openHour) {
+                sysStatus.set_openTime(openHour);
+                Log.info("Config: Open hour → %d", openHour);
+                changed = true;
+            }
         } else {
             success = false;
         }
@@ -298,35 +299,39 @@ bool Cloud::applyTimingConfig() {
     if (timing.has("closeHour")) {
         int closeHour = timing.get("closeHour").toInt();
         if (validateRange(closeHour, 0, 23, "timing.closeHour")) {
-            sysStatus.set_closeTime(closeHour);
-            Log.info("Close hour: %d", closeHour);
+            if (sysStatus.get_closeTime() != closeHour) {
+                sysStatus.set_closeTime(closeHour);
+                Log.info("Config: Close hour → %d", closeHour);
+                changed = true;
+            }
         } else {
             success = false;
         }
     }
 
+    if (changed) Log.info("Timing config updated");
     return success;
 }
 
 bool Cloud::applyPowerConfig() {
-    Log.info("Applying power configuration");
-    
     if (!mergedConfig.has("power")) return true;
     Variant power = mergedConfig.get("power");
     
-    if (!power.isMap()) {
-        Log.info("No power configuration found");
-        return true;
-    }
+    if (!power.isMap()) return true;
 
     bool success = true;
+    bool changed = false;
 
     if (power.has("solarPowerMode")) {
         bool solarPowerMode = power.get("solarPowerMode").toBool();
-        sysStatus.set_solarPowerMode(solarPowerMode);
-        Log.info("Solar power: %s", solarPowerMode ? "ON" : "OFF");
+        if (sysStatus.get_solarPowerMode() != solarPowerMode) {
+            sysStatus.set_solarPowerMode(solarPowerMode);
+            Log.info("Config: Solar power → %s", solarPowerMode ? "ON" : "OFF");
+            changed = true;
+        }
     }
 
+    if (changed) Log.info("Power config updated");
     return success;
 }
 
@@ -341,28 +346,23 @@ bool Cloud::validateRange(T value, T min, T max, const String& name) {
 }
 
 bool Cloud::applySensorConfig() {
-    Log.info("Applying sensor configuration");
-    
-    if (!mergedConfig.has("sensor")) {
-        Log.warn("No sensor configuration found");
-        return true;
-    }
+    if (!mergedConfig.has("sensor")) return true;
     
     Variant sensor = mergedConfig.get("sensor");
-    
-    if (!sensor.isMap()) {
-        Log.warn("Sensor configuration is not a map");
-        return true;
-    }
+    if (!sensor.isMap()) return true;
     
     bool success = true;
+    bool changed = false;
     
     // threshold1
     if (sensor.has("threshold1")) {
         int threshold1 = sensor.get("threshold1").toInt();
         if (validateRange(threshold1, 0, 100, "sensor.threshold1")) {
-            sensorConfig.set_threshold1(threshold1);
-            Log.info("✓ Sensor threshold1: %d", threshold1);
+            if (sensorConfig.get_threshold1() != threshold1) {
+                sensorConfig.set_threshold1(threshold1);
+                Log.info("Config: Threshold1 → %d", threshold1);
+                changed = true;
+            }
         } else {
             success = false;
         }
@@ -372,49 +372,42 @@ bool Cloud::applySensorConfig() {
     if (sensor.has("threshold2")) {
         int threshold2 = sensor.get("threshold2").toInt();
         if (validateRange(threshold2, 0, 100, "sensor.threshold2")) {
-            sensorConfig.set_threshold2(threshold2);
-            Log.info("✓ Sensor threshold2: %d", threshold2);
+            if (sensorConfig.get_threshold2() != threshold2) {
+                sensorConfig.set_threshold2(threshold2);
+                Log.info("Config: Threshold2 → %d", threshold2);
+                changed = true;
+            }
         } else {
             success = false;
         }
     }
     
+    if (changed) Log.info("Sensor config updated");
     return success;
 }
 
 bool Cloud::applyModesConfig() {
-    Log.info("Applying modes configuration");
-    
     if (!mergedConfig.has("modes")) return true;
     Variant modes = mergedConfig.get("modes");
     
     if (!modes.isMap()) {
-        Log.info("No modes configuration found");
         return true;
     }
     
     bool success = true;
+    bool changed = false;
 
     // Counting mode: 0=COUNTING, 1=OCCUPANCY, 2=SCHEDULED (time-based)
     if (modes.has("countingMode")) {
         int countingMode = modes.get("countingMode").asInt();
         if (validateRange(countingMode, 0, 2, "countingMode")) {
-            sysStatus.set_countingMode(static_cast<CountingMode>(countingMode));
-
-            const char *modeStr = "UNKNOWN";
-            switch (countingMode) {
-            case COUNTING:
-                modeStr = "COUNTING";
-                break;
-            case OCCUPANCY:
-                modeStr = "OCCUPANCY";
-                break;
-            case SCHEDULED:
-                modeStr = "SCHEDULED";
-                break;
+            if (sysStatus.get_countingMode() != static_cast<CountingMode>(countingMode)) {
+                sysStatus.set_countingMode(static_cast<CountingMode>(countingMode));
+                const char *modeStr = countingMode == COUNTING ? "COUNTING" :
+                                     countingMode == OCCUPANCY ? "OCCUPANCY" : "SCHEDULED";
+                Log.info("Config: Counting mode → %s", modeStr);
+                changed = true;
             }
-
-            Log.info("Counting mode set to: %d (%s)", countingMode, modeStr);
         } else {
             success = false;
         }
@@ -424,10 +417,13 @@ bool Cloud::applyModesConfig() {
     if (modes.has("operatingMode")) {
         int operatingMode = modes.get("operatingMode").asInt();
         if (validateRange(operatingMode, 0, 2, "operatingMode")) {
-            sysStatus.set_operatingMode(static_cast<OperatingMode>(operatingMode));
-            Log.info("Operating mode set to: %d (%s)", operatingMode,
-                     operatingMode == 0 ? "CONNECTED" :
-                     operatingMode == 1 ? "LOW_POWER" : "DISCONNECTED");
+            if (sysStatus.get_operatingMode() != static_cast<OperatingMode>(operatingMode)) {
+                sysStatus.set_operatingMode(static_cast<OperatingMode>(operatingMode));
+                const char *modeStr = operatingMode == 0 ? "CONNECTED" :
+                                     operatingMode == 1 ? "LOW_POWER" : "DISCONNECTED";
+                Log.info("Config: Operating mode → %s", modeStr);
+                changed = true;
+            }
         } else {
             success = false;
         }
@@ -437,8 +433,11 @@ bool Cloud::applyModesConfig() {
     if (modes.has("occupancyDebounceMs")) {
         unsigned long occupancyDebounceMs = modes.get("occupancyDebounceMs").asUInt();
         if (validateRange(occupancyDebounceMs, 0UL, 600000UL, "occupancyDebounceMs")) {
-            sysStatus.set_occupancyDebounceMs(occupancyDebounceMs);
-            Log.info("Occupancy debounce set to: %lu ms", occupancyDebounceMs);
+            if (sysStatus.get_occupancyDebounceMs() != occupancyDebounceMs) {
+                sysStatus.set_occupancyDebounceMs(occupancyDebounceMs);
+                Log.info("Config: Occupancy debounce → %lu ms", occupancyDebounceMs);
+                changed = true;
+            }
         } else {
             success = false;
         }
@@ -448,8 +447,11 @@ bool Cloud::applyModesConfig() {
     if (modes.has("connectedReportingIntervalSec")) {
         int connectedReportingIntervalSec = modes.get("connectedReportingIntervalSec").asInt();
         if (validateRange(connectedReportingIntervalSec, 60, 86400, "connectedReportingIntervalSec")) {
-            sysStatus.set_connectedReportingIntervalSec(connectedReportingIntervalSec);
-            Log.info("Connected mode reporting interval set to: %d seconds", connectedReportingIntervalSec);
+            if (sysStatus.get_connectedReportingIntervalSec() != connectedReportingIntervalSec) {
+                sysStatus.set_connectedReportingIntervalSec(connectedReportingIntervalSec);
+                Log.info("Config: Connected reporting interval → %ds", connectedReportingIntervalSec);
+                changed = true;
+            }
         } else {
             success = false;
         }
@@ -459,8 +461,11 @@ bool Cloud::applyModesConfig() {
     if (modes.has("lowPowerReportingIntervalSec")) {
         int lowPowerReportingIntervalSec = modes.get("lowPowerReportingIntervalSec").asInt();
         if (validateRange(lowPowerReportingIntervalSec, 300, 86400, "lowPowerReportingIntervalSec")) {
-            sysStatus.set_lowPowerReportingIntervalSec(lowPowerReportingIntervalSec);
-            Log.info("Low power mode reporting interval set to: %d seconds", lowPowerReportingIntervalSec);
+            if (sysStatus.get_lowPowerReportingIntervalSec() != lowPowerReportingIntervalSec) {
+                sysStatus.set_lowPowerReportingIntervalSec(lowPowerReportingIntervalSec);
+                Log.info("Config: Low power reporting interval → %ds", lowPowerReportingIntervalSec);
+                changed = true;
+            }
         } else {
             success = false;
         }
@@ -470,8 +475,11 @@ bool Cloud::applyModesConfig() {
     if (modes.has("connectAttemptBudgetSec")) {
         int connectAttemptBudgetSec = modes.get("connectAttemptBudgetSec").asInt();
         if (validateRange(connectAttemptBudgetSec, 30, 900, "connectAttemptBudgetSec")) {
-            sysStatus.set_connectAttemptBudgetSec((uint16_t)connectAttemptBudgetSec);
-            Log.info("Connect attempt budget set to: %d seconds", connectAttemptBudgetSec);
+            if (sysStatus.get_connectAttemptBudgetSec() != connectAttemptBudgetSec) {
+                sysStatus.set_connectAttemptBudgetSec((uint16_t)connectAttemptBudgetSec);
+                Log.info("Config: Connect budget → %ds", connectAttemptBudgetSec);
+                changed = true;
+            }
         } else {
             success = false;
         }
@@ -481,8 +489,11 @@ bool Cloud::applyModesConfig() {
     if (modes.has("cloudDisconnectBudgetSec")) {
         int cloudDisconnectBudgetSec = modes.get("cloudDisconnectBudgetSec").asInt();
         if (validateRange(cloudDisconnectBudgetSec, 5, 120, "cloudDisconnectBudgetSec")) {
-            sysStatus.set_cloudDisconnectBudgetSec((uint16_t)cloudDisconnectBudgetSec);
-            Log.info("Cloud disconnect budget set to: %d seconds", cloudDisconnectBudgetSec);
+            if (sysStatus.get_cloudDisconnectBudgetSec() != cloudDisconnectBudgetSec) {
+                sysStatus.set_cloudDisconnectBudgetSec((uint16_t)cloudDisconnectBudgetSec);
+                Log.info("Config: Disconnect budget → %ds", cloudDisconnectBudgetSec);
+                changed = true;
+            }
         } else {
             success = false;
         }
@@ -492,13 +503,17 @@ bool Cloud::applyModesConfig() {
     if (modes.has("modemOffBudgetSec")) {
         int modemOffBudgetSec = modes.get("modemOffBudgetSec").asInt();
         if (validateRange(modemOffBudgetSec, 5, 120, "modemOffBudgetSec")) {
-            sysStatus.set_modemOffBudgetSec((uint16_t)modemOffBudgetSec);
-            Log.info("Modem off budget set to: %d seconds", modemOffBudgetSec);
+            if (sysStatus.get_modemOffBudgetSec() != modemOffBudgetSec) {
+                sysStatus.set_modemOffBudgetSec((uint16_t)modemOffBudgetSec);
+                Log.info("Config: Modem off budget → %ds", modemOffBudgetSec);
+                changed = true;
+            }
         } else {
             success = false;
         }
     }
 
+    if (changed) Log.info("Modes config updated");
     return success;
 }
 

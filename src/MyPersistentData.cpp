@@ -268,6 +268,13 @@ void sysStatusData::set_lastDailyCleanup(time_t value) {
     setValue<time_t>(offsetof(SysData, lastDailyCleanup), value);
 }
 
+time_t sysStatusData::get_lastTimeSync() const  {
+    return getValue<time_t>(offsetof(SysData,lastTimeSync));
+}
+void sysStatusData::set_lastTimeSync(time_t value) {
+    setValue<time_t>(offsetof(SysData, lastTimeSync), value);
+}
+
 // ********** Operating Mode Configuration Get/Set Functions **********
 
 uint8_t sysStatusData::get_countingMode() const {

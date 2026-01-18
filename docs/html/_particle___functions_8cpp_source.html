@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.14</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.15</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -98,7 +98,7 @@ $(function(){initNavTree('_particle___functions_8cpp_source.html','',''); });
 <div class="line"><a id="l00004" name="l00004"></a><span class="lineno">    4</span><span class="preprocessor">#include &quot;<a class="code" href="_my_persistent_data_8h.html">MyPersistentData.h</a>&quot;</span>  <span class="comment">// For sysStatus (serialConnected configuration)</span></div>
 <div class="line"><a id="l00005" name="l00005"></a><span class="lineno">    5</span> </div>
 <div class="line"><a id="l00006" name="l00006"></a><span class="lineno">    6</span><span class="comment">// Prototypes and System Mode calls</span></div>
-<div class="line"><a id="l00007" name="l00007"></a><span class="lineno"><a class="line" href="_particle___functions_8cpp.html#ade711d6199c4b8d728ef859e4d9cb3a2">    7</a></span><a class="code hl_function" href="_particle___functions_8cpp.html#ade711d6199c4b8d728ef859e4d9cb3a2">SYSTEM_THREAD</a>(ENABLED);</div>
+<div class="line"><a id="l00007" name="l00007"></a><span class="lineno">    7</span><span class="comment">// SYSTEM_THREAD is enabled by default in Device OS 6.2.0+</span></div>
 <div class="line"><a id="l00008" name="l00008"></a><span class="lineno"><a class="line" href="_particle___functions_8cpp.html#a127c47259af3cf7697a5969e0c514817">    8</a></span><a class="code hl_function" href="_particle___functions_8cpp.html#a127c47259af3cf7697a5969e0c514817">SYSTEM_MODE</a>(SEMI_AUTOMATIC); <span class="comment">// This will enable user code to start executing</span></div>
 <div class="line"><a id="l00009" name="l00009"></a><span class="lineno">    9</span>                             <span class="comment">// automatically.</span></div>
 <div class="line"><a id="l00010" name="l00010"></a><span class="lineno"><a class="line" href="_particle___functions_8cpp.html#a7834ad6df8334c7744aabbcf74350b01">   10</a></span><a class="code hl_function" href="_particle___functions_8cpp.html#a7834ad6df8334c7744aabbcf74350b01">STARTUP</a>(System.enableFeature(FEATURE_RESET_INFO));</div>
@@ -167,7 +167,6 @@ $(function(){initNavTree('_particle___functions_8cpp_source.html','',''); });
 <div class="ttc" id="a_particle___functions_8cpp_html_a127c47259af3cf7697a5969e0c514817"><div class="ttname"><a href="_particle___functions_8cpp.html#a127c47259af3cf7697a5969e0c514817">SYSTEM_MODE</a></div><div class="ttdeci">SYSTEM_MODE(SEMI_AUTOMATIC)</div></div>
 <div class="ttc" id="a_particle___functions_8cpp_html_a5145c003ded5f6575c71bfbf03c5940c"><div class="ttname"><a href="_particle___functions_8cpp.html#a5145c003ded5f6575c71bfbf03c5940c">logHandler</a></div><div class="ttdeci">SerialLogHandler logHandler(LOG_LEVEL_INFO, { {&quot;app.pubq&quot;, LOG_LEVEL_ERROR}, {&quot;app.seqfile&quot;, LOG_LEVEL_ERROR}, {&quot;comm.dtls&quot;, LOG_LEVEL_ERROR}, {&quot;comm&quot;, LOG_LEVEL_ERROR}, {&quot;hal&quot;, LOG_LEVEL_ERROR}, {&quot;comm.protocol&quot;, LOG_LEVEL_ERROR}, {&quot;ncp.rltk.client&quot;, LOG_LEVEL_ERROR}, {&quot;app.device&quot;, LOG_LEVEL_ERROR}, {&quot;system&quot;, LOG_LEVEL_ERROR}, {&quot;net.ifapi&quot;, LOG_LEVEL_ERROR}, {&quot;app.system.reset&quot;, LOG_LEVEL_ERROR}, {&quot;app.ab1805&quot;, LOG_LEVEL_ERROR}})</div></div>
 <div class="ttc" id="a_particle___functions_8cpp_html_a7834ad6df8334c7744aabbcf74350b01"><div class="ttname"><a href="_particle___functions_8cpp.html#a7834ad6df8334c7744aabbcf74350b01">STARTUP</a></div><div class="ttdeci">STARTUP(System.enableFeature(FEATURE_RESET_INFO))</div></div>
-<div class="ttc" id="a_particle___functions_8cpp_html_ade711d6199c4b8d728ef859e4d9cb3a2"><div class="ttname"><a href="_particle___functions_8cpp.html#ade711d6199c4b8d728ef859e4d9cb3a2">SYSTEM_THREAD</a></div><div class="ttdeci">SYSTEM_THREAD(ENABLED)</div></div>
 <div class="ttc" id="a_particle___functions_8h_html"><div class="ttname"><a href="_particle___functions_8h.html">Particle_Functions.h</a></div><div class="ttdoc">This file initilizes the Particle functions and variables needed for control from the console / API c...</div></div>
 <div class="ttc" id="a_sensor_manager_8h_html"><div class="ttname"><a href="_sensor_manager_8h.html">SensorManager.h</a></div><div class="ttdoc">Singleton wrapper around ISensor implementations.</div></div>
 <div class="ttc" id="aclass_particle___functions_html"><div class="ttname"><a href="class_particle___functions.html">Particle_Functions</a></div><div class="ttdoc">This class is a singleton; you do not create one as a global, on the stack, or with new.</div><div class="ttdef"><b>Definition</b> <a href="_particle___functions_8h_source.html#l00021">Particle_Functions.h:21</a></div></div>

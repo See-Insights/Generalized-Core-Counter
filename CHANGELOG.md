@@ -56,3 +56,6 @@ All notable changes to this project will be documented in this file.
 ## 3.14 – 2026-01-17
 - Long-term test candidate
 
+## 3.15 – 2026-01-18
+- Sleep - Wake refinements
+

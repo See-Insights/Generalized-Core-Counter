@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.14</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.15</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -93,6 +93,7 @@ $(function(){initNavTree('_generalized-_core-_counter_8cpp.html','',''); });
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><code>#include &quot;Particle.h&quot;</code><br />
+<code>#include &quot;<a class="el" href="_config_8h_source.html">Config.h</a>&quot;</code><br />
 <code>#include &quot;AB1805_RK.h&quot;</code><br />
 <code>#include &quot;<a class="el" href="_cloud_8h_source.html">Cloud.h</a>&quot;</code><br />
 <code>#include &quot;LocalTimeRK.h&quot;</code><br />
@@ -114,7 +115,7 @@ $(function(){initNavTree('_generalized-_core-_counter_8cpp.html','',''); });
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:ac76c3827d7e201a452741421f4737990" id="r_ac76c3827d7e201a452741421f4737990"><td class="memItemLeft" align="right" valign="top">AB1805&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ac76c3827d7e201a452741421f4737990">ab1805</a> (Wire)</td></tr>
-<tr class="memitem:acc8846869443575f768d24829037eec4" id="r_acc8846869443575f768d24829037eec4"><td class="memItemLeft" align="right" valign="top">Timer&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#acc8846869443575f768d24829037eec4">countSignalTimer</a> (1000, <a class="el" href="#aafd752c276befe106eb6a9c6dc395962">countSignalTimerISR</a>, true)</td></tr>
+<tr class="memitem:ace371ac8f4eb5b9c14b1e4a5f9da82e9" id="r_ace371ac8f4eb5b9c14b1e4a5f9da82e9"><td class="memItemLeft" align="right" valign="top">Timer&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ace371ac8f4eb5b9c14b1e4a5f9da82e9">countSignalTimer</a> (2000, <a class="el" href="#aafd752c276befe106eb6a9c6dc395962">countSignalTimerISR</a>, true)</td></tr>
 <tr class="memitem:aafd752c276befe106eb6a9c6dc395962" id="r_aafd752c276befe106eb6a9c6dc395962"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aafd752c276befe106eb6a9c6dc395962">countSignalTimerISR</a> ()</td></tr>
 <tr class="memitem:a496510658b21d252547ca67ae1035445" id="r_a496510658b21d252547ca67ae1035445"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a496510658b21d252547ca67ae1035445">dailyCleanup</a> ()</td></tr>
 <tr class="memdesc:a496510658b21d252547ca67ae1035445"><td class="mdescLeft">&#160;</td><td class="mdescRight">Cleanup function that is run at the beginning of the day.  <br /></td></tr>
@@ -153,6 +154,7 @@ Variables</h2></td></tr>
 <tr class="memitem:a9ae784228f6b9b5ec7d14839274b3448" id="r_a9ae784228f6b9b5ec7d14839274b3448"><td class="memItemLeft" align="right" valign="top">volatile bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a9ae784228f6b9b5ec7d14839274b3448">sensorDetect</a> = false</td></tr>
 <tr class="memitem:a876b486d3a5241a126bd5751c5f70f79" id="r_a876b486d3a5241a126bd5751c5f70f79"><td class="memItemLeft" align="right" valign="top"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8">State</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a876b486d3a5241a126bd5751c5f70f79">state</a> = <a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8ae6345fad0beb5f8f70fed55dcdae6003">INITIALIZATION_STATE</a></td></tr>
 <tr class="memitem:abcd5d33fa869a1d746ac85a5f6ac720b" id="r_abcd5d33fa869a1d746ac85a5f6ac720b"><td class="memItemLeft" align="right" valign="top">char&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#abcd5d33fa869a1d746ac85a5f6ac720b">stateNames</a> [7][16]</td></tr>
+<tr class="memitem:a56da71c8fad275eebc0b43ee5d80b506" id="r_a56da71c8fad275eebc0b43ee5d80b506"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a56da71c8fad275eebc0b43ee5d80b506">suppressAlert40ThisSession</a> = false</td></tr>
 <tr class="memitem:a8e11b98139fe014f3e8a660d91905438" id="r_a8e11b98139fe014f3e8a660d91905438"><td class="memItemLeft" align="right" valign="top">volatile bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a8e11b98139fe014f3e8a660d91905438">userSwitchDetected</a> = false</td></tr>
 <tr class="memitem:a3c07c9394207388fc074bbbe0075b99c" id="r_a3c07c9394207388fc074bbbe0075b99c"><td class="memItemLeft" align="right" valign="top">const int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a3c07c9394207388fc074bbbe0075b99c">wakeBoundary</a> = 1 * 3600</td></tr>
 </table>
@@ -174,8 +176,8 @@ Variables</h2></td></tr>
 
 </div>
 </div>
-<a id="acc8846869443575f768d24829037eec4" name="acc8846869443575f768d24829037eec4"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#acc8846869443575f768d24829037eec4">&#9670;&#160;</a></span>countSignalTimer()</h2>
+<a id="ace371ac8f4eb5b9c14b1e4a5f9da82e9" name="ace371ac8f4eb5b9c14b1e4a5f9da82e9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ace371ac8f4eb5b9c14b1e4a5f9da82e9">&#9670;&#160;</a></span>countSignalTimer()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -183,7 +185,7 @@ Variables</h2></td></tr>
         <tr>
           <td class="memname">Timer countSignalTimer </td>
           <td>(</td>
-          <td class="paramtype">1000</td>          <td class="paramname"><span class="paramname"><em></em></span>, </td>
+          <td class="paramtype">2000</td>          <td class="paramname"><span class="paramname"><em></em></span>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -198,7 +200,7 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00649">countSignalTimerISR()</a>.</p>
+<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00684">countSignalTimerISR()</a>.</p>
 
 </div>
 </div>
@@ -217,11 +219,11 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00649">649</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00684">684</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="device__pinout_8cpp_source.html#l00027">BLUE_LED</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="#acc8846869443575f768d24829037eec4">countSignalTimer()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="#ace371ac8f4eb5b9c14b1e4a5f9da82e9">countSignalTimer()</a>.</p>
 
 </div>
 </div>
@@ -243,11 +245,11 @@ Variables</h2></td></tr>
 <p>Cleanup function that is run at the beginning of the day. </p>
 <p>May or may not be in connected state. Syncs time with remote service and sets low power mode. Called from Reporting <a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8">State</a> ONLY. Cleans house at the beginning of a new day. </p>
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00658">658</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00693">693</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00598">publishDiagnosticSafe()</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
+<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00633">publishDiagnosticSafe()</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00576">handleReportingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00603">handleReportingState()</a>.</p>
 
 </div>
 </div>
@@ -266,11 +268,11 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00091">91</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00428">428</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00060">handleIdleState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00225">handleSleepingState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00117">secondsUntilNextOpen()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00199">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00061">handleIdleState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00232">handleSleepingState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00454">secondsUntilNextOpen()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00125">setup()</a>.</p>
 
 </div>
 </div>
@@ -289,11 +291,11 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00394">394</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00346">346</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_state_machine_8h.html#aa2fc2ac89f9c96bbbad1d4086a8b296d">ab1805</a>, <a class="el" href="_state_machine_8h_source.html#l00012">CONNECTING_STATE</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00054">COUNTING</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_state_machine_8h_source.html#l00009">ERROR_STATE</a>, <a class="el" href="_state_machine_8h_source.html#l00014">FIRMWARE_UPDATE_STATE</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00681">handleConnectingState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00997">handleCountingMode()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00924">handleErrorState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00786">handleFirmwareUpdateState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00060">handleIdleState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l01031">handleOccupancyMode()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00576">handleReportingState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00225">handleSleepingState()</a>, <a class="el" href="_state_machine_8h_source.html#l00010">IDLE_STATE</a>, <a class="el" href="_cloud_8cpp_source.html#l00020">Cloud::instance()</a>, <a class="el" href="_cloud_8cpp_source.html#l00198">Cloud::loop()</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00055">OCCUPANCY</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00170">outOfMemory</a>, <a class="el" href="_state_machine_8h_source.html#l00013">REPORTING_STATE</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00043">sensorConfig</a>, <a class="el" href="_state_machine_8h_source.html#l00011">SLEEPING_STATE</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00176">state</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00180">userSwitchDetected</a>.</p>
+<p class="reference">References <a class="el" href="_state_machine_8h.html#aa2fc2ac89f9c96bbbad1d4086a8b296d">ab1805</a>, <a class="el" href="_state_machine_8h_source.html#l00012">CONNECTING_STATE</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00054">COUNTING</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_state_machine_8h_source.html#l00009">ERROR_STATE</a>, <a class="el" href="_state_machine_8h_source.html#l00014">FIRMWARE_UPDATE_STATE</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00715">handleConnectingState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l01031">handleCountingMode()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00958">handleErrorState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00820">handleFirmwareUpdateState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00061">handleIdleState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l01065">handleOccupancyMode()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00603">handleReportingState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00232">handleSleepingState()</a>, <a class="el" href="_state_machine_8h_source.html#l00010">IDLE_STATE</a>, <a class="el" href="_cloud_8cpp_source.html#l00020">Cloud::instance()</a>, <a class="el" href="_cloud_8cpp_source.html#l00188">Cloud::loop()</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00055">OCCUPANCY</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00093">outOfMemory</a>, <a class="el" href="_state_machine_8h_source.html#l00013">REPORTING_STATE</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00043">sensorConfig</a>, <a class="el" href="_state_machine_8h_source.html#l00011">SLEEPING_STATE</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00099">state</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00103">userSwitchDetected</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00997">handleCountingMode()</a>, and <a class="el" href="_state_handlers_8cpp_source.html#l01031">handleOccupancyMode()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l01031">handleCountingMode()</a>, and <a class="el" href="_state_handlers_8cpp_source.html#l01065">handleOccupancyMode()</a>.</p>
 
 </div>
 </div>
@@ -316,11 +318,11 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00634">634</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00669">669</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00170">outOfMemory</a>.</p>
+<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00093">outOfMemory</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00199">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00125">setup()</a>.</p>
 
 </div>
 </div>
@@ -361,11 +363,11 @@ Variables</h2></td></tr>
 <p>Publish sensor data to Ubidots webhook and device-data ledger. </p>
 <p>1) Builds a compact JSON payload expected by the Ubidots webhook template and enqueues it via PublishQueuePosix to the "Ubidots-Parking-Hook-v1" event. 2) Updates the Particle Ledger "device-data" with a richer JSON snapshot via <a class="el" href="class_cloud.html#a832b2fee272f68202c5877a0b2fee7c0" title="Publish latest sensor data to device-data ledger.">Cloud::publishDataToLedger()</a> for Console visibility. </p>
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00474">474</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00509">509</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_sensor_manager_8cpp_source.html#l00003">batteryContext</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_cloud_8cpp_source.html#l00020">Cloud::instance()</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00576">handleReportingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00603">handleReportingState()</a>.</p>
 
 </div>
 </div>
@@ -406,9 +408,9 @@ Variables</h2></td></tr>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>true if message was queued or published, false if queue was too full. </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00598">598</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00633">633</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00658">dailyCleanup()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00681">handleConnectingState()</a>, <a class="el" href="_my_persistent_data_8cpp_source.html#l00103">sysStatusData::initialize()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00552">UbidotsHandler()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00693">dailyCleanup()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00715">handleConnectingState()</a>, <a class="el" href="_my_persistent_data_8cpp_source.html#l00103">sysStatusData::initialize()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00587">UbidotsHandler()</a>.</p>
 
 </div>
 </div>
@@ -430,11 +432,11 @@ Variables</h2></td></tr>
 <p>Enqueue a one-time startup status event summarizing firmware version, reset reason, and any active alert. </p>
 <p>This uses PublishQueuePosix so the event will be delivered after the next successful cloud connection, even if called before the radio is brought up. </p>
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00532">532</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00567">567</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, and <a class="el" href="_version_8cpp_source.html#l00006">FIRMWARE_VERSION</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00199">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00125">setup()</a>.</p>
 
 </div>
 </div>
@@ -453,11 +455,11 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00616">616</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00651">651</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_state_machine_8h_source.html#l00010">IDLE_STATE</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00177">oldState</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00176">state</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00173">stateNames</a>.</p>
+<p class="reference">References <a class="el" href="_state_machine_8h_source.html#l00010">IDLE_STATE</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00100">oldState</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00099">state</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00096">stateNames</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00681">handleConnectingState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00924">handleErrorState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00786">handleFirmwareUpdateState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00060">handleIdleState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00576">handleReportingState()</a>, and <a class="el" href="_state_handlers_8cpp_source.html#l00225">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00715">handleConnectingState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00958">handleErrorState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00820">handleFirmwareUpdateState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00061">handleIdleState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00603">handleReportingState()</a>, and <a class="el" href="_state_handlers_8cpp_source.html#l00232">handleSleepingState()</a>.</p>
 
 </div>
 </div>
@@ -476,11 +478,11 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00117">117</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00454">454</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00091">isWithinOpenHours()</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
+<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00428">isWithinOpenHours()</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00225">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00232">handleSleepingState()</a>.</p>
 
 </div>
 </div>
@@ -499,9 +501,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00640">640</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00675">675</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00181">sensorDetect</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
+<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00104">sensorDetect</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
 </div>
 </div>
@@ -520,9 +522,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00199">199</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00125">125</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_state_machine_8h.html#aa2fc2ac89f9c96bbbad1d4086a8b296d">ab1805</a>, <a class="el" href="device__pinout_8cpp_source.html#l00027">BLUE_LED</a>, <a class="el" href="device__pinout_8cpp_source.html#l00026">BUTTON_PIN</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00067">CONNECTED</a>, <a class="el" href="_state_machine_8h_source.html#l00012">CONNECTING_STATE</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00166">conv</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_version_8cpp_source.html#l00007">FIRMWARE_RELEASE_NOTES</a>, <a class="el" href="_version_8cpp_source.html#l00006">FIRMWARE_VERSION</a>, <a class="el" href="_sensor_definitions_8h_source.html#l00039">SensorDefinitions::getDefinition()</a>, <a class="el" href="_state_machine_8h_source.html#l00010">IDLE_STATE</a>, <a class="el" href="_state_machine_8h_source.html#l00008">INITIALIZATION_STATE</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00056">SensorManager::initializeFromConfig()</a>, <a class="el" href="device__pinout_8cpp_source.html#l00060">initializePinModes()</a>, <a class="el" href="_cloud_8cpp_source.html#l00020">Cloud::instance()</a>, <a class="el" href="_particle___functions_8cpp_source.html#l00043">Particle_Functions::instance()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00022">SensorManager::instance()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00091">isWithinOpenHours()</a>, <a class="el" href="_sensor_definitions_8h_source.html#l00017">SensorDefinition::ledDefaultOn</a>, <a class="el" href="device__pinout_8cpp_source.html#l00046">ledPower</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00116">SensorManager::onEnterSleep()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00634">outOfMemoryHandler()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00532">publishStartupStatus()</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00043">sensorConfig</a>, <a class="el" href="_cloud_8cpp_source.html#l00036">Cloud::setup()</a>, <a class="el" href="_particle___functions_8cpp_source.html#l00054">Particle_Functions::setup()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00176">state</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00552">UbidotsHandler()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00638">userSwitchISR()</a>.</p>
+<p class="reference">References <a class="el" href="_state_machine_8h.html#aa2fc2ac89f9c96bbbad1d4086a8b296d">ab1805</a>, <a class="el" href="device__pinout_8cpp_source.html#l00027">BLUE_LED</a>, <a class="el" href="device__pinout_8cpp_source.html#l00026">BUTTON_PIN</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00067">CONNECTED</a>, <a class="el" href="_state_machine_8h_source.html#l00012">CONNECTING_STATE</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00089">conv</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_version_8cpp_source.html#l00007">FIRMWARE_RELEASE_NOTES</a>, <a class="el" href="_version_8cpp_source.html#l00006">FIRMWARE_VERSION</a>, <a class="el" href="_sensor_definitions_8h_source.html#l00039">SensorDefinitions::getDefinition()</a>, <a class="el" href="_state_machine_8h_source.html#l00010">IDLE_STATE</a>, <a class="el" href="_state_machine_8h_source.html#l00008">INITIALIZATION_STATE</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00056">SensorManager::initializeFromConfig()</a>, <a class="el" href="device__pinout_8cpp_source.html#l00060">initializePinModes()</a>, <a class="el" href="_cloud_8cpp_source.html#l00020">Cloud::instance()</a>, <a class="el" href="_particle___functions_8cpp_source.html#l00043">Particle_Functions::instance()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00022">SensorManager::instance()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00428">isWithinOpenHours()</a>, <a class="el" href="_sensor_definitions_8h_source.html#l00017">SensorDefinition::ledDefaultOn</a>, <a class="el" href="device__pinout_8cpp_source.html#l00046">ledPower</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00116">SensorManager::onEnterSleep()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00669">outOfMemoryHandler()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00567">publishStartupStatus()</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00043">sensorConfig</a>, <a class="el" href="_cloud_8cpp_source.html#l00036">Cloud::setup()</a>, <a class="el" href="_particle___functions_8cpp_source.html#l00054">Particle_Functions::setup()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00099">state</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00118">suppressAlert40ThisSession</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00587">UbidotsHandler()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00673">userSwitchISR()</a>.</p>
 
 </div>
 </div>
@@ -545,11 +547,11 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00552">552</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00587">587</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00182">dataInFlight</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00598">publishDiagnosticSafe()</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
+<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00105">dataInFlight</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00633">publishDiagnosticSafe()</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00199">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00125">setup()</a>.</p>
 
 </div>
 </div>
@@ -568,11 +570,11 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00638">638</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00673">673</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00180">userSwitchDetected</a>.</p>
+<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00103">userSwitchDetected</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00199">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00125">setup()</a>.</p>
 
 </div>
 </div>
@@ -589,9 +591,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00164">164</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00087">87</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00225">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00232">handleSleepingState()</a>.</p>
 
 </div>
 </div>
@@ -607,9 +609,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00192">192</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00115">115</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00681">handleConnectingState()</a>, and <a class="el" href="_state_handlers_8cpp_source.html#l00060">handleIdleState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00715">handleConnectingState()</a>, and <a class="el" href="_state_handlers_8cpp_source.html#l00061">handleIdleState()</a>.</p>
 
 </div>
 </div>
@@ -625,9 +627,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00166">166</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00089">89</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00225">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00199">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00232">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00125">setup()</a>.</p>
 
 </div>
 </div>
@@ -645,9 +647,9 @@ Variables</h2></td></tr>
 <b>Initial value:</b><div class="fragment"><div class="line">=</div>
 <div class="line">    <span class="keyword">false</span></div>
 </div><!-- fragment -->
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00182">182</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00105">105</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00552">UbidotsHandler()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00587">UbidotsHandler()</a>.</p>
 
 </div>
 </div>
@@ -673,7 +675,7 @@ Variables</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_version_8cpp_source.html#l00007">7</a> of file <a class="el" href="_version_8cpp_source.html">Version.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="#a0096c2cc976b98298ae0d988896cb51f">PRODUCT_VERSION()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00199">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="#a0096c2cc976b98298ae0d988896cb51f">PRODUCT_VERSION()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00125">setup()</a>.</p>
 
 </div>
 </div>
@@ -713,9 +715,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00186">186</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00109">109</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00681">handleConnectingState()</a>, and <a class="el" href="_state_handlers_8cpp_source.html#l00060">handleIdleState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00715">handleConnectingState()</a>, and <a class="el" href="_state_handlers_8cpp_source.html#l00061">handleIdleState()</a>.</p>
 
 </div>
 </div>
@@ -731,9 +733,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00187">187</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00110">110</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00681">handleConnectingState()</a>, and <a class="el" href="_state_handlers_8cpp_source.html#l00060">handleIdleState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00715">handleConnectingState()</a>, and <a class="el" href="_state_handlers_8cpp_source.html#l00061">handleIdleState()</a>.</p>
 
 </div>
 </div>
@@ -749,9 +751,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00189">189</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00112">112</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00225">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00232">handleSleepingState()</a>.</p>
 
 </div>
 </div>
@@ -767,9 +769,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00197">197</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00123">123</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00681">handleConnectingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00715">handleConnectingState()</a>.</p>
 
 </div>
 </div>
@@ -785,9 +787,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00177">177</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00100">100</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00681">handleConnectingState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00924">handleErrorState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00786">handleFirmwareUpdateState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00060">handleIdleState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00576">handleReportingState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00225">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00616">publishStateTransition()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00715">handleConnectingState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00958">handleErrorState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00820">handleFirmwareUpdateState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00061">handleIdleState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00603">handleReportingState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00232">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00651">publishStateTransition()</a>.</p>
 
 </div>
 </div>
@@ -803,9 +805,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00170">170</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00093">93</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00394">loop()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00634">outOfMemoryHandler()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00346">loop()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00669">outOfMemoryHandler()</a>.</p>
 
 </div>
 </div>
@@ -821,9 +823,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00196">196</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00122">122</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00924">handleErrorState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00958">handleErrorState()</a>.</p>
 
 </div>
 </div>
@@ -839,9 +841,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00181">181</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00104">104</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00060">handleIdleState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00225">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00640">sensorISR()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00061">handleIdleState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00232">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00675">sensorISR()</a>.</p>
 
 </div>
 </div>
@@ -857,9 +859,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00176">176</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00099">99</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00681">handleConnectingState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00924">handleErrorState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00786">handleFirmwareUpdateState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00060">handleIdleState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00576">handleReportingState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00225">handleSleepingState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00394">loop()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00616">publishStateTransition()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00199">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00715">handleConnectingState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00958">handleErrorState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00820">handleFirmwareUpdateState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00061">handleIdleState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00603">handleReportingState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00232">handleSleepingState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00346">loop()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00651">publishStateTransition()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00125">setup()</a>.</p>
 
 </div>
 </div>
@@ -878,9 +880,27 @@ Variables</h2></td></tr>
 <div class="line">                          <span class="stringliteral">&quot;Sleeping&quot;</span>,   <span class="stringliteral">&quot;Connecting&quot;</span>, <span class="stringliteral">&quot;Reporting&quot;</span>,</div>
 <div class="line">                          <span class="stringliteral">&quot;FirmwareUpdate&quot;</span>}</div>
 </div><!-- fragment -->
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00173">173</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00096">96</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00616">publishStateTransition()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00651">publishStateTransition()</a>.</p>
+
+</div>
+</div>
+<a id="a56da71c8fad275eebc0b43ee5d80b506" name="a56da71c8fad275eebc0b43ee5d80b506"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a56da71c8fad275eebc0b43ee5d80b506">&#9670;&#160;</a></span>suppressAlert40ThisSession</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool suppressAlert40ThisSession = false</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00118">118</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00603">handleReportingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00125">setup()</a>.</p>
 
 </div>
 </div>
@@ -896,9 +916,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00180">180</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00103">103</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00225">handleSleepingState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00394">loop()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00638">userSwitchISR()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00232">handleSleepingState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00346">loop()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00673">userSwitchISR()</a>.</p>
 
 </div>
 </div>
@@ -914,9 +934,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00195">195</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00121">121</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00225">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00232">handleSleepingState()</a>.</p>
 
 </div>
 </div>

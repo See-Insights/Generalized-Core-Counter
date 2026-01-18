@@ -3,5 +3,5 @@
 // Bump this string and the release notes on each new release.
 // Keep the value in sync with the Doxyfile PROJECT_NUMBER.
 
-const char* FIRMWARE_VERSION = "3.14";
-const char* FIRMWARE_RELEASE_NOTES = "Long-term test candidate";
+const char* FIRMWARE_VERSION = "3.15";
+const char* FIRMWARE_RELEASE_NOTES = "Sleep - Wake refinements";

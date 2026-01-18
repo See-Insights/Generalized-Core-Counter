@@ -1,4 +1,5 @@
 #include "Particle.h"
+#include "Config.h"
 #include "Cloud.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
@@ -137,6 +138,12 @@ void handleIdleState() {
     time_t now = Time.now();
     time_t lastReport = sysStatus.get_lastReport();
     if (lastReport == 0 || (now - lastReport) >= intervalSec) {
+      int secondsOverdue = (lastReport == 0) ? 0 : (int)(now - lastReport - intervalSec);
+      if (secondsOverdue > 0) {
+        Log.info("IDLE: Report overdue by %d seconds - transitioning to REPORTING_STATE", secondsOverdue);
+      } else {
+        Log.info("IDLE: Scheduled report interval reached - transitioning to REPORTING_STATE");
+      }
       state = REPORTING_STATE;
       return;
     }
@@ -405,13 +412,17 @@ void handleSleepingState() {
     // Within opening hours, align wake to the hour (or boundary) when possible.
     if (Time.isValid() && wakeBoundary > 0) {
       int boundary = wakeBoundary;
-      int aligned = (int)(boundary - (Time.now() % boundary));
+      time_t now = Time.now();
+      int offset = (int)(now % boundary);
+      int aligned = boundary - offset;
       if (aligned < 1) {
         aligned = 1;
       } else if (aligned > boundary) {
         aligned = boundary;
       }
       wakeInSeconds = aligned;
+      Log.info("Sleep alignment: now=%lu boundary=%d offset=%d aligned=%d",
+               (unsigned long)now, boundary, offset, aligned);
     } else {
       wakeInSeconds = (int)intervalSec;
     }
@@ -454,6 +465,12 @@ void handleSleepingState() {
   SystemSleepResult result = System.sleep(config); // Put the device to sleep
   ab1805.resumeWDT();       // Wakey Wakey - WDT can resume
 
+  // Wait for serial connection when DEBUG_SERIAL is enabled
+#ifdef DEBUG_SERIAL
+  waitFor(Serial.isConnected, 10000);
+  delay(1000);
+#endif
+
   // If this wake was caused by the PIR interrupt pin, turn on the
   // BLUE LED immediately so motion-triggered wakes are visible with
   // minimal latency, even before serial logging resumes.
@@ -480,7 +497,7 @@ void handleSleepingState() {
   if (result.wakeupPin() == BUTTON_PIN) {
     // User button wake: go directly to CONNECTING_STATE.
     SensorManager::instance().onExitSleep();
-    Log.info("Button wake - connecting to sync and drain queue");
+    Log.info("WAKE: Button pressed - reason=SERVICE_REQUEST transitioning to CONNECTING_STATE");
     userSwitchDetected = false;
     state = CONNECTING_STATE;
     return;
@@ -503,7 +520,7 @@ void handleSleepingState() {
       // In CONNECTED operating mode, the device should reconnect at the
       // start of open hours so it can resume normal connected behavior.
       if (sysStatus.get_operatingMode() == CONNECTED && !Particle.connected()) {
-        Log.info("Wake: CONNECTED mode - reconnecting to Particle (park OPEN)");
+        Log.info("WAKE: CONNECTED mode + OPEN hours - reason=MAINTAIN_CONNECTION transitioning to CONNECTING_STATE");
         state = CONNECTING_STATE;
         return;
       }
@@ -549,9 +566,18 @@ void handleSleepingState() {
       return;
     }
 
-    // Check if this wake is due to scheduled reporting interval.
-    // This ensures hourly (or configured-interval) reporting works even
-    // when no other wake conditions are present.
+    // If this wake was due to the RTC timer alarm, it means we've reached
+    // the scheduled reporting boundary - report unconditionally.
+    // The sleep alignment logic ensures timer wakes happen on reporting boundaries,
+    // so we don't need to check elapsed time - the timer firing IS the trigger.
+    if (result.wakeupReason() == SystemSleepWakeupReason::BY_RTC && Time.isValid() && isWithinOpenHours()) {
+      Log.info("WAKE: RTC timer alarm - reason=SCHEDULED_REPORT transitioning to REPORTING_STATE");
+      state = REPORTING_STATE;
+      return;
+    }
+
+    // For non-timer wakes (like PIR), check if we've coincidentally reached
+    // the reporting interval as well (opportunistic reporting).
     if (Time.isValid() && isWithinOpenHours()) {
       uint16_t intervalSec = sysStatus.get_reportingInterval();
       if (intervalSec == 0) {
@@ -561,13 +587,14 @@ void handleSleepingState() {
       time_t now = Time.now();
       time_t lastReport = sysStatus.get_lastReport();
       if (lastReport == 0 || (now - lastReport) >= intervalSec) {
-        Log.info("Wake: scheduled report due (now=%ld lastReport=%ld interval=%u)",
-                 (long)now, (long)lastReport, (unsigned)intervalSec);
+        int secondsOverdue = (lastReport == 0) ? 0 : (int)(now - lastReport - intervalSec);
+        Log.info("WAKE: Opportunistic report (non-timer wake, but interval met) - overdue=%d seconds", secondsOverdue);
         state = REPORTING_STATE;
         return;
       }
     }
 
+    Log.info("WAKE: No immediate action needed - transitioning to IDLE_STATE");
     state = IDLE_STATE;
   }
 }
@@ -627,12 +654,19 @@ void handleReportingState() {
   // supervisor can evaluate and potentially reset. Threshold is set
   // higher for remote/solar units in poor reception where intermittent
   // connectivity is expected.
-  if (Time.isValid()) {
+  // Suppress alert 40 if we just woke from overnight closed-hours sleep.
+  extern bool suppressAlert40ThisSession;
+  if (Time.isValid() && !suppressAlert40ThisSession) {
     time_t lastHook = sysStatus.get_lastHookResponse();
     if (lastHook != 0 && (now - lastHook) > (6 * 3600L)) {
       Log.info("No successful webhook response for >6 hours (last=%ld, now=%ld) - raising alert 40",
                (long)lastHook, (long)now);
       current.raiseAlert(40);
+    }
+  } else if (Time.isValid() && suppressAlert40ThisSession) {
+    time_t lastHook = sysStatus.get_lastHookResponse();
+    if (lastHook != 0 && (now - lastHook) > (6 * 3600L)) {
+      Log.info("Webhook timeout detected after power mgmt wake - suppressing alert 40 (expected behavior)");
     }
   }
 
@@ -640,7 +674,7 @@ void handleReportingState() {
   // In low-power mode, connect on every scheduled report to drain queue.
   // User can control report frequency via reportingIntervalSec.
   if (!Particle.connected()) {
-    Log.info("Transitioning to CONNECTING_STATE after report");
+    Log.info("REPORTING: Not connected - reason=SCHEDULED_REPORT transitioning to CONNECTING_STATE");
     state = CONNECTING_STATE;
   } else {
     state = IDLE_STATE;

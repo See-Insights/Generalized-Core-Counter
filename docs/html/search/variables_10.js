@@ -15,8 +15,9 @@ var searchData=
   ['stateofcharge_12',['stateOfCharge',['../classcurrent_status_data_1_1_current_data.html#a82063c1108d32895c6354c2b9b5265e4',1,'currentStatusData::CurrentData']]],
   ['stayawakelong_13',['stayAwakeLong',['../_state_machine_8h.html#a0fe07b60c166917b09995113865cf1b1',1,'StateMachine.h']]],
   ['structuresversion_14',['structuresVersion',['../classsys_status_data_1_1_sys_data.html#a4595625ff422e5883ae59676ada79e6e',1,'sysStatusData::SysData']]],
-  ['sys_5fdata_5fmagic_15',['SYS_DATA_MAGIC',['../classsys_status_data.html#a8cf8d65d626ec2425d8771291009d0be',1,'sysStatusData']]],
-  ['sys_5fdata_5fversion_16',['SYS_DATA_VERSION',['../classsys_status_data.html#ab59d43806c6ae14717057ae37bac77c3',1,'sysStatusData']]],
-  ['sysdata_17',['sysData',['../classsys_status_data.html#aa9330d4fc33ab22aee26f90182266b46',1,'sysStatusData']]],
-  ['sysheader_18',['sysHeader',['../classsys_status_data_1_1_sys_data.html#aa481142f43bddd33da6a5795e90c0a06',1,'sysStatusData::SysData']]]
+  ['suppressalert40thissession_15',['suppressAlert40ThisSession',['../_generalized-_core-_counter_8cpp.html#a56da71c8fad275eebc0b43ee5d80b506',1,'Generalized-Core-Counter.cpp']]],
+  ['sys_5fdata_5fmagic_16',['SYS_DATA_MAGIC',['../classsys_status_data.html#a8cf8d65d626ec2425d8771291009d0be',1,'sysStatusData']]],
+  ['sys_5fdata_5fversion_17',['SYS_DATA_VERSION',['../classsys_status_data.html#ab59d43806c6ae14717057ae37bac77c3',1,'sysStatusData']]],
+  ['sysdata_18',['sysData',['../classsys_status_data.html#aa9330d4fc33ab22aee26f90182266b46',1,'sysStatusData']]],
+  ['sysheader_19',['sysHeader',['../classsys_status_data_1_1_sys_data.html#aa481142f43bddd33da6a5795e90c0a06',1,'sysStatusData::SysData']]]
 ];
