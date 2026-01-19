@@ -59,3 +59,6 @@ All notable changes to this project will be documented in this file.
 ## 3.15 – 2026-01-18
 - Sleep - Wake refinements
 
+## 3.16 – 2026-01-19
+- Sleep - Wake Refinement
+

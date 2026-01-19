@@ -445,7 +445,10 @@ void handleSleepingState() {
   // accumulate across calls.
   config = SystemSleepConfiguration();
 
-  Log.info("SLEEP duration: %d seconds", wakeInSeconds);
+  // Calculate expected wake time for diagnostics
+  time_t expectedWakeTime = Time.now() + wakeInSeconds;
+  Log.info("SLEEP duration: %d seconds (until %s)", wakeInSeconds, Time.format(expectedWakeTime, TIME_FORMAT_DEFAULT).c_str());
+  Log.info("SLEEP: Current time is %s", Time.timeStr().c_str());
 
   config.mode(SystemSleepMode::ULTRA_LOW_POWER)
     .duration(wakeInSeconds * 1000L);
@@ -455,15 +458,21 @@ void handleSleepingState() {
   // pins or motion we intentionally ignore.
   config.gpio(BUTTON_PIN, FALLING);
   if (isWithinOpenHours()) {
-    Log.info("SLEEP config: arming button + PIR wake pins (open hours)");
+    Log.info("SLEEP config: timer=%dms + button + PIR wake (open hours)", wakeInSeconds * 1000);
     config.gpio(intPin, RISING);
   } else {
-    Log.info("SLEEP config: arming button wake pin only (closed hours)");
+    Log.info("SLEEP config: timer=%dms + button wake (closed hours)", wakeInSeconds * 1000);
   }
 
   ab1805.stopWDT(); // No watchdogs interrupting our slumber
+  time_t sleepStartTime = Time.now();
   SystemSleepResult result = System.sleep(config); // Put the device to sleep
   ab1805.resumeWDT();       // Wakey Wakey - WDT can resume
+  
+  time_t wakeTime = Time.now();
+  int actualSleepSec = (int)(wakeTime - sleepStartTime);
+  int sleepDelta = actualSleepSec - wakeInSeconds;
+  Log.info("WAKE: slept %d sec (expected %d, delta %+d)", actualSleepSec, wakeInSeconds, sleepDelta);
 
   // Wait for serial connection when DEBUG_SERIAL is enabled
 #ifdef DEBUG_SERIAL
@@ -475,12 +484,18 @@ void handleSleepingState() {
   // BLUE LED immediately so motion-triggered wakes are visible with
   // minimal latency, even before serial logging resumes.
   bool pirWake = (result.wakeupPin() == intPin);
+  
   if (pirWake) {
     digitalWrite(BLUE_LED, HIGH);
   }
 
   Log.info("Woke from ULTRA_LOW_POWER sleep: reason=%d, pin=%d",
            (int)result.wakeupReason(), (int)result.wakeupPin());
+           
+  // DIAGNOSTIC: If we woke from PIR but slept longer than expected, timer may have failed
+  if (pirWake && sleepDelta > 60) {
+    Log.warn("PIR wake after extended sleep - timer wake may have been missed (delta=%+d sec)", sleepDelta);
+  }
 
   // Diagnostic: confirm open/closed decision at wake.
   if (Time.isValid()) {
@@ -560,12 +575,6 @@ void handleSleepingState() {
       }
     }
 
-    // If PIR woke us in LOW_POWER or DISCONNECTED mode, return immediately to sleep.
-    if (pirWake && sysStatus.get_operatingMode() != CONNECTED) {
-      state = SLEEPING_STATE;
-      return;
-    }
-
     // If this wake was due to the RTC timer alarm, it means we've reached
     // the scheduled reporting boundary - report unconditionally.
     // The sleep alignment logic ensures timer wakes happen on reporting boundaries,
@@ -578,6 +587,7 @@ void handleSleepingState() {
 
     // For non-timer wakes (like PIR), check if we've coincidentally reached
     // the reporting interval as well (opportunistic reporting).
+    // This check runs BEFORE returning to sleep so PIR wakes can report if truly overdue.
     if (Time.isValid() && isWithinOpenHours()) {
       uint16_t intervalSec = sysStatus.get_reportingInterval();
       if (intervalSec == 0) {
@@ -592,6 +602,14 @@ void handleSleepingState() {
         state = REPORTING_STATE;
         return;
       }
+    }
+
+    // If PIR woke us in LOW_POWER or DISCONNECTED mode and no report is needed,
+    // return immediately to sleep. This check comes AFTER opportunistic reporting
+    // so overdue reports are not missed.
+    if (pirWake && sysStatus.get_operatingMode() != CONNECTED) {
+      state = SLEEPING_STATE;
+      return;
     }
 
     Log.info("WAKE: No immediate action needed - transitioning to IDLE_STATE");
