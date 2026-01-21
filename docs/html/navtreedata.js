@@ -102,8 +102,8 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "_cloud_8cpp.html",
-"classcurrent_status_data.html#a37fb5f0f316b3ed22b482e7dbd8190df",
-"index.html#autotoc_md22"
+"class_sensor_manager.html#a3d605277298d063851c91b1238784c17",
+"functions_vars.html"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronization';

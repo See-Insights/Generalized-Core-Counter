@@ -61,7 +61,7 @@
 extern const pin_t BUTTON_PIN;        // User switch on carrier (front-panel)
 extern const pin_t TMP36_SENSE_PIN;   // Carrier board temperature sensor (A4)
 extern const pin_t BLUE_LED;          // On-module blue status LED (D7)
-extern const pin_t WAKEUP_PIN;        // Wake pin connected to watchdog timer
+extern const pin_t WAKEUP_PIN;        // AB1805 FOUT/nIRQ wake pin (WKP = D10 on Photon2, was D8 on Argon/Boron)
 
 // ---------------------------------------------------------------------------
 // Optional build-time hardware flags

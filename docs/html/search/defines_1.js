@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['debug_5fserial_0',['DEBUG_SERIAL',['../_config_8h.html#a61e127df60d55ea4c8bd6b8ec1f88367',1,'Config.h']]]
+  ['measure_0',['measure',['../_sensor_manager_8h.html#a3b4da825cbc4f7722d063cc18f1412a4',1,'SensorManager.h']]]
 ];

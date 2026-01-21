@@ -4,11 +4,11 @@ var indexSectionsWithContent =
   1: "cips",
   2: "acps",
   3: "cdgimprsv",
-  4: "abcdghiloprstuvw~",
+  4: "abcdeghiloprstuvw~",
   5: "_abcdefghilmnoprstuvw",
   6: "cos",
   7: "acdefiloprsv",
-  8: "cdms",
+  8: "cms",
   9: "abcdefghilmnoprstuvw"
 };
 

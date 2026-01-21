@@ -51,7 +51,7 @@ void setup() {
     
     // If using the supercap, enable trickle charging here. 
     // Do not enable this for the AB1805-Li example!
-    ab1805.setTrickle(AB1805::REG_TRICKLE_DIODE_0_3 | AB1805::REG_TRICKLE_ROUT_3K);
+    // ab1805.setTrickle(AB1805::REG_TRICKLE_DIODE_0_3 | AB1805::REG_TRICKLE_ROUT_3K);
     
     // Enable periodic wake-up once per hour
     // `REG_TIMER_CTRL_RPT_MIN` tm_sec, tm_min match (once per hour)

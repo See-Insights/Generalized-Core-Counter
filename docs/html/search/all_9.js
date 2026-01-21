@@ -18,7 +18,7 @@ var searchData=
   ['isensor_2eh_15',['ISensor.h',['../_i_sensor_8h.html',1,'']]],
   ['ishealthy_16',['isHealthy',['../class_i_sensor.html#af70f465ae2e58ac7b6650fc32c2a01f0',1,'ISensor']]],
   ['isitsafetocharge_17',['isItSafeToCharge',['../class_sensor_manager.html#ad7031fd4e8dbe8bb106ebf4406d608ca',1,'SensorManager']]],
-  ['isradiopoweredon_18',['isRadioPoweredOn',['../namespace_connectivity.html#a834c90315e1ac893f48fc5dfccbae3cf',1,'Connectivity']]],
+  ['isradiopoweredon_18',['isRadioPoweredOn',['../namespace_connectivity.html#a834c90315e1ac893f48fc5dfccbae3cf',1,'Connectivity::isRadioPoweredOn()'],['../_state___common_8h.html#a2ccab5114a4396c737816079f5cc657e',1,'isRadioPoweredOn():&#160;State_Connect.cpp'],['../_state___connect_8cpp.html#a2ccab5114a4396c737816079f5cc657e',1,'isRadioPoweredOn():&#160;State_Connect.cpp']]],
   ['isready_19',['isReady',['../class_i_sensor.html#adc29a47f0806f9db7cbb984c6fdee491',1,'ISensor::isReady()'],['../class_p_i_r_sensor.html#a6a349ffbde2cad5994f7e7933e936c35',1,'PIRSensor::isReady()']]],
   ['issensorready_20',['isSensorReady',['../class_sensor_manager.html#a70dabc59358476483196904dab2612b3',1,'SensorManager']]],
   ['iswithinopenhours_21',['isWithinOpenHours',['../_generalized-_core-_counter_8cpp.html#adaf14f9ee408635f2c952b99aaeda484',1,'isWithinOpenHours():&#160;Generalized-Core-Counter.cpp'],['../_state_machine_8h.html#adaf14f9ee408635f2c952b99aaeda484',1,'isWithinOpenHours():&#160;Generalized-Core-Counter.cpp']]]

@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.16</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.18</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -110,7 +110,7 @@ Variables</h2></td></tr>
 <tr class="memitem:af10028b3e028ba5dd0a7aade08e7f9f2" id="r_af10028b3e028ba5dd0a7aade08e7f9f2"><td class="memItemLeft" align="right" valign="top">const pin_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#af10028b3e028ba5dd0a7aade08e7f9f2">intPin</a> = S2</td></tr>
 <tr class="memitem:acd13ce86cf516466e21e068ed7306716" id="r_acd13ce86cf516466e21e068ed7306716"><td class="memItemLeft" align="right" valign="top">const pin_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#acd13ce86cf516466e21e068ed7306716">ledPower</a> = S1</td></tr>
 <tr class="memitem:abe0da77b4714252385701ee7c36ddfa5" id="r_abe0da77b4714252385701ee7c36ddfa5"><td class="memItemLeft" align="right" valign="top">const pin_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#abe0da77b4714252385701ee7c36ddfa5">TMP36_SENSE_PIN</a> = S4</td></tr>
-<tr class="memitem:ae1dd17f05a4a5df98977d786da6cf4a8" id="r_ae1dd17f05a4a5df98977d786da6cf4a8"><td class="memItemLeft" align="right" valign="top">const pin_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ae1dd17f05a4a5df98977d786da6cf4a8">WAKEUP_PIN</a> = D8</td></tr>
+<tr class="memitem:ae1dd17f05a4a5df98977d786da6cf4a8" id="r_ae1dd17f05a4a5df98977d786da6cf4a8"><td class="memItemLeft" align="right" valign="top">const pin_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ae1dd17f05a4a5df98977d786da6cf4a8">WAKEUP_PIN</a> = WKP</td></tr>
 </table>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
 <a id="a067c646f1e434ca48179948e715f76e4" name="a067c646f1e434ca48179948e715f76e4"></a>
@@ -170,7 +170,7 @@ Variables</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00027">27</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00684">countSignalTimerISR()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l01049">handleCountingMode()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l01083">handleOccupancyMode()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00232">handleSleepingState()</a>, <a class="el" href="device__pinout_8cpp_source.html#l00060">initializePinModes()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00125">setup()</a>, and <a class="el" href="_state_handlers_8cpp_source.html#l01116">updateOccupancyState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00684">countSignalTimerISR()</a>, <a class="el" href="_state___modes_8cpp_source.html#l00024">handleCountingMode()</a>, <a class="el" href="_state___modes_8cpp_source.html#l00058">handleOccupancyMode()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00020">handleSleepingState()</a>, <a class="el" href="device__pinout_8cpp_source.html#l00060">initializePinModes()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00125">setup()</a>, and <a class="el" href="_state___modes_8cpp_source.html#l00091">updateOccupancyState()</a>.</p>
 
 </div>
 </div>
@@ -188,7 +188,7 @@ Variables</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00026">26</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00838">handleFirmwareUpdateState()</a>, <a class="el" href="_state_handlers_8cpp_source.html#l00232">handleSleepingState()</a>, <a class="el" href="device__pinout_8cpp_source.html#l00060">initializePinModes()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00125">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00173">handleFirmwareUpdateState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00020">handleSleepingState()</a>, <a class="el" href="device__pinout_8cpp_source.html#l00060">initializePinModes()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00125">setup()</a>.</p>
 
 </div>
 </div>
@@ -224,7 +224,7 @@ Variables</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00044">44</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state_handlers_8cpp_source.html#l00232">handleSleepingState()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00131">PIRSensor::onSleep()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00146">PIRSensor::onWake()</a>, and <a class="el" href="_p_i_r_sensor_8h_source.html#l00040">PIRSensor::setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00020">handleSleepingState()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00131">PIRSensor::onSleep()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00146">PIRSensor::onWake()</a>, and <a class="el" href="_p_i_r_sensor_8h_source.html#l00040">PIRSensor::setup()</a>.</p>
 
 </div>
 </div>
@@ -271,7 +271,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">const pin_t WAKEUP_PIN = D8</td>
+          <td class="memname">const pin_t WAKEUP_PIN = WKP</td>
         </tr>
       </table>
 </div><div class="memdoc">

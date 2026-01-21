@@ -234,7 +234,7 @@ void setup() {
 
   // Initialize AB1805 RTC and watchdog
   const bool timeValidBeforeRtc = Time.isValid();
-  ab1805.withFOUT(D8).setup();                 // Initialize AB1805 RTC
+  ab1805.withFOUT(WKP).setup();                // Initialize AB1805 RTC - WKP is D10 on Photon2
   ab1805.setWDT(AB1805::WATCHDOG_MAX_SECONDS); // Enable watchdog
 
   time_t rtcTime = 0;

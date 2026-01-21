@@ -62,3 +62,6 @@ All notable changes to this project will be documented in this file.
 ## 3.16 – 2026-01-19
 - Sleep - Wake Refinement
 
+## 3.18 – 2026-01-21
+- Release Candidate for Limited Deployment
+

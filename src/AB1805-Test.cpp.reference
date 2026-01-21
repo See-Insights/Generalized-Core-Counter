@@ -1,0 +1,95 @@
+// SIMPLIFIED TEST - Matches working Connected-Counter-Next approach
+// Key insight: Connected-Counter-Next does NOT use AB1805 alarms!
+// It uses SystemSleepMode::ULTRA_LOW_POWER with .duration() for timer wake
+// And .gpio(INT_PIN, RISING) for sensor wake - NO AB1805 alarm configuration!
+
+#include "Particle.h"
+#include "AB1805_RK.h"
+
+SYSTEM_THREAD(ENABLED);
+SYSTEM_MODE(SEMI_AUTOMATIC);
+
+SerialLogHandler logHandler;
+
+AB1805 ab1805(Wire);
+unsigned long wakeCount = 0;
+const int SLEEP_DURATION_SEC = 60;  // Sleep for 60 seconds
+
+void setup() {
+    // Wait for serial connection to see startup messages
+    waitFor(Serial.isConnected, 15000);
+    delay(1000);
+
+    wakeCount++;
+    Log.info("========================================");
+    Log.info("AB1805 Test - Wake #%lu", wakeCount);
+    Log.info("BASED ON WORKING Connected-Counter-Next");
+    Log.info("NO AB1805 alarms - uses .duration() timer");
+    Log.info("========================================");
+
+    // Initialize AB1805 - just for watchdog and RTC
+    ab1805.withFOUT(WKP).setup();
+    ab1805.resetConfig();
+    ab1805.setWDT(AB1805::WATCHDOG_MAX_SECONDS);
+    Log.info("AB1805 initialized (watchdog + RTC only)");
+
+    // Check if we need time from cloud
+    if (!ab1805.isRTCSet()) {
+        Log.info("RTC not set - connecting to cloud for time");
+        Particle.connect();
+    } else {
+        Log.info("RTC already set: %s", Time.timeStr().c_str());
+    }
+}
+
+void loop() {
+    // Must call ab1805.loop() every loop iteration
+    ab1805.loop();
+
+    static unsigned long awakeStart = millis();
+    static bool goingToSleep = false;
+    
+    // Once we have time, stay awake for 10 seconds then sleep
+    if (!goingToSleep && ab1805.isRTCSet()) {
+        if (millis() - awakeStart >= 10000) {
+            goingToSleep = true;
+            
+            Log.info("========================================");
+            Log.info("Current time: %s", Time.timeStr().c_str());
+            Log.info("Sleep duration: %d seconds", SLEEP_DURATION_SEC);
+            Log.info("Expected wake: ~%d seconds from now", SLEEP_DURATION_SEC);
+            Log.info("Going to sleep using .duration() timer...");
+            Log.info("(NO AB1805 alarms - just like Connected-Counter-Next)");
+            Log.info("========================================");
+            delay(100);
+
+            // Stop watchdog before sleep (like Connected-Counter-Next does)
+            ab1805.stopWDT();
+            
+            // Sleep with ULTRA_LOW_POWER and .duration() timer
+            // This is EXACTLY how Connected-Counter-Next does it!
+            SystemSleepConfiguration config;
+            config.mode(SystemSleepMode::ULTRA_LOW_POWER)
+                .duration(SLEEP_DURATION_SEC * 1000L);  // Timer wake, not AB1805 alarm!
+            
+            SystemSleepResult result = System.sleep(config);
+
+            // Resume watchdog after wake
+            ab1805.resumeWDT();
+            
+            Log.info("========================================");
+            Log.info("WOKE FROM SLEEP!");
+            Log.info("Wake reason: %s", 
+                     result.wakeupReason() == SystemSleepWakeupReason::BY_NETWORK ? "NETWORK" :
+                     result.wakeupReason() == SystemSleepWakeupReason::BY_GPIO ? "GPIO" :
+                     result.wakeupReason() == SystemSleepWakeupReason::BY_TIMER ? "TIMER" : "UNKNOWN");
+            Log.info("Current time: %s", Time.timeStr().c_str());
+            Log.info("========================================");
+            
+            // Reset state to sleep again
+            goingToSleep = false;
+            awakeStart = millis();
+        }
+    }
+}
+

@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.16</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.18</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -119,7 +119,7 @@ $(function(){initNavTree('device__pinout_8cpp_source.html','',''); });
 <div class="line"><a id="l00025" name="l00025"></a><span class="lineno">   25</span> </div>
 <div class="line"><a id="l00026" name="l00026"></a><span class="lineno"><a class="line" href="device__pinout_8cpp.html#ae2f2771b68bc677751483fae6699726a">   26</a></span><span class="keyword">const</span> pin_t <a class="code hl_variable" href="device__pinout_8cpp.html#ae2f2771b68bc677751483fae6699726a">BUTTON_PIN</a>        = D4;</div>
 <div class="line"><a id="l00027" name="l00027"></a><span class="lineno"><a class="line" href="device__pinout_8cpp.html#aa4e58025e38ebad58b71cdfa59e76ebe">   27</a></span><span class="keyword">const</span> pin_t <a class="code hl_variable" href="device__pinout_8cpp.html#aa4e58025e38ebad58b71cdfa59e76ebe">BLUE_LED</a>          = D7;</div>
-<div class="line"><a id="l00028" name="l00028"></a><span class="lineno"><a class="line" href="device__pinout_8cpp.html#ae1dd17f05a4a5df98977d786da6cf4a8">   28</a></span><span class="keyword">const</span> pin_t <a class="code hl_variable" href="device__pinout_8cpp.html#ae1dd17f05a4a5df98977d786da6cf4a8">WAKEUP_PIN</a>        = D8;</div>
+<div class="line"><a id="l00028" name="l00028"></a><span class="lineno"><a class="line" href="device__pinout_8cpp.html#ae1dd17f05a4a5df98977d786da6cf4a8">   28</a></span><span class="keyword">const</span> pin_t <a class="code hl_variable" href="device__pinout_8cpp.html#ae1dd17f05a4a5df98977d786da6cf4a8">WAKEUP_PIN</a>        = WKP;  <span class="comment">// D10 on Photon2 (was D8 on Argon/Boron)</span></div>
 <div class="line"><a id="l00029" name="l00029"></a><span class="lineno">   29</span> </div>
 <div class="line"><a id="l00030" name="l00030"></a><span class="lineno">   30</span><span class="comment">// Convenience aliases for carrier functions</span></div>
 <div class="line"><a id="l00031" name="l00031"></a><span class="lineno">   31</span><span class="comment">// (No additional aliases; use the base names directly in application code.)</span></div>
@@ -156,7 +156,7 @@ $(function(){initNavTree('device__pinout_8cpp_source.html','',''); });
 <div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span>    Log.info(<span class="stringliteral">&quot;Initalizing the pinModes&quot;</span>);</div>
 <div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span>    <span class="comment">// Define as inputs or outputs</span></div>
 <div class="line"><a id="l00063" name="l00063"></a><span class="lineno">   63</span>    pinMode(<a class="code hl_variable" href="device__pinout_8cpp.html#ae2f2771b68bc677751483fae6699726a">BUTTON_PIN</a>, INPUT);    <span class="comment">// User button on the carrier board - external pull-up on carrier</span></div>
-<div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span>    pinMode(<a class="code hl_variable" href="device__pinout_8cpp.html#ae1dd17f05a4a5df98977d786da6cf4a8">WAKEUP_PIN</a>, INPUT);    <span class="comment">// Watchdog wake line (active HIGH)</span></div>
+<div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span>    pinMode(<a class="code hl_variable" href="device__pinout_8cpp.html#ae1dd17f05a4a5df98977d786da6cf4a8">WAKEUP_PIN</a>, INPUT_PULLUP);    <span class="comment">// AB1805 FOUT/nIRQ (open-drain, active-LOW, needs pull-up)</span></div>
 <div class="line"><a id="l00065" name="l00065"></a><span class="lineno">   65</span>    pinMode(<a class="code hl_variable" href="device__pinout_8cpp.html#aa4e58025e38ebad58b71cdfa59e76ebe">BLUE_LED</a>, OUTPUT);     <span class="comment">// On-module status LED</span></div>
 <div class="line"><a id="l00066" name="l00066"></a><span class="lineno">   66</span>     <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
 <div class="line"><a id="l00067" name="l00067"></a><span class="lineno">   67</span>}</div>

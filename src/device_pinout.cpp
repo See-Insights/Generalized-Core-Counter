@@ -25,7 +25,7 @@ const pin_t TMP36_SENSE_PIN   = A4;
 
 const pin_t BUTTON_PIN        = D4;
 const pin_t BLUE_LED          = D7;
-const pin_t WAKEUP_PIN        = D8;
+const pin_t WAKEUP_PIN        = WKP;  // D10 on Photon2 (was D8 on Argon/Boron)
 
 // Convenience aliases for carrier functions
 // (No additional aliases; use the base names directly in application code.)
@@ -61,7 +61,7 @@ bool initializePinModes() {
     Log.info("Initalizing the pinModes");
     // Define as inputs or outputs
     pinMode(BUTTON_PIN, INPUT);    // User button on the carrier board - external pull-up on carrier
-    pinMode(WAKEUP_PIN, INPUT);    // Watchdog wake line (active HIGH)
+    pinMode(WAKEUP_PIN, INPUT_PULLUP);    // AB1805 FOUT/nIRQ (open-drain, active-LOW, needs pull-up)
     pinMode(BLUE_LED, OUTPUT);     // On-module status LED
      return true;
 }
