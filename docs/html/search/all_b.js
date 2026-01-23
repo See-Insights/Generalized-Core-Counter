@@ -12,6 +12,7 @@ var searchData=
   ['mode_20values_9',['Mode Values',['../index.html#autotoc_md14',1,'']]],
   ['modemoffbudgetsec_10',['modemOffBudgetSec',['../classsys_status_data_1_1_sys_data.html#a0bbf6577468e7f05f9101582d2ac0c61',1,'sysStatusData::SysData']]],
   ['monitor_20operation_11',['Monitor Operation',['../index.html#autotoc_md24',1,'']]],
-  ['mypersistentdata_2ecpp_12',['MyPersistentData.cpp',['../_my_persistent_data_8cpp.html',1,'']]],
-  ['mypersistentdata_2eh_13',['MyPersistentData.h',['../_my_persistent_data_8h.html',1,'']]]
+  ['monitoring_20remediation_20boron_20only_12',['PMIC Monitoring &amp;amp; Remediation (Boron Only)',['../index.html#autotoc_md35',1,'']]],
+  ['mypersistentdata_2ecpp_13',['MyPersistentData.cpp',['../_my_persistent_data_8cpp.html',1,'']]],
+  ['mypersistentdata_2eh_14',['MyPersistentData.h',['../_my_persistent_data_8h.html',1,'']]]
 ];

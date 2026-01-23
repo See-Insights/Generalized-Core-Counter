@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.18</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.20</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -532,13 +532,66 @@ Offline Data Retention &amp; Firmware Updates</h1>
 <li><b>Bounded firmware-update mode</b>: The FIRMWARE_UPDATE state is time-limited (5 minutes by default). If no updates are applied within this window, the device exits update mode and returns toward its normal connect/report/sleep cycle to protect battery life.</li>
 </ul>
 <h1 class="doxsection"><a class="anchor" id="autotoc_md33"></a>
-Error Handling</h1>
+Error Handling &amp; Alert System</h1>
+<p>The firmware implements a comprehensive alert system that monitors device health and reports issues through webhooks:</p>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md34"></a>
+Alert Severity Levels</h2>
+<p><b>Critical (Tier 3)</b> - Requires immediate attention:</p><ul>
+<li><span class="tt">14</span>: Out of memory</li>
+<li><span class="tt">15</span>: Modem/disconnect failure</li>
+<li><span class="tt">16</span>: Repeated sleep failures (HIBERNATE/ULP)</li>
+<li><span class="tt">20</span>: <b>PMIC thermal shutdown</b> (charging stopped due to temperature)</li>
+<li><span class="tt">21</span>: <b>PMIC charge timeout</b> (stuck charging - safety timer expired)</li>
+</ul>
+<p><b>Major (Tier 2)</b> - Should be addressed soon:</p><ul>
+<li><span class="tt">22</span>: <b>PMIC input fault</b> (VBUS overvoltage)</li>
+<li><span class="tt">23</span>: <b>PMIC battery fault</b> (general charging issue)</li>
+<li><span class="tt">30</span>: <a class="el" href="namespace_connectivity.html">Connectivity</a> timeout with radio up</li>
+<li><span class="tt">31</span>: Failed to connect to cloud</li>
+<li><span class="tt">32</span>: Connect taking too long</li>
+<li><span class="tt">40</span>: Repeated webhook failures (&gt;6 hours without response)</li>
+<li><span class="tt">41</span>: Configuration/ledger apply failure</li>
+<li><span class="tt">42</span>: Data ledger publish failure</li>
+<li><span class="tt">43</span>: Publish queue not drained before forced sleep</li>
+</ul>
+<p><b>Minor (Tier 1)</b> - Informational warnings</p>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md35"></a>
+PMIC Monitoring &amp; Remediation (Boron Only)</h2>
+<p>For Boron devices with BQ24195 PMIC, the firmware actively monitors charging health:</p>
+<p><b>Detection:</b></p><ul>
+<li>Reads PMIC fault registers every battery check cycle</li>
+<li>Monitors for thermal shutdown, charge timeout, input faults</li>
+<li>Tracks stuck charging states (&gt;6 hours at same SoC)</li>
+<li>Logs detailed PMIC status (charge state, VBUS, thermal regulation)</li>
+</ul>
+<p><b>Smart Remediation with Anti-Thrashing:</b></p><ul>
+<li><b>Level 0</b> (Initial): Monitor only, log diagnostics</li>
+<li><b>Level 1</b> (2+ consecutive faults): Soft reset - cycle charging off/on</li>
+<li><b>Level 2</b> (3+ consecutive faults): Power cycle with watchdog supervision</li>
+<li><b>Cooldown</b>: 1 hour minimum between remediation attempts</li>
+<li><b>Auto-Clear</b>: Resets counters when charging returns to healthy state</li>
+</ul>
+<p><b>Escalation Example:</b></p><ol type="1">
+<li>First fault detected → Alert raised, monitor only (wait for cooldown)</li>
+<li>Second fault after cooldown → Level 1: Cycle charging (disable 500ms, re-enable)</li>
+<li>Third fault after cooldown → Level 2: Power cycle with watchdog reset</li>
+<li>Charging recovers → Clear alert, reset remediation level</li>
+</ol>
+<p><b>Benefits:</b></p><ul>
+<li>Automatic recovery from common "1Hz amber LED" charging faults</li>
+<li>Prevents thrashing (repeated fix attempts)</li>
+<li>Detailed diagnostic logs for root cause analysis</li>
+<li>Alert webhooks notify monitoring systems before manual intervention needed</li>
+</ul>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md36"></a>
+Error Recovery Strategy</h2>
 <ul>
 <li>Sensor failures → Connect and report (no reset loops)</li>
 <li>Configuration validation with range checking</li>
 <li>Graceful degradation for remote deployments</li>
+<li>Alerts automatically clear when underlying condition resolves</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md34"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md37"></a>
 Dependencies</h1>
 <ul>
 <li>AB1805_RK: RTC and watchdog</li>
@@ -548,7 +601,7 @@ Dependencies</h1>
 <li>BackgroundPublishRK: Non-blocking publishes</li>
 <li>SequentialFileRK: File operations</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md35"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md38"></a>
 Contributing</h1>
 <p>When adding features:</p><ol type="1">
 <li><b>Maintain simplicity</b>: Keep core logic clean</li>
@@ -556,12 +609,12 @@ Contributing</h1>
 <li><b>Extend, don't modify</b>: Use factory pattern for new types</li>
 <li><b>Test remotely</b>: Ensure devices don't brick in field</li>
 </ol>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md36"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md39"></a>
 License</h1>
 <p>This project is licensed under the MIT License.</p>
 <p>You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of this software, subject to the conditions of the MIT License.</p>
 <p>See the top-level <span class="tt">LICENSE</span> file in this repository for the complete license text.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md37"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md40"></a>
 Support</h1>
 <p>For issues or questions, contact [Your Contact Info] </p>
 </div></div><!-- PageDoc -->

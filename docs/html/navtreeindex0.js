@@ -6,6 +6,7 @@ var NAVTREEINDEX0 =
 "_cloud_8h.html":[21,0,0,2],
 "_cloud_8h_source.html":[21,0,0,2],
 "_config_8h.html":[21,0,0,3],
+"_config_8h.html#a61e127df60d55ea4c8bd6b8ec1f88367":[21,0,0,3,0],
 "_config_8h_source.html":[21,0,0,3],
 "_connectivity_8h.html":[21,0,0,4],
 "_connectivity_8h_source.html":[21,0,0,4],
@@ -38,7 +39,7 @@ var NAVTREEINDEX0 =
 "_generalized-_core-_counter_8cpp.html#ac2b04988d07864c6c31e1d15b9d1198c":[21,0,0,7,25],
 "_generalized-_core-_counter_8cpp.html#ac76c3827d7e201a452741421f4737990":[21,0,0,7,0],
 "_generalized-_core-_counter_8cpp.html#acbe01778898ecb2b953cc096aeb6539a":[21,0,0,7,19],
-"_generalized-_core-_counter_8cpp.html#ace371ac8f4eb5b9c14b1e4a5f9da82e9":[21,0,0,7,1],
+"_generalized-_core-_counter_8cpp.html#acc8846869443575f768d24829037eec4":[21,0,0,7,1],
 "_generalized-_core-_counter_8cpp.html#acf025b054301360475a0ec4542f74ff3":[21,0,0,7,22],
 "_generalized-_core-_counter_8cpp.html#ad46915a4f3e89ba9e29e19720677db47":[21,0,0,7,15],
 "_generalized-_core-_counter_8cpp.html#ada98fd6c3ac770e6a604ce883e8b7966":[21,0,0,7,13],
@@ -248,6 +249,5 @@ var NAVTREEINDEX0 =
 "class_sensor_manager.html#a049e5cf771c954f3b4d0702f2ac1c412":[20,0,9,16],
 "class_sensor_manager.html#a24c47251bd3eb4e8962ce41783fa426e":[20,0,9,15],
 "class_sensor_manager.html#a27577f963c22e4249ea73d0961d7cba3":[20,0,9,12],
-"class_sensor_manager.html#a37887256d56db58df659e45ff96bf507":[20,0,9,1],
-"class_sensor_manager.html#a3caa244323f9a9851b1097baeaec7736":[20,0,9,2]
+"class_sensor_manager.html#a37887256d56db58df659e45ff96bf507":[20,0,9,1]
 };

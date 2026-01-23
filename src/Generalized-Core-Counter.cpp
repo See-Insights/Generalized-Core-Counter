@@ -81,7 +81,7 @@ bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags
 
 // One-shot software timer to keep BLUE_LED on long enough
 // to be visible for each count or PIR-triggered wake event.
-Timer countSignalTimer(2000, countSignalTimerISR, true);
+Timer countSignalTimer(1000, countSignalTimerISR, true);
 
 // Sleep configuration
 SystemSleepConfiguration config; // Sleep 2.0 configuration

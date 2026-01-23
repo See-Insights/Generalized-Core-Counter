@@ -65,3 +65,9 @@ All notable changes to this project will be documented in this file.
 ## 3.18 – 2026-01-21
 - Release Candidate for Limited Deployment
 
+## 3.19 – 2026-01-21
+- Minor Update on serial logging
+
+## 3.20 – 2026-01-23
+- Added PMIC monitoring for Boron
+

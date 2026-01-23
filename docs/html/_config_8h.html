@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.18</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.20</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -97,12 +97,39 @@ $(function(){initNavTree('_config_8h.html','',''); });
 <a href="#details">More...</a></p>
 
 <p><a href="_config_8h_source.html">Go to the source code of this file.</a></p>
+<table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 id="header-define-members" class="groupheader"><a id="define-members" name="define-members"></a>
+Macros</h2></td></tr>
+<tr class="memitem:a61e127df60d55ea4c8bd6b8ec1f88367" id="r_a61e127df60d55ea4c8bd6b8ec1f88367"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a61e127df60d55ea4c8bd6b8ec1f88367">DEBUG_SERIAL</a></td></tr>
+<tr class="memdesc:a61e127df60d55ea4c8bd6b8ec1f88367"><td class="mdescLeft">&#160;</td><td class="mdescRight">Debug serial configuration.  <br /></td></tr>
+</table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Global compile-time configuration options and enums. </p>
 <p>This header is reserved for project-wide configuration values and enumerations (such as sensor type selection) that are shared across modules. Some configuration is currently defined in other headers and implementation files; this file provides a single place for Doxygen to anchor high-level configuration documentation. </p>
 
 <p class="definition">Definition in file <a class="el" href="_config_8h_source.html">Config.h</a>.</p>
-</div></div><!-- contents -->
+</div><a name="doc-define-members" id="doc-define-members"></a><h2 id="header-doc-define-members" class="groupheader">Macro Definition Documentation</h2>
+<a id="a61e127df60d55ea4c8bd6b8ec1f88367" name="a61e127df60d55ea4c8bd6b8ec1f88367"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a61e127df60d55ea4c8bd6b8ec1f88367">&#9670;&#160;</a></span>DEBUG_SERIAL</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">#define DEBUG_SERIAL</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Debug serial configuration. </p>
+<p>Uncomment this line to enable waitFor(Serial.isConnected) on startup and after waking from sleep. This allows you to connect a USB serial terminal to see early boot and wake logs that would otherwise be missed.</p>
+<p>WARNING: When enabled, the device will pause for up to 10 seconds waiting for serial connection at boot and after each sleep wake. Only enable this for debugging; leave it commented out for production deployments. </p>
+
+<p class="definition">Definition at line <a class="el" href="_config_8h_source.html#l00026">26</a> of file <a class="el" href="_config_8h_source.html">Config.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <div id="page-nav" class="page-nav-panel">
 <div id="page-nav-resize-handle"></div>

@@ -250,7 +250,9 @@ void handleSleepingState() {
   
   SystemSleepResult result = System.sleep(config);
   
+#ifdef DEBUG_SERIAL
   waitFor(Serial.isConnected, 30000);  // Wait for Serial after wake so logs are visible
+#endif
   
   ab1805.resumeWDT();
   

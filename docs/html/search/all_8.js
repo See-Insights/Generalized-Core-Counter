@@ -9,7 +9,7 @@ var searchData=
   ['handlereportingstate_6',['handleReportingState',['../_state___report_8cpp.html#a1ef85fec9be65d21b46ebd2b1a57294a',1,'handleReportingState():&#160;State_Report.cpp'],['../_state_handlers_8h.html#a1ef85fec9be65d21b46ebd2b1a57294a',1,'handleReportingState():&#160;State_Report.cpp']]],
   ['handlers_7',['Application State Machine &amp;amp; Handlers',['../index.html#autotoc_md9',1,'']]],
   ['handlesleepingstate_8',['handleSleepingState',['../_state___sleep_8cpp.html#a733df5bda859981b51a039b66edc6a5a',1,'handleSleepingState():&#160;State_Sleep.cpp'],['../_state_handlers_8h.html#a733df5bda859981b51a039b66edc6a5a',1,'handleSleepingState():&#160;State_Sleep.cpp']]],
-  ['handling_9',['Error Handling',['../index.html#autotoc_md33',1,'']]],
+  ['handling_20alert_20system_9',['Error Handling &amp;amp; Alert System',['../index.html#autotoc_md33',1,'']]],
   ['hardware_10',['Hardware',['../index.html#autotoc_md4',1,'']]],
   ['hasnewdata_11',['hasNewData',['../struct_sensor_data.html#a4f6309bd50c2b45d4cea3d224c1a6e6b',1,'SensorData']]],
   ['header_20pir_20sensor_20on_20carrier_12',['Carrier board header (PIR sensor on carrier)',['../device__pinout_8h.html#autotoc_md0',1,'']]],

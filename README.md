@@ -453,11 +453,67 @@ case MYNEWSENSOR:
 - **Sleep-aware queue handling**: The state machine checks that the publish queue is in a sleep-safe state before entering long low-power sleeps, avoiding data loss due to mid-flight publishes.
 - **Bounded firmware-update mode**: The FIRMWARE_UPDATE state is time-limited (5 minutes by default). If no updates are applied within this window, the device exits update mode and returns toward its normal connect/report/sleep cycle to protect battery life.
 
-## Error Handling
+## Error Handling & Alert System
+
+The firmware implements a comprehensive alert system that monitors device health and reports issues through webhooks:
+
+### Alert Severity Levels
+
+**Critical (Tier 3)** - Requires immediate attention:
+- `14`: Out of memory
+- `15`: Modem/disconnect failure
+- `16`: Repeated sleep failures (HIBERNATE/ULP)
+- `20`: **PMIC thermal shutdown** (charging stopped due to temperature)
+- `21`: **PMIC charge timeout** (stuck charging - safety timer expired)
+
+**Major (Tier 2)** - Should be addressed soon:
+- `22`: **PMIC input fault** (VBUS overvoltage)
+- `23`: **PMIC battery fault** (general charging issue)
+- `30`: Connectivity timeout with radio up
+- `31`: Failed to connect to cloud
+- `32`: Connect taking too long
+- `40`: Repeated webhook failures (>6 hours without response)
+- `41`: Configuration/ledger apply failure
+- `42`: Data ledger publish failure
+- `43`: Publish queue not drained before forced sleep
+
+**Minor (Tier 1)** - Informational warnings
+
+### PMIC Monitoring & Remediation (Boron Only)
+
+For Boron devices with BQ24195 PMIC, the firmware actively monitors charging health:
+
+**Detection:**
+- Reads PMIC fault registers every battery check cycle
+- Monitors for thermal shutdown, charge timeout, input faults
+- Tracks stuck charging states (>6 hours at same SoC)
+- Logs detailed PMIC status (charge state, VBUS, thermal regulation)
+
+**Smart Remediation with Anti-Thrashing:**
+- **Level 0** (Initial): Monitor only, log diagnostics
+- **Level 1** (2+ consecutive faults): Soft reset - cycle charging off/on
+- **Level 2** (3+ consecutive faults): Power cycle with watchdog supervision
+- **Cooldown**: 1 hour minimum between remediation attempts
+- **Auto-Clear**: Resets counters when charging returns to healthy state
+
+**Escalation Example:**
+1. First fault detected → Alert raised, monitor only (wait for cooldown)
+2. Second fault after cooldown → Level 1: Cycle charging (disable 500ms, re-enable)
+3. Third fault after cooldown → Level 2: Power cycle with watchdog reset
+4. Charging recovers → Clear alert, reset remediation level
+
+**Benefits:**
+- Automatic recovery from common "1Hz amber LED" charging faults
+- Prevents thrashing (repeated fix attempts)
+- Detailed diagnostic logs for root cause analysis
+- Alert webhooks notify monitoring systems before manual intervention needed
+
+### Error Recovery Strategy
 
 - Sensor failures → Connect and report (no reset loops)
 - Configuration validation with range checking
 - Graceful degradation for remote deployments
+- Alerts automatically clear when underlying condition resolves
 
 ## Dependencies
 

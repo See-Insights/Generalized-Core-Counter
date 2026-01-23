@@ -63,11 +63,15 @@ var NAVTREE =
     ] ],
     [ "Memory Constraints", "index.html#autotoc_md31", null ],
     [ "Offline Data Retention &amp; Firmware Updates", "index.html#autotoc_md32", null ],
-    [ "Error Handling", "index.html#autotoc_md33", null ],
-    [ "Dependencies", "index.html#autotoc_md34", null ],
-    [ "Contributing", "index.html#autotoc_md35", null ],
-    [ "License", "index.html#autotoc_md36", null ],
-    [ "Support", "index.html#autotoc_md37", null ],
+    [ "Error Handling &amp; Alert System", "index.html#autotoc_md33", [
+      [ "Alert Severity Levels", "index.html#autotoc_md34", null ],
+      [ "PMIC Monitoring &amp; Remediation (Boron Only)", "index.html#autotoc_md35", null ],
+      [ "Error Recovery Strategy", "index.html#autotoc_md36", null ]
+    ] ],
+    [ "Dependencies", "index.html#autotoc_md37", null ],
+    [ "Contributing", "index.html#autotoc_md38", null ],
+    [ "License", "index.html#autotoc_md39", null ],
+    [ "Support", "index.html#autotoc_md40", null ],
     [ "Namespaces", "namespaces.html", [
       [ "Namespace List", "namespaces.html", "namespaces_dup" ],
       [ "Namespace Members", "namespacemembers.html", [
@@ -102,8 +106,8 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "_cloud_8cpp.html",
-"class_sensor_manager.html#a3d605277298d063851c91b1238784c17",
-"functions_vars.html"
+"class_sensor_manager.html#a3caa244323f9a9851b1097baeaec7736",
+"functions_v.html"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronization';

@@ -1,7 +1,7 @@
 var _generalized__core__counter_8cpp =
 [
     [ "ab1805", "_generalized-_core-_counter_8cpp.html#ac76c3827d7e201a452741421f4737990", null ],
-    [ "countSignalTimer", "_generalized-_core-_counter_8cpp.html#ace371ac8f4eb5b9c14b1e4a5f9da82e9", null ],
+    [ "countSignalTimer", "_generalized-_core-_counter_8cpp.html#acc8846869443575f768d24829037eec4", null ],
     [ "countSignalTimerISR", "_generalized-_core-_counter_8cpp.html#aafd752c276befe106eb6a9c6dc395962", null ],
     [ "dailyCleanup", "_generalized-_core-_counter_8cpp.html#a496510658b21d252547ca67ae1035445", null ],
     [ "isWithinOpenHours", "_generalized-_core-_counter_8cpp.html#adaf14f9ee408635f2c952b99aaeda484", null ],

@@ -1,5 +1,6 @@
 var NAVTREEINDEX1 =
 {
+"class_sensor_manager.html#a3caa244323f9a9851b1097baeaec7736":[20,0,9,2],
 "class_sensor_manager.html#a3d605277298d063851c91b1238784c17":[20,0,9,11],
 "class_sensor_manager.html#a6da110325ebad4ad76647add5f4b5746":[20,0,9,17],
 "class_sensor_manager.html#a70dabc59358476483196904dab2612b3":[20,0,9,8],
@@ -248,6 +249,5 @@ var NAVTREEINDEX1 =
 "functions_r.html":[20,3,0,15],
 "functions_s.html":[20,3,0,16],
 "functions_t.html":[20,3,0,17],
-"functions_u.html":[20,3,0,18],
-"functions_v.html":[20,3,0,19]
+"functions_u.html":[20,3,0,18]
 };

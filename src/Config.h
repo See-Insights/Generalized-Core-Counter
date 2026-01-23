@@ -23,7 +23,7 @@
  * for serial connection at boot and after each sleep wake. Only enable this
  * for debugging; leave it commented out for production deployments.
  */
-// #define DEBUG_SERIAL
+#define DEBUG_SERIAL
 
 /**
  * @brief Sensor type ID mapping (for sysStatus.sensorType).

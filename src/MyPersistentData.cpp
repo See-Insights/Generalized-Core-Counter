@@ -575,8 +575,11 @@ static int getAlertSeverity(int8_t code) {
         case 14: // out-of-memory
         case 15: // modem / disconnect failure
         case 16: // repeated sleep failures (HIBERNATE / ULP)
+        case 20: // PMIC thermal shutdown (critical battery/charging fault)
+        case 21: // PMIC charge timeout / stuck charging
             return 3; // critical
 
+        case 23: // PMIC battery fault (general)
         case 30: // connectivity timeout with radio up
         case 31: // failed to connect to cloud
         case 32: // connect taking too long

@@ -228,8 +228,198 @@ bool SensorManager::batteryState() {
   // Boron (cellular) and Argon (Wi-Fi) Gen 3 devices:
   // Use built-in System battery APIs backed by the fuel gauge
   // (and a BQ24195 PMIC on Boron only).
-  current.set_batteryState(System.batteryState());
-  current.set_stateOfCharge(System.batteryCharge());
+  uint8_t battState = System.batteryState();
+  float soc = System.batteryCharge();
+  int powerSource = System.powerSource();
+  
+  // Log battery diagnostics to help identify charging state issues
+  Log.info("Battery: state=%s (%d), SoC=%.2f%%, powerSource=%d", 
+           batteryContext[battState], battState, (double)soc, powerSource);
+  
+  current.set_batteryState(battState);
+  current.set_stateOfCharge(soc);
+
+#if HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
+  // =========================================================================
+  // PMIC Health Monitoring & Smart Remediation (BQ24195 PMIC)
+  // =========================================================================
+  // Supported platforms: Boron (Gen 3 cellular with BQ24195 PMIC)
+  // Excluded platforms: M-SoM/Muon (uses Particle Power Module with MAX17043, not BQ24195)
+  // 
+  // Detects charging faults (1Hz amber LED = fault register set) and attempts
+  // automatic recovery with escalating remediation levels to prevent thrashing.
+  //
+  // Alert Codes (auto-reported via webhook):
+  //   20 = PMIC Thermal Shutdown (critical - charging stopped due to temp)
+  //   21 = PMIC Charge Timeout (critical - safety timer expired, stuck charging)
+  //   23 = PMIC Battery Fault (major - general charging issue)
+  //
+  // Log-Only Diagnostics (NOT alerted - transient/normal conditions):
+  //   Input Fault: VBUS out of range (solar undervoltage common, backend detects sustained issues)
+  //
+  // Remediation Strategy:
+  //   Level 0: Monitor only (log diagnostics, raise alert)
+  //   Level 1: Soft reset (cycle charging off/on after 2+ consecutive faults)
+  //   Level 2: Power cycle with watchdog (after 3+ consecutive faults)
+  //   Cooldown: 1 hour minimum between remediation attempts
+  //   Auto-Clear: Resets all counters when charging returns to healthy state
+  //
+  // This prevents the common "loss of charge until power cycle" issue by
+  // detecting PMIC faults early and automatically attempting recovery before
+  // requiring manual intervention.
+  // =========================================================================
+  
+  // PMIC health monitoring (BQ24195 PMIC - Boron only)
+  // Tracks charging faults and attempts smart remediation with escalation
+  static unsigned long lastRemediationAttempt = 0;
+  static uint8_t remediationLevel = 0; // 0=none, 1=soft reset, 2=power cycle
+  static uint8_t consecutiveFaults = 0;
+  const unsigned long REMEDIATION_COOLDOWN = 3600000; // 1 hour between attempts
+  
+  // Check if charging is intentionally disabled due to temperature BEFORE attempting remediation
+  bool safeToCharge = isItSafeToCharge();
+  
+  PMIC pmic(true); // true = lock I2C during operations
+  
+  // Read REG09 (Fault Register)
+  byte faultReg = pmic.readFaultRegister();
+  
+  // Check for charging faults (bits 3-5: CHRG_FAULT)
+  if (faultReg & 0x38) {
+    uint8_t chargeFault = (faultReg >> 3) & 0x07;
+    consecutiveFaults++;
+    
+    switch(chargeFault) {
+      case 0x01: // Input fault (VBUS overvoltage or undervoltage)
+        // This triggers when VIN < powerSourceMinVoltage (5.08V) or > max
+        // Most common cause: obscured/faulty solar panel insufficient voltage
+        // LOG ONLY - transient voltage dips are normal (clouds, trees, dawn/dusk)
+        // Backend detects sustained panel failures via multi-day SoC decline
+        Log.info("PMIC: Input fault - VBUS out of range (likely solar variation)");
+        break;
+      case 0x02: // Thermal shutdown
+        Log.error("PMIC: Thermal shutdown - charging stopped due to temperature");
+        current.raiseAlert(20); // Alert code 20: PMIC Thermal (critical)
+        break;
+      case 0x03: // Charge safety timer expired
+        Log.error("PMIC: Charge safety timer expired - charging timeout (common stuck charging indicator)");
+        current.raiseAlert(21); // Alert code 21: PMIC Charge Timeout (critical)
+        break;
+      default:
+        Log.warn("PMIC: Charge fault detected (code=0x%02x)", chargeFault);
+        current.raiseAlert(23); // Alert code 23: PMIC Battery Fault
+        break;
+    }
+    
+    // Smart remediation with escalation and thrash prevention
+    // CRITICAL SAFETY CHECK: Never attempt remediation if charging is disabled due to temperature
+    if (!safeToCharge) {
+      Log.info("PMIC: Fault detected but charging disabled due to temperature (%.1fC) - skipping remediation", 
+               (double)current.get_internalTempC());
+      // Don't escalate fault counters when temperature is the issue
+      // Temperature will recover naturally without intervention
+    } else {
+      unsigned long now = millis();
+      if (now - lastRemediationAttempt > REMEDIATION_COOLDOWN) {
+        // Escalate remediation level based on consecutive faults
+        if (consecutiveFaults >= 3 && remediationLevel < 2) {
+          remediationLevel = 2; // Escalate to power cycle reset
+        } else if (consecutiveFaults >= 2 && remediationLevel < 1) {
+          remediationLevel = 1; // Escalate to disable/enable charging
+        }
+        
+        // Apply remediation based on level
+        switch(remediationLevel) {
+          case 1:
+            Log.warn("PMIC: Attempting soft remediation - cycle charging (level 1)");
+            pmic.disableCharging();
+            delay(500);
+            pmic.enableCharging();
+            Log.info("PMIC: Charging re-enabled after soft reset");
+            break;
+            
+          case 2:
+            Log.error("PMIC: Attempting aggressive remediation - power cycle reset (level 2)");
+            pmic.disableCharging();
+            delay(1000);
+            // Set watchdog to force reset in 10 seconds if charging doesn't recover
+            pmic.setWatchdog(0b01); // 40 seconds
+            pmic.enableCharging();
+            Log.info("PMIC: Charging re-enabled with watchdog supervision");
+            remediationLevel = 0; // Reset level after power cycle attempt
+            break;
+            
+          default:
+            Log.info("PMIC: Fault detected but remediation level 0 - monitoring only");
+            break;
+        }
+        
+        lastRemediationAttempt = now;
+      } else {
+        unsigned long remainingCooldown = (REMEDIATION_COOLDOWN - (now - lastRemediationAttempt)) / 60000;
+        Log.info("PMIC: Fault detected but in cooldown period (%lu min remaining)", remainingCooldown);
+      }
+    }
+  } else {
+    // No faults detected - clear counters if charging is healthy
+    if (consecutiveFaults > 0) {
+      Log.info("PMIC: Charging healthy - clearing fault counters");
+      consecutiveFaults = 0;
+      remediationLevel = 0;
+      
+      // Clear PMIC-related alerts if they were active
+      int8_t currentAlert = current.get_alertCode();
+      if (currentAlert >= 20 && currentAlert <= 23) {
+        Log.info("PMIC: Clearing battery/charging alert %d - charging resumed", currentAlert);
+        current.set_alertCode(0);
+        current.set_lastAlertTime(0);
+      }
+    }
+  }
+  
+  // Read REG08 (System Status Register) for additional diagnostics
+  byte systemStatus = pmic.readSystemStatusRegister();
+  uint8_t chargeStatus = (systemStatus >> 4) & 0x03;
+  bool vbusGood = (systemStatus & 0x80) != 0;
+  uint8_t thermalStatus = systemStatus & 0x03;
+  
+  const char* chargeStatusStr[] = {"Not Charging", "Pre-charge", "Fast Charging", "Charge Done"};
+  const char* thermalStr[] = {"Normal", "Warm", "Hot", "Cold"};
+  
+  Log.info("PMIC Status: charge=%s, VBUS=%s, thermal=%s, faultReg=0x%02x",
+           chargeStatusStr[chargeStatus],
+           vbusGood ? "Good" : "Fault",
+           thermalStr[thermalStatus],
+           faultReg);
+  
+  // Detect stuck charging state (charging for >6 hours at same SoC)
+  static uint8_t lastChargeStatus = 0xFF;
+  static float lastSoC = -1.0f;
+  static unsigned long chargeStateStartTime = 0;
+  
+  if (chargeStatus == 2) { // Fast Charging
+    if (lastChargeStatus == 2) {
+      // Still in fast charging
+      if (abs(soc - lastSoC) < 1.0f) { // SoC not increasing
+        if (chargeStateStartTime == 0) {
+          chargeStateStartTime = millis();
+        } else if (millis() - chargeStateStartTime > 6UL * 3600000UL) { // 6 hours
+          Log.error("PMIC: Stuck in Fast Charging for 6+ hours with no SoC increase (%.1f%%) - possible fault", (double)soc);
+          current.raiseAlert(21); // Charge timeout alert
+        }
+      } else {
+        chargeStateStartTime = 0; // SoC increasing, reset timer
+      }
+    } else {
+      chargeStateStartTime = millis(); // Just entered fast charging
+    }
+  } else {
+    chargeStateStartTime = 0; // Not charging or charge done
+  }
+  
+  lastChargeStatus = chargeStatus;
+  lastSoC = soc;
+#endif // HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
 
 #elif PLATFORM_ID == 32 || PLATFORM_ID == 34
   // Photon 2 and P2:
@@ -249,16 +439,15 @@ bool SensorManager::batteryState() {
   }
   current.set_stateOfCharge(soc);
 
-  // Coarse battery state: we don't have a reliable CHG pin on Photon 2/P2
-  // (per docs), so infer from voltage only.
+  // Photon 2/P2 cannot reliably determine charging state without a PMIC.
+  // Always report "Unknown" since voltage alone can't distinguish between
+  // charging and discharging at the same voltage level.
   uint8_t battState = 0; // Unknown
-  if (voltage >= 4.1f) {
-    battState = 3; // "Charged"
-  } else if (voltage >= 3.6f) {
-    battState = 2; // "Charging/Normal"
-  } else if (voltage > 0.1f) {
-    battState = 4; // "Discharging / Low"
-  }
+  
+  // Log battery diagnostics (Photon 2/P2 voltage-based estimation)
+  Log.info("Battery: voltage=%.2fV, state=%s (%d), SoC=%.2f%% (estimated from voltage)", 
+           (double)voltage, batteryContext[battState], battState, (double)soc);
+  
   current.set_batteryState(battState);
 
 #else

@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.18</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.20</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -175,7 +175,7 @@ $(function(){initNavTree('_generalized-_core-_counter_8cpp_source.html','',''); 
 <div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span> </div>
 <div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span><span class="comment">// One-shot software timer to keep BLUE_LED on long enough</span></div>
 <div class="line"><a id="l00083" name="l00083"></a><span class="lineno">   83</span><span class="comment">// to be visible for each count or PIR-triggered wake event.</span></div>
-<div class="line"><a id="l00084" name="l00084"></a><span class="lineno"><a class="line" href="_generalized-_core-_counter_8cpp.html#ace371ac8f4eb5b9c14b1e4a5f9da82e9">   84</a></span>Timer <a class="code hl_variable" href="_state_machine_8h.html#acf7db90684edac6c3b280478fcc07db6">countSignalTimer</a>(2000, <a class="code hl_function" href="_generalized-_core-_counter_8cpp.html#aafd752c276befe106eb6a9c6dc395962">countSignalTimerISR</a>, <span class="keyword">true</span>);</div>
+<div class="line"><a id="l00084" name="l00084"></a><span class="lineno"><a class="line" href="_generalized-_core-_counter_8cpp.html#acc8846869443575f768d24829037eec4">   84</a></span>Timer <a class="code hl_variable" href="_state_machine_8h.html#acf7db90684edac6c3b280478fcc07db6">countSignalTimer</a>(1000, <a class="code hl_function" href="_generalized-_core-_counter_8cpp.html#aafd752c276befe106eb6a9c6dc395962">countSignalTimerISR</a>, <span class="keyword">true</span>);</div>
 <div class="line"><a id="l00085" name="l00085"></a><span class="lineno">   85</span> </div>
 <div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span><span class="comment">// Sleep configuration</span></div>
 <div class="line"><a id="l00087" name="l00087"></a><span class="lineno"><a class="line" href="_generalized-_core-_counter_8cpp.html#ab71602050f3582f2f394acb7c5e97606">   87</a></span>SystemSleepConfiguration <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#ab71602050f3582f2f394acb7c5e97606">config</a>; <span class="comment">// Sleep 2.0 configuration</span></div>
