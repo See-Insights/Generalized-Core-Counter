@@ -245,14 +245,16 @@ void handleSleepingState() {
   
   config.mode(SystemSleepMode::ULTRA_LOW_POWER)
     .gpio(BUTTON_PIN, CHANGE)    // Service button wake
-    .gpio(intPin, RISING)         // PIR sensor wake (active HIGH on detect)
+    .gpio(intPin, RISING)        // PIR sensor wake (original behavior: rising edge)
     .duration(wakeInSeconds * 1000L);  // Timer-based wake at reporting boundary
   
   SystemSleepResult result = System.sleep(config);
-  
+
 #ifdef DEBUG_SERIAL
-  waitFor(Serial.isConnected, 30000);  // Wait for Serial after wake so logs are visible
-#endif
+  delay(100);
+  waitFor(Serial.isConnected, 5000);
+  delay(100);
+#endif // DEBUG_SERIAL
   
   ab1805.resumeWDT();
   
@@ -329,11 +331,18 @@ void handleSleepingState() {
         current.set_lastCountTime(Time.now());
         Log.info("Count detected from PIR wake - Hourly: %d, Daily: %d",
                  current.get_hourlyCount(), current.get_dailyCount());
+        if (Serial && Serial.isConnected()) {
+          Serial.printf("Count detected from PIR wake - Hourly: %d, Daily: %d\r\n",
+                        current.get_hourlyCount(), current.get_dailyCount());
+        }
       } else if (sysStatus.get_countingMode() == OCCUPANCY) {
         if (!current.get_occupied()) {
           current.set_occupied(true);
           current.set_occupancyStartTime(Time.now());
           Log.info("Space now OCCUPIED from PIR wake at %s", Time.timeStr().c_str());
+          if (Serial && Serial.isConnected()) {
+            Serial.printf("Space now OCCUPIED from PIR wake at %s\r\n", Time.timeStr().c_str());
+          }
         }
         current.set_lastOccupancyEvent(millis());
       }
