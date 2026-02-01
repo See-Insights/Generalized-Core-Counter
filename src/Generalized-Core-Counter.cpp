@@ -28,21 +28,32 @@
 // Firmware version recognized by Particle Product firmware management
 // Bump this integer whenever you cut a new production release.
 PRODUCT_VERSION(3);
-#include "AB1805_RK.h"
-#include "Cloud.h"
-#include "LocalTimeRK.h"
-#include "MyPersistentData.h"
-#include "Particle_Functions.h"
-#include "PublishQueuePosixRK.h"
-#include "SensorManager.h"
-#include "device_pinout.h"
-#include "ISensor.h"
-#include "SensorFactory.h"
-#include "SensorDefinitions.h"
-#include "Version.h"
-#include "StateMachine.h"
-#include "StateHandlers.h"
-#include "ProjectConfig.h"
+
+// Hardware abstraction and device-specific pinouts
+#include "device_pinout.h"           // Platform-specific pin definitions
+#include "AB1805_RK.h"               // RTC and hardware watchdog
+#include "LocalTimeRK.h"             // Timezone conversion (UTC to local)
+
+// Persistent data and configuration
+#include "MyPersistentData.h"        // FRAM-backed sysStatus, current, sensorConfig
+
+// Cloud connectivity and data publishing
+#include "Cloud.h"                   // Particle Ledger integration (config + data)
+#include "PublishQueuePosixRK.h"     // File-backed persistent event queue
+#include "Particle_Functions.h"      // Particle.function() and Particle.variable() registration
+
+// Sensor abstraction layer
+#include "SensorManager.h"           // Singleton managing active sensor instance
+#include "SensorFactory.h"           // Factory for creating sensor instances by type
+#include "SensorDefinitions.h"       // SensorType enum and counting mode constants
+
+// State machine implementation
+#include "StateMachine.h"            // State enum and global state variables
+#include "StateHandlers.h"           // Handler functions for each state
+
+// Application metadata
+#include "Version.h"                 // FIRMWARE_VERSION and FIRMWARE_RELEASE_NOTES
+#include "ProjectConfig.h"           // Webhook event name and project constants
 
 // Forward declarations in case Version.h is not picked up correctly
 // by the build system in this translation unit.
@@ -80,10 +91,10 @@ void publishStartupStatus();  // One-time status summary at boot
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE); // Safe diagnostic publish with queue guard
 
 // One-shot software timer to keep BLUE_LED on long enough
-// to be visible for each count or PIR-triggered wake event.
+// to be visible for each count or sensor triggered wake event.
 Timer countSignalTimer(1000, countSignalTimerISR, true);
 
-// Sleep configuration
+// Instantiate needed libraries / APIs
 SystemSleepConfiguration config; // Sleep 2.0 configuration
 void outOfMemoryHandler(system_event_t event, int param);
 LocalTimeConvert conv; // For converting UTC time to local time
@@ -102,13 +113,10 @@ State oldState = INITIALIZATION_STATE;
 // ********** Global Flags **********
 volatile bool userSwitchDetected = false;
 volatile bool sensorDetect = false; // Flag for sensor interrupt
-bool dataInFlight =
-    false; // Flag for whether we are waiting for a response from the webhook
 
 // Track first-connection queue behaviour for observability
 bool firstConnectionObserved = false;
 bool firstConnectionQueueDrainedLogged = false;
-
 bool hibernateDisabledForSession = false;
 
 // Track when we connected to enforce max connected time in LOW_POWER/DISCONNECTED modes
@@ -117,10 +125,14 @@ unsigned long connectedStartMs = 0;
 // Suppress alert 40 (webhook timeout) after waking from overnight closed-hours hibernate
 bool suppressAlert40ThisSession = false;
 
+// Webhook response timeout tracking (20 second budget per article about B524 platform issue)
+unsigned long webhookPublishMs = 0;  // Timestamp when we last published to webhook
+bool awaitingWebhookResponse = false; // True if we're waiting for webhook response
+const unsigned long webhookResponseTimeoutMs = 20000; // 20 second timeout for webhook response
+
 // ********** Timing **********
-const int wakeBoundary = 1 * 3600;          // Reporting boundary (1 hour)
+const int wakeBoundary = 1 * 3600;          // Default reporting boundary (1 hour); actual interval set via sysStatus.get_reportingBoundaryMin()
 const unsigned long resetWait = 30000;      // Error state dwell before reset
-const unsigned long maxConnectAttemptMs = 5UL * 60UL * 1000UL; // Max time to spend trying to connect per wake
 
 void setup() {
   // Wait for serial connection when DEBUG_SERIAL is enabled
@@ -146,6 +158,7 @@ void setup() {
 
   // Subscribe to the Ubidots integration response event so we can track
   // successful webhook deliveries and update lastHookResponse.
+  // This subscription is non-blocking; we'll receive responses when connected.
   {
     char responseTopic[125];
     String deviceID = System.deviceID();
@@ -201,20 +214,15 @@ void setup() {
     state = CONNECTING_STATE;
     break;
   case RESET_REASON_POWER_MANAGEMENT:
-    // Waking from sleep. If current local hour matches opening hour (e.g., 07:00),
-    // we likely just woke from overnight closed-hours hibernate.
-    // Suppress alert 40 this session since 8+ hours without webhook responses
-    // during closed hours is expected, not an error.
-    // Error escalation/hard resets during other hours (08:00-22:00) will still
-    // correctly trigger alert 40 if there's a real connectivity issue.
-    // Note: Local time calculation happens after timezone setup, so we check this
-    // later in setup() rather than here where timezone isn't configured yet.
+    // Waking from sleep. Alert 40 suppression for overnight hibernate
+    // is handled later in setup() after timezone configuration is complete.
     break;
   default:
     break;
   }
 
   // Ensure sensor-board LED power default matches configured sensor type
+  // TODO: Consider moving this sensor-specific logic to device_pinout.cpp or SensorManager
   pinMode(ledPower, OUTPUT);
   SensorType configuredType = static_cast<SensorType>(sysStatus.get_sensorType());
   const SensorDefinition* sensorDef = SensorDefinitions::getDefinition(configuredType);
@@ -232,7 +240,8 @@ void setup() {
       .withFileQueueSize(800)
       .setup(); // Initialize the publish queue
 
-  // Initialize AB1805 RTC and watchdog
+  // ===== TIME, RTC, AND WATCHDOG CONFIGURATION =====
+  // Initialize AB1805 RTC and hardware watchdog, then restore system time if needed
   const bool timeValidBeforeRtc = Time.isValid();
   ab1805.withFOUT(WKP).setup();                // Initialize AB1805 RTC - WKP is D10 on Photon2
   ab1805.setWDT(AB1805::WATCHDOG_MAX_SECONDS); // Enable watchdog
@@ -294,13 +303,6 @@ void setup() {
         Log.info("Wake from overnight hibernate at opening hour - suppressing alert 40");
         suppressAlert40ThisSession = true;
       }
-    }
-
-    // In CONNECTED operating mode, always connect on boot to reload
-    // configuration from ledger and prevent stuck-in-IDLE power drain.
-    if (sysStatus.get_operatingMode() == CONNECTED) {
-      Log.info("CONNECTED mode - connecting on boot to reload config");
-      state = CONNECTING_STATE;
     }
   }
 
@@ -383,6 +385,13 @@ void loop() {
 
   // Service outgoing publish queue
   PublishQueuePosix::instance().loop();
+
+  // Check for webhook response timeout (20 second budget per B524 platform issue)
+  if (awaitingWebhookResponse && (millis() - webhookPublishMs) > webhookResponseTimeoutMs) {
+    Log.warn("Webhook response timeout after %lu ms - raising alert 40", (millis() - webhookPublishMs));
+    awaitingWebhookResponse = false; // Clear flag so we don't repeatedly raise alert
+    current.raiseAlert(40);
+  }
 
   // If an out-of-memory event occurred, go to error state
   if (outOfMemory >= 0) {
@@ -548,6 +557,10 @@ void publishData() {
   PublishQueuePosix::instance().publish(ProjectConfig::webhookEventName(), data, PRIVATE | WITH_ACK);
   Log.info("Ubidots Webhook: %s", data);
 
+  // Start webhook response timeout tracking (20 second budget)
+  webhookPublishMs = millis();
+  awaitingWebhookResponse = true;
+
   // Also update device-data ledger with structured JSON snapshot
   if (!Cloud::instance().publishDataToLedger()) {
     // Data ledger publish failure; escalate via alert so the error
@@ -584,6 +597,26 @@ void publishStartupStatus() {
   Log.info("Startup status: %s", status);
 }
 
+/**
+ * @brief Handle response from Ubidots webhook.
+ *
+ * @details This handler is necessary for webhook response supervision (alert 40).
+ * PublishQueue tracks publish success, but cannot verify end-to-end webhook delivery
+ * to Ubidots. This handler confirms the webhook template executed successfully and
+ * Ubidots accepted the data (HTTP 200/201). Without this, we cannot distinguish
+ * between "event published to Particle cloud" vs "data actually received by Ubidots".
+ *
+ * During each connection, devices must complete 4 tasks:
+ *   1) Clear the publish queue (drain queued events)
+ *   2) Sync Ledger (configuration and data)
+ *   3) Check for firmware updates
+ *   4) Receive Ubidots webhook response (this handler)
+ *
+ * The webhook response arrives asynchronously (typically 5-15 seconds after publish),
+ * so devices must remain connected long enough to complete all 4 tasks. Task timing
+ * is managed by connection budget and state machine logic in CONNECTING_STATE and
+ * REPORTING_STATE.
+ */
 void UbidotsHandler(const char *event, const char *data) {
   // Handle response from Ubidots webhook (legacy integration)
   char responseString[64];
@@ -592,10 +625,11 @@ void UbidotsHandler(const char *event, const char *data) {
     snprintf(responseString, sizeof(responseString), "No Data");
   } else if (atoi(data) == 200 || atoi(data) == 201) {
     snprintf(responseString, sizeof(responseString), "Response Received");
-    dataInFlight =
-        false; // We have received a response - so we can send another
     sysStatus.set_lastHookResponse(
         Time.now()); // Record the last successful Webhook Response
+
+    // Clear webhook response timeout tracking - we got the response!
+    awaitingWebhookResponse = false;
 
     // If a webhook supervision alert (40) was active, clear it now that
     // we have a confirmed successful response, so future reports reflect
@@ -614,9 +648,7 @@ void UbidotsHandler(const char *event, const char *data) {
   Log.info(responseString);
 }
 
-/**
- * @brief Publish a state transition to the log handler.
- */
+
 /**
  * @brief Safely publish diagnostic message through queue with depth guard.
  *
@@ -648,6 +680,12 @@ bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags
   return true;
 }
 
+/**
+ * @brief Publish a state transition to the log handler.
+ * 
+ * @details Logs transitions between states with context on time validity
+ *          when entering IDLE_STATE. Updates oldState to current state.
+ */
 void publishStateTransition() {
   char stateTransitionString[256];
   if (state == IDLE_STATE) {
@@ -694,19 +732,35 @@ void dailyCleanup() {
   if (Particle.connected()) {
     publishDiagnosticSafe("Daily Cleanup", "Running", PRIVATE);
     
-    // Force time sync once per day to prevent clock drift
+    // Force time sync once per day to prevent clock drift.
+    // dailyCleanup() is called once per day from REPORTING_STATE. All devices
+    // should connect at least daily, but LOW_POWER and DISCONNECTED mode devices
+    // may not be connected at the specific time dailyCleanup runs. If a device
+    // connects daily but misses the cleanup window each day, it won't sync time
+    // despite daily connections, causing drift to accumulate over multiple days.
+    // The AB1805 RTC has ±2.0 ppm accuracy (~±5 seconds/month typical), so
+    // missing sync for several days can accumulate noticeable drift. This ensures
+    // at least one time sync per day when the device happens to be connected
+    // during the cleanup window.
     Log.info("Daily time sync requested");
     Particle.syncTime();
     sysStatus.set_lastTimeSync(Time.now());
   }
   
   Log.info("Running Daily Cleanup");
-  // Leave verbose mode enabled for now to aid debugging
-  if (sysStatus.get_solarPowerMode() ||
-      current.get_stateOfCharge() <=
-          65) { // If Solar or if the battery is being discharged
-    // setLowPowerMode("1");
+  
+  // Automatic low-power mode activation on low battery:
+  // When state of charge drops to 65% or below, the device should transition
+  // to LOW_POWER mode to preserve remaining battery. This typically happens
+  // when solar charging is insufficient for current operating mode.
+  // TODO: Implement automatic operatingMode transition via setOperatingMode()
+  // function (from Particle_Functions) to switch from CONNECTED (mode 0) to
+  // LOW_POWER (mode 1) when battery threshold is crossed. Current implementation
+  // has this logic disabled (setLowPowerMode commented out) pending testing.
+  if (sysStatus.get_solarPowerMode() || current.get_stateOfCharge() <= 65) {
+    // Automatic power mode adjustment needed here
+    // setLowPowerMode("1");  // Commented pending implementation validation
   }
-  current
-      .resetEverything(); // If so, we need to Zero the counts for the new day
+  
+  current.resetEverything(); // Zero the counts for the new day
 }

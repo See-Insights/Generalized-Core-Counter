@@ -156,6 +156,12 @@ void handleSleepingState() {
     // First attempt a true HIBERNATE so platforms that support it
     // still get a cold boot at next opening time.
     if (!hibernateDisabledForSession) {
+      // Diagnostic logging to help debug alert 16 issues
+      LocalTimeConvert diagConv;
+      diagConv.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
+      uint8_t currentHour = (uint8_t)(diagConv.getLocalTimeHMS().toSeconds() / 3600);
+      Log.info("Entering HIBERNATE: Time.isValid=%d localHour=%d openTime=%d closeTime=%d",
+               Time.isValid(), currentHour, sysStatus.get_openTime(), sysStatus.get_closeTime());
       Log.info("Outside opening hours - entering NIGHT HIBERNATE sleep for %d seconds", nightSleepSec);
 
       ab1805.stopWDT();
@@ -175,9 +181,15 @@ void handleSleepingState() {
       // permanently disable HIBERNATE for the remainder of this boot so
       // we can fall back to ULTRA_LOW_POWER instead of thrashing.
       ab1805.resumeWDT();
-      Log.error("HIBERNATE sleep returned unexpectedly - disabling HIBERNATE for this session");
+      Log.error("HIBERNATE sleep returned unexpectedly (platform does not support or HIBERNATE woke early)");
+      Log.error("Park hours context: Time.isValid=%d localHour=%d openTime=%d closeTime=%d",
+                Time.isValid(), currentHour, sysStatus.get_openTime(), sysStatus.get_closeTime());
       current.raiseAlert(16); // Alert: unexpected return from HIBERNATE
       hibernateDisabledForSession = true;
+      // Clear alert immediately since we've handled the failure by disabling HIBERNATE
+      // Without a reset, the setup() alert clearing code won't run
+      current.set_alertCode(0);
+      current.set_lastAlertTime(0);
       // Fall through to ULTRA_LOW_POWER fallback below.
     }
   }
