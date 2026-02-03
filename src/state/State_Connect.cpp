@@ -83,9 +83,8 @@ void handleConnectingState() {
   unsigned long elapsedMs = millis() - connectionStartTimeStamp;
   sysStatus.set_lastConnectionDuration(int(elapsedMs / 1000));
 
-  // Use a ledger-configured budget when available; otherwise fall back
-  // to the compiled default maxConnectAttemptMs constant.
-  unsigned long budgetMs = maxConnectAttemptMs;
+  // Use ledger-configured connection budget; default to 5 minutes if not configured
+  unsigned long budgetMs = 5UL * 60UL * 1000UL; // Default 5 minutes
   uint16_t budgetSec = sysStatus.get_connectAttemptBudgetSec();
   if (budgetSec >= 30 && budgetSec <= 900) {
     budgetMs = (unsigned long)budgetSec * 1000UL;

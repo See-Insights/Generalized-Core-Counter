@@ -208,6 +208,15 @@ private:
      * @brief Flag indicating if ledgers have synced from cloud
      */
     bool ledgersSynced;
+
+public:
+    /**
+     * @brief Check if ledgers have synced from cloud
+     * @return true if all ledgers have completed initial sync
+     */
+    bool areLedgersSynced() const;
+
+private:
     
     /**
      * @brief Store last published device status to detect changes

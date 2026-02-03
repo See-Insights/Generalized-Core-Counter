@@ -27,20 +27,22 @@ extern AB1805 ab1805;
 extern int outOfMemory;
 extern volatile bool userSwitchDetected;
 extern volatile bool sensorDetect;
-extern bool dataInFlight;
+
+// ISR functions
+void userSwitchISR();
 
 // Connection / power management timing shared between the
 // state machine core and state handlers.
 extern const unsigned long stayAwakeLong;
 extern const unsigned long resetWait;
 extern const unsigned long maxOnlineWorkMs;
-extern const unsigned long maxConnectAttemptMs;
 extern const int wakeBoundary;
 extern unsigned long connectedStartMs;
 extern bool lastLowPowerMode;
 extern bool firstConnectionObserved;
 extern bool firstConnectionQueueDrainedLogged;
 extern bool hibernateDisabledForSession;
+extern bool suppressAlert40ThisSession;
 
 // Helper functions used by multiple state handlers
 bool isWithinOpenHours();

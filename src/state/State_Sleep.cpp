@@ -1,3 +1,7 @@
+// Enable debug serial wait for sleep debugging
+// This must be defined before any includes to ensure it's available
+#define DEBUG_SERIAL
+
 #include "state/State_Common.h"
 #include "Config.h"
 #include "Cloud.h"
@@ -8,6 +12,9 @@
 #include "device_pinout.h"
 #include "SensorDefinitions.h"
 #include "AB1805_RK.h"
+
+// External declarations for webhook response tracking
+extern bool awaitingWebhookResponse;
 
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
@@ -65,6 +72,78 @@ void handleSleepingState() {
     }
     // Stay in SLEEPING_STATE until the queue is sleep-safe.
     return;
+  }
+
+  // ********** Cloud Operations Sync Prerequisites (with timeout budget) **********
+  // Before disconnecting, ensure four critical operations complete:
+  //   1) Publish queue drained (checked above)
+  //   2) Ledgers synced from cloud
+  //   3) OTA updates checked
+  //   4) Ubidots webhook response received
+  // Use a timeout budget to prevent battery drain if operations hang.
+  // NOTE: This code is non-blocking at application level (Particle.process() called)
+  // but blocks state transition until prerequisites complete or timeout.
+  static unsigned long cloudSyncStartMs = 0;
+  const unsigned long CLOUD_SYNC_TIMEOUT_MS = 30000; // 30 second budget
+
+  if (Particle.connected()) {
+    // Initialize timer on first check
+    if (cloudSyncStartMs == 0) {
+      cloudSyncStartMs = millis();
+    }
+
+    // Check prerequisite completion
+    bool ledgersSynced = Cloud::instance().areLedgersSynced();
+    bool webhookConfirmed = !awaitingWebhookResponse;
+    bool updatesChecked = !System.updatesPending();
+
+    bool allComplete = ledgersSynced && webhookConfirmed && updatesChecked;
+
+    if (!allComplete) {
+      unsigned long elapsedMs = millis() - cloudSyncStartMs;
+      
+      if (elapsedMs < CLOUD_SYNC_TIMEOUT_MS) {
+        // Still within budget - log status every 5 seconds
+        static unsigned long lastStatusLogMs = 0;
+        if ((millis() - lastStatusLogMs) > 5000UL) {
+          Log.info("SLEEP: Waiting for cloud operations - ledgers:%s updates:%s webhook:%s (%lu/%lu ms)",
+                   ledgersSynced ? "Y" : "N",
+                   updatesChecked ? "Y" : "N",
+                   webhookConfirmed ? "Y" : "N",
+                   elapsedMs, CLOUD_SYNC_TIMEOUT_MS);
+          lastStatusLogMs = millis();
+        }
+        Particle.process(); // Keep connection alive
+        return; // Stay in SLEEPING_STATE until complete or timeout
+      } else {
+        // Budget exceeded - log incomplete operations and raise ONE alert (priority order)
+        Log.warn("SLEEP: Cloud sync timeout after %lu ms", elapsedMs);
+        Log.warn("SLEEP: State at timeout - ledgersSynced=%d updatesChecked=%d webhookConfirmed=%d",
+                 ledgersSynced, updatesChecked, webhookConfirmed);
+        
+        // Only raise one alert - check in priority order (ledger > updates > webhook)
+        if (!ledgersSynced) {
+          Log.warn("SLEEP: Ledger sync incomplete - raising alert 41");
+          current.raiseAlert(41); // Configuration sync failure (highest priority)
+        } else if (!updatesChecked) {
+          Log.warn("SLEEP: OTA updates pending - raising alert 42");
+          current.raiseAlert(42); // OTA updates pending (second priority)
+        } else if (!webhookConfirmed) {
+          Log.warn("SLEEP: Webhook response not received - raising alert 40");
+          current.raiseAlert(40); // Webhook timeout (third priority)
+        }
+        
+        // Reset timer and proceed with disconnect despite incomplete operations
+        cloudSyncStartMs = 0;
+      }
+    } else {
+      // All operations complete - reset timer and proceed
+      Log.info("SLEEP: All cloud operations complete - ready to disconnect");
+      cloudSyncStartMs = 0;
+    }
+  } else {
+    // Not connected - reset timer
+    cloudSyncStartMs = 0;
   }
 
   // ********** Non-blocking disconnect + modem power-down **********
@@ -262,13 +341,41 @@ void handleSleepingState() {
   
   SystemSleepResult result = System.sleep(config);
   
-#ifdef DEBUG_SERIAL
-  waitFor(Serial.isConnected, 30000);  // Wait for Serial after wake so logs are visible
-#endif
+  // Clear any pending interrupts on wake pins after sleep to ensure clean state
+  // This is critical for proper interrupt handling after wake
+  pinMode(BUTTON_PIN, INPUT);    // Reset pin mode
+  pinMode(intPin, INPUT);         // Reset pin mode
   
+  // Resume hardware watchdog immediately after wake
   ab1805.resumeWDT();
+
+#ifdef DEBUG_SERIAL
+  // Photon2 USB serial needs time to re-enumerate after sleep.
+  // Must re-initialize before any Log.info() calls to avoid corrupted output.
+  Serial.begin();  // Re-initialize serial port
+  delay(500);     // Give USB time to re-enumerate
   
-  // Determine wake source
+  // Use blocking wait for serial connection - waitFor() is non-blocking
+  // and the device would go back to sleep before connection established
+  unsigned long serialWaitStart = millis();
+  while (!Serial.isConnected() && (millis() - serialWaitStart) < 30000) {
+    // Feed application watchdog during the wait to prevent reset
+    Particle.process();
+    delay(100);  // Blocking wait for serial connection
+  }
+  
+  if (Serial.isConnected()) {
+    delay(500);  // Extra settling time after connection
+    Log.info("Serial reconnected after %lu ms", (millis() - serialWaitStart));
+  } else {
+    Log.warn("Serial did not reconnect within 30s - continuing without serial");
+  }
+#endif // DEBUG_SERIAL
+
+  // Re-attach user button interrupt after sleep (sleep may have detached it)
+  attachInterrupt(BUTTON_PIN, userSwitchISR, FALLING);
+  userSwitchDetected = false;  // Clear any spurious flag
+
   // When both GPIO and timer wake are configured, the wake source detection can be
   // ambiguous. The explicit approach: if neither GPIO pin woke us, it's the timer.
   pin_t wakePin = result.wakeupPin();
@@ -301,7 +408,6 @@ void handleSleepingState() {
     // User button wake: go directly to CONNECTING_STATE.
     SensorManager::instance().onExitSleep();
     Log.info("WAKE: Button pressed - reason=SERVICE_REQUEST transitioning to CONNECTING_STATE");
-    userSwitchDetected = false;
     state = CONNECTING_STATE;
     return;
   } else {

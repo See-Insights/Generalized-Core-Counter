@@ -650,7 +650,7 @@ bool SensorManager::isItSafeToCharge() // Returns a true or false if the battery
 }
 
 void SensorManager::getSignalStrength() {
-  char signalStr[64];  // Declare outside platform-specific blocks
+  char signalStr[64] = {0};  // Initialize buffer to zeros to prevent garbage output
   
 #if HAL_PLATFORM_CELLULAR
   const char *radioTech[10] = {"Unknown",    "None",       "WiFi", "GSM",
@@ -668,7 +668,7 @@ void SensorManager::getSignalStrength() {
   // float qualityVal = sig.getQualityValue();
   float qualityPercentage = sig.getQuality();
 
-  snprintf(signalStr, sizeof(signalStr), "%s S:%2.0f%%, Q:%2.0f%% ",
+  snprintf(signalStr, sizeof(signalStr), "%s S:%2.0f%%, Q:%2.0f%%",
            radioTech[rat], strengthPercentage, qualityPercentage);
   Log.info(signalStr);
 #elif HAL_PLATFORM_WIFI
@@ -676,7 +676,7 @@ void SensorManager::getSignalStrength() {
   float strengthPercentage = sig.getStrength();
   float qualityPercentage = sig.getQuality();
   
-  snprintf(signalStr, sizeof(signalStr), "WiFi S:%2.0f%%, Q:%2.0f%% ",
+  snprintf(signalStr, sizeof(signalStr), "WiFi S:%2.0f%%, Q:%2.0f%%",
            strengthPercentage, qualityPercentage);
   Log.info(signalStr);
 #endif
