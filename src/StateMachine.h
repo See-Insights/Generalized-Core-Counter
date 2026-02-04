@@ -36,7 +36,6 @@ void userSwitchISR();
 extern const unsigned long stayAwakeLong;
 extern const unsigned long resetWait;
 extern const unsigned long maxOnlineWorkMs;
-extern const int wakeBoundary;
 extern unsigned long connectedStartMs;
 extern bool lastLowPowerMode;
 extern bool firstConnectionObserved;

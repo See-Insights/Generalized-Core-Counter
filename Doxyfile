@@ -2,7 +2,7 @@
 
 PROJECT_NAME           = "Generalized-Core-Counter"
 PROJECT_BRIEF          = "Particle-based generalized core counter firmware"
-PROJECT_NUMBER         = "3.20"
+PROJECT_NUMBER         = "3.21"
 
 # Where to put generated docs
 OUTPUT_DIRECTORY       = docs

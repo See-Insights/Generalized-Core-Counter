@@ -131,9 +131,7 @@ Three storage structures:
         "operatingMode": 0,
         "triggerMode": 0,
         "occupancyDebounceMs": 0,
-        "connectedReportingIntervalSec": 300,
-      "lowPowerReportingIntervalSec": 3600,
-      "connectAttemptBudgetSec": 300
+        "connectAttemptBudgetSec": 300
     }
 }
 ```

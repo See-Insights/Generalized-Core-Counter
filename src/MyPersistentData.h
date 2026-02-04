@@ -69,6 +69,21 @@ enum OperatingMode {
 	DISCONNECTED = 2   // Stay offline unless manually overridden
 };
 
+/**
+ * @brief Battery tier defines progressive power conservation levels
+ * 
+ * TIER_HEALTHY:    >70% SoC, normal operation (1x interval)
+ * TIER_CONSERVING: 50-70% SoC, moderate reduction (2x interval)
+ * TIER_CRITICAL:   30-50% SoC, aggressive reduction (4x interval)
+ * TIER_SURVIVAL:   <30% SoC, minimal operation (12x interval)
+ */
+enum BatteryTier {
+	TIER_HEALTHY    = 0,  // >70% - Normal operation
+	TIER_CONSERVING = 1,  // 50-70% - Moderate power saving
+	TIER_CRITICAL   = 2,  // 30-50% - Aggressive power saving
+	TIER_SURVIVAL   = 3   // <30% - Survival mode
+};
+
 // NOTE: TriggerMode has been deprecated in favor of using
 // CountingMode (COUNTING/OCCUPANCY/SCHEDULED) as the single
 // source of truth for behavioral mode. The legacy TriggerMode
@@ -162,11 +177,18 @@ public:
 		uint8_t countingMode;                             // 0=COUNTING, 1=OCCUPANCY, 2=SCHEDULED (time-based)
 		uint8_t operatingMode;                            // 0=CONNECTED, 1=LOW_POWER, 2=DISCONNECTED
 		uint32_t occupancyDebounceMs;                     // Milliseconds to wait before marking space as unoccupied (occupancy mode only)
-		uint16_t connectedReportingIntervalSec;           // Reporting interval in seconds when in CONNECTED mode
-		uint16_t lowPowerReportingIntervalSec;            // Reporting interval in seconds when in LOW_POWER mode
 		uint16_t connectAttemptBudgetSec;                 // Max seconds to spend attempting a cloud connect per wake
 		uint16_t cloudDisconnectBudgetSec;                // Max seconds to wait for cloud disconnect before error
 		uint16_t modemOffBudgetSec;                       // Max seconds to wait for modem power-down before error
+		
+		// ********** Battery-Aware Back-off Configuration **********
+		uint8_t currentBatteryTier;                       // Current battery tier (0=HEALTHY, 1=CONSERVING, 2=CRITICAL, 3=SURVIVAL)
+		uint8_t connectionAttemptCounter;                 // Counter for periodic deep connection attempts (0-3, resets to 0 after reaching 3)
+		
+		// ********** Test Mode Overrides **********
+		float testBatteryOverride;                        // Test mode: battery percentage override (-1.0 = disabled, 0-100 = override value)
+		uint16_t testConnectionDurationOverride;          // Test mode: connection duration override (0xFFFF = disabled, 0-999 = override value in seconds)
+		uint8_t testScenarioIndex;                        // Auto-cycle test mode: scenario index (0xFF = disabled, 0-4 = active scenario)
 
 	};
 
@@ -273,12 +295,6 @@ public:
 	uint32_t get_occupancyDebounceMs() const;
 	void set_occupancyDebounceMs(uint32_t value);
 
-	uint16_t get_connectedReportingIntervalSec() const;
-	void set_connectedReportingIntervalSec(uint16_t value);
-
-	uint16_t get_lowPowerReportingIntervalSec() const;
-	void set_lowPowerReportingIntervalSec(uint16_t value);
-
 	uint16_t get_connectAttemptBudgetSec() const;
 	void set_connectAttemptBudgetSec(uint16_t value);
 
@@ -288,7 +304,17 @@ public:
 	uint16_t get_modemOffBudgetSec() const;
 	void set_modemOffBudgetSec(uint16_t value);
 
+	uint8_t get_currentBatteryTier() const;
+	void set_currentBatteryTier(uint8_t value);
 
+	uint8_t get_connectionAttemptCounter() const;
+	void set_connectionAttemptCounter(uint8_t value);
+    float get_testBatteryOverride() const;
+    void set_testBatteryOverride(float value);
+    uint16_t get_testConnectionDurationOverride() const;
+    void set_testConnectionDurationOverride(uint16_t value);
+    uint8_t get_testScenarioIndex() const;
+    void set_testScenarioIndex(uint8_t value);
 	//Members here are internal only and therefore protected
 protected:
     /**

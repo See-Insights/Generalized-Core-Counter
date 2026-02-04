@@ -123,8 +123,6 @@ void sysStatusData::initialize() {
     sysStatus.set_countingMode(COUNTING);                                  // Default to counting mode
     sysStatus.set_operatingMode(CONNECTED);                                // Default to connected mode
     sysStatus.set_occupancyDebounceMs(0);                                  // Default 0 ms; only used in OCCUPANCY mode
-    sysStatus.set_connectedReportingIntervalSec(300);                      // Default 5 minutes when connected
-    sysStatus.set_lowPowerReportingIntervalSec(3600);                      // Default 1 hour when in low power
     sysStatus.set_connectAttemptBudgetSec(300);                            // Default 300s (5 minutes) max connect attempt per wake
     sysStatus.set_cloudDisconnectBudgetSec(15);                            // Default 15s max wait for cloud disconnect
     sysStatus.set_modemOffBudgetSec(30);                                   // Default 30s max wait for modem power-down
@@ -298,20 +296,6 @@ void sysStatusData::set_occupancyDebounceMs(uint32_t value) {
     setValue<uint32_t>(offsetof(SysData,occupancyDebounceMs), value);
 }
 
-uint16_t sysStatusData::get_connectedReportingIntervalSec() const {
-    return getValue<uint16_t>(offsetof(SysData,connectedReportingIntervalSec));
-}
-void sysStatusData::set_connectedReportingIntervalSec(uint16_t value) {
-    setValue<uint16_t>(offsetof(SysData,connectedReportingIntervalSec), value);
-}
-
-uint16_t sysStatusData::get_lowPowerReportingIntervalSec() const {
-    return getValue<uint16_t>(offsetof(SysData,lowPowerReportingIntervalSec));
-}
-void sysStatusData::set_lowPowerReportingIntervalSec(uint16_t value) {
-    setValue<uint16_t>(offsetof(SysData,lowPowerReportingIntervalSec), value);
-}
-
 uint16_t sysStatusData::get_connectAttemptBudgetSec() const {
     return getValue<uint16_t>(offsetof(SysData,connectAttemptBudgetSec));
 }
@@ -331,6 +315,41 @@ uint16_t sysStatusData::get_modemOffBudgetSec() const {
 }
 void sysStatusData::set_modemOffBudgetSec(uint16_t value) {
     setValue<uint16_t>(offsetof(SysData,modemOffBudgetSec), value);
+}
+
+uint8_t sysStatusData::get_currentBatteryTier() const {
+    return getValue<uint8_t>(offsetof(SysData,currentBatteryTier));
+}
+void sysStatusData::set_currentBatteryTier(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,currentBatteryTier), value);
+}
+
+uint8_t sysStatusData::get_connectionAttemptCounter() const {
+    return getValue<uint8_t>(offsetof(SysData,connectionAttemptCounter));
+}
+void sysStatusData::set_connectionAttemptCounter(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,connectionAttemptCounter), value);
+}
+
+float sysStatusData::get_testBatteryOverride() const {
+    return getValue<float>(offsetof(SysData,testBatteryOverride));
+}
+void sysStatusData::set_testBatteryOverride(float value) {
+    setValue<float>(offsetof(SysData,testBatteryOverride), value);
+}
+
+uint16_t sysStatusData::get_testConnectionDurationOverride() const {
+    return getValue<uint16_t>(offsetof(SysData,testConnectionDurationOverride));
+}
+void sysStatusData::set_testConnectionDurationOverride(uint16_t value) {
+    setValue<uint16_t>(offsetof(SysData,testConnectionDurationOverride), value);
+}
+
+uint8_t sysStatusData::get_testScenarioIndex() const {
+    return getValue<uint8_t>(offsetof(SysData,testScenarioIndex));
+}
+void sysStatusData::set_testScenarioIndex(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,testScenarioIndex), value);
 }
 
 // End of sysStatusData class

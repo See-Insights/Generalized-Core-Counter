@@ -71,8 +71,7 @@ Top-level sections:
     - `1` – OCCUPANCY (interrupt).
     - `2` – SCHEDULED (time-based).
   - `occupancyDebounceMs` (uint, 0–600000).
-  - `connectedReportingIntervalSec` (int, 60–86400).
-  - `lowPowerReportingIntervalSec` (int, 300–86400).
+  - `connectAttemptBudgetSec` (int, 30–900).
 - `power`
   - `solarPowerMode` (bool).
 - `messaging`
@@ -98,8 +97,7 @@ Published from the device as:
   - `countingMode` (0/1/2).
   - `operatingMode` (0/1/2).
   - `occupancyDebounceMs`.
-  - `connectedReportingIntervalSec`.
-  - `lowPowerReportingIntervalSec`.
+  - `connectAttemptBudgetSec`.
 - `firmware`
   - `version`.
   - `notes`.

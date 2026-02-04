@@ -70,6 +70,7 @@ void handleConnectingState() {
   static bool lastEnteredFromReporting = false;  // Whether we came from REPORTING_STATE
   static bool connectRequested = false;
   static bool postConnectDone = false;
+  static unsigned long budgetMs = 5UL * 60UL * 1000UL; // Connection timeout budget
 
   if (state != oldState) {
     publishStateTransition();
@@ -78,17 +79,46 @@ void handleConnectingState() {
     connectionStartTimeStamp = millis();
     connectRequested = false;
     postConnectDone = false;
+
+    // ********** Connection Budget with Periodic Deep Attempts **********
+    // Per Particle cellular docs: Must allow at least 5 minutes for IMSI cycling,
+    // and periodically allow 11 minutes for full modem reset (occurs at 10 min mark).
+    // Base budget: 300s (5 minutes) - adequate for normal connection + IMSI cycling
+    // Deep budget: 660s (11 minutes) - allows full modem reset periodically
+    
+    budgetMs = 5UL * 60UL * 1000UL; // Default 5 minutes
+    uint16_t configuredBudgetSec = sysStatus.get_connectAttemptBudgetSec();
+    
+    // Use ledger-configured budget if valid, ensuring minimum 120s per Particle docs
+    if (configuredBudgetSec >= 120 && configuredBudgetSec <= 900) {
+      budgetMs = (unsigned long)configuredBudgetSec * 1000UL;
+    } else if (configuredBudgetSec > 0 && configuredBudgetSec < 120) {
+      Log.warn("Configured budget %us below 120s minimum, using 300s default", configuredBudgetSec);
+      budgetMs = 5UL * 60UL * 1000UL;
+    }
+    
+    // Implement periodic deep attempts for full modem reset capability
+    uint8_t attemptCounter = sysStatus.get_connectionAttemptCounter();
+    float currentSoC = current.get_stateOfCharge();
+    bool allowDeepAttempt = (attemptCounter >= 3) || (currentSoC > 50.0f);
+    
+    if (allowDeepAttempt) {
+      // Every 4th attempt (counter 0-3, resets at 3) OR when battery >50%,
+      // allow 11 minutes for full modem reset
+      budgetMs = 11UL * 60UL * 1000UL;
+      if (attemptCounter >= 3) {
+        Log.info("Deep connection attempt #%d - allowing 11 min for modem reset", attemptCounter + 1);
+        sysStatus.set_connectionAttemptCounter(0);  // Reset counter after deep attempt
+      } else {
+        Log.info("Healthy battery (%.1f%%) - allowing 11 min connection budget", (double)currentSoC);
+      }
+    } else {
+      Log.trace("Normal connection attempt #%d - 5 min budget", attemptCounter + 1);
+    }
   }
 
   unsigned long elapsedMs = millis() - connectionStartTimeStamp;
   sysStatus.set_lastConnectionDuration(int(elapsedMs / 1000));
-
-  // Use ledger-configured connection budget; default to 5 minutes if not configured
-  unsigned long budgetMs = 5UL * 60UL * 1000UL; // Default 5 minutes
-  uint16_t budgetSec = sysStatus.get_connectAttemptBudgetSec();
-  if (budgetSec >= 30 && budgetSec <= 900) {
-    budgetMs = (unsigned long)budgetSec * 1000UL;
-  }
 
   if (!connectRequested) {
     // Log signal strength at start of connection attempt for field
@@ -111,6 +141,15 @@ void handleConnectingState() {
     if (!postConnectDone) {
       connectedStartMs = millis();
       sysStatus.set_lastConnection(Time.now());
+      
+      // Increment connection attempt counter for periodic deep attempts
+      // (unless we just did a deep attempt which already reset counter to 0)
+      uint8_t attemptCounter = sysStatus.get_connectionAttemptCounter();
+      if (attemptCounter < 3) {
+        sysStatus.set_connectionAttemptCounter(attemptCounter + 1);
+        Log.trace("Connection attempt counter: %d → %d", attemptCounter, attemptCounter + 1);
+      }
+      
       if (current.get_alertCode() == 31) {
         Log.info("Connection successful - clearing alert 31");
         current.set_alertCode(0);

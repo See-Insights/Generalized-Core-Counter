@@ -131,7 +131,6 @@ bool awaitingWebhookResponse = false; // True if we're waiting for webhook respo
 const unsigned long webhookResponseTimeoutMs = 20000; // 20 second timeout for webhook response
 
 // ********** Timing **********
-const int wakeBoundary = 1 * 3600;          // Default reporting boundary (1 hour); actual interval set via sysStatus.get_reportingBoundaryMin()
 const unsigned long resetWait = 30000;      // Error state dwell before reset
 
 void setup() {
@@ -189,6 +188,23 @@ void setup() {
   sysStatus.setup();    // Initialize persistent storage
   sensorConfig.setup(); // Initialize the sensor configuration
   current.setup();      // Initialize the current status data
+
+  // Initialize test mode overrides to disabled state
+  // Use -1.0f for battery (invalid SoC) and 0xFFFF for connection duration (max uint16_t)
+  // to indicate test mode is disabled. These can be set to valid values to enable test mode.
+  if (sysStatus.get_testBatteryOverride() < -1.0f || sysStatus.get_testBatteryOverride() > 100.0f) {
+    sysStatus.set_testBatteryOverride(-1.0f);  // Disabled
+  }
+  if (sysStatus.get_testConnectionDurationOverride() == 0) {
+    sysStatus.set_testConnectionDurationOverride(0xFFFF);  // Disabled (max uint16_t)
+  }
+  
+  // Auto-cycling test mode: uncomment to enable automatic tier testing
+  // Will cycle through HEALTHY(80%) → CONSERVING(60%) → CRITICAL(40%) → SURVIVAL(25%) → Real battery
+  // sysStatus.set_testScenarioIndex(0);  // Start from scenario 0
+  
+  // Uncomment the following line to run unit tests on boot
+  // Cloud::testBatteryBackoffLogic();
 
   // Testing: clear sticky sleep-failure alert to avoid reset/deep-power loops.
   if (current.get_alertCode() == 16) {

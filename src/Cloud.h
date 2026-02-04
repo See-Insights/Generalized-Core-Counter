@@ -216,6 +216,59 @@ public:
      */
     bool areLedgersSynced() const;
 
+    /**
+     * @brief Calculate battery tier from current state of charge
+     * 
+     * @details Implements 4-tier system with hysteresis to prevent tier thrashing:
+     *          - TIER_HEALTHY (0):    >70% SoC (recover at >75%)
+     *          - TIER_CONSERVING (1): 50-70% SoC (recover at >55%)
+     *          - TIER_CRITICAL (2):   30-50% SoC (recover at >35%)
+     *          - TIER_SURVIVAL (3):   <30% SoC
+     * 
+     * @param currentSoC Current state of charge percentage (0-100)
+     * @return BatteryTier enum value (0-3)
+     */
+    static BatteryTier calculateBatteryTier(float currentSoC);
+
+    /**
+     * @brief Calculate connection interval multiplier based on battery tier
+     * 
+     * @details Returns multiplier to apply to base reportingInterval:
+     *          - TIER_HEALTHY: 1x (no change)
+     *          - TIER_CONSERVING: 2x (half connections per day)
+     *          - TIER_CRITICAL: 4x (quarter connections per day)
+     *          - TIER_SURVIVAL: 12x (e.g., 1hr base → 12hr, 30min base → 6hr)
+     * 
+     * @param tier Current battery tier
+     * @return Interval multiplier (1, 2, 4, or 12)
+     */
+    static uint16_t getIntervalMultiplier(BatteryTier tier);
+
+    /**
+     * @brief Evaluate connection history and return backoff multiplier
+     * 
+     * @details Analyzes lastConnectionDuration to determine location quality:
+     *          - Fast (<60s): 1.0x (no additional backoff)
+     *          - Normal (60-180s): 1.0x (no additional backoff)
+     *          - Slow (180-300s): 1.5x (additional backoff)
+     *          - Problem (>300s or failed): 2.0x (strong backoff)
+     * 
+     * @param lastDurationSec Last connection duration in seconds (0 = failed)
+     * @return Backoff multiplier (1.0, 1.5, or 2.0)
+     */
+    static float getConnectionBackoffMultiplier(uint16_t lastDurationSec);
+
+    /**
+     * @brief Unit test function to validate battery-aware backoff calculations
+     * 
+     * @details Iterates through all combinations of battery levels and connection durations,
+     *          printing the calculated tier, multipliers, and effective intervals.
+     *          Use this to verify the logic produces expected results across all scenarios.
+     * 
+     * Call via uncommenting in setup() or from a test mode.
+     */
+    static void testBatteryBackoffLogic();
+
 private:
     
     /**

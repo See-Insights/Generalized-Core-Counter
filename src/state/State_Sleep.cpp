@@ -290,8 +290,8 @@ void handleSleepingState() {
   } else {
     // Within opening hours, align wake to the reporting boundary.
     // Add 1 second margin to ensure we wake slightly after the boundary.
-    if (Time.isValid() && wakeBoundary > 0) {
-      int boundary = wakeBoundary;
+    if (Time.isValid() && intervalSec > 0) {
+      int boundary = (int)intervalSec;
       time_t now = Time.now();
       int offset = (int)(now % boundary);
       int aligned = boundary - offset;

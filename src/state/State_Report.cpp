@@ -83,12 +83,88 @@ void handleReportingState() {
     }
   }
 
-  // ********** Connectivity Decision **********
-  // In low-power mode, connect on every scheduled report to drain queue.
-  // User can control report frequency via reportingIntervalSec.
+  // ********** Connectivity Decision with Battery-Aware Back-off **********
+  // Instead of connecting on every report, implement progressive back-off
+  // based on battery tier and connection history to extend operational life
+  // in remote solar deployments with poor charging conditions.
+  
   if (!Particle.connected()) {
-    Log.info("REPORTING: Not connected - reason=SCHEDULED_REPORT transitioning to CONNECTING_STATE");
-    state = CONNECTING_STATE;
+    // ********** Auto-Cycling Test Mode **********
+    // Automatically cycle through test scenarios on each report:
+    // 0: 80% (HEALTHY), 1: 60% (CONSERVING), 2: 40% (CRITICAL), 3: 25% (SURVIVAL), 4: Real battery
+    uint8_t scenarioIndex = sysStatus.get_testScenarioIndex();
+    if (scenarioIndex != 0xFF) {
+      const float testBatteryValues[] = {80.0f, 60.0f, 40.0f, 25.0f, -1.0f};
+      const char* scenarioNames[] = {"HEALTHY tier test", "CONSERVING tier test", "CRITICAL tier test", "SURVIVAL tier test", "Real battery"};
+      
+      if (scenarioIndex < 5) {
+        float batteryOverride = testBatteryValues[scenarioIndex];
+        sysStatus.set_testBatteryOverride(batteryOverride);
+        Log.info("AUTO-TEST: Scenario %d - %s (battery=%.1f%%)", scenarioIndex, scenarioNames[scenarioIndex], (double)batteryOverride);
+        
+        // Advance to next scenario for next cycle
+        scenarioIndex++;
+        if (scenarioIndex >= 5) {
+          scenarioIndex = 0xFF;  // Done with all scenarios
+          Log.info("AUTO-TEST: Completed all scenarios - disabling auto-test mode");
+        }
+        sysStatus.set_testScenarioIndex(scenarioIndex);
+      }
+    }
+    
+    // Calculate current battery tier with hysteresis to prevent thrashing
+    // Use test override if set (>= 0), otherwise use actual battery level
+    float testBatteryOverride = sysStatus.get_testBatteryOverride();
+    float currentSoC = (testBatteryOverride >= 0.0f) ? testBatteryOverride : current.get_stateOfCharge();
+    
+    if (testBatteryOverride >= 0.0f && sysStatus.get_testScenarioIndex() == 0xFF) {
+      Log.info("TEST MODE: Using battery override = %.1f%%", (double)testBatteryOverride);
+    }
+    
+    BatteryTier newTier = Cloud::calculateBatteryTier(currentSoC);
+    uint8_t prevTierValue = sysStatus.get_currentBatteryTier();
+    
+    // Log tier transitions for field diagnostics
+    if (newTier != prevTierValue) {
+      const char* tierNames[] = {"HEALTHY", "CONSERVING", "CRITICAL", "SURVIVAL"};
+      const char* prevName = (prevTierValue < 4) ? tierNames[prevTierValue] : "UNKNOWN";
+      const char* newName = tierNames[newTier];
+      Log.info("Battery tier transition: %s → %s (SoC=%.1f%%)", prevName, newName, (double)currentSoC);
+      sysStatus.set_currentBatteryTier(static_cast<uint8_t>(newTier));
+    }
+    
+    // Calculate effective interval based on tier multiplier only
+    // Connection timing is boundary-aligned, not elapsed-time based
+    uint16_t baseInterval = sysStatus.get_reportingInterval();
+    uint16_t tierMultiplier = Cloud::getIntervalMultiplier(newTier);
+    uint32_t effectiveInterval = (uint32_t)baseInterval * tierMultiplier;
+    
+    // Check if current time is aligned to the effective interval boundary
+    // Allow 30 second tolerance for timer jitter and processing overhead
+    time_t offset = now % effectiveInterval;
+    bool isAligned = (offset <= 30) || (offset >= effectiveInterval - 30);
+    
+    const char* tierName = (newTier == TIER_HEALTHY ? "HEALTHY" : 
+                            newTier == TIER_CONSERVING ? "CONSERVING" :
+                            newTier == TIER_CRITICAL ? "CRITICAL" : "SURVIVAL");
+    
+    if (isAligned) {
+      Log.info("REPORTING: Connection due - boundary aligned tier=%s interval=%us (base=%u x %u) offset=%lus",
+               tierName,
+               (unsigned)effectiveInterval,
+               (unsigned)baseInterval,
+               (unsigned)tierMultiplier,
+               (unsigned long)offset);
+      state = CONNECTING_STATE;
+    } else {
+      time_t nextBoundary = effectiveInterval - offset;
+      Log.info("REPORTING: Connection deferred - not aligned tier=%s interval=%us offset=%lus next_in=%lus",
+               tierName,
+               (unsigned)effectiveInterval,
+               (unsigned long)offset,
+               (unsigned long)nextBoundary);
+      state = IDLE_STATE;
+    }
   } else {
     state = IDLE_STATE;
   }
