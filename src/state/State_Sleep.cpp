@@ -47,7 +47,7 @@ void handleSleepingState() {
   // If a ledger update (or time progression) moves the park into OPEN hours
   // while we are in SLEEPING_STATE, abort sleeping immediately in CONNECTED
   // mode so we stay awake/connected and resume counting.
-  if (Time.isValid() && sysStatus.get_operatingMode() == CONNECTED && isWithinOpenHours()) {
+  if (Time.isValid() && sysStatus.get_connectionMode() == CONNECTED && isWithinOpenHours()) {
     ensureSensorEnabled("SLEEP abort: CONNECTED+OPEN");
     state = IDLE_STATE;
     return;
@@ -185,7 +185,7 @@ void handleSleepingState() {
     bool stillOn = Particle.connected() || isRadioPoweredOn();
     if (stillOn) {
       if (disconnectRequestStartMs != 0 && (millis() - disconnectRequestStartMs) > budgetMs) {
-        if (sysStatus.get_operatingMode() != CONNECTED) {
+        if (sysStatus.get_connectionMode() != CONNECTED) {
           Log.warn("SLEEP: disconnect/modem-off exceeded budget (%lu ms) - continuing to sleep",
                    (unsigned long)(millis() - disconnectRequestStartMs));
           ignoreDisconnectFailure = true;
@@ -330,14 +330,42 @@ void handleSleepingState() {
   // NO AB1805 alarms - AB1805 is only used for watchdog + RTC time sync.
   // This approach works reliably on Photon2!
   
-  Log.info("Entering ULTRA_LOW_POWER sleep for %d seconds (wakes at boundary or on GPIO)", wakeInSeconds);
+  // In INTERMITTENT_KEEP_ALIVE mode during open hours, use network standby
+  // to avoid rapid reconnects that could trigger carrier blacklisting.
+  // This is essential for occupancy sensors with frequent state changes.
+  bool useNetworkStandby = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) && 
+                           isWithinOpenHours();
+  
+#if HAL_PLATFORM_CELLULAR
+  // On cellular devices, only use standby if modem is powered on
+  useNetworkStandby = useNetworkStandby && !Cellular.isOff();
+#endif
+  
+  if (useNetworkStandby) {
+    Log.info("Entering ULTRA_LOW_POWER sleep with NETWORK STANDBY for %d seconds (occupancy mode)", wakeInSeconds);
+  } else {
+    Log.info("Entering ULTRA_LOW_POWER sleep for %d seconds (wakes at boundary or on GPIO)", wakeInSeconds);
+  }
   
   ab1805.stopWDT();
   
   config.mode(SystemSleepMode::ULTRA_LOW_POWER)
     .gpio(BUTTON_PIN, CHANGE)    // Service button wake
-    .gpio(intPin, RISING)         // PIR sensor wake (active HIGH on detect)
-    .duration(wakeInSeconds * 1000L);  // Timer-based wake at reporting boundary
+    .gpio(intPin, RISING);        // PIR sensor wake (active HIGH on detect)
+    
+  // Add network standby for occupancy mode to avoid reconnection delays
+  // Note: Network standby is only supported/needed on cellular devices to prevent
+  // carrier blacklisting. WiFi reconnection is already fast enough (~2-5s).
+  if (useNetworkStandby) {
+#if HAL_PLATFORM_CELLULAR
+    // Keep cellular modem in low-power standby so we can quickly reconnect
+    // when occupancy changes. This prevents 30-60s reconnection overhead and
+    // potential carrier blacklisting from rapid disconnect/reconnect cycles.
+    config.network(NETWORK_INTERFACE_CELLULAR, SystemSleepNetworkFlag::INACTIVE_STANDBY);
+#endif
+  }
+  
+  config.duration(wakeInSeconds * 1000L);  // Timer-based wake at reporting boundary
   
   SystemSleepResult result = System.sleep(config);
   
@@ -428,7 +456,7 @@ void handleSleepingState() {
 
       // In CONNECTED operating mode, the device should reconnect at the
       // start of open hours so it can resume normal connected behavior.
-      if (sysStatus.get_operatingMode() == CONNECTED && !Particle.connected()) {
+      if (sysStatus.get_connectionMode() == CONNECTED && !Particle.connected()) {
         Log.info("WAKE: CONNECTED mode + OPEN hours - reason=MAINTAIN_CONNECTION transitioning to CONNECTING_STATE");
         state = CONNECTING_STATE;
         return;
@@ -441,13 +469,13 @@ void handleSleepingState() {
     // detection event so that the motion that woke the device is counted
     // even if the ISR flag did not survive ULTRA_LOW_POWER sleep.
     if (pirWake) {
-      if (sysStatus.get_countingMode() == COUNTING) {
+      if (sysStatus.get_sensorMode() == COUNTING) {
         current.set_hourlyCount(current.get_hourlyCount() + 1);
         current.set_dailyCount(current.get_dailyCount() + 1);
         current.set_lastCountTime(Time.now());
         Log.info("Count detected from PIR wake - Hourly: %d, Daily: %d",
                  current.get_hourlyCount(), current.get_dailyCount());
-      } else if (sysStatus.get_countingMode() == OCCUPANCY) {
+      } else if (sysStatus.get_sensorMode() == OCCUPANCY) {
         if (!current.get_occupied()) {
           current.set_occupied(true);
           current.set_occupancyStartTime(Time.now());
@@ -492,10 +520,10 @@ void handleSleepingState() {
       }
     }
 
-    // If PIR woke us in LOW_POWER or DISCONNECTED mode and no report is needed,
+    // If PIR woke us in INTERMITTENT or DISCONNECTED mode and no report is needed,
     // return immediately to sleep. This check comes AFTER opportunistic reporting
     // so overdue reports are not missed.
-    if (pirWake && sysStatus.get_operatingMode() != CONNECTED) {
+    if (pirWake && sysStatus.get_connectionMode() != CONNECTED) {
       state = SLEEPING_STATE;
       return;
     }

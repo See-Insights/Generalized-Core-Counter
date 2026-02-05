@@ -66,6 +66,13 @@ void handleOccupancyMode() {
 
       Log.info("Space now OCCUPIED at %s", Time.timeStr().c_str());
       digitalWrite(BLUE_LED, HIGH); // Visual indicator
+      
+      // In INTERMITTENT_KEEP_ALIVE mode, report immediately on occupancy state changes
+      // This allows dashboard to show real-time occupancy transitions
+      if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
+        Log.info("Occupancy change detected - triggering immediate report");
+        state = REPORTING_STATE;
+      }
     }
 
     // Update last event time (resets debounce timer)
@@ -87,6 +94,7 @@ void handleOccupancyMode() {
  * @details If space is occupied and debounce timeout has expired without
  *          new sensor events, mark space as unoccupied.
  *          Accumulates total occupied time for daily reporting.
+ *          Triggers immediate reporting on state change for DISCONNECTED_KEEP_ALIVE mode.
  */
 void updateOccupancyState() {
   if (!current.get_occupied()) {
@@ -113,5 +121,12 @@ void updateOccupancyState() {
              sessionDuration, totalOccupied);
 
     digitalWrite(BLUE_LED, LOW); // Turn off visual indicator
+    
+    // In INTERMITTENT_KEEP_ALIVE mode, report immediately on occupancy state changes
+    // This allows dashboard to show real-time occupancy transitions
+    if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
+      Log.info("Occupancy change detected - triggering immediate report");
+      state = REPORTING_STATE;
+    }
   }
 }

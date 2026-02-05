@@ -44,29 +44,58 @@
 
 // *************** Operating Mode Enumerations ***************
 /**
- * @brief Counting mode defines how the device processes sensor events
+ * @brief Sensor mode defines how the device processes sensor data
  * 
- * COUNTING:   Interrupt-driven event counting.
- * OCCUPANCY:  Interrupt-driven occupied/unoccupied tracking.
- * SCHEDULED:  Non-interrupt, time-based sampling.
+ * COUNTING:     Interrupt-driven event counting.
+ * OCCUPANCY:    Interrupt-driven occupied/unoccupied state tracking.
+ * MEASUREMENT:  Analog readings and threshold-based reporting.
  */
-enum CountingMode {
-	COUNTING   = 0,  // Count each detection event (interrupt-driven)
-	OCCUPANCY = 1,  // Track occupied/unoccupied state with debounce (interrupt-driven)
-	SCHEDULED = 2   // Time-based polling (non-interrupt)
+enum SensorMode {
+	COUNTING     = 0,  // Count each detection event
+	OCCUPANCY    = 1,  // Track occupied/unoccupied state
+	MEASUREMENT  = 2   // Analog sensor readings
 };
 
 /**
- * @brief Operating mode defines power and connectivity behavior
+ * @brief Connection mode defines power and connectivity behavior
  * 
- * CONNECTED:     Device stays connected to cloud, reports frequently.
- * LOW_POWER:     Device disconnects between reports to save battery.
- * DISCONNECTED:  Device never auto-connects (test / bench mode).
+ * CONNECTED:                Device stays connected to cloud, reports frequently.
+ * INTERMITTENT:             Device disconnects between reports to save battery.
+ * DISCONNECTED:             Device never auto-connects (test / bench mode).
+ * INTERMITTENT_KEEP_ALIVE:  During open hours, maintain network standby for fast reconnects.
+ *                           Used for occupancy sensors with frequent state changes.
  */
-enum OperatingMode {
-	CONNECTED    = 0,  // Always connected, frequent reporting
-	LOW_POWER    = 1,  // Disconnect and sleep between reports
-	DISCONNECTED = 2   // Stay offline unless manually overridden
+enum ConnectionMode {
+	CONNECTED               = 0,  // Always connected, frequent reporting
+	INTERMITTENT            = 1,  // Disconnect and sleep between reports
+	DISCONNECTED            = 2,  // Stay offline unless manually overridden
+	INTERMITTENT_KEEP_ALIVE = 3   // Network standby during open hours
+};
+
+/**
+ * @brief Reporting mode defines what triggers a report
+ * 
+ * SCHEDULED:              Time-based reporting at fixed intervals.
+ * ON_CHANGE:              Report when state changes (occupancy, threshold crossing).
+ * THRESHOLD:              Report when sensor value crosses threshold.
+ * SCHEDULED_OR_THRESHOLD: Report on either schedule OR threshold (whichever comes first).
+ */
+enum ReportingMode {
+	SCHEDULED              = 0,  // Time-based reporting
+	ON_CHANGE              = 1,  // State change triggers
+	THRESHOLD              = 2,  // Threshold crossing
+	SCHEDULED_OR_THRESHOLD = 3   // Either condition triggers
+};
+
+/**
+ * @brief Sampling mode defines how sensor is read
+ * 
+ * INTERRUPT:  Hardware interrupt-driven (event-driven).
+ * POLLING:    Periodic timer-based sampling.
+ */
+enum SamplingMode {
+	INTERRUPT = 0,  // Hardware interrupt-driven
+	POLLING   = 1   // Periodic timer-based
 };
 
 /**
@@ -84,10 +113,7 @@ enum BatteryTier {
 	TIER_SURVIVAL   = 3   // <30% - Survival mode
 };
 
-// NOTE: TriggerMode has been deprecated in favor of using
-// CountingMode (COUNTING/OCCUPANCY/SCHEDULED) as the single
-// source of truth for behavioral mode. The legacy TriggerMode
-// enum and associated storage have been removed.
+
 
 /**
  * This class is a singleton; you do not create one as a global, on the stack, or with new.
@@ -170,13 +196,16 @@ public:
 		uint16_t reportingInterval;                       // How often do we report in to the Particle cloud - in seconds
 		bool disconnectedMode;                            // Are we in disconnected mode - this is used to prevent the device from trying to connect to the Particle cloud - for Development and testing purposes
 		bool serialConnected;							  // Is the serial port connected - used to determine if we should wait for a serial connection before starting the device
+		uint16_t verboseTimeoutMin;                       // Minutes before verbose mode auto-disables (0 = no timeout)
+		time_t verboseModeStartTime;                      // Timestamp when verbose mode was enabled (0 = not active)
 		time_t lastDailyCleanup;                           // Last time dailyCleanup() successfully ran
 		time_t lastTimeSync;                               // Last time we synced time from Particle cloud
 		
 		// ********** Operating Mode Configuration **********
-		uint8_t countingMode;                             // 0=COUNTING, 1=OCCUPANCY, 2=SCHEDULED (time-based)
-		uint8_t operatingMode;                            // 0=CONNECTED, 1=LOW_POWER, 2=DISCONNECTED
-		uint32_t occupancyDebounceMs;                     // Milliseconds to wait before marking space as unoccupied (occupancy mode only)
+		uint8_t sensorMode;                               // 0=COUNTING, 1=OCCUPANCY, 2=MEASUREMENT
+		uint8_t connectionMode;                           // 0=CONNECTED, 1=INTERMITTENT, 2=DISCONNECTED, 3=INTERMITTENT_KEEP_ALIVE
+		uint8_t reportingMode;                            // 0=SCHEDULED, 1=ON_CHANGE, 2=THRESHOLD, 3=SCHEDULED_OR_THRESHOLD
+		uint8_t samplingMode;                             // 0=INTERRUPT, 1=POLLING
 		uint16_t connectAttemptBudgetSec;                 // Max seconds to spend attempting a cloud connect per wake
 		uint16_t cloudDisconnectBudgetSec;                // Max seconds to wait for cloud disconnect before error
 		uint16_t modemOffBudgetSec;                       // Max seconds to wait for modem power-down before error
@@ -286,14 +315,23 @@ public:
 
 	// ********** Operating Mode Configuration Get/Set Functions **********
 	
-	uint8_t get_countingMode() const;
-	void set_countingMode(uint8_t value);
+	uint8_t get_sensorMode() const;
+	void set_sensorMode(uint8_t value);
 
-	uint8_t get_operatingMode() const;
-	void set_operatingMode(uint8_t value);
+	uint8_t get_connectionMode() const;
+	void set_connectionMode(uint8_t value);
 
-	uint32_t get_occupancyDebounceMs() const;
-	void set_occupancyDebounceMs(uint32_t value);
+	uint8_t get_reportingMode() const;
+	void set_reportingMode(uint8_t value);
+
+	uint8_t get_samplingMode() const;
+	void set_samplingMode(uint8_t value);
+
+	uint16_t get_verboseTimeoutMin() const;
+	void set_verboseTimeoutMin(uint16_t value);
+
+	time_t get_verboseModeStartTime() const;
+	void set_verboseModeStartTime(time_t value);
 
 	uint16_t get_connectAttemptBudgetSec() const;
 	void set_connectAttemptBudgetSec(uint16_t value);
@@ -410,10 +448,12 @@ public:
 		// Your fields go here. Once you've added a field you cannot add fields
 		// (except at the end), insert fields, remove fields, change size of a field.
 		// Doing so will cause the data to be corrupted!
-		// You may want to keep a version number in your data.
-		uint16_t threshold1;                            // Sensor-specific threshold 1 (e.g., confidence, distance)
-		uint16_t threshold2;                            // Sensor-specific threshold 2 (e.g., secondary parameter)
-		uint16_t pollingRate;                           // How often to poll the sensor in seconds - a value of zero means no polling
+		// Generic sensor configuration - sensor-specific meaning
+		uint8_t type;                                   // Sensor type (1=PIR, 2=Analog, 3=Ultrasonic, etc.)
+		uint32_t setting1;                              // Sensor-specific setting 1 (e.g., PIR debounce time in ms)
+		uint32_t setting2;                              // Sensor-specific setting 2
+		uint32_t setting3;                              // Sensor-specific setting 3
+		uint32_t setting4;                              // Sensor-specific setting 4
 	};
 	SensorData sensorData;
 
@@ -442,12 +482,20 @@ public:
 	 */
 
 	
-	uint16_t get_threshold1() const;
-	void set_threshold1(uint16_t value);
+	uint8_t get_sensorType() const;
+	void set_sensorType(uint8_t value);
 
-	uint16_t get_threshold2() const;
-	void set_threshold2(uint16_t value);	uint16_t get_pollingRate() const;
-	void set_pollingRate(uint16_t value);
+	uint32_t get_sensorSetting1() const;
+	void set_sensorSetting1(uint32_t value);
+
+	uint32_t get_sensorSetting2() const;
+	void set_sensorSetting2(uint32_t value);
+
+	uint32_t get_sensorSetting3() const;
+	void set_sensorSetting3(uint32_t value);
+
+	uint32_t get_sensorSetting4() const;
+	void set_sensorSetting4(uint32_t value);
 
 		//Members here are internal only and therefore protected
 protected:

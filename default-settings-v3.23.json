@@ -1,0 +1,28 @@
+{
+  "messaging": {
+    "disconnectedMode": false,
+    "serial": false,
+    "verboseMode": false,
+    "verboseTimeoutMin": 60
+  },
+  "sensor": {
+    "type": 1,
+    "setting1": 5000,
+    "setting2": 0,
+    "setting3": 0,
+    "setting4": 0
+  },
+  "timing": {
+    "closeHour": 22,
+    "openHour": 6,
+    "reportingIntervalSec": 3600,
+    "timezone": "SGT-8",
+    "connectAttemptBudgetSec": 300
+  },
+  "modes": {
+    "sensorMode": 0,
+    "connectionMode": 0,
+    "reportingMode": 0,
+    "samplingMode": 0
+  }
+}

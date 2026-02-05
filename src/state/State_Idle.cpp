@@ -51,7 +51,7 @@ void handleIdleState() {
   // In CONNECTED operating mode, the device stays awake during park open hours.
   // When the park is closed, it should disconnect, power down the sensor, and
   // deep-sleep until the next opening time.
-  if (Time.isValid() && sysStatus.get_operatingMode() == CONNECTED) {
+  if (Time.isValid() && sysStatus.get_connectionMode() == CONNECTED) {
     if (!isWithinOpenHours()) {
       Log.info("CONNECTED mode: park CLOSED - transitioning to SLEEPING_STATE for overnight sleep");
       state = SLEEPING_STATE;
@@ -64,7 +64,7 @@ void handleIdleState() {
   // ********** Scheduled Mode Sampling **********
   // SCHEDULED mode uses time-based sampling (non-interrupt).
   // Interrupt-driven modes (COUNTING/OCCUPANCY) are handled centrally in main loop().
-  if (sysStatus.get_countingMode() == SCHEDULED) {
+  if (sysStatus.get_sensorMode() == MEASUREMENT) {
     if (Time.isValid()) {
       static time_t lastScheduledSample = 0;
       uint16_t intervalSec = sysStatus.get_reportingInterval();
@@ -118,8 +118,8 @@ void handleIdleState() {
   }
 
   // ********** Power Management **********
-  // In LOW_POWER (1) or DISCONNECTED (2) modes, manage connection lifecycle.
-  if (sysStatus.get_operatingMode() != CONNECTED) {
+  // In INTERMITTENT (1) or DISCONNECTED (2) modes, manage connection lifecycle.
+  if (sysStatus.get_connectionMode() != CONNECTED) {
     // In LOW_POWER or DISCONNECTED modes, enforce maximum connected time.
     // Use connectAttemptBudgetSec as the max connected duration.
     if (Particle.connected() && connectedStartMs != 0) {
@@ -138,7 +138,7 @@ void handleIdleState() {
     }
 
     // In CONNECTED mode during open hours, never auto-sleep.
-    if (Time.isValid() && sysStatus.get_operatingMode() == CONNECTED && isWithinOpenHours()) {
+    if (Time.isValid() && sysStatus.get_connectionMode() == CONNECTED && isWithinOpenHours()) {
       return;
     }
 

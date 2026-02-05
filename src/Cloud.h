@@ -123,13 +123,6 @@ private:
      * @return true if successful
      */
     bool applyTimingConfig();
-
-    /**
-     * @brief Apply power configuration section
-     * 
-     * @return true if successful
-     */
-    bool applyPowerConfig();
     
     /**
      * @brief Callback when default-settings ledger syncs

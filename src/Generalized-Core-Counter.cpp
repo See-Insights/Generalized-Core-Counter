@@ -189,6 +189,17 @@ void setup() {
   sensorConfig.setup(); // Initialize the sensor configuration
   current.setup();      // Initialize the current status data
 
+  // Configure serial logging based on serial flag
+  // When serial is connected: INFO level for development/debugging
+  // When serial is not connected: ERROR level only to reduce overhead
+  if (sysStatus.get_serialConnected()) {
+    Serial.begin(9600);
+    Log.level(LOG_LEVEL_INFO);
+    Log.info("Serial logging enabled (LOG_LEVEL_INFO)");
+  } else {
+    Log.level(LOG_LEVEL_ERROR);
+  }
+
   // Initialize test mode overrides to disabled state
   // Use -1.0f for battery (invalid SoC) and 0xFFFF for connection duration (max uint16_t)
   // to indicate test mode is disabled. These can be set to valid values to enable test mode.
@@ -327,9 +338,10 @@ void setup() {
   // ===== SENSOR ABSTRACTION LAYER =====
   // Initialize the sensor based on configuration using *local* time. This
   // runs after timezone configuration so open/close checks are correct.
-  Log.info("Initial operatingMode: %d (%s)", sysStatus.get_operatingMode(),
-           sysStatus.get_operatingMode() == 0 ? "CONNECTED" :
-           sysStatus.get_operatingMode() == 1 ? "LOW_POWER" : "DISCONNECTED");
+  Log.info("Initial connectionMode: %d (%s)", sysStatus.get_connectionMode(),
+           sysStatus.get_connectionMode() == 0 ? "CONNECTED" :
+           sysStatus.get_connectionMode() == 1 ? "INTERMITTENT" :
+           sysStatus.get_connectionMode() == 2 ? "DISCONNECTED" : "INTERMITTENT_KEEP_ALIVE");
 
   if (!SensorManager::instance().isSensorReady()) {
     if (isWithinOpenHours()) {
@@ -429,11 +441,11 @@ void loop() {
   // Service sensor interrupts regardless of current state. This ensures
   // counts are captured even during long-running operations like cellular
   // connection attempts (which can take minutes) or firmware updates.
-  // SCHEDULED mode is time-based (handled in IDLE only), not interrupt-driven.
-  uint8_t countingMode = sysStatus.get_countingMode();
-  if (countingMode == COUNTING) {
+  // MEASUREMENT mode is time-based (handled in IDLE only), not interrupt-driven.
+  uint8_t sensorMode = sysStatus.get_sensorMode();
+  if (sensorMode == COUNTING) {
     handleCountingMode();  // Count each sensor event
-  } else if (countingMode == OCCUPANCY) {
+  } else if (sensorMode == OCCUPANCY) {
     handleOccupancyMode(); // Track occupied/unoccupied state
   }
 
@@ -551,24 +563,48 @@ void publishData() {
     battState = 0;
   }
 
-  // Correct Ubidots webhook JSON structure
-  snprintf(data, sizeof(data),
-           "{\"hourly\":%i, \"daily\":%i, \"battery\":%4.2f,\"key1\":\"%s\", \"temp\":%4.2f, \"resets\":%i, \"alerts\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
-           current.get_hourlyCount(),
-           current.get_dailyCount(),
-           current.get_stateOfCharge(),
-           batteryContext[battState],
-           current.get_internalTempC(),
-           sysStatus.get_resetCount(),
-           current.get_alertCode(),
-           sysStatus.get_lastConnectionDuration(),
-           timeStampValue);
+  uint8_t sensorMode = sysStatus.get_sensorMode();
 
-  // Explicitly log the counts and alert code used in this report
-  Log.info("Report payload: hourly=%d daily=%d alert=%d",
-           (int)current.get_hourlyCount(),
-           (int)current.get_dailyCount(),
-           (int)current.get_alertCode());
+  // Build webhook payload based on sensor mode
+  if (sensorMode == OCCUPANCY) {
+    // Occupancy mode webhook format
+    snprintf(data, sizeof(data),
+             "{\"occupancy\":\"%s\",\"dailyoccupancy\":%lu,\"battery\":{\"value\":%4.2f,\"context\":{\"key1\":\"%s\"}},\"temp\":%4.2f,\"alerts\":%i,\"resets\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
+             current.get_occupied() ? "occupied" : "unoccupied",
+             (unsigned long)current.get_totalOccupiedSeconds(),
+             current.get_stateOfCharge(),
+             batteryContext[battState],
+             current.get_internalTempC(),
+             current.get_alertCode(),
+             sysStatus.get_resetCount(),
+             sysStatus.get_lastConnectionDuration(),
+             timeStampValue);
+
+    // Log occupancy state and total seconds
+    Log.info("Report payload: occupancy=%s totalSeconds=%lu alert=%d",
+             current.get_occupied() ? "occupied" : "unoccupied",
+             (unsigned long)current.get_totalOccupiedSeconds(),
+             (int)current.get_alertCode());
+  } else {
+    // Counting mode webhook format (original format)
+    snprintf(data, sizeof(data),
+             "{\"hourly\":%i,\"daily\":%i,\"battery\":%4.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"resets\":%i,\"alerts\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
+             current.get_hourlyCount(),
+             current.get_dailyCount(),
+             current.get_stateOfCharge(),
+             batteryContext[battState],
+             current.get_internalTempC(),
+             sysStatus.get_resetCount(),
+             current.get_alertCode(),
+             sysStatus.get_lastConnectionDuration(),
+             timeStampValue);
+
+    // Explicitly log the counts and alert code used in this report
+    Log.info("Report payload: hourly=%d daily=%d alert=%d",
+             (int)current.get_hourlyCount(),
+             (int)current.get_dailyCount(),
+             (int)current.get_alertCode());
+  }
 
   PublishQueuePosix::instance().publish(ProjectConfig::webhookEventName(), data, PRIVATE | WITH_ACK);
   Log.info("Ubidots Webhook: %s", data);

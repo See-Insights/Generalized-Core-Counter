@@ -120,9 +120,12 @@ void sysStatusData::initialize() {
     sysStatus.set_lastDailyCleanup(0);                                     // No cleanup has run yet
     
     // ********** Operating Mode Defaults **********
-    sysStatus.set_countingMode(COUNTING);                                  // Default to counting mode
-    sysStatus.set_operatingMode(CONNECTED);                                // Default to connected mode
-    sysStatus.set_occupancyDebounceMs(0);                                  // Default 0 ms; only used in OCCUPANCY mode
+    sysStatus.set_sensorMode(COUNTING);                                    // Default to counting mode
+    sysStatus.set_connectionMode(CONNECTED);                               // Default to connected mode
+    sysStatus.set_reportingMode(SCHEDULED);                                // Default to scheduled reporting
+    sysStatus.set_samplingMode(INTERRUPT);                                 // Default to interrupt-driven
+    sysStatus.set_verboseTimeoutMin(60);                                   // Default 60 min verbose timeout
+    sysStatus.set_verboseModeStartTime(0);                                 // Verbose mode not active
     sysStatus.set_connectAttemptBudgetSec(300);                            // Default 300s (5 minutes) max connect attempt per wake
     sysStatus.set_cloudDisconnectBudgetSec(15);                            // Default 15s max wait for cloud disconnect
     sysStatus.set_modemOffBudgetSec(30);                                   // Default 30s max wait for modem power-down
@@ -275,25 +278,46 @@ void sysStatusData::set_lastTimeSync(time_t value) {
 
 // ********** Operating Mode Configuration Get/Set Functions **********
 
-uint8_t sysStatusData::get_countingMode() const {
-    return getValue<uint8_t>(offsetof(SysData,countingMode));
+uint8_t sysStatusData::get_sensorMode() const {
+    return getValue<uint8_t>(offsetof(SysData,sensorMode));
 }
-void sysStatusData::set_countingMode(uint8_t value) {
-    setValue<uint8_t>(offsetof(SysData,countingMode), value);
-}
-
-uint8_t sysStatusData::get_operatingMode() const {
-    return getValue<uint8_t>(offsetof(SysData,operatingMode));
-}
-void sysStatusData::set_operatingMode(uint8_t value) {
-    setValue<uint8_t>(offsetof(SysData,operatingMode), value);
+void sysStatusData::set_sensorMode(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,sensorMode), value);
 }
 
-uint32_t sysStatusData::get_occupancyDebounceMs() const {
-    return getValue<uint32_t>(offsetof(SysData,occupancyDebounceMs));
+uint8_t sysStatusData::get_connectionMode() const {
+    return getValue<uint8_t>(offsetof(SysData,connectionMode));
 }
-void sysStatusData::set_occupancyDebounceMs(uint32_t value) {
-    setValue<uint32_t>(offsetof(SysData,occupancyDebounceMs), value);
+void sysStatusData::set_connectionMode(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,connectionMode), value);
+}
+
+uint8_t sysStatusData::get_reportingMode() const {
+    return getValue<uint8_t>(offsetof(SysData,reportingMode));
+}
+void sysStatusData::set_reportingMode(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,reportingMode), value);
+}
+
+uint8_t sysStatusData::get_samplingMode() const {
+    return getValue<uint8_t>(offsetof(SysData,samplingMode));
+}
+void sysStatusData::set_samplingMode(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,samplingMode), value);
+}
+
+uint16_t sysStatusData::get_verboseTimeoutMin() const {
+    return getValue<uint16_t>(offsetof(SysData,verboseTimeoutMin));
+}
+void sysStatusData::set_verboseTimeoutMin(uint16_t value) {
+    setValue<uint16_t>(offsetof(SysData,verboseTimeoutMin), value);
+}
+
+time_t sysStatusData::get_verboseModeStartTime() const {
+    return getValue<time_t>(offsetof(SysData,verboseModeStartTime));
+}
+void sysStatusData::set_verboseModeStartTime(time_t value) {
+    setValue<time_t>(offsetof(SysData,verboseModeStartTime), value);
 }
 
 uint16_t sysStatusData::get_connectAttemptBudgetSec() const {
@@ -389,13 +413,6 @@ void sensorConfigData::loop() {
 
 bool sensorConfigData::validate(size_t dataSize) {
     bool valid = PersistentDataFile::validate(dataSize);
-    if (valid) {
-        if (sensorConfig.get_threshold1() > 100 || sensorConfig.get_threshold2() > 100) {
-            Log.info("Sensor config: thresholds not valid (threshold1=%d, threshold2=%d)", 
-                     sensorConfig.get_threshold1(), sensorConfig.get_threshold2());
-            valid = false;
-        }
-    }
     Log.info("Sensor config is %s", (valid) ? "valid" : "not valid");
     return valid;
 }
@@ -409,27 +426,44 @@ void sensorConfigData::initialize() {
     updateHash();
 }
 
-uint16_t sensorConfigData::get_threshold1() const {
-    return getValue<uint16_t>(offsetof(SensorData, threshold1));
+uint8_t sensorConfigData::get_sensorType() const {
+    return getValue<uint8_t>(offsetof(SensorData, type));
 }
 
-void sensorConfigData::set_threshold1(uint16_t value) {
-    setValue<uint16_t>(offsetof(SensorData, threshold1), value);
+void sensorConfigData::set_sensorType(uint8_t value) {
+    setValue<uint8_t>(offsetof(SensorData, type), value);
 }
 
-uint16_t sensorConfigData::get_threshold2() const {
-    return getValue<uint16_t>(offsetof(SensorData, threshold2));
+uint32_t sensorConfigData::get_sensorSetting1() const {
+    return getValue<uint32_t>(offsetof(SensorData, setting1));
 }
 
-void sensorConfigData::set_threshold2(uint16_t value) {
-    setValue<uint16_t>(offsetof(SensorData, threshold2), value);
-}
-uint16_t sensorConfigData::get_pollingRate() const {
-    return getValue<uint16_t>(offsetof(SensorData, pollingRate));
+void sensorConfigData::set_sensorSetting1(uint32_t value) {
+    setValue<uint32_t>(offsetof(SensorData, setting1), value);
 }
 
-void sensorConfigData::set_pollingRate(uint16_t value) {
-    setValue<uint16_t>(offsetof(SensorData, pollingRate), value);
+uint32_t sensorConfigData::get_sensorSetting2() const {
+    return getValue<uint32_t>(offsetof(SensorData, setting2));
+}
+
+void sensorConfigData::set_sensorSetting2(uint32_t value) {
+    setValue<uint32_t>(offsetof(SensorData, setting2), value);
+}
+
+uint32_t sensorConfigData::get_sensorSetting3() const {
+    return getValue<uint32_t>(offsetof(SensorData, setting3));
+}
+
+void sensorConfigData::set_sensorSetting3(uint32_t value) {
+    setValue<uint32_t>(offsetof(SensorData, setting3), value);
+}
+
+uint32_t sensorConfigData::get_sensorSetting4() const {
+    return getValue<uint32_t>(offsetof(SensorData, setting4));
+}
+
+void sensorConfigData::set_sensorSetting4(uint32_t value) {
+    setValue<uint32_t>(offsetof(SensorData, setting4), value);
 }  // End of sensorConfigData class
 
 

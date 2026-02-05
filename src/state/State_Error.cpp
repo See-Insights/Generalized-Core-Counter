@@ -108,8 +108,8 @@ void handleErrorState() {
     // while we sit in ERROR_STATE waiting for reset.
     requestFullDisconnectAndRadioOff();
 
-    // In LOW_POWER or DISCONNECTED modes, avoid reset loops for connectivity/sleep alerts.
-    if (sysStatus.get_operatingMode() != CONNECTED) {
+    // In INTERMITTENT or DISCONNECTED modes, avoid reset loops for connectivity/sleep alerts.
+    if (sysStatus.get_connectionMode() != CONNECTED) {
       int8_t alert = current.get_alertCode();
       if (alert == 15 || alert == 16 || alert == 31) {
         Log.warn("Low-power mode: clearing alert %d to avoid reset loop", alert);

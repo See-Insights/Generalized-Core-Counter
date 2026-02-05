@@ -1,5 +1,7 @@
 # Generalized-Core-Counter
 
+**Version:** 3.22 | **Latest:** Occupancy mode enhancements - state-change reporting and network keep-alive
+
 A generalized IoT firmware core for outdoor sensor devices supporting multiple operating modes and sensor types.
 
 ## Overview
@@ -10,11 +12,13 @@ This firmware provides a flexible, production-ready platform for outdoor IoT dev
 
 - **Multiple Operating Modes**:
   - **Counting Mode**: Track individual events (counts per hour/day)
-  - **Occupancy Mode**: Monitor occupied time with debounce logic
+  - **Occupancy Mode**: Monitor occupied time with debounce logic and real-time state-change reporting
   
 - **Power Management**:
   - **Connected Mode**: Stay connected for real-time updates
   - **Low-Power Mode**: Sleep between scheduled reports
+  - **Disconnected Mode**: Stay offline unless manually connected
+  - **Disconnected Keep-Alive Mode**: Network standby during open hours for rapid occupancy reporting (cellular only)
   
 - **Trigger Types**:
   - **Interrupt-Driven**: Event-based sensor triggering
@@ -40,6 +44,30 @@ Sensor Support (Extensible):
 - PIR motion sensor (implemented)
 - Ultrasonic distance sensor (template)
 - Custom sensors via ISensor interface
+
+## Occupancy Mode Details
+
+When configured in **OCCUPANCY** counting mode with **DISCONNECTED_KEEP_ALIVE** operating mode:
+
+**State-Change Reporting:**
+- Device reports immediately when occupancy state changes (occupied ↔ unoccupied)
+- No waiting for scheduled reporting intervals
+- Enables real-time dashboard updates for occupancy status
+
+**Debounce Logic:**
+- Configurable debounce timer (`occupancyDebounceMs`) prevents rapid state flipping
+- Timer resets on each new sensor detection while occupied
+- Space becomes "unoccupied" only after full timeout without new detections
+- Accumulates total occupied time per day
+
+**Network Standby (Cellular Only):**
+- During open hours, cellular modem stays in low-power standby (~14mA)
+- Prevents 30-60 second reconnection delays on state changes
+- Essential for preventing carrier blacklisting from rapid connect/disconnect cycles
+- Automatically disabled outside open hours to save power
+- WiFi devices don't need standby (reconnection already fast at ~2-5s)
+
+**Use Case:** Tennis courts, sports facilities where real-time occupancy visibility matters and solar power provides adequate budget for network standby.
 
 ## Documentation
 
@@ -109,29 +137,28 @@ Three storage structures:
     "messaging": {
         "disconnectedMode": false,
         "serial": false,
-        "verboseMode": false
-    },
-    "power": {
-        "lowPowerMode": false,
-        "solarPowerMode": true
+        "verboseMode": false,
+        "verboseTimeoutMin": 60
     },
     "sensor": {
-        "threshold1": 60,
-        "threshold2": 60
+        "type": 1,
+        "setting1": 5000,
+        "setting2": 0,
+        "setting3": 0,
+        "setting4": 0
     },
     "timing": {
       "closeHour": 22,
       "openHour": 6,
-      "pollingRateSec": 0,
       "reportingIntervalSec": 3600,
-      "timezone": "SGT-8"   
+      "timezone": "SGT-8",
+      "connectAttemptBudgetSec": 300
   },
     "modes": {
-        "countingMode": 0,
-        "operatingMode": 0,
-        "triggerMode": 0,
-        "occupancyDebounceMs": 0,
-        "connectAttemptBudgetSec": 300
+        "sensorMode": 0,
+        "connectionMode": 0,
+        "reportingMode": 0,
+        "samplingMode": 0
     }
 }
 ```
@@ -143,17 +170,36 @@ Three storage structures:
 
 ### Mode Values
 
-**countingMode**: 
-- `0` = COUNTING (count events)
-- `1` = OCCUPANCY (track occupied time)
+**sensorMode** (what the sensor measures):
+- `0` = COUNTING (count discrete events)
+- `1` = OCCUPANCY (track occupied/unoccupied state)
+- `2` = MEASUREMENT (periodic measurements)
 
-**operatingMode**:
-- `0` = CONNECTED (stay connected)
-- `1` = LOW_POWER (sleep between reports)
+**connectionMode** (network behavior):
+- `0` = CONNECTED (always connected during open hours)
+- `1` = INTERMITTENT (connect only to report, then sleep)
+- `2` = DISCONNECTED (stay offline, log locally)
+- `3` = INTERMITTENT_KEEP_ALIVE (network standby during open hours)
 
-**triggerMode**:
-- `0` = INTERRUPT (event-driven)
-- `1` = SCHEDULED (periodic polling)
+**reportingMode** (when to send data):
+- `0` = SCHEDULED (time-based intervals)
+- `1` = ON_CHANGE (when sensor value changes)
+- `2` = THRESHOLD (when threshold exceeded)
+- `3` = SCHEDULED_OR_THRESHOLD (either condition)
+
+**samplingMode** (how sensor operates):
+- `0` = INTERRUPT (event-driven, sensor wakes device)
+- `1` = POLLING (periodic sampling at intervals)
+
+**sensor.type** (hardware sensor):
+- `1` = PIR motion sensor
+- `2` = Analog sensor
+- Future types can be added without firmware changes
+
+**sensor.setting1-4** (sensor-specific configuration):
+- PIR sensor: `setting1` = debounce time in milliseconds (e.g., 5000)
+- Analog sensor: `setting1` = threshold value, `setting2` = hysteresis, etc.
+- Configuration meaning depends on sensor.type
 
 ## Device Commissioning Workflow
 
@@ -242,33 +288,34 @@ You can:
 ### Counting Mode Payload
 ```json
 {
-    "timestamp": 1702345678,
-    "deviceId": "e00fce68...",
+    "hourly": 42,
+    "daily": 327,
     "battery": 85.2,
+    "key1": "Healthy",
     "temp": 23.5,
-    "mode": "counting",
-    "hourlyCount": 42,
-    "dailyCount": 327,
-    "lastCount": 1702345670,
-    "powerMode": "connected",
-    "triggerMode": "interrupt"
+    "resets": 2,
+    "alerts": 0,
+    "connecttime": 15,
+    "timestamp": 1702345678000
 }
 ```
 
 ### Occupancy Mode Payload
 ```json
 {
-    "timestamp": 1702345678,
-    "deviceId": "e00fce68...",
-    "battery": 85.2,
+    "occupancy": "occupied",
+    "dailyoccupancy": 3847,
+    "battery": {
+        "value": 85.2,
+        "context": {
+            "key1": "Healthy"
+        }
+    },
     "temp": 23.5,
-    "mode": "occupancy",
-    "occupied": true,
-    "sessionDuration": 120,
-    "occupancyStart": 1702345558,
-    "totalOccupiedSec": 3847,
-    "powerMode": "lowPower",
-    "triggerMode": "scheduled"
+    "alerts": 0,
+    "resets": 2,
+    "connecttime": 15,
+    "timestamp": 1702345678000
 }
 ```
 
@@ -297,10 +344,10 @@ You can:
    - If absent, device uses `default-settings`
 
 5. **Set Up Webhook** for Ubidots integration:
-   - Event name: `sensor-data`
+   - Event name: `Ubidots-Counter-Hook-v1`
    - URL: Your Ubidots endpoint
    - Request type: POST
-   - JSON template as needed
+   - **Note:** Counting mode and occupancy mode send different JSON structures (see Data Reporting section)
 
 ### Flash Firmware
 
@@ -398,9 +445,12 @@ Example - Different park hours:
 {
     "modes": {
         "countingMode": 1,
-        "occupancyDebounceMs": 600000
+        "occupancyDebounceMs": 600000,
+        "operatingMode": 3
     }
 }
+```
+**Note:** For occupancy sensors (e.g., tennis courts), `operatingMode: 3` (DISCONNECTED_KEEP_ALIVE) enables real-time reporting on state changes while maintaining cellular network standby during open hours to prevent carrier blacklisting. WiFi devices will function normally but won't use network standby (not needed - WiFi reconnection is already fast).
 ```
 
 ### Verifying Configuration Applied

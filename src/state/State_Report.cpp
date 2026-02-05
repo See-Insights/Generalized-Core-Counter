@@ -57,7 +57,7 @@ void handleReportingState() {
 
   // After each hourly report, reset the hourly counter so
   // the next report contains only the counts for that hour.
-  if (sysStatus.get_countingMode() == COUNTING) {
+  if (sysStatus.get_sensorMode() == COUNTING) {
     Log.info("Resetting hourlyCount after report (was %d)", current.get_hourlyCount());
     current.set_hourlyCount(0);
   }
