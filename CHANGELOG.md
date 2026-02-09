@@ -237,3 +237,6 @@ This release fundamentally restructures device configuration to use four indepen
 ## 3.20 – 2026-01-23
 - Added PMIC monitoring for Boron
 
+## 3.24 – 2026-02-09
+- Implmeented Occupancy
+
