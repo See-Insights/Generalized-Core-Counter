@@ -141,6 +141,15 @@ void handleConnectingState() {
     if (!postConnectDone) {
       connectedStartMs = millis();
       sysStatus.set_lastConnection(Time.now());
+
+      // Short-term webhook supervision: start the response window only after
+      // a successful cloud connection, and only if a webhook publish was queued.
+      if (session.webhookExpectedOnConnect) {
+        session.webhookExpectedOnConnect = false;
+        session.awaitingWebhookResponse = true;
+        session.webhookAwaitStartMs = millis();
+        Log.info("Cloud connected - awaiting webhook response (short-term window started)");
+      }
       
       // Increment connection attempt counter for periodic deep attempts
       // (unless we just did a deep attempt which already reset counter to 0)
@@ -181,9 +190,9 @@ void handleConnectingState() {
       size_t pending = PublishQueuePosix::instance().getNumEvents();
       Log.info("Publish queue depth after connect: %u event(s)", (unsigned)pending);
 
-      if (!firstConnectionObserved) {
-        firstConnectionObserved = true;
-        firstConnectionQueueDrainedLogged = false;
+      if (!session.firstConnectionObserved) {
+        session.firstConnectionObserved = true;
+        session.firstConnectionQueueDrainedLogged = false;
       }
 
       postConnectDone = true;
@@ -192,6 +201,11 @@ void handleConnectingState() {
     if (System.updatesPending()) {
       Log.info("Updates pending after connect - transitioning to FIRMWARE_UPDATE_STATE");
       state = FIRMWARE_UPDATE_STATE;
+    } else if (session.returnToSleepAfterReport) {
+      // After reporting occupied state in low-power mode, return to sleep to check debounce timeout
+      Log.info("Connection complete - returning to SLEEPING_STATE (occupied, low-power mode)");
+      session.returnToSleepAfterReport = false;
+      state = SLEEPING_STATE;
     } else {
       state = IDLE_STATE;
     }

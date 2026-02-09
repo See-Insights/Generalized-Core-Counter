@@ -319,6 +319,163 @@ You can:
 }
 ```
 
+## Webhook Configuration
+
+### Overview
+
+The firmware uses a **cloud-configurable webhook system** that allows you to specify different webhook names for different products or deployment scenarios without changing firmware. The webhook name is resolved using a 3-tier priority system:
+
+1. **Cloud Configuration** (highest priority): Explicitly set webhook name in cloud ledger
+2. **Convention-Based**: Auto-generated based on sensor mode (`counting-webhook-v1`, `occupancy-webhook-v1`)
+3. **Legacy Default**: Fallback to configured default if no cloud config exists
+
+This architecture enables:
+- Different products to use different backend services
+- Testing webhooks vs production webhooks
+- Mode-specific webhooks for different payload formats
+- Zero-firmware-change webhook updates
+
+### Configuration Method
+
+Add a `reporting` section to your `default-settings` or `device-settings` ledger:
+
+```json
+{
+  "reporting": {
+    "webhook": {
+      "name": "Ubidots-Sensor-Hook-v1",
+      "enabled": true,
+      "timeoutMs": 20000
+    }
+  }
+}
+```
+
+**Configuration Fields:**
+- `name` (string): Webhook event name to publish to
+- `enabled` (boolean): Enable/disable webhook publishing
+- `timeoutMs` (number): Webhook response timeout in milliseconds (1000-60000)
+
+### Webhook Resolution Examples
+
+**Example 1: Product-Level Webhook (Recommended)**
+```json
+// In default-settings ledger (Product scope)
+{
+  "reporting": {
+    "webhook": {
+      "name": "Trail-Counter-Webhook-v1"
+    }
+  }
+}
+```
+- All devices in product publish to "Trail-Counter-Webhook-v1"
+- Easy to change all devices at once via product configuration
+
+**Example 2: Device-Specific Testing Webhook**
+```json
+// In device-settings ledger (Device scope)
+{
+  "reporting": {
+    "webhook": {
+      "name": "Test-Webhook-Dev"
+    }
+  }
+}
+```
+- Specific device publishes to test webhook
+- Other devices continue using product default
+- Perfect for testing new integrations
+
+**Example 3: Mode-Based Convention (No Config)**
+- If no `reporting.webhook.name` is configured
+- Device automatically generates webhook name based on sensor mode:
+  - COUNTING mode → publishes to `counting-webhook-v1`
+  - OCCUPANCY mode → publishes to `occupancy-webhook-v1`
+  - MEASUREMENT mode → publishes to `measurement-webhook-v1`
+
+### Setting Up Webhooks in Particle Console
+
+1. **Navigate to Integrations**:
+   - Go to your product in Particle Console
+   - Click "Integrations" → "New Integration" → "Webhook"
+
+2. **Configure Webhook**:
+   - **Event Name**: Match your configured webhook name (e.g., "Ubidots-Sensor-Hook-v1")
+   - **URL**: Your backend endpoint (e.g., Ubidots API)
+   - **Request Type**: POST
+   - **Request Format**: JSON
+   - **Device**: Any (all devices can trigger this webhook)
+
+3. **Add Custom Template** (Optional):
+   - Transform the payload before sending to your backend
+   - Extract specific fields
+   - Add authentication headers
+
+4. **Response Integration**:
+   - Check "Send custom response"
+   - Configure response topic if needed
+   - Device logs webhook response for troubleshooting
+
+### Multiple Products Example
+
+**Product: Trail-Counter-P2**
+```json
+// default-settings
+{
+  "reporting": {
+    "webhook": {
+      "name": "Trail-Counter-Webhook-v1"
+    }
+  }
+}
+```
+
+**Product: Parking-Sensor-Boron**
+```json
+// default-settings
+{
+  "reporting": {
+    "webhook": {
+      "name": "Parking-Sensor-Webhook-v1"
+    }
+  }
+}
+```
+
+Each product uses different webhooks pointing to different backend services, all running the same firmware.
+
+### Monitoring Webhook Activity
+
+View webhook events in device logs:
+```
+Publishing to webhook 'Ubidots-Sensor-Hook-v1': {"occupancy":"occupied",...}
+Using cloud-configured webhook: Ubidots-Sensor-Hook-v1
+```
+
+Or check convention-based fallback:
+```
+Using convention-based webhook: occupancy-webhook-v1
+```
+
+### Troubleshooting
+
+**Webhook not publishing:**
+1. Check `device-status` ledger to see current webhook configuration
+2. Verify `webhook.enabled = true`
+3. Check logs for webhook resolution messages
+4. Verify webhook exists in Console Integrations
+
+**Wrong webhook being used:**
+1. Check merge priority: device-settings overrides default-settings
+2. View logs to see which webhook name is resolved
+3. Confirm spelling of webhook name in configuration
+
+**Webhook timeout:**
+1. Increase `webhook.timeoutMs` in configuration
+2. Default is 20000ms (20 seconds)
+3. Check backend service response time
+
 ## Getting Started
 
 ### Setup in Particle Console
@@ -343,11 +500,12 @@ You can:
    - Start with JSON from `device-status`, then modify as needed
    - If absent, device uses `default-settings`
 
-5. **Set Up Webhook** for Ubidots integration:
-   - Event name: `Ubidots-Counter-Hook-v1`
-   - URL: Your Ubidots endpoint
-   - Request type: POST
-   - **Note:** Counting mode and occupancy mode send different JSON structures (see Data Reporting section)
+5. **Set Up Webhook** for data integration:
+   - See **Webhook Configuration** section above for detailed instructions
+   - Event name must match your configured webhook name
+   - Default webhook name in `default-settings-v3.23.json`: `Ubidots-Sensor-Hook-v1`
+   - **Important:** Configure webhook name in `default-settings` ledger before creating webhook
+   - Counting mode and occupancy mode send different JSON structures (see Data Reporting section)
 
 ### Flash Firmware
 

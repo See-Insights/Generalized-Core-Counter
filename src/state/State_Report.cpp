@@ -62,24 +62,53 @@ void handleReportingState() {
     current.set_hourlyCount(0);
   }
 
-  // Webhook supervision: if we have not seen a successful webhook
-  // response in more than 6 hours, raise alert 40 so the error
-  // supervisor can evaluate and potentially reset. Threshold is set
-  // higher for remote/solar units in poor reception where intermittent
-  // connectivity is expected.
-  // Suppress alert 40 if we just woke from overnight closed-hours sleep.
-  extern bool suppressAlert40ThisSession;
-  if (Time.isValid() && !suppressAlert40ThisSession) {
+  // Long-term webhook supervision
+  // Requirement: when >3 hours have passed without a webhook response, take
+  // escalating corrective action, but only during OPEN hours and with backoff
+  // to prevent thrashing.
+  bool forceConnectForLongTermWebhook = false;
+  if (Time.isValid() && isWithinOpenHours() && !session.suppressAlert40ThisSession) {
     time_t lastHook = sysStatus.get_lastHookResponse();
-    if (lastHook != 0 && (now - lastHook) > (6 * 3600L)) {
-      Log.info("No successful webhook response for >6 hours (last=%ld, now=%ld) - raising alert 40",
-               (long)lastHook, (long)now);
-      current.raiseAlert(40);
-    }
-  } else if (Time.isValid() && suppressAlert40ThisSession) {
-    time_t lastHook = sysStatus.get_lastHookResponse();
-    if (lastHook != 0 && (now - lastHook) > (6 * 3600L)) {
-      Log.info("Webhook timeout detected after power mgmt wake - suppressing alert 40 (expected behavior)");
+    if (lastHook != 0) {
+      const long ageSec = (long)(now - lastHook);
+
+      // Only evaluate long-term health when we're not already in the middle of
+      // the short-term response window.
+      if (!session.awaitingWebhookResponse) {
+        if (ageSec > (3L * 3600L)) {
+          if (current.get_alertCode() != 40) {
+            Log.info("No successful webhook response for >3 hours during OPEN hours (age=%ld sec) - raising alert 40",
+                     ageSec);
+          }
+          current.raiseAlert(40);
+
+          // Corrective action stage 1: periodically force a connection attempt
+          // so we can validate the integration path during open hours.
+          // Backoff: do not force connect more often than every 30 minutes.
+          time_t lastConn = sysStatus.get_lastConnection();
+          if (lastConn == 0 || (now - lastConn) > (30L * 60L)) {
+            forceConnectForLongTermWebhook = true;
+          }
+        }
+
+        // Corrective action stage 2: if we've been failing for a long time and
+        // we have connected recently but still aren't seeing hook responses,
+        // escalate via ERROR_STATE (soft reset policy applies there).
+        // Backoff: at most once every 3 hours.
+        if (ageSec > (6L * 3600L) && current.get_alertCode() == 40) {
+          time_t lastConn = sysStatus.get_lastConnection();
+          bool connectedRecently = (lastConn != 0 && (now - lastConn) < (2L * 3600L));
+          time_t lastEscalation = current.get_lastAlertTime();
+          bool cooldownPassed = (lastEscalation == 0 || (now - lastEscalation) > (3L * 3600L));
+          if (connectedRecently && cooldownPassed) {
+            Log.warn("Webhook long-term failure persists (age=%ld sec) - escalating to ERROR_STATE (backoff ok)", ageSec);
+            // Repurpose lastAlertTime as our escalation timestamp for alert 40.
+            current.set_lastAlertTime(now);
+            state = ERROR_STATE;
+            return;
+          }
+        }
+      }
     }
   }
 
@@ -148,7 +177,29 @@ void handleReportingState() {
                             newTier == TIER_CONSERVING ? "CONSERVING" :
                             newTier == TIER_CRITICAL ? "CRITICAL" : "SURVIVAL");
     
-    if (isAligned) {
+    // Check if occupied in low-power mode - need to return to sleep after reporting
+    // to wake periodically and check debounce timeout
+    if (current.get_occupied() && sysStatus.get_connectionMode() != CONNECTED) {
+      Log.info("REPORTING: Occupied in low-power mode - will return to sleep after report tier=%s",
+               tierName);
+      session.returnToSleepAfterReport = true;
+    }
+    
+    // Check if report was triggered by occupancy state change
+    if (session.occupancyChangeTriggered) {
+      session.occupancyChangeTriggered = false;  // Clear flag after processing
+      Log.info("REPORTING: Immediate connection (occupancy change) - bypassing alignment tier=%s",
+               tierName);
+      state = CONNECTING_STATE;
+    } else if (forceConnectForLongTermWebhook) {
+      Log.info("REPORTING: Forcing connection due to long-term webhook health (OPEN hours)");
+      state = CONNECTING_STATE;
+    } else if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
+      // In INTERMITTENT_KEEP_ALIVE mode, connect immediately for all reports
+      Log.info("REPORTING: Immediate connection (KEEP_ALIVE mode) - bypassing alignment tier=%s",
+               tierName);
+      state = CONNECTING_STATE;
+    } else if (isAligned) {
       Log.info("REPORTING: Connection due - boundary aligned tier=%s interval=%us (base=%u x %u) offset=%lus",
                tierName,
                (unsigned)effectiveInterval,

@@ -80,21 +80,28 @@ bool SensorManager::loop() {
         return false;
     }
     
-    unsigned long currentTime = millis();
-    uint16_t pollingRate = sensorConfig.get_pollingRate() * 1000; // Convert to ms
-    
-  // Interrupt-driven sensors should be serviced on every pass through
-  // the main loop regardless of pollingRate.
-  if (_sensor->usesInterrupt() || pollingRate == 0) {
-    bool event = _sensor->loop();
-    if (event && sysStatus.get_verboseMode()) {
-      Log.info("SensorManager: event reported by interrupt-driven sensor");
+    // V3.23: Most sensors (like PIR) are interrupt-driven and should be 
+    // serviced on every pass through the main loop.
+    // Future polling sensors would use sensor.setting2 or setting3 for polling interval.
+    if (_sensor->usesInterrupt()) {
+        bool event = _sensor->loop();
+        if (event && sysStatus.get_verboseMode()) {
+            Log.info("SensorManager: event reported by interrupt-driven sensor");
+        }
+        return event;
     }
-    return event;
-  }
     
-    // Polling mode - check sensor at specified intervals
-    if (currentTime - _lastPollTime >= pollingRate) {
+    // Polling mode - for future sensors that don't use interrupts
+    // Polling interval would come from sensor.setting2 (in milliseconds)
+    unsigned long currentTime = millis();
+    uint32_t pollingInterval = sensorConfig.get_sensorSetting2(); // Polling interval in ms
+    
+    if (pollingInterval == 0) {
+        // No polling interval set, check every loop
+        return _sensor->loop();
+    }
+    
+    if (currentTime - _lastPollTime >= pollingInterval) {
         _lastPollTime = currentTime;
         return _sensor->loop();
     }

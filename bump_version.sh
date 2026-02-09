@@ -8,7 +8,7 @@
 #
 # Notes:
 # - This script is tailored for macOS (uses BSD sed with -i '').
-# - Avoid double quotes in the release notes, or edit Version.cpp manually.
+# - Escapes values for safe use in sed replacement.
 
 set -euo pipefail
 
@@ -20,6 +20,18 @@ fi
 VERSION="$1"
 shift
 NOTES="$*"
+
+sed_escape_replacement() {
+  # Escapes characters that are special in the sed replacement part.
+  # - '&' expands to the matched text
+  # - '\\' is the escape character
+  # - '/' is the delimiter we use
+  # - '"' must be escaped because we embed the replacement in a double-quoted sed script
+  printf '%s' "$1" | sed -e 's/[\\&/]/\\&/g' -e 's/"/\\"/g'
+}
+
+VERSION_ESCAPED="$(sed_escape_replacement "$VERSION")"
+NOTES_ESCAPED="$(sed_escape_replacement "$NOTES")"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
@@ -39,13 +51,13 @@ if [ ! -f "$DOXYFILE" ]; then
 fi
 
 # Update firmware version in Version.cpp
-sed -i '' "s/^const char\\* FIRMWARE_VERSION.*/const char* FIRMWARE_VERSION = \"${VERSION}\";/" "$VERSION_FILE"
+sed -i '' "s/^const char\\* FIRMWARE_VERSION.*/const char* FIRMWARE_VERSION = \"${VERSION_ESCAPED}\";/" "$VERSION_FILE"
 
 # Update firmware release notes in Version.cpp
-sed -i '' "s/^const char\\* FIRMWARE_RELEASE_NOTES.*/const char* FIRMWARE_RELEASE_NOTES = \"${NOTES}\";/" "$VERSION_FILE"
+sed -i '' "s/^const char\\* FIRMWARE_RELEASE_NOTES.*/const char* FIRMWARE_RELEASE_NOTES = \"${NOTES_ESCAPED}\";/" "$VERSION_FILE"
 
 # Update Doxygen project number
-sed -i '' "s/^PROJECT_NUMBER.*/PROJECT_NUMBER         = \"${VERSION}\"/" "$DOXYFILE"
+sed -i '' "s/^PROJECT_NUMBER.*/PROJECT_NUMBER         = \"${VERSION_ESCAPED}\"/" "$DOXYFILE"
 
 # Append to CHANGELOG.md
 DATE="$(date +%Y-%m-%d)"

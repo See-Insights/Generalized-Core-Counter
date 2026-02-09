@@ -34,14 +34,8 @@ void handleCountingMode() {
              current.get_hourlyCount(), current.get_dailyCount());
 
     // Flash the on-module BLUE LED for ~1 second as a
-    // visual count indicator using a software timer so we
-    // don't block the main loop.
-    digitalWrite(BLUE_LED, HIGH);
-    if (countSignalTimer.isActive()) {
-      countSignalTimer.reset();
-    } else {
-      countSignalTimer.start();
-    }
+    // visual count indicator (works across sleep cycles)
+    signalLED(true, 1000);  // Turn on with 1-second timeout
 
     // Stay in IDLE_STATE; hourly reporting will publish aggregated counts.
   }
@@ -63,15 +57,37 @@ void handleOccupancyMode() {
       // Transition from unoccupied to occupied
       current.set_occupied(true);
       current.set_occupancyStartTime(Time.now());
+      
+      // V3.23: Set LED with debounce timeout from sensor.setting1
+      uint32_t setting1Raw = sensorConfig.get_sensorSetting1();
+      uint32_t debounceSeconds = setting1Raw / 1000;
+      Log.info("OCCUPANCY detection: setting1=%lu ms => debounce=%lu sec",
+               (unsigned long)setting1Raw, (unsigned long)debounceSeconds);
+      if (debounceSeconds == 0) {
+        Log.warn("Debounce timeout is 0 - using 60 sec default (check sensor.setting1=%lu)", 
+                 (unsigned long)setting1Raw);
+        debounceSeconds = 60;  // Minimum 60 second debounce for occupancy
+      }
+      signalLED(true, debounceSeconds * 1000UL);  // Turn on LED until debounce expires
 
-      Log.info("Space now OCCUPIED at %s", Time.timeStr().c_str());
-      digitalWrite(BLUE_LED, HIGH); // Visual indicator
+      Log.info("Space now OCCUPIED at %s (LED timeout in %lu sec)", Time.timeStr().c_str(), debounceSeconds);
       
       // In INTERMITTENT_KEEP_ALIVE mode, report immediately on occupancy state changes
       // This allows dashboard to show real-time occupancy transitions
       if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
         Log.info("Occupancy change detected - triggering immediate report");
+        session.occupancyChangeTriggered = true;
         state = REPORTING_STATE;
+      }
+    } else {
+      // Already occupied - reset LED timeout on new motion
+      uint32_t debounceSeconds = sensorConfig.get_sensorSetting1() / 1000;
+      if (debounceSeconds == 0) {
+        debounceSeconds = 60;  // Minimum 60 second debounce for occupancy
+      }
+      signalLED(true, debounceSeconds * 1000UL);  // Reset LED timeout
+      if (sysStatus.get_verboseMode()) {
+        Log.info("Motion detected - LED timeout reset to %lu sec", debounceSeconds);
       }
     }
 
@@ -101,11 +117,31 @@ void updateOccupancyState() {
     return; // Nothing to do if not occupied
   }
 
-  uint32_t debounceMs = sysStatus.get_occupancyDebounceMs();
-  uint32_t timeSinceLastEvent = millis() - current.get_lastOccupancyEvent();
+  // V3.23: Occupancy debounce timeout comes from sensor.setting1
+  uint32_t debounceMs = sensorConfig.get_sensorSetting1();
+  if (debounceMs == 0) {
+    debounceMs = 60000; // default 60s
+  }
+
+  uint32_t lastEvent = current.get_lastOccupancyEvent();
+  if (lastEvent == 0) {
+    // If this is 0 (for example, occupancy set from a PIR wake path that
+    // didn't update lastOccupancyEvent), we must not immediately expire.
+    lastEvent = millis();
+    current.set_lastOccupancyEvent(lastEvent);
+  }
+  uint32_t timeSinceLastEvent = millis() - lastEvent;
 
   // Check if debounce timeout has expired
   if (timeSinceLastEvent > debounceMs) {
+    Log.info("[OCC DBG] debounceMs=%lu nowMs=%lu lastEventMs=%lu sinceMs=%lu start=%lu now=%lu total=%lu",
+             (unsigned long)debounceMs,
+             (unsigned long)millis(),
+             (unsigned long)lastEvent,
+             (unsigned long)timeSinceLastEvent,
+             (unsigned long)current.get_occupancyStartTime(),
+             (unsigned long)Time.now(),
+             (unsigned long)current.get_totalOccupiedSeconds());
     // Calculate this occupancy session duration
     uint32_t sessionDuration = Time.now() - current.get_occupancyStartTime();
 
@@ -120,12 +156,13 @@ void updateOccupancyState() {
     Log.info("Space now UNOCCUPIED - Session duration: %lu seconds, Total today: %lu seconds",
              sessionDuration, totalOccupied);
 
-    digitalWrite(BLUE_LED, LOW); // Turn off visual indicator
+    signalLED(false);  // Turn off LED
     
     // In INTERMITTENT_KEEP_ALIVE mode, report immediately on occupancy state changes
     // This allows dashboard to show real-time occupancy transitions
     if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
       Log.info("Occupancy change detected - triggering immediate report");
+      session.occupancyChangeTriggered = true;
       state = REPORTING_STATE;
     }
   }

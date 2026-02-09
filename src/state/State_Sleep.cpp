@@ -13,9 +13,6 @@
 #include "SensorDefinitions.h"
 #include "AB1805_RK.h"
 
-// External declarations for webhook response tracking
-extern bool awaitingWebhookResponse;
-
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
 // No behavioral changes were made.
@@ -27,9 +24,11 @@ extern bool awaitingWebhookResponse;
 void handleSleepingState() {
   bool enteredState = (state != oldState);
   bool ignoreDisconnectFailure = false;
+  static bool operationsCompleteLogged = false;  // Track if we've logged completion message
 
   if (enteredState) {
     publishStateTransition();
+    operationsCompleteLogged = false;  // Reset flag on state entry
     // One-time diagnostic on entry so logs clearly show the device's view of park hours.
     if (Time.isValid()) {
       LocalTimeConvert conv;
@@ -44,6 +43,17 @@ void handleSleepingState() {
     Log.info("SLEEP entry: sensorReady=%s", SensorManager::instance().isSensorReady() ? "true" : "false");
   }
 
+  // Determine if we will use *effective* network standby for the upcoming sleep.
+  // Only cellular platforms actually apply standby; on WiFi, treat as disabled
+  // so disconnect logic doesn't wait for a radio state that won't change.
+  bool useNetworkStandbyEffective = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) &&
+                                   isWithinOpenHours();
+#if HAL_PLATFORM_CELLULAR
+  useNetworkStandbyEffective = useNetworkStandbyEffective && !Cellular.isOff();
+#else
+  useNetworkStandbyEffective = false;
+#endif
+
   // If a ledger update (or time progression) moves the park into OPEN hours
   // while we are in SLEEPING_STATE, abort sleeping immediately in CONNECTED
   // mode so we stay awake/connected and resume counting.
@@ -54,97 +64,21 @@ void handleSleepingState() {
   }
 
   // If we are connected and the publish queue is not yet in a sleep-safe
-  // state (events queued or a publish in progress), defer sleeping so we
-  // can finish delivering data. When offline, allow sleep immediately;
-  // queued events will be flushed on the next connection.
-  if (Particle.connected() && !PublishQueuePosix::instance().getCanSleep()) {
-    static size_t lastPendingLogged = (size_t)-1;
-    static unsigned long lastDeferralLogMs = 0;
-
-    size_t pending = PublishQueuePosix::instance().getNumEvents();
-    unsigned long nowMs = millis();
-    bool shouldLog = (pending != lastPendingLogged) || (nowMs - lastDeferralLogMs) > 5000UL;
-    if (shouldLog) {
-      Log.info("Deferring sleep - publish queue has %u pending event(s) or publish in progress",
-               (unsigned)pending);
-      lastPendingLogged = pending;
-      lastDeferralLogMs = nowMs;
-    }
-    // Stay in SLEEPING_STATE until the queue is sleep-safe.
-    return;
-  }
+  // state (events queued or a publish in progress), we will wait below in the
+  // unified cloud-operations gate (with a timeout budget) so we never wait
+  // indefinitely on a stuck publish.
 
   // ********** Cloud Operations Sync Prerequisites (with timeout budget) **********
-  // Before disconnecting, ensure four critical operations complete:
-  //   1) Publish queue drained (checked above)
+  // Before disconnecting, ensure critical operations complete:
+  //   1) Publish queue drained
   //   2) Ledgers synced from cloud
   //   3) OTA updates checked
-  //   4) Ubidots webhook response received
+  //   4) Webhook response received
   // Use a timeout budget to prevent battery drain if operations hang.
   // NOTE: This code is non-blocking at application level (Particle.process() called)
   // but blocks state transition until prerequisites complete or timeout.
   static unsigned long cloudSyncStartMs = 0;
   const unsigned long CLOUD_SYNC_TIMEOUT_MS = 30000; // 30 second budget
-
-  if (Particle.connected()) {
-    // Initialize timer on first check
-    if (cloudSyncStartMs == 0) {
-      cloudSyncStartMs = millis();
-    }
-
-    // Check prerequisite completion
-    bool ledgersSynced = Cloud::instance().areLedgersSynced();
-    bool webhookConfirmed = !awaitingWebhookResponse;
-    bool updatesChecked = !System.updatesPending();
-
-    bool allComplete = ledgersSynced && webhookConfirmed && updatesChecked;
-
-    if (!allComplete) {
-      unsigned long elapsedMs = millis() - cloudSyncStartMs;
-      
-      if (elapsedMs < CLOUD_SYNC_TIMEOUT_MS) {
-        // Still within budget - log status every 5 seconds
-        static unsigned long lastStatusLogMs = 0;
-        if ((millis() - lastStatusLogMs) > 5000UL) {
-          Log.info("SLEEP: Waiting for cloud operations - ledgers:%s updates:%s webhook:%s (%lu/%lu ms)",
-                   ledgersSynced ? "Y" : "N",
-                   updatesChecked ? "Y" : "N",
-                   webhookConfirmed ? "Y" : "N",
-                   elapsedMs, CLOUD_SYNC_TIMEOUT_MS);
-          lastStatusLogMs = millis();
-        }
-        Particle.process(); // Keep connection alive
-        return; // Stay in SLEEPING_STATE until complete or timeout
-      } else {
-        // Budget exceeded - log incomplete operations and raise ONE alert (priority order)
-        Log.warn("SLEEP: Cloud sync timeout after %lu ms", elapsedMs);
-        Log.warn("SLEEP: State at timeout - ledgersSynced=%d updatesChecked=%d webhookConfirmed=%d",
-                 ledgersSynced, updatesChecked, webhookConfirmed);
-        
-        // Only raise one alert - check in priority order (ledger > updates > webhook)
-        if (!ledgersSynced) {
-          Log.warn("SLEEP: Ledger sync incomplete - raising alert 41");
-          current.raiseAlert(41); // Configuration sync failure (highest priority)
-        } else if (!updatesChecked) {
-          Log.warn("SLEEP: OTA updates pending - raising alert 42");
-          current.raiseAlert(42); // OTA updates pending (second priority)
-        } else if (!webhookConfirmed) {
-          Log.warn("SLEEP: Webhook response not received - raising alert 40");
-          current.raiseAlert(40); // Webhook timeout (third priority)
-        }
-        
-        // Reset timer and proceed with disconnect despite incomplete operations
-        cloudSyncStartMs = 0;
-      }
-    } else {
-      // All operations complete - reset timer and proceed
-      Log.info("SLEEP: All cloud operations complete - ready to disconnect");
-      cloudSyncStartMs = 0;
-    }
-  } else {
-    // Not connected - reset timer
-    cloudSyncStartMs = 0;
-  }
 
   // ********** Non-blocking disconnect + modem power-down **********
   // Device OS already manages the asynchronous cloud session teardown once
@@ -159,8 +93,112 @@ void handleSleepingState() {
     disconnectRequestStartMs = 0;
   }
 
-  bool needDisconnect = Particle.connected() || isRadioPoweredOn();
-  if (needDisconnect) {
+  // Safety: if disconnectRequested was latched but the timestamp got lost
+  // (for example, due to an unexpected state-machine re-entry), reset so we
+  // can actually issue the request instead of waiting forever.
+  if (disconnectRequested && disconnectRequestStartMs == 0) {
+    Log.warn("SLEEP: disconnectRequested latched without timestamp - resetting");
+    disconnectRequested = false;
+  }
+
+  // Only wait for cloud operations *before* requesting disconnect.
+  if (Particle.connected() && !disconnectRequested) {
+    // Initialize timer on first check
+    if (cloudSyncStartMs == 0) {
+      cloudSyncStartMs = millis();
+    }
+    // Check prerequisite completion
+    bool queueEmpty = PublishQueuePosix::instance().getCanSleep();
+    bool ledgersSynced = Cloud::instance().areLedgersSynced();
+    bool updatesChecked = !System.updatesPending();
+    bool webhookConfirmed = !session.awaitingWebhookResponse;
+
+    bool allComplete = queueEmpty && ledgersSynced && updatesChecked && webhookConfirmed;
+
+    if (!allComplete) {
+      unsigned long elapsedMs = millis() - cloudSyncStartMs;
+
+      if (elapsedMs < CLOUD_SYNC_TIMEOUT_MS) {
+        // Still within budget - log status every 5 seconds
+        static unsigned long lastStatusLogMs = 0;
+        if ((millis() - lastStatusLogMs) > 5000UL) {
+          Log.info("SLEEP: Waiting for cloud operations - queue:%s ledgers:%s updates:%s webhook:%s (%lu/%lu ms)",
+                   queueEmpty ? "Y" : "N",
+                   ledgersSynced ? "Y" : "N",
+                   updatesChecked ? "Y" : "N",
+                   webhookConfirmed ? "Y" : "N",
+                   elapsedMs, CLOUD_SYNC_TIMEOUT_MS);
+          lastStatusLogMs = millis();
+        }
+        Particle.process(); // Keep connection alive
+        return; // Stay in SLEEPING_STATE until complete or timeout
+      }
+
+      // Budget exceeded - log incomplete operations and raise ONE alert (priority order)
+      Log.warn("SLEEP: Cloud sync timeout after %lu ms", elapsedMs);
+      Log.warn("SLEEP: State at timeout - queue=%d ledgers=%d updates=%d webhook=%d",
+               queueEmpty, ledgersSynced, updatesChecked, webhookConfirmed);
+
+      // Only raise one alert - check in priority order (queue > ledger > updates > webhook)
+      if (!queueEmpty) {
+        Log.warn("SLEEP: Publish queue not empty - raising alert 43");
+        current.raiseAlert(43); // Queue drainage failure (highest priority)
+      } else if (!ledgersSynced) {
+        Log.warn("SLEEP: Ledger sync incomplete - raising alert 41");
+        current.raiseAlert(41); // Configuration sync failure
+      } else if (!updatesChecked) {
+        Log.warn("SLEEP: OTA updates pending - raising alert 42");
+        current.raiseAlert(42); // OTA updates pending
+      } else if (!webhookConfirmed) {
+        Log.warn("SLEEP: Webhook response not received - raising alert 40");
+        current.raiseAlert(40); // Webhook response timeout
+      }
+
+      // Proceed with disconnect despite incomplete operations
+      cloudSyncStartMs = 0;
+    } else {
+      // All operations complete - reset timer and proceed
+      cloudSyncStartMs = 0;
+    }
+
+    if (!operationsCompleteLogged) {
+      Log.info("SLEEP: Cloud operations gate passed - ready to disconnect");
+      // One-time diagnostic to explain disconnect decisions; helps catch
+      // cases where disconnect is skipped due to connectivity state.
+      Log.info("SLEEP: disconnect context connected=%d radioOn=%d standbyEffective=%d occupied=%d",
+               Particle.connected(), isRadioPoweredOn(), useNetworkStandbyEffective, current.get_occupied());
+      operationsCompleteLogged = true;
+    }
+  } else {
+    // Not connected - reset timer
+    cloudSyncStartMs = 0;
+  }
+
+  // If we're going to sleep with cellular network standby, do NOT wait for radio-off.
+  // We only need to tear down the cloud session (quickly) before sleeping.
+  bool stillOn;
+#if Wiring_Cellular
+  stillOn = useNetworkStandbyEffective ? Particle.connected() : (Particle.connected() || isRadioPoweredOn());
+#else
+  // On WiFi platforms, waiting for WiFi.isOn() to flip false can take a long
+  // time and is not required for safe low-power sleep. Only gate on cloud.
+  stillOn = Particle.connected();
+#endif
+
+  // If cloud is already offline but the radio is still on (common after a transient
+  // cloud drop), power down the radio before sleeping (unless using standby).
+#if Wiring_Cellular
+  if (!disconnectRequested && !useNetworkStandbyEffective && !Particle.connected() && isRadioPoweredOn()) {
+    Log.info("SLEEP: cloud offline but radio still on - powering down radio");
+    requestRadioPowerOff();
+    disconnectRequested = true;
+    disconnectRequestStartMs = millis();
+    return;
+  }
+#endif
+
+  // Compute disconnect budget once per loop to avoid duplicated logic.
+  auto computeDisconnectBudgetMs = [&]() -> unsigned long {
     // Use ledger-configured budgets when available, with conservative defaults.
     uint16_t cloudBudgetSec = sysStatus.get_cloudDisconnectBudgetSec();
     if (cloudBudgetSec < 5 || cloudBudgetSec > 120) {
@@ -174,20 +212,50 @@ void handleSleepingState() {
 
     unsigned long budgetMs = (unsigned long)((modemBudgetSec > cloudBudgetSec) ? modemBudgetSec : cloudBudgetSec) * 1000UL;
 
-    if (!disconnectRequested) {
+    // When using network standby, shorten the disconnect grace period: we don't
+    // want to burn connection budget waiting for a perfect teardown.
+    if (useNetworkStandbyEffective) {
+      budgetMs = (unsigned long)cloudBudgetSec * 1000UL;
+      if (budgetMs > 5000UL) {
+        budgetMs = 5000UL;
+      }
+    }
+    return budgetMs;
+  };
+
+  unsigned long disconnectBudgetMs = computeDisconnectBudgetMs();
+
+  // Once cloud operations are satisfied (or timed out), initiate disconnect exactly once.
+  if (Particle.connected() && !disconnectRequested) {
+    if (useNetworkStandbyEffective) {
+      Log.info("SLEEP: requesting cloud disconnect (network standby enabled)");
+      requestCloudDisconnectOnly();
+    } else {
       Log.info("SLEEP: requesting cloud disconnect + modem off");
       requestFullDisconnectAndRadioOff();
-      disconnectRequested = true;
-      disconnectRequestStartMs = millis();
-      return;
     }
+    disconnectRequested = true;
+    disconnectRequestStartMs = millis();
+    return;
+  }
 
-    bool stillOn = Particle.connected() || isRadioPoweredOn();
-    if (stillOn) {
-      if (disconnectRequestStartMs != 0 && (millis() - disconnectRequestStartMs) > budgetMs) {
+  // If disconnect was requested, wait (bounded) for it to take effect before sleeping.
+  if (disconnectRequested && stillOn) {
+      if (disconnectRequestStartMs != 0 && (millis() - disconnectRequestStartMs) > disconnectBudgetMs) {
         if (sysStatus.get_connectionMode() != CONNECTED) {
           Log.warn("SLEEP: disconnect/modem-off exceeded budget (%lu ms) - continuing to sleep",
                    (unsigned long)(millis() - disconnectRequestStartMs));
+
+          // Best-effort: if cloud/radio teardown is stalling, force the radio off
+          // so we don't repeatedly wake with the Wi-Fi stack trying to reconnect.
+#if Wiring_WiFi
+          requestRadioPowerOff();
+#elif Wiring_Cellular
+          if (!useNetworkStandbyEffective) {
+            requestRadioPowerOff();
+          }
+#endif
+
           ignoreDisconnectFailure = true;
           disconnectRequested = false;
           disconnectRequestStartMs = 0;
@@ -202,9 +270,10 @@ void handleSleepingState() {
         }
       }
       if (!ignoreDisconnectFailure) {
+        // Help DeviceOS make progress on the disconnect.
+        Particle.process();
         return;
       }
-    }
   }
 
   int nightSleepSec = -1;
@@ -234,7 +303,7 @@ void handleSleepingState() {
 
     // First attempt a true HIBERNATE so platforms that support it
     // still get a cold boot at next opening time.
-    if (!hibernateDisabledForSession) {
+    if (!session.hibernateDisabledForSession) {
       // Diagnostic logging to help debug alert 16 issues
       LocalTimeConvert diagConv;
       diagConv.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
@@ -264,7 +333,7 @@ void handleSleepingState() {
       Log.error("Park hours context: Time.isValid=%d localHour=%d openTime=%d closeTime=%d",
                 Time.isValid(), currentHour, sysStatus.get_openTime(), sysStatus.get_closeTime());
       current.raiseAlert(16); // Alert: unexpected return from HIBERNATE
-      hibernateDisabledForSession = true;
+      session.hibernateDisabledForSession = true;
       // Clear alert immediately since we've handled the failure by disabling HIBERNATE
       // Without a reset, the setup() alert clearing code won't run
       current.set_alertCode(0);
@@ -308,17 +377,35 @@ void handleSleepingState() {
     }
   }
 
-  // If a sensor event is pending or the BLUE LED timer is still
-  // active from a recent count, defer entering deep sleep so we
-  // don't cut off in-progress events or visible indications.
-  if (sensorDetect || countSignalTimer.isActive()) {
-    Log.info("Deferring sleep - sensor event or LED timer active");
-    state = IDLE_STATE;
-    return;
+  // COUNTING MODE: Defer sleep until LED flash completes
+  if (sysStatus.get_sensorMode() == COUNTING) {
+    uint32_t ledRemaining = signalLEDTimeRemaining();
+    if (sensorDetect || ledRemaining > 0) {
+      Log.info("COUNTING: Deferring sleep - sensor=%d LED remaining=%lu sec", 
+               sensorDetect, ledRemaining);
+      state = IDLE_STATE;
+      return;
+    }
+    // Turn off LED before sleep (should already be off)
+    if (signalLEDStatus()) {
+      signalLED(false);
+    }
   }
 
-  if (digitalRead(BLUE_LED) == HIGH) {
-    digitalWrite(BLUE_LED, LOW);
+  // OCCUPANCY MODE: Calculate sleep duration based on debounce timer or scheduled wake
+  if (sysStatus.get_sensorMode() == OCCUPANCY) {
+    if (current.get_occupied()) {
+      // Occupied - wake for debounce timeout check
+      uint32_t setting1Raw = sensorConfig.get_sensorSetting1();
+      uint32_t debounceSeconds = (setting1Raw > 0) ? (setting1Raw / 1000) : 60;
+      if (debounceSeconds < (uint32_t)wakeInSeconds) {
+        wakeInSeconds = (int)debounceSeconds;
+      }
+      Log.info("OCCUPANCY: Sleeping for debounce check: %d sec (occupied)", wakeInSeconds);
+    } else {
+      // Unoccupied - use scheduled wake time
+      Log.info("OCCUPANCY: Sleeping for scheduled wake: %d sec (unoccupied)", wakeInSeconds);
+    }
   }
 
   // Reset sleep configuration on each sleep so GPIO selections do not
@@ -330,22 +417,31 @@ void handleSleepingState() {
   // NO AB1805 alarms - AB1805 is only used for watchdog + RTC time sync.
   // This approach works reliably on Photon2!
   
-  // In INTERMITTENT_KEEP_ALIVE mode during open hours, use network standby
-  // to avoid rapid reconnects that could trigger carrier blacklisting.
-  // This is essential for occupancy sensors with frequent state changes.
-  bool useNetworkStandby = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) && 
-                           isWithinOpenHours();
-  
-#if HAL_PLATFORM_CELLULAR
-  // On cellular devices, only use standby if modem is powered on
-  useNetworkStandby = useNetworkStandby && !Cellular.isOff();
-#endif
+  // In INTERMITTENT_KEEP_ALIVE mode during open hours on *cellular* devices,
+  // use network standby to avoid rapid reconnects that could trigger carrier
+  // blacklisting. On WiFi devices, standby is not applied.
+  bool useNetworkStandby = useNetworkStandbyEffective;
   
   if (useNetworkStandby) {
     Log.info("Entering ULTRA_LOW_POWER sleep with NETWORK STANDBY for %d seconds (occupancy mode)", wakeInSeconds);
   } else {
     Log.info("Entering ULTRA_LOW_POWER sleep for %d seconds (wakes at boundary or on GPIO)", wakeInSeconds);
   }
+
+  // On WiFi platforms, ensure the radio is actually OFF before entering
+  // ULTRA_LOW_POWER. If the cloud/radio was left on, the device can flash
+  // green briefly on wake as WiFi attempts to reconnect.
+#if Wiring_WiFi
+  if (!useNetworkStandby) {
+    if (Particle.connected()) {
+      Particle.disconnect();
+    }
+    if (WiFi.isOn()) {
+      WiFi.disconnect();
+      WiFi.off();
+    }
+  }
+#endif
   
   ab1805.stopWDT();
   
@@ -416,9 +512,8 @@ void handleSleepingState() {
   Log.info("Woke from ULTRA_LOW_POWER: wakeupReason=%d pin=%d (pir=%d button=%d timer=%d)",
            (int)reason, (int)wakePin, pirWake, buttonWake, timerWake);
   
-  if (pirWake) {
-    digitalWrite(BLUE_LED, HIGH);  // Immediate visual feedback for motion
-  }
+  // LED will be turned on with proper timeout by PIR wake processing below
+  // Don't turn it on here without timeout as it causes false LED timeout detection
 
   // Diagnostic: confirm open/closed decision at wake.
   if (Time.isValid()) {
@@ -465,41 +560,95 @@ void handleSleepingState() {
       Log.info("Woke outside opening hours; keeping sensors powered down");
     }
 
+    // Check if LED timeout expired FIRST (before processing new PIR wake)
+    // This ensures we don't immediately undo state changes from PIR processing
+    Log.info("[WAKE CHECK] Mode=%d, LED status=%s, LED time remaining=%lu sec, occupied=%s",
+             sysStatus.get_sensorMode(),
+             signalLEDStatus() ? "ON" : "OFF",
+             (unsigned long)signalLEDTimeRemaining(),
+             current.get_occupied() ? "true" : "false");
+    
+    if (sysStatus.get_sensorMode() == OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
+      // LED timeout expired - debounce period elapsed without motion
+      Log.info("[LED TIMEOUT] Detected on wake - processing unoccupied transition");
+      uint32_t sessionDuration = Time.now() - current.get_occupancyStartTime();
+      uint32_t totalOccupied = current.get_totalOccupiedSeconds() + sessionDuration;
+      current.set_totalOccupiedSeconds(totalOccupied);
+      current.set_occupied(false);
+      current.set_occupancyStartTime(0);
+      signalLED(false);  // Turn off LED
+
+      Log.info("Space now UNOCCUPIED (LED timeout on wake) - Session: %lu sec, Total today: %lu sec",
+               sessionDuration, totalOccupied);
+      
+      // Report immediately on occupancy state changes
+      Log.info("Occupancy change detected (occupied->unoccupied) - triggering immediate report");
+      session.occupancyChangeTriggered = true;
+      state = REPORTING_STATE;
+      return;
+    }
+
+    // Process PIR wake events (after checking LED timeout above)
     // If this wake was caused by the PIR interrupt, synthesize a single
     // detection event so that the motion that woke the device is counted
     // even if the ISR flag did not survive ULTRA_LOW_POWER sleep.
     if (pirWake) {
+      Log.info("[PIR WAKE] Processing PIR wake event (mode=%d)", sysStatus.get_sensorMode());
       if (sysStatus.get_sensorMode() == COUNTING) {
         current.set_hourlyCount(current.get_hourlyCount() + 1);
         current.set_dailyCount(current.get_dailyCount() + 1);
         current.set_lastCountTime(Time.now());
+        signalLED(true, 1000);  // Flash for 1 second
         Log.info("Count detected from PIR wake - Hourly: %d, Daily: %d",
                  current.get_hourlyCount(), current.get_dailyCount());
       } else if (sysStatus.get_sensorMode() == OCCUPANCY) {
         if (!current.get_occupied()) {
           current.set_occupied(true);
           current.set_occupancyStartTime(Time.now());
-          Log.info("Space now OCCUPIED from PIR wake at %s", Time.timeStr().c_str());
+          // Treat the PIR wake as an occupancy event for debounce purposes.
+          // If lastOccupancyEvent is left at 0, the debounce logic that uses
+          // millis()-based timing will immediately expire and mark UNOCCUPIED.
+          current.set_lastOccupancyEvent(millis());
+
+          // Keep LED on for the debounce window (sensor.setting1 is milliseconds).
+          uint32_t debounceMs = sensorConfig.get_sensorSetting1();
+          if (debounceMs == 0) {
+            debounceMs = 60000; // default 60s
+          }
+          signalLED(true, debounceMs);
+          Log.info("Space now OCCUPIED from PIR wake at %s",
+                   Time.timeStr().c_str());
+          
+          // Report immediately on occupancy state changes
+          Log.info("Occupancy change detected (unoccupied->occupied) - triggering immediate report");
+          session.occupancyChangeTriggered = true;
+          state = REPORTING_STATE;
+          return;
+        } else {
+          // Already occupied - motion detected, LED stays on
+          Log.info("Motion from PIR wake - space remains occupied");
         }
         current.set_lastOccupancyEvent(millis());
       }
     }
 
-    // If this wake was from PIR, keep the BLUE LED on using the
-    // same software timer used for normal count events so the
-    // visible behaviour is consistent.
-    if (pirWake) {
-      digitalWrite(BLUE_LED, HIGH);
-      if (countSignalTimer.isActive()) {
-        countSignalTimer.reset();
-      } else {
-        countSignalTimer.start();
-      }
+    // For COUNTING mode: Turn off LED if flash completed during sleep
+    if (sysStatus.get_sensorMode() == COUNTING && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
+      signalLED(false);
     }
 
     // Timer wake = scheduled report. No checks, no gates.
     // We trust that the system timer woke us at the correct boundary.
     if (timerWake) {
+      // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, suppress periodic reports
+      // while occupied so occupancy=1 is only reported on 0->1 transition.
+      if (sysStatus.get_sensorMode() == OCCUPANCY && current.get_occupied() &&
+          sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
+        Log.info("WAKE: Timer wake while OCCUPIED (KEEP_ALIVE) - suppressing scheduled report");
+        state = SLEEPING_STATE;
+        return;
+      }
+
       Log.info("WAKE: Timer wake - reason=SCHEDULED_REPORT transitioning to REPORTING_STATE");
       state = REPORTING_STATE;
       return;
@@ -507,6 +656,12 @@ void handleSleepingState() {
 
     // For PIR wakes, check if reporting is also due (opportunistic reporting)
     if (pirWake && Time.isValid() && isWithinOpenHours()) {
+      // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, do not opportunistically
+      // report while occupied; PIR hits should only reset debounce.
+      if (sysStatus.get_sensorMode() == OCCUPANCY && current.get_occupied() &&
+          sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
+        // Skip overdue-report check while occupied.
+      } else {
       uint16_t intervalSec = sysStatus.get_reportingInterval();
       if (intervalSec == 0) intervalSec = 3600;
 
@@ -517,6 +672,7 @@ void handleSleepingState() {
         Log.info("WAKE: PIR + report overdue (%d sec) - transitioning to REPORTING_STATE", overdue);
         state = REPORTING_STATE;
         return;
+      }
       }
     }
 

@@ -29,4 +29,8 @@ inline void requestFullDisconnectAndRadioOff() {
   requestRadioPowerOff();
 }
 
+inline void requestCloudDisconnectOnly() {
+  Particle.disconnect();
+}
+
 } // namespace Connectivity

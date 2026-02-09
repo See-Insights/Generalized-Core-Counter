@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+
+# Interactive release launcher.
+# Prompts for version + notes, then calls ./release.sh
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT_DIR"
+
+if [ ! -x "./release.sh" ]; then
+  echo "Error: release.sh not found or not executable" >&2
+  exit 1
+fi
+
+VERSION=""
+RELEASE_NOTES=""
+DO_TAG=0
+DRY_RUN=0
+ALLOW_DIRTY=0
+
+# Allow basic flags here too
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -h|--help)
+      echo "Usage: ./release [--tag] [--dry-run] [--allow-dirty]"
+      exit 0
+      ;;
+    --tag)
+      DO_TAG=1
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    --allow-dirty)
+      ALLOW_DIRTY=1
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+echo "Interactive release"
+echo
+
+read -r -p "Version (e.g. 3.24): " VERSION
+if [ -z "$VERSION" ]; then
+  echo "Error: version is required" >&2
+  exit 1
+fi
+
+read -r -p "Release notes (one line): " RELEASE_NOTES
+if [ -z "$RELEASE_NOTES" ]; then
+  echo "Error: release notes are required" >&2
+  exit 1
+fi
+
+# If --tag wasn't passed, ask
+if [ "$DO_TAG" -eq 0 ]; then
+  read -r -p "Create git tag v${VERSION}? [y/N] " ANSWER
+  case "$ANSWER" in
+    y|Y|yes|YES) DO_TAG=1;;
+    *) DO_TAG=0;;
+  esac
+fi
+
+echo
+read -r -p "Continue? [y/N] " ANSWER
+case "$ANSWER" in
+  y|Y|yes|YES) ;;
+  *) echo "Aborted."; exit 0;;
+esac
+
+ARGS=()
+ARGS+=("--yes")
+if [ "$DO_TAG" -eq 1 ]; then
+  ARGS+=("--tag")
+fi
+if [ "$DRY_RUN" -eq 1 ]; then
+  ARGS+=("--dry-run")
+fi
+if [ "$ALLOW_DIRTY" -eq 1 ]; then
+  ARGS+=("--allow-dirty")
+fi
+
+exec ./release.sh "${ARGS[@]}" "$VERSION" "$RELEASE_NOTES"

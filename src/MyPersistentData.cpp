@@ -376,6 +376,29 @@ void sysStatusData::set_testScenarioIndex(uint8_t value) {
     setValue<uint8_t>(offsetof(SysData,testScenarioIndex), value);
 }
 
+String sysStatusData::get_webhookName() const {
+    String result;
+    getValueString(offsetof(SysData,webhookName), sizeof(SysData::webhookName), result);
+    return result;
+}
+bool sysStatusData::set_webhookName(const char *str) {
+    return setValueString(offsetof(SysData,webhookName), sizeof(SysData::webhookName), str);
+}
+
+bool sysStatusData::get_webhookEnabled() const {
+    return getValue<bool>(offsetof(SysData,webhookEnabled));
+}
+void sysStatusData::set_webhookEnabled(bool value) {
+    setValue<bool>(offsetof(SysData,webhookEnabled), value);
+}
+
+uint32_t sysStatusData::get_webhookTimeoutMs() const {
+    return getValue<uint32_t>(offsetof(SysData,webhookTimeoutMs));
+}
+void sysStatusData::set_webhookTimeoutMs(uint32_t value) {
+    setValue<uint32_t>(offsetof(SysData,webhookTimeoutMs), value);
+}
+
 // End of sysStatusData class
 
 // *****************  Sensor Config Storage Object *******************
@@ -435,7 +458,9 @@ void sensorConfigData::set_sensorType(uint8_t value) {
 }
 
 uint32_t sensorConfigData::get_sensorSetting1() const {
-    return getValue<uint32_t>(offsetof(SensorData, setting1));
+    uint32_t value = getValue<uint32_t>(offsetof(SensorData, setting1));
+    Log.trace("sensorConfig.get_sensorSetting1() => %lu", (unsigned long)value);
+    return value;
 }
 
 void sensorConfigData::set_sensorSetting1(uint32_t value) {
@@ -526,6 +551,36 @@ bool currentStatusData::validate(size_t dataSize) {
             current.set_hourlyCount(0);
             current.set_dailyCount(0);
             valid = false;
+        }
+
+        // Occupancy-mode sanity checks (prevents bogus 100+ year totals)
+        // totalOccupiedSeconds is "today" and should never exceed 24 hours.
+        uint32_t totalOccupied = current.get_totalOccupiedSeconds();
+        if (totalOccupied > 24UL * 3600UL) {
+            Log.warn("Current: totalOccupiedSeconds invalid (%lu) - resetting", (unsigned long)totalOccupied);
+            current.set_totalOccupiedSeconds(0);
+        }
+
+        // If occupied is true, occupancyStartTime must be non-zero and plausible.
+        if (current.get_occupied()) {
+            time_t start = current.get_occupancyStartTime();
+            if (start == 0) {
+                Log.warn("Current: occupied=true but occupancyStartTime=0 - forcing unoccupied");
+                current.set_occupied(false);
+                current.set_lastOccupancyEvent(0);
+            } else if (Time.isValid()) {
+                time_t now = Time.now();
+                // If start is in the future by more than a few seconds, clamp.
+                if (start > now + 5) {
+                    Log.warn("Current: occupancyStartTime in future (%lu > %lu) - clamping", (unsigned long)start, (unsigned long)now);
+                    current.set_occupancyStartTime(now);
+                }
+            }
+
+            // lastOccupancyEvent drives debounce logic; if missing, seed to now to avoid immediate expiry.
+            if (current.get_lastOccupancyEvent() == 0) {
+                current.set_lastOccupancyEvent(millis());
+            }
         }
     }
     Log.info("Current data is %s", (valid) ? "valid" : "not valid");

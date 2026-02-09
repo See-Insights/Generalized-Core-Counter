@@ -87,4 +87,54 @@ bool initializePowerCfg() {
     */
     return true;
 }
+
+// ---------------------------------------------------------------------------
+// Centralized LED management
+// ---------------------------------------------------------------------------
+// Use RTC seconds (not millis) so time advances during sleep
+retained time_t ledOffTime = 0;  // RTC time when LED should turn off (0 = indefinite)
+
+void signalLED(bool state, uint32_t durationMs) {
+    digitalWrite(BLUE_LED, state ? HIGH : LOW);
+    
+    if (state && durationMs > 0) {
+        if (Time.isValid()) {
+            ledOffTime = Time.now() + (durationMs / 1000);
+        } else {
+            ledOffTime = 0;  // Fallback to indefinite if no valid time
+        }
+    } else if (state) {
+        ledOffTime = 0;
+    } else {
+        ledOffTime = 0;
+    }
+}
+
+void signalLEDUpdate() {
+    if (ledOffTime > 0 && Time.isValid() && Time.now() >= ledOffTime) {
+        digitalWrite(BLUE_LED, LOW);
+        ledOffTime = 0;
+    }
+}
+
+uint32_t signalLEDTimeRemaining() {
+    if (ledOffTime == 0) {
+        return 0;
+    }
+    
+    if (!Time.isValid()) {
+        return 0;
+    }
+    
+    time_t now = Time.now();
+    if (now >= ledOffTime) {
+        return 0;
+    }
+    
+    return (uint32_t)(ledOffTime - now);  // Return seconds remaining
+}
+
+bool signalLEDStatus() {
+    return digitalRead(BLUE_LED) == HIGH;
+}
                 

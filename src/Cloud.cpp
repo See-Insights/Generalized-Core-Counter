@@ -125,62 +125,98 @@ void Cloud::mergeConfiguration() {
     // Start with defaults as base
     mergedConfig = defaults;
     
-    // Manually merge sensor thresholds using a simple, consistent schema.
+    // Manually merge sensor configuration - copy ALL sensor keys then override with device settings
     //
-    // Supported keys:
-    //   defaults.sensor.threshold1 / threshold2
-    //   defaults.sensorThreshold   (applies to both thresholds)
-    //   device.sensor.threshold1 / threshold2
-    //   device.sensorThreshold     (applies to both thresholds)
+    // Supported keys: type, setting1, setting2, setting3, setting4, threshold1, threshold2
+    //   plus legacy sensorThreshold (applies to both thresholds)
     {
-        // Start from sensible defaults; these will be overridden by
-        // ledger values from defaults and then device.
-        int threshold1 = 60;
-        int threshold2 = 60;
-        bool haveDefaultSensor = defaults.has("sensor") && defaults.get("sensor").isMap();
-        bool haveDeviceSensor = device.has("sensor") && device.get("sensor").isMap();
+        VariantMap mergedSensor;
 
-        if (haveDefaultSensor) {
+        // Start with defaults sensor config - copy ALL keys
+        if (defaults.has("sensor") && defaults.get("sensor").isMap()) {
             Variant defaultSensor = defaults.get("sensor");
-            if (defaultSensor.has("threshold1")) {
-                threshold1 = defaultSensor.get("threshold1").toInt();
-            }
-            if (defaultSensor.has("threshold2")) {
-                threshold2 = defaultSensor.get("threshold2").toInt();
-            }
+            if (defaultSensor.has("type")) mergedSensor["type"] = defaultSensor.get("type");
+            if (defaultSensor.has("setting1")) mergedSensor["setting1"] = defaultSensor.get("setting1");
+            if (defaultSensor.has("setting2")) mergedSensor["setting2"] = defaultSensor.get("setting2");
+            if (defaultSensor.has("setting3")) mergedSensor["setting3"] = defaultSensor.get("setting3");
+            if (defaultSensor.has("setting4")) mergedSensor["setting4"] = defaultSensor.get("setting4");
+            if (defaultSensor.has("threshold1")) mergedSensor["threshold1"] = defaultSensor.get("threshold1");
+            if (defaultSensor.has("threshold2")) mergedSensor["threshold2"] = defaultSensor.get("threshold2");
+        } else {
+            // Fallback defaults if no sensor section in ledger
+            mergedSensor["threshold1"] = Variant(60);
+            mergedSensor["threshold2"] = Variant(60);
         }
 
-        // Allow a single generic default threshold that applies
-        // to both channels when more specific keys are not used.
+        // Allow a single generic default threshold that applies to both channels
         if (defaults.has("sensorThreshold")) {
             int base = defaults.get("sensorThreshold").toInt();
-            threshold1 = base;
-            threshold2 = base;
+            mergedSensor["threshold1"] = Variant(base);
+            mergedSensor["threshold2"] = Variant(base);
         }
 
-        if (haveDeviceSensor) {
+        // Override with device-specific sensor config - copy ALL keys
+        if (device.has("sensor") && device.get("sensor").isMap()) {
             Variant deviceSensor = device.get("sensor");
-            if (deviceSensor.has("threshold1")) {
-                int override1 = deviceSensor.get("threshold1").toInt();
-                threshold1 = override1;
-            }
-            if (deviceSensor.has("threshold2")) {
-                int override2 = deviceSensor.get("threshold2").toInt();
-                threshold2 = override2;
-            }
+            if (deviceSensor.has("type")) mergedSensor["type"] = deviceSensor.get("type");
+            if (deviceSensor.has("setting1")) mergedSensor["setting1"] = deviceSensor.get("setting1");
+            if (deviceSensor.has("setting2")) mergedSensor["setting2"] = deviceSensor.get("setting2");
+            if (deviceSensor.has("setting3")) mergedSensor["setting3"] = deviceSensor.get("setting3");
+            if (deviceSensor.has("setting4")) mergedSensor["setting4"] = deviceSensor.get("setting4");
+            if (deviceSensor.has("threshold1")) mergedSensor["threshold1"] = deviceSensor.get("threshold1");
+            if (deviceSensor.has("threshold2")) mergedSensor["threshold2"] = deviceSensor.get("threshold2");
         }
+
         if (device.has("sensorThreshold")) {
             int override = device.get("sensorThreshold").toInt();
-            threshold1 = override;
-            threshold2 = override;
+            mergedSensor["threshold1"] = Variant(override);
+            mergedSensor["threshold2"] = Variant(override);
         }
 
-        // Build a minimal merged sensor object with only the supported keys
-        VariantMap mergedSensor;
-        mergedSensor["threshold1"] = Variant(threshold1);
-        mergedSensor["threshold2"] = Variant(threshold2);
-
         mergedConfig.set("sensor", Variant(mergedSensor));
+        
+        // Log merged sensor config for debugging
+        int type = mergedSensor.has("type") ? mergedSensor["type"].toInt() : -1;
+        int setting1 = mergedSensor.has("setting1") ? mergedSensor["setting1"].toInt() : -1;
+        Log.info("Merged sensor config: type=%d, setting1=%d", type, setting1);
+    }
+    
+    // Manually merge webhook configuration - copy ALL webhook keys then override with device settings
+    {
+        VariantMap mergedReporting;
+        VariantMap mergedWebhook;
+
+        // Start with defaults webhook config - copy ALL keys
+        if (defaults.has("reporting") && defaults.get("reporting").isMap()) {
+            Variant defaultReporting = defaults.get("reporting");
+            if (defaultReporting.has("webhook") && defaultReporting.get("webhook").isMap()) {
+                Variant defaultWebhook = defaultReporting.get("webhook");
+                if (defaultWebhook.has("name")) mergedWebhook["name"] = defaultWebhook.get("name");
+                if (defaultWebhook.has("enabled")) mergedWebhook["enabled"] = defaultWebhook.get("enabled");
+                if (defaultWebhook.has("timeoutMs")) mergedWebhook["timeoutMs"] = defaultWebhook.get("timeoutMs");
+            }
+        }
+
+        // Override with device-specific webhook config - copy ALL keys
+        if (device.has("reporting") && device.get("reporting").isMap()) {
+            Variant deviceReporting = device.get("reporting");
+            if (deviceReporting.has("webhook") && deviceReporting.get("webhook").isMap()) {
+                Variant deviceWebhook = deviceReporting.get("webhook");
+                if (deviceWebhook.has("name")) mergedWebhook["name"] = deviceWebhook.get("name");
+                if (deviceWebhook.has("enabled")) mergedWebhook["enabled"] = deviceWebhook.get("enabled");
+                if (deviceWebhook.has("timeoutMs")) mergedWebhook["timeoutMs"] = deviceWebhook.get("timeoutMs");
+            }
+        }
+
+        if (!mergedWebhook.isEmpty()) {
+            mergedReporting["webhook"] = Variant(mergedWebhook);
+            mergedConfig.set("reporting", Variant(mergedReporting));
+            
+            // Log merged webhook config for debugging
+            String name = mergedWebhook.has("name") ? mergedWebhook["name"].toString() : "none";
+            bool enabled = mergedWebhook.has("enabled") ? mergedWebhook["enabled"].toBool() : false;
+            Log.info("Merged webhook config: name=%s, enabled=%d", name.c_str(), enabled);
+        }
     }
     
     // Apply other top-level device overrides (these aren't nested objects)
@@ -205,6 +241,37 @@ bool Cloud::loadConfigurationFromCloud() {
     return lastApplySuccess;
 }
 
+String Cloud::getWebhookName() {
+    // Priority 1: Cloud configuration (explicitly set)
+    String cloudWebhookName = sysStatus.get_webhookName();
+    if (cloudWebhookName.length() > 0) {
+        Log.info("Using cloud-configured webhook: %s", cloudWebhookName.c_str());
+        return cloudWebhookName;
+    }
+    
+    // Priority 2: Convention-based (mode-specific)
+    uint8_t mode = sysStatus.get_sensorMode();
+    String conventionName;
+    
+    switch (mode) {
+        case COUNTING:
+            conventionName = "counting-webhook-v1";
+            break;
+        case OCCUPANCY:
+            conventionName = "occupancy-webhook-v1";
+            break;
+        case MEASUREMENT:
+            conventionName = "measurement-webhook-v1";
+            break;
+        default:
+            conventionName = "unknown-webhook-v1";
+            break;
+    }
+    
+    Log.info("Using convention-based webhook: %s", conventionName.c_str());
+    return conventionName;
+}
+
 bool Cloud::applyConfigurationFromLedger() {
     bool success = true;
 
@@ -212,6 +279,7 @@ bool Cloud::applyConfigurationFromLedger() {
     success &= applyTimingConfig();
     success &= applyMessagingConfig();
     success &= applyModesConfig();
+    success &= applyReportingConfig();
     
     if (success) {
         // Do not force synchronous storage flushes here; they can exceed the
@@ -328,18 +396,8 @@ bool Cloud::applyTimingConfig() {
         }
     }
 
-    if (timing.has("pollingRateSec")) {
-        int pollingRate = timing.get("pollingRateSec").toInt();
-        if (validateRange(pollingRate, 0, 3600, "timing.pollingRateSec")) {
-            if (sensorConfig.get_pollingRate() != pollingRate) {
-                sensorConfig.set_pollingRate(pollingRate);
-                Log.info("Config: Polling rate -> %ds", pollingRate);
-                changed = true;
-            }
-        } else {
-            success = false;
-        }
-    }
+    // Note: pollingRate is no longer used in v3.23 - sensor-specific timing
+    // is now configured via sensor.setting1-4 fields in the sensor section
 
     if (timing.has("openHour")) {
         int openHour = timing.get("openHour").toInt();
@@ -421,11 +479,17 @@ bool Cloud::applySensorConfig() {
     // sensor.setting1-4 (generic settings)
     if (sensor.has("setting1")) {
         int setting1 = sensor.get("setting1").toInt();
-        if (sensorConfig.get_sensorSetting1() != (uint32_t)setting1) {
+        uint32_t currentValue = sensorConfig.get_sensorSetting1();
+        Log.info("Cloud config: setting1=%d (current EEPROM=%lu)", setting1, (unsigned long)currentValue);
+        if (currentValue != (uint32_t)setting1) {
             sensorConfig.set_sensorSetting1((uint32_t)setting1);
-            Log.info("Config: Sensor setting1 -> %d", setting1);
+            Log.info("Config: Sensor setting1 updated: %lu -> %d", (unsigned long)currentValue, setting1);
             changed = true;
+        } else {
+            Log.info("Config: Sensor setting1 unchanged at %d", setting1);
         }
+    } else {
+        Log.warn("Cloud config: sensor.setting1 key NOT FOUND in ledger!");
     }
     
     if (sensor.has("setting2")) {
@@ -564,6 +628,59 @@ bool Cloud::applyModesConfig() {
     }
 
     if (changed) Log.info("Modes config updated");
+    return success;
+}
+
+bool Cloud::applyReportingConfig() {
+    if (!mergedConfig.has("reporting")) return true;
+    Variant reporting = mergedConfig.get("reporting");
+    
+    if (!reporting.isMap()) return true;
+
+    bool success = true;
+    bool changed = false;
+
+    if (reporting.has("webhook") && reporting.get("webhook").isMap()) {
+        Variant webhook = reporting.get("webhook");
+        
+        if (webhook.has("name")) {
+            String webhookName = webhook.get("name").toString();
+            if (webhookName.length() > 0 && webhookName.length() < 64) {
+                if (strcmp(sysStatus.get_webhookName(), webhookName.c_str()) != 0) {
+                    sysStatus.set_webhookName(webhookName.c_str());
+                    Log.info("Config: Webhook name -> %s", webhookName.c_str());
+                    changed = true;
+                }
+            } else {
+                Log.warn("Invalid webhook name length: %d", webhookName.length());
+                success = false;
+            }
+        }
+        
+        if (webhook.has("enabled")) {
+            bool webhookEnabled = webhook.get("enabled").toBool();
+            if (sysStatus.get_webhookEnabled() != webhookEnabled) {
+                sysStatus.set_webhookEnabled(webhookEnabled);
+                Log.info("Config: Webhook enabled -> %s", webhookEnabled ? "YES" : "NO");
+                changed = true;
+            }
+        }
+        
+        if (webhook.has("timeoutMs")) {
+            int webhookTimeout = webhook.get("timeoutMs").toInt();
+            if (validateRange(webhookTimeout, 1000, 60000, "webhookTimeoutMs")) {
+                if (sysStatus.get_webhookTimeoutMs() != (uint32_t)webhookTimeout) {
+                    sysStatus.set_webhookTimeoutMs((uint32_t)webhookTimeout);
+                    Log.info("Config: Webhook timeout -> %dms", webhookTimeout);
+                    changed = true;
+                }
+            } else {
+                success = false;
+            }
+        }
+    }
+
+    if (changed) Log.info("Reporting config updated");
     return success;
 }
 

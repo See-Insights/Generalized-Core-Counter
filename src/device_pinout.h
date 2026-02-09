@@ -95,6 +95,22 @@ extern const pin_t intPin;            // PIR interrupt pin (SPI clock line)
 extern const pin_t disableModule;     // Sensor enable line
 extern const pin_t ledPower;          // Sensor LED power
 
+// ---------------------------------------------------------------------------
+// Centralized LED management functions
+// ---------------------------------------------------------------------------
+void signalLED(bool state, uint32_t durationMs = 0);  // Control LED with optional duration
+void signalLEDUpdate();  // Process automatic LED turn-off
+uint32_t signalLEDTimeRemaining();  // Get seconds remaining until LED timeout
+bool signalLEDStatus();  // Get current LED state
+
+/**
+ * @brief Get seconds remaining until LED should turn off
+ * @return Seconds until off time (0 if off, already expired, or indefinite)
+ * @details Use this to:
+ *          - Calculate sleep duration (min of scheduled wake and LED timeout)
+ *          - Check if LED timeout expired while awake (main loop)
+ *          - Defer sleep in COUNTING mode until LED turns off
+ */
 bool initializePinModes();
 bool initializePowerCfg();
 

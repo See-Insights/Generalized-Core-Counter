@@ -219,6 +219,11 @@ public:
 		uint16_t testConnectionDurationOverride;          // Test mode: connection duration override (0xFFFF = disabled, 0-999 = override value in seconds)
 		uint8_t testScenarioIndex;                        // Auto-cycle test mode: scenario index (0xFF = disabled, 0-4 = active scenario)
 
+		// ********** Webhook Configuration **********
+		char webhookName[64];                             // Webhook event name from cloud config
+		bool webhookEnabled;                              // Enable/disable webhook publishing
+		uint32_t webhookTimeoutMs;                        // Webhook response timeout in milliseconds
+
 	};
 
 	SysData sysData;
@@ -353,6 +358,14 @@ public:
     void set_testConnectionDurationOverride(uint16_t value);
     uint8_t get_testScenarioIndex() const;
     void set_testScenarioIndex(uint8_t value);
+
+	String get_webhookName() const;
+	bool set_webhookName(const char *str);
+	bool get_webhookEnabled() const;
+	void set_webhookEnabled(bool value);
+	uint32_t get_webhookTimeoutMs() const;
+	void set_webhookTimeoutMs(uint32_t value);
+
 	//Members here are internal only and therefore protected
 protected:
     /**

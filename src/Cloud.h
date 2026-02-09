@@ -91,6 +91,18 @@ public:
     bool publishDataToLedger();
 
     /**
+     * @brief Get the webhook event name for data publishing
+     * 
+     * Returns webhook name using 3-tier resolution:
+     * 1. Cloud configuration (if explicitly set)
+     * 2. Convention-based ({mode}-webhook-v1)
+     * 3. Legacy fallback (Ubidots-Counter-Hook-v1)
+     * 
+     * @return String containing webhook event name
+     */
+    String getWebhookName();
+
+    /**
      * @brief Service deferred cloud work; call from main loop.
      *
      * Used to keep any ledger/status publishing out of callback context
@@ -152,6 +164,13 @@ private:
      * @return true if successful
      */
     bool applyModesConfig();
+
+    /**
+     * @brief Apply reporting configuration section (webhook settings)
+     * 
+     * @return true if successful
+     */
+    bool applyReportingConfig();
 
     /**
      * @brief Validate configuration value is within acceptable range

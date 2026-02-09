@@ -31,6 +31,60 @@ void handleIdleState() {
     publishStateTransition();
   }
 
+  // Process LED timers for timed flashes (COUNTING mode)
+  signalLEDUpdate();
+
+  // Maintain LED state for OCCUPANCY mode and check debounce timeout
+  if (sysStatus.get_sensorMode() == OCCUPANCY) {
+    // Check if debounce timeout expired (no motion for debounce period)
+    if (current.get_occupied()) {
+      uint32_t debounceMs = sensorConfig.get_sensorSetting1();
+      if (debounceMs == 0) {
+        debounceMs = 60000; // default 60s
+      }
+
+      uint32_t lastEvent = current.get_lastOccupancyEvent();
+      if (lastEvent == 0) {
+        lastEvent = millis();
+        current.set_lastOccupancyEvent(lastEvent);
+      }
+      uint32_t timeSinceLastEvent = millis() - lastEvent;
+
+      if (timeSinceLastEvent >= debounceMs) {
+        // Debounce timeout expired - space is now unoccupied
+        uint32_t sessionDuration = Time.now() - current.get_occupancyStartTime();
+        uint32_t totalOccupied = current.get_totalOccupiedSeconds() + sessionDuration;
+        current.set_totalOccupiedSeconds(totalOccupied);
+        current.set_occupied(false);
+        current.set_occupancyStartTime(0);
+        signalLED(false);  // Turn off LED
+        
+        Log.info("Space now UNOCCUPIED (debounce timeout in IDLE) - Session: %lu sec, Total today: %lu sec",
+                 sessionDuration, totalOccupied);
+        
+        // In INTERMITTENT_KEEP_ALIVE mode (connectionMode 3), report immediately
+        // on occupancy transitions. In other modes, occupancy transitions are
+        // still tracked, but do not force an immediate report/connect.
+        if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
+          Log.info("Occupancy change detected (occupied->unoccupied) - triggering immediate report");
+          session.occupancyChangeTriggered = true;
+          state = REPORTING_STATE;
+          return;
+        } else {
+          Log.info("Occupancy change detected (occupied->unoccupied) - no immediate report (connectionMode=%d)",
+                   (int)sysStatus.get_connectionMode());
+        }
+      }
+    }
+    
+    // Maintain LED state based on occupancy
+    if (current.get_occupied() && !signalLEDStatus()) {
+      signalLED(true);   // Keep LED on while occupied
+    } else if (!current.get_occupied() && signalLEDStatus()) {
+      signalLED(false);  // Ensure LED off when unoccupied
+    }
+  }
+
   // If configuration changes (for example, device-settings ledger updates)
   // move the park from CLOSED->OPEN while the device is already awake,
   // ensure the sensor stack is enabled. Previously this only happened on
@@ -86,11 +140,11 @@ void handleIdleState() {
   // publish queue has fully drained so we can confirm that any
   // pending offline events (for example, from before boot) have
   // been flushed.
-  if (firstConnectionObserved && !firstConnectionQueueDrainedLogged && Particle.connected()) {
+  if (session.firstConnectionObserved && !session.firstConnectionQueueDrainedLogged && Particle.connected()) {
     if (PublishQueuePosix::instance().getCanSleep() &&
         PublishQueuePosix::instance().getNumEvents() == 0) {
       Log.info("First connection queue drained - all pending events flushed");
-      firstConnectionQueueDrainedLogged = true;
+      session.firstConnectionQueueDrainedLogged = true;
     }
   }
 
@@ -98,6 +152,13 @@ void handleIdleState() {
   // Use the configured reportingIntervalSec to determine when to
   // generate a periodic report, regardless of trigger mode.
   if (Time.isValid() && isWithinOpenHours()) {
+    // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, do not generate periodic
+    // reports while occupied. Occupancy=1 should only be reported on the
+    // transition 0->1 (and 1->0 when it clears).
+    if (sysStatus.get_sensorMode() == OCCUPANCY && current.get_occupied() &&
+        sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
+      // Skip periodic reporting while occupied in this mode.
+    } else {
     uint16_t intervalSec = sysStatus.get_reportingInterval();
     if (intervalSec == 0) {
       intervalSec = 3600; // Fallback to 1 hour
@@ -114,6 +175,7 @@ void handleIdleState() {
       }
       state = REPORTING_STATE;
       return;
+    }
     }
   }
 
@@ -156,12 +218,17 @@ void handleIdleState() {
     }
 
     if (!updatesPending && canSleepGate) {
-      // If a sensor event is still pending or the BLUE LED timer is
-      // active from a recent count, defer transitioning into the
-      // SLEEPING_STATE. This avoids rapid Idle<->Sleeping ping-pong
-      // and the associated extra logging while still honouring the
-      // low-power policy once the indication has finished.
-      if (sensorDetect || countSignalTimer.isActive()) {
+      // If a sensor event is still pending or the BLUE LED is still on
+      // from a recent count, defer transitioning into the SLEEPING_STATE.
+      // This avoids rapid Idle<->Sleeping ping-pong and the associated
+      // extra logging while still honouring the low-power policy once
+      // the indication has finished.
+      // NOTE: In OCCUPANCY mode, we intentionally allow sleep even while the
+      // debounce/LED timer is running. The PIR interrupt will wake us early
+      // for new motion, and SLEEPING_STATE already wakes on timer to evaluate
+      // the debounce timeout. Keeping the device awake here causes it to
+      // remain connected and burn power during continued motion.
+      if (sensorDetect || (sysStatus.get_sensorMode() == COUNTING && signalLEDTimeRemaining() > 0)) {
         return;
       }
 

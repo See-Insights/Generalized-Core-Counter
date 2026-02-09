@@ -31,25 +31,31 @@ extern volatile bool sensorDetect;
 // ISR functions
 void userSwitchISR();
 
+// Session state flags consolidated into a struct
+struct SessionState {
+  bool firstConnectionObserved = false;
+  bool firstConnectionQueueDrainedLogged = false;
+  bool hibernateDisabledForSession = false;
+  bool suppressAlert40ThisSession = false;
+  bool awaitingWebhookResponse = false;
+  bool webhookExpectedOnConnect = false;   // We queued a webhook publish and should start a response window on next cloud connect
+  unsigned long webhookAwaitStartMs = 0;  // millis() when the short-term webhook response window started
+  bool occupancyChangeTriggered = false;  // Report triggered by occupancy state change
+  bool returnToSleepAfterReport = false;  // Should return to SLEEPING_STATE after connection
+};
+
 // Connection / power management timing shared between the
 // state machine core and state handlers.
 extern const unsigned long stayAwakeLong;
 extern const unsigned long resetWait;
 extern const unsigned long maxOnlineWorkMs;
 extern unsigned long connectedStartMs;
-extern bool lastLowPowerMode;
-extern bool firstConnectionObserved;
-extern bool firstConnectionQueueDrainedLogged;
-extern bool hibernateDisabledForSession;
-extern bool suppressAlert40ThisSession;
+extern SessionState session;
 
 // Helper functions used by multiple state handlers
 bool isWithinOpenHours();
 int secondsUntilNextOpen();
 void publishStateTransition();
-
-// Shared software timer for BLUE_LED visibility on count events
-extern Timer countSignalTimer;
 
 // Application-level helpers implemented in Generalized-Core-Counter.cpp
 void dailyCleanup();

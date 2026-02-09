@@ -84,15 +84,10 @@ static void appWatchdogHandler(); // Application watchdog handler
 void publishData();           // Publish the data to the cloud
 void userSwitchISR();         // Interrupt for the user switch
 void sensorISR();             // Interrupt for legacy tire-counting sensor
-void countSignalTimerISR();   // Timer ISR to turn off BLUE LED
 void dailyCleanup();          // Reset daily counters and housekeeping
 void UbidotsHandler(const char *event, const char *data); // Webhook response handler
 void publishStartupStatus();  // One-time status summary at boot
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE); // Safe diagnostic publish with queue guard
-
-// One-shot software timer to keep BLUE_LED on long enough
-// to be visible for each count or sensor triggered wake event.
-Timer countSignalTimer(1000, countSignalTimerISR, true);
 
 // Instantiate needed libraries / APIs
 SystemSleepConfiguration config; // Sleep 2.0 configuration
@@ -114,21 +109,16 @@ State oldState = INITIALIZATION_STATE;
 volatile bool userSwitchDetected = false;
 volatile bool sensorDetect = false; // Flag for sensor interrupt
 
-// Track first-connection queue behaviour for observability
-bool firstConnectionObserved = false;
-bool firstConnectionQueueDrainedLogged = false;
-bool hibernateDisabledForSession = false;
+// Session state - consolidated flags for connection/webhook/hibernate tracking
+SessionState session;
 
 // Track when we connected to enforce max connected time in LOW_POWER/DISCONNECTED modes
 unsigned long connectedStartMs = 0;
 
-// Suppress alert 40 (webhook timeout) after waking from overnight closed-hours hibernate
-bool suppressAlert40ThisSession = false;
-
-// Webhook response timeout tracking (20 second budget per article about B524 platform issue)
-unsigned long webhookPublishMs = 0;  // Timestamp when we last published to webhook
-bool awaitingWebhookResponse = false; // True if we're waiting for webhook response
-const unsigned long webhookResponseTimeoutMs = 20000; // 20 second timeout for webhook response
+// Webhook response supervision
+// Short-term monitoring is a simple 20s window that starts only when the
+// device is successfully cloud-connected (Particle.connected()). We arm the
+// expectation when we queue a webhook publish.
 
 // ********** Timing **********
 const unsigned long resetWait = 30000;      // Error state dwell before reset
@@ -163,6 +153,12 @@ void setup() {
     String deviceID = System.deviceID();
     deviceID.toCharArray(responseTopic, sizeof(responseTopic));
     Particle.subscribe(responseTopic, UbidotsHandler);
+
+    // Also subscribe to the default Particle webhook response prefix so this
+    // works with whatever webhook name is configured in the ledger.
+    // If the integration uses the default response topic, responses will be
+    // published to: hook-response/<eventName>.
+    Particle.subscribe("hook-response/", UbidotsHandler);
   }
 
   // Configure network stack but keep radio OFF at startup.
@@ -190,14 +186,10 @@ void setup() {
   current.setup();      // Initialize the current status data
 
   // Configure serial logging based on serial flag
-  // When serial is connected: INFO level for development/debugging
-  // When serial is not connected: ERROR level only to reduce overhead
+  // Note: Particle firmware on this platform doesn't support Log.level()
   if (sysStatus.get_serialConnected()) {
     Serial.begin(9600);
-    Log.level(LOG_LEVEL_INFO);
-    Log.info("Serial logging enabled (LOG_LEVEL_INFO)");
-  } else {
-    Log.level(LOG_LEVEL_ERROR);
+    Log.info("Serial logging enabled");
   }
 
   // Initialize test mode overrides to disabled state
@@ -328,7 +320,7 @@ void setup() {
       uint8_t localHour = (uint8_t)(conv.getLocalTimeHMS().toSeconds() / 3600);
       if (localHour == sysStatus.get_openTime()) {
         Log.info("Wake from overnight hibernate at opening hour - suppressing alert 40");
-        suppressAlert40ThisSession = true;
+        session.suppressAlert40ThisSession = true;
       }
     }
   }
@@ -370,7 +362,7 @@ void setup() {
   if (state == INITIALIZATION_STATE)
     state = IDLE_STATE; // Default to IDLE; CONNECTING only when explicitly requested
   Log.info("Startup complete");
-  digitalWrite(BLUE_LED, LOW); // Signal the end of startup
+  signalLED(false);  // Turn off startup indicator
 }
 
 void loop() {
@@ -414,11 +406,21 @@ void loop() {
   // Service outgoing publish queue
   PublishQueuePosix::instance().loop();
 
-  // Check for webhook response timeout (20 second budget per B524 platform issue)
-  if (awaitingWebhookResponse && (millis() - webhookPublishMs) > webhookResponseTimeoutMs) {
-    Log.warn("Webhook response timeout after %lu ms - raising alert 40", (millis() - webhookPublishMs));
-    awaitingWebhookResponse = false; // Clear flag so we don't repeatedly raise alert
-    current.raiseAlert(40);
+  // Check for short-term webhook response timeout.
+  // Requirement: 20 seconds starting only after a successful cloud connect.
+  if (Particle.connected() && session.awaitingWebhookResponse && session.webhookAwaitStartMs != 0) {
+    unsigned long timeoutMs = sysStatus.get_webhookTimeoutMs();
+    if (timeoutMs < 5000UL || timeoutMs > 120000UL) {
+      timeoutMs = 20000UL;
+    }
+
+    const unsigned long elapsedMs = millis() - session.webhookAwaitStartMs;
+    if (elapsedMs > timeoutMs) {
+      Log.warn("Webhook response timeout after %lu ms - raising alert 40", elapsedMs);
+      session.awaitingWebhookResponse = false;
+      session.webhookAwaitStartMs = 0;
+      current.raiseAlert(40);
+    }
   }
 
   // If an out-of-memory event occurred, go to error state
@@ -430,11 +432,12 @@ void loop() {
     state = ERROR_STATE;
   }
 
-  // If the user switch is pressed, force a connection to drain queue.
+  // If the user switch is pressed, force an immediate report and connection
   if (userSwitchDetected) {
-    Log.info("User switch pressed - connecting to drain queue");
+    Log.info("User switch pressed - triggering immediate report and connection");
     userSwitchDetected = false;
-    state = CONNECTING_STATE;
+    session.occupancyChangeTriggered = true;  // Bypass boundary alignment for immediate connection
+    state = REPORTING_STATE;
   }
 
   // ********** Centralized sensor event handling **********
@@ -553,9 +556,13 @@ void publishData() {
 
   char data[256];
 
-  // Compute the timestamp as the last second of the previous hour so the
-  // webhook data aggregates correctly into hourly buckets in Ubidots.
-  unsigned long timeStampValue = Time.now() - (Time.minute() * 60L + Time.second() + 1L);
+  // We support two timestamp strategies:
+  // - Occupancy mode: use current time so the value updates in Ubidots even
+  //   if multiple publishes happen within the same hour.
+  // - Counting mode: keep the legacy "end of previous hour" timestamp so
+  //   hourly bucket aggregation behavior remains unchanged.
+  const unsigned long nowStampSec = Time.now();
+  const unsigned long endOfPrevHourStampSec = nowStampSec - (Time.minute() * 60L + Time.second() + 1L);
 
   // Bounds check battery state index for safety
   uint8_t battState = current.get_batteryState();
@@ -565,14 +572,24 @@ void publishData() {
 
   uint8_t sensorMode = sysStatus.get_sensorMode();
 
+  // Ensure battery value is always a finite number for webhook ingestion.
+  // Ubidots rejects NaN/Inf with a 400 response.
+  float stateOfCharge = current.get_stateOfCharge();
+  if (!(stateOfCharge == stateOfCharge) || stateOfCharge < 0.0f || stateOfCharge > 100.0f) {
+    stateOfCharge = 0.0f;
+    battState = 0;
+  }
+
   // Build webhook payload based on sensor mode
   if (sensorMode == OCCUPANCY) {
-    // Occupancy mode webhook format
+    const unsigned long timeStampValue = nowStampSec;
+
+    // Occupancy mode webhook format (occupancy as 0/1 numeric value)
     snprintf(data, sizeof(data),
-             "{\"occupancy\":\"%s\",\"dailyoccupancy\":%lu,\"battery\":{\"value\":%4.2f,\"context\":{\"key1\":\"%s\"}},\"temp\":%4.2f,\"alerts\":%i,\"resets\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
-             current.get_occupied() ? "occupied" : "unoccupied",
+             "{\"occupancy\":%d,\"dailyoccupancy\":%lu,\"battery\":%4.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"alerts\":%i,\"resets\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
+             current.get_occupied() ? 1 : 0,
              (unsigned long)current.get_totalOccupiedSeconds(),
-             current.get_stateOfCharge(),
+             stateOfCharge,
              batteryContext[battState],
              current.get_internalTempC(),
              current.get_alertCode(),
@@ -581,17 +598,19 @@ void publishData() {
              timeStampValue);
 
     // Log occupancy state and total seconds
-    Log.info("Report payload: occupancy=%s totalSeconds=%lu alert=%d",
-             current.get_occupied() ? "occupied" : "unoccupied",
+    Log.info("Report payload: occupancy=%d totalSeconds=%lu alert=%d",
+             current.get_occupied() ? 1 : 0,
              (unsigned long)current.get_totalOccupiedSeconds(),
              (int)current.get_alertCode());
   } else {
+    const unsigned long timeStampValue = endOfPrevHourStampSec;
+
     // Counting mode webhook format (original format)
     snprintf(data, sizeof(data),
              "{\"hourly\":%i,\"daily\":%i,\"battery\":%4.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"resets\":%i,\"alerts\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
              current.get_hourlyCount(),
              current.get_dailyCount(),
-             current.get_stateOfCharge(),
+             stateOfCharge,
              batteryContext[battState],
              current.get_internalTempC(),
              sysStatus.get_resetCount(),
@@ -606,12 +625,22 @@ void publishData() {
              (int)current.get_alertCode());
   }
 
-  PublishQueuePosix::instance().publish(ProjectConfig::webhookEventName(), data, PRIVATE | WITH_ACK);
-  Log.info("Ubidots Webhook: %s", data);
+  // Get webhook name from cloud configuration (with fallback to convention)
+  String webhookName = Cloud::instance().getWebhookName();
+  
+  PublishQueuePosix::instance().publish(webhookName, data, PRIVATE);
+  Log.info("Publishing to webhook '%s': %s", webhookName.c_str(), data);
 
-  // Start webhook response timeout tracking (20 second budget)
-  webhookPublishMs = millis();
-  awaitingWebhookResponse = true;
+  // Arm short-term webhook supervision.
+  // If we're already connected, start the 20s window immediately.
+  // Otherwise start it when CONNECTING_STATE reports a successful cloud connect.
+  session.webhookExpectedOnConnect = true;
+  if (Particle.connected()) {
+    session.webhookExpectedOnConnect = false;
+    session.awaitingWebhookResponse = true;
+    session.webhookAwaitStartMs = millis();
+    Log.info("Webhook queued while connected - awaiting response (short-term window started)");
+  }
 
   // Also update device-data ledger with structured JSON snapshot
   if (!Cloud::instance().publishDataToLedger()) {
@@ -645,7 +674,7 @@ void publishStartupStatus() {
            (int)alertCode,
            (long)lastAlert);
 
-  PublishQueuePosix::instance().publish("status", status, PRIVATE | WITH_ACK);
+  PublishQueuePosix::instance().publish("status", status, PRIVATE);
   Log.info("Startup status: %s", status);
 }
 
@@ -672,32 +701,43 @@ void publishStartupStatus() {
 void UbidotsHandler(const char *event, const char *data) {
   // Handle response from Ubidots webhook (legacy integration)
   char responseString[64];
-  // Response is only a single number thanks to Template
-  if (!strlen(data)) { // No data in response - Error
+  // Response is expected to be a single numeric code from the Particle
+  // integration response template (e.g. "200" or "201").
+  if (!data || !strlen(data)) {
     snprintf(responseString, sizeof(responseString), "No Data");
-  } else if (atoi(data) == 200 || atoi(data) == 201) {
-    snprintf(responseString, sizeof(responseString), "Response Received");
-    sysStatus.set_lastHookResponse(
-        Time.now()); // Record the last successful Webhook Response
+  } else {
+    // Any webhook response indicates the integration path is alive.
+    // Update lastHookResponse even if it arrived after our short-term window.
+    sysStatus.set_lastHookResponse(Time.now());
 
-    // Clear webhook response timeout tracking - we got the response!
-    awaitingWebhookResponse = false;
+    if (session.awaitingWebhookResponse) {
+      session.awaitingWebhookResponse = false;
+      session.webhookAwaitStartMs = 0;
+    }
 
-    // If a webhook supervision alert (40) was active, clear it now that
-    // we have a confirmed successful response, so future reports reflect
-    // the healthy state.
+    // Clear webhook supervision alert (40) on any response.
     if (current.get_alertCode() == 40) {
       current.set_alertCode(0);
       current.set_lastAlertTime(0);
     }
-  } else {
-    snprintf(responseString, sizeof(responseString),
-             "Unknown response recevied %i", atoi(data));
+
+    // If the response is numeric, treat 200/201 as success.
+    // Otherwise, treat it as an opaque success marker.
+    if (isdigit((unsigned char)data[0])) {
+      int code = atoi(data);
+      if (code == 200 || code == 201) {
+        snprintf(responseString, sizeof(responseString), "Response Received");
+      } else {
+        snprintf(responseString, sizeof(responseString), "Hook response %d", code);
+      }
+    } else {
+      snprintf(responseString, sizeof(responseString), "Response Received");
+    }
   }
   if (sysStatus.get_verboseMode() && Particle.connected()) {
     publishDiagnosticSafe("Ubidots Hook", responseString, PRIVATE);
   }
-  Log.info(responseString);
+  Log.info("%s", responseString);
 }
 
 
@@ -728,7 +768,7 @@ bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags
   }
   
   // Queue has capacity; safe to add diagnostic message
-  PublishQueuePosix::instance().publish(eventName, data, flags | WITH_ACK);
+  PublishQueuePosix::instance().publish(eventName, data, flags);
   return true;
 }
 
@@ -771,7 +811,7 @@ void sensorISR() {
     frontTireFlag = true;
 }
 
-void countSignalTimerISR() { digitalWrite(BLUE_LED, LOW); }
+// countSignalTimerISR removed - signalLED() now handles timed LED control automatically
 
 /**
  * @brief Cleanup function that is run at the beginning of the day.
