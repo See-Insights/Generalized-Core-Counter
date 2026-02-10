@@ -1,9 +1,9 @@
 var searchData=
 [
-  ['raisealert_0',['raiseAlert',['../classcurrent_status_data.html#a3b9d02e3ef08b2a9629ff053aacee27c',1,'currentStatusData']]],
-  ['readtmp112temperaturec_1',['readTmp112TemperatureC',['../class_sensor_manager.html#a87645f59d0a2fe8c6644b386f24b7692',1,'SensorManager']]],
-  ['requestfulldisconnectandradiooff_2',['requestFullDisconnectAndRadioOff',['../namespace_connectivity.html#a50bb34193371f247ff8639d8fba69409',1,'Connectivity::requestFullDisconnectAndRadioOff()'],['../_state___common_8h.html#a2d1f2f1e068f4596c30201c084bbef7e',1,'requestFullDisconnectAndRadioOff():&#160;State_Connect.cpp'],['../_state___connect_8cpp.html#a2d1f2f1e068f4596c30201c084bbef7e',1,'requestFullDisconnectAndRadioOff():&#160;State_Connect.cpp']]],
-  ['requestradiopoweroff_3',['requestRadioPowerOff',['../namespace_connectivity.html#a2a57cc42c82eb80256258e783f248508',1,'Connectivity::requestRadioPowerOff()'],['../_state___common_8h.html#af2abede9d48068410c96a9772d0b61d2',1,'requestRadioPowerOff():&#160;State_Connect.cpp'],['../_state___connect_8cpp.html#af2abede9d48068410c96a9772d0b61d2',1,'requestRadioPowerOff():&#160;State_Connect.cpp']]],
-  ['reset_4',['reset',['../class_i_sensor.html#a5a11e705590a9a16bef6c0dd154da2e7',1,'ISensor::reset()'],['../class_p_i_r_sensor.html#a0f0d1a8a3d010e2fbef7acaed0b381b7',1,'PIRSensor::reset()']]],
-  ['reseteverything_5',['resetEverything',['../classcurrent_status_data.html#a338c2e9242f5cbbc12a1be90861c45cb',1,'currentStatusData']]]
+  ['onentersleep_0',['onEnterSleep',['../class_sensor_manager.html#acd053548a4cb1ac2623de8f27514b5c6',1,'SensorManager']]],
+  ['onexitsleep_1',['onExitSleep',['../class_sensor_manager.html#a3d605277298d063851c91b1238784c17',1,'SensorManager']]],
+  ['onsleep_2',['onSleep',['../class_i_sensor.html#a657816643b95ea93192db51541b16661',1,'ISensor::onSleep()'],['../class_p_i_r_sensor.html#ae17b164f8666f3629ff1eafacea892e3',1,'PIRSensor::onSleep()']]],
+  ['onwake_3',['onWake',['../class_i_sensor.html#a6eb640b82bf260898c32f74b053046d7',1,'ISensor::onWake()'],['../class_p_i_r_sensor.html#ab549238241a6e4e39a5da774ba5df89a',1,'PIRSensor::onWake()']]],
+  ['operator_3d_4',['operator=',['../class_cloud.html#a89d68dd84add935e621be4b7b380192a',1,'Cloud::operator=()'],['../class_particle___functions.html#ae2b5c249fffa217b75b3647baf04a5bd',1,'Particle_Functions::operator=()'],['../classsys_status_data.html#a0fcf28bd66fbd70cd1ca4bea8e379ca6',1,'sysStatusData::operator=()'],['../classsensor_config_data.html#a7d2ae669c36de9ec76831099970e7091',1,'sensorConfigData::operator=()'],['../classcurrent_status_data.html#afa96d991a872d1ba2b1e26f2786e8feb',1,'currentStatusData::operator=()'],['../class_sensor_manager.html#a27577f963c22e4249ea73d0961d7cba3',1,'SensorManager::operator=()']]],
+  ['outofmemoryhandler_5',['outOfMemoryHandler',['../_generalized-_core-_counter_8cpp.html#a1711b4262f6d65d417a01d7081daa4e8',1,'Generalized-Core-Counter.cpp']]]
 ];

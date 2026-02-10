@@ -1,13 +1,44 @@
 var namespaces_dup =
 [
+    [ "anonymous_namespace{LocalTimeCache.cpp}", "namespaceanonymous__namespace_02_local_time_cache_8cpp_03.html", null ],
     [ "anonymous_namespace{SensorManager.cpp}", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html", [
       [ "probeTmp112Present", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a452bb1633016be3c71fffc2fe5d5a0d7", null ]
     ] ],
     [ "Connectivity", "namespace_connectivity.html", [
       [ "isRadioPoweredOn", "namespace_connectivity.html#a834c90315e1ac893f48fc5dfccbae3cf", null ],
+      [ "requestCloudDisconnectOnly", "namespace_connectivity.html#a0e2777379673ce5006c16847bc640547", null ],
       [ "requestFullDisconnectAndRadioOff", "namespace_connectivity.html#a50bb34193371f247ff8639d8fba69409", null ],
       [ "requestRadioPowerOff", "namespace_connectivity.html#a2a57cc42c82eb80256258e783f248508", null ]
     ] ],
+    [ "ConnectivityPolicy", "namespace_connectivity_policy.html", [
+      [ "CLOUD_OPS_GATE_TIMEOUT_MS", "namespace_connectivity_policy.html#a7040aac1badbcf609009c686cb58fee0", null ],
+      [ "CLOUD_OPS_STATUS_LOG_INTERVAL_MS", "namespace_connectivity_policy.html#ae79b12c5f7f85ae9ca5a607ef4cdd075", null ],
+      [ "CONNECT_ALIGNMENT_TOLERANCE_SEC", "namespace_connectivity_policy.html#aff43402fa9d45e067666caf3f2347686", null ],
+      [ "CONNECT_BUDGET_CONFIG_MAX_SEC", "namespace_connectivity_policy.html#a2f3840e5f7645f7fa95b985235bffabc", null ],
+      [ "CONNECT_BUDGET_CONFIG_MIN_SEC", "namespace_connectivity_policy.html#ae4c406adaf792a77e28c34e21da8a8c2", null ],
+      [ "CONNECT_BUDGET_DEEP_MS", "namespace_connectivity_policy.html#a87b91a8af5b73e7fb4c2915c17473d93", null ],
+      [ "CONNECT_BUDGET_DEFAULT_MS", "namespace_connectivity_policy.html#ab4e13d08abe16b232ee9d8a6be91f426", null ],
+      [ "CONNECT_BUDGET_DEFAULT_SEC", "namespace_connectivity_policy.html#a72970a4a15bbfd3af3dc9812753eec18", null ],
+      [ "DEBUG_SERIAL_POST_CONNECT_DELAY_MS", "namespace_connectivity_policy.html#ac4e9c849bfed8fdef2386743a31f0533", null ],
+      [ "DEBUG_SERIAL_REENUM_DELAY_MS", "namespace_connectivity_policy.html#aab29f49018a33279dba763fecd9c4a7d", null ],
+      [ "DEBUG_SERIAL_WAIT_POLL_DELAY_MS", "namespace_connectivity_policy.html#a2a3ed6467a209cf111e1dbf81233b2a8", null ],
+      [ "DEBUG_SERIAL_WAIT_TIMEOUT_MS", "namespace_connectivity_policy.html#a655a0b2dec259c5420ab9845947f823b", null ],
+      [ "DEEP_ATTEMPT_COUNTER_THRESHOLD", "namespace_connectivity_policy.html#ac83a2c24916289ab8816b402020a33ca", null ],
+      [ "DEEP_ATTEMPT_SOC_THRESHOLD", "namespace_connectivity_policy.html#a2a07fe78541c40949cbef8752c37e13d", null ],
+      [ "DISCONNECT_BUDGET_MAX_SEC", "namespace_connectivity_policy.html#a208dc292832c173cdefee60da4070513", null ],
+      [ "DISCONNECT_BUDGET_MIN_SEC", "namespace_connectivity_policy.html#a83d6d83252af21bc850a03598a81411b", null ],
+      [ "DISCONNECT_CLOUD_DEFAULT_SEC", "namespace_connectivity_policy.html#ac5ae769c843502bc5096f6ae7d09678f", null ],
+      [ "DISCONNECT_MODEM_DEFAULT_SEC", "namespace_connectivity_policy.html#a705397f035907905d74eb58006a987c2", null ],
+      [ "DISCONNECT_STANDBY_MAX_MS", "namespace_connectivity_policy.html#a27680d5a2fe0f28206eed36f939f763d", null ],
+      [ "FIRMWARE_UPDATE_MAX_MS", "namespace_connectivity_policy.html#aca78df6b9ce0caf57f4672e8c0b15f72", null ],
+      [ "WEBHOOK_LONGTERM_ALERT40_SEC", "namespace_connectivity_policy.html#a2bf83afe32c0f44b32a6cb4d48e6a402", null ],
+      [ "WEBHOOK_LONGTERM_CONNECTED_RECENTLY_SEC", "namespace_connectivity_policy.html#aec173e6da0225c588ff07235628b1b16", null ],
+      [ "WEBHOOK_LONGTERM_ESCALATE_TO_ERROR_SEC", "namespace_connectivity_policy.html#a8c2c9ae6d7ba0414db36943cd01d78a4", null ],
+      [ "WEBHOOK_LONGTERM_ESCALATION_COOLDOWN_SEC", "namespace_connectivity_policy.html#a265ffd204ee54129193460d456e828b5", null ],
+      [ "WEBHOOK_LONGTERM_FORCE_CONNECT_MIN_INTERVAL_SEC", "namespace_connectivity_policy.html#ab0ffdd31eacb54b27effeb2600a1fbc6", null ]
+    ] ],
+    [ "LocalTimeCache", "namespace_local_time_cache.html", "namespace_local_time_cache" ],
+    [ "Observability", "namespace_observability.html", "namespace_observability" ],
     [ "ProjectConfig", "namespace_project_config.html", null ],
     [ "SensorDefinitions", "namespace_sensor_definitions.html", [
       [ "getDefinition", "namespace_sensor_definitions.html#a34fb19e38eb53ee26d2002be38be6ef2", null ]

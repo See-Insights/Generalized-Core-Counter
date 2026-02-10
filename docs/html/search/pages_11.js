@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['updates_0',['Offline Data Retention &amp;amp; Firmware Updates',['../index.html#autotoc_md32',1,'']]]
+  ['values_0',['Mode Values',['../index.html#autotoc_md16',1,'']]]
 ];

@@ -1,8 +1,6 @@
 var _generalized__core__counter_8cpp =
 [
     [ "ab1805", "_generalized-_core-_counter_8cpp.html#ac76c3827d7e201a452741421f4737990", null ],
-    [ "countSignalTimer", "_generalized-_core-_counter_8cpp.html#acc8846869443575f768d24829037eec4", null ],
-    [ "countSignalTimerISR", "_generalized-_core-_counter_8cpp.html#aafd752c276befe106eb6a9c6dc395962", null ],
     [ "dailyCleanup", "_generalized-_core-_counter_8cpp.html#a496510658b21d252547ca67ae1035445", null ],
     [ "isWithinOpenHours", "_generalized-_core-_counter_8cpp.html#adaf14f9ee408635f2c952b99aaeda484", null ],
     [ "loop", "_generalized-_core-_counter_8cpp.html#afe461d27b9c48d5921c00d521181f12f", null ],
@@ -20,20 +18,14 @@ var _generalized__core__counter_8cpp =
     [ "config", "_generalized-_core-_counter_8cpp.html#ab71602050f3582f2f394acb7c5e97606", null ],
     [ "connectedStartMs", "_generalized-_core-_counter_8cpp.html#aae28e5f0c49a70c0b58808040acb0649", null ],
     [ "conv", "_generalized-_core-_counter_8cpp.html#acbe01778898ecb2b953cc096aeb6539a", null ],
-    [ "dataInFlight", "_generalized-_core-_counter_8cpp.html#a6330a318d9634e00ad5fcee1ec97de86", null ],
     [ "FIRMWARE_RELEASE_NOTES", "_generalized-_core-_counter_8cpp.html#a812ec2bf3ae5f5e6c4d120d735df14c7", null ],
     [ "FIRMWARE_VERSION", "_generalized-_core-_counter_8cpp.html#acf025b054301360475a0ec4542f74ff3", null ],
-    [ "firstConnectionObserved", "_generalized-_core-_counter_8cpp.html#a57045c549f822ef4962889d1c333d055", null ],
-    [ "firstConnectionQueueDrainedLogged", "_generalized-_core-_counter_8cpp.html#a5b6e97ba4faba12de811107fb3e7813f", null ],
-    [ "hibernateDisabledForSession", "_generalized-_core-_counter_8cpp.html#ac2b04988d07864c6c31e1d15b9d1198c", null ],
-    [ "maxConnectAttemptMs", "_generalized-_core-_counter_8cpp.html#ae7dc3360f1628536873428f3d0694415", null ],
     [ "oldState", "_generalized-_core-_counter_8cpp.html#a0840b91aed028ae09ab1d7a4238569ec", null ],
     [ "outOfMemory", "_generalized-_core-_counter_8cpp.html#a98dbb1ba2c2de8358c8e27e2fa03859c", null ],
     [ "resetWait", "_generalized-_core-_counter_8cpp.html#a51c21d3aa0797826d2cfcf9de5c1082d", null ],
     [ "sensorDetect", "_generalized-_core-_counter_8cpp.html#a9ae784228f6b9b5ec7d14839274b3448", null ],
+    [ "session", "_generalized-_core-_counter_8cpp.html#a05393235987309ad44164c2676ba311d", null ],
     [ "state", "_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79", null ],
     [ "stateNames", "_generalized-_core-_counter_8cpp.html#abcd5d33fa869a1d746ac85a5f6ac720b", null ],
-    [ "suppressAlert40ThisSession", "_generalized-_core-_counter_8cpp.html#a56da71c8fad275eebc0b43ee5d80b506", null ],
-    [ "userSwitchDetected", "_generalized-_core-_counter_8cpp.html#a8e11b98139fe014f3e8a660d91905438", null ],
-    [ "wakeBoundary", "_generalized-_core-_counter_8cpp.html#a3c07c9394207388fc074bbbe0075b99c", null ]
+    [ "userSwitchDetected", "_generalized-_core-_counter_8cpp.html#a8e11b98139fe014f3e8a660d91905438", null ]
 ];

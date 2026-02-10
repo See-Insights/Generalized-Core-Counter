@@ -1,6 +1,6 @@
 # Generalized-Core-Counter
 
-**Version:** 3.22 | **Latest:** Occupancy mode enhancements - state-change reporting and network keep-alive
+**Version:** 3.24 | **Latest:** Optimized to reduce complexity / improve maintainability
 
 A generalized IoT firmware core for outdoor sensor devices supporting multiple operating modes and sensor types.
 
@@ -58,7 +58,7 @@ When configured in **OCCUPANCY** counting mode with **DISCONNECTED_KEEP_ALIVE** 
 - Configurable debounce timer (`occupancyDebounceMs`) prevents rapid state flipping
 - Timer resets on each new sensor detection while occupied
 - Space becomes "unoccupied" only after full timeout without new detections
-- Accumulates total occupied time per day
+- Accumulates total occupied time per day (reported in minutes)
 
 **Network Standby (Cellular Only):**
 - During open hours, cellular modem stays in low-power standby (~14mA)
@@ -107,6 +107,37 @@ The main application logic is implemented as a small, explicit state machine:
 This split keeps the outer `setup()/loop()` structure simple while allowing the
 per-state behaviour to evolve independently as new modes or error conditions
 are added.
+
+### Wake-Cycle Observability (Field Diagnostics)
+
+The firmware emits a single compact log line per wake cycle right before
+entering sleep. This is designed to be safe in low-power and poor-connectivity
+conditions (no blocking, no extra cloud work).
+
+Example log line:
+
+```
+CYCLE end awake=12345ms conn=normal/ok/4567ms svc=890ms td=321ms q=3/0/0 soc=78.4% chg=1 lastOk=1739160000
+```
+
+Field meanings:
+- `awake`: total awake time in this cycle (ms)
+- `conn`: connect attempt type/result/duration (type is `normal|deep|none`)
+- `svc`: service window duration (ledger sync + queue drain + OTA check) in ms
+- `td`: teardown duration (disconnect + modem off) in ms
+- `q`: publish queue depth `beforeConnect/afterConnect/beforeSleep`
+- `soc`: battery state of charge (percent; `-1.0` means unknown)
+- `chg`: charging flag (`1` charging, `0` not charging, `-1` unknown)
+- `lastOk`: last successful connection epoch (seconds)
+
+Optional device-status fields:
+- When the device is already publishing `device-status` (config changed), a
+  `cycle` object is included with the same data. This does not increase the
+  publish rate and is only present on those existing status updates.
+
+Keys in the `cycle` object:
+- `awakeMs`, `connectType`, `connectResult`, `connectMs`, `serviceMs`,
+  `teardownMs`, `qBefore`, `qAfter`, `qSleep`, `socTenths`, `charging`, `lastOk`
 
 ### Persistent Storage
 Three storage structures:
@@ -304,7 +335,7 @@ You can:
 ```json
 {
     "occupancy": "occupied",
-    "dailyoccupancy": 3847,
+  "dailyoccupancy": 320,
     "battery": {
         "value": 85.2,
         "context": {
@@ -318,6 +349,8 @@ You can:
     "timestamp": 1702345678000
 }
 ```
+
+  **Note:** `dailyoccupancy` is reported in whole minutes (derived from total occupied seconds). The `device-data` ledger field `totalOccupiedSec` is also reported in minutes.
 
 ## Webhook Configuration
 

@@ -1,0 +1,28 @@
+var _connectivity_policy_8h =
+[
+    [ "ConnectivityPolicy::CLOUD_OPS_GATE_TIMEOUT_MS", "namespace_connectivity_policy.html#a7040aac1badbcf609009c686cb58fee0", null ],
+    [ "ConnectivityPolicy::CLOUD_OPS_STATUS_LOG_INTERVAL_MS", "namespace_connectivity_policy.html#ae79b12c5f7f85ae9ca5a607ef4cdd075", null ],
+    [ "ConnectivityPolicy::CONNECT_ALIGNMENT_TOLERANCE_SEC", "namespace_connectivity_policy.html#aff43402fa9d45e067666caf3f2347686", null ],
+    [ "ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MAX_SEC", "namespace_connectivity_policy.html#a2f3840e5f7645f7fa95b985235bffabc", null ],
+    [ "ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MIN_SEC", "namespace_connectivity_policy.html#ae4c406adaf792a77e28c34e21da8a8c2", null ],
+    [ "ConnectivityPolicy::CONNECT_BUDGET_DEEP_MS", "namespace_connectivity_policy.html#a87b91a8af5b73e7fb4c2915c17473d93", null ],
+    [ "ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS", "namespace_connectivity_policy.html#ab4e13d08abe16b232ee9d8a6be91f426", null ],
+    [ "ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_SEC", "namespace_connectivity_policy.html#a72970a4a15bbfd3af3dc9812753eec18", null ],
+    [ "ConnectivityPolicy::DEBUG_SERIAL_POST_CONNECT_DELAY_MS", "namespace_connectivity_policy.html#ac4e9c849bfed8fdef2386743a31f0533", null ],
+    [ "ConnectivityPolicy::DEBUG_SERIAL_REENUM_DELAY_MS", "namespace_connectivity_policy.html#aab29f49018a33279dba763fecd9c4a7d", null ],
+    [ "ConnectivityPolicy::DEBUG_SERIAL_WAIT_POLL_DELAY_MS", "namespace_connectivity_policy.html#a2a3ed6467a209cf111e1dbf81233b2a8", null ],
+    [ "ConnectivityPolicy::DEBUG_SERIAL_WAIT_TIMEOUT_MS", "namespace_connectivity_policy.html#a655a0b2dec259c5420ab9845947f823b", null ],
+    [ "ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD", "namespace_connectivity_policy.html#ac83a2c24916289ab8816b402020a33ca", null ],
+    [ "ConnectivityPolicy::DEEP_ATTEMPT_SOC_THRESHOLD", "namespace_connectivity_policy.html#a2a07fe78541c40949cbef8752c37e13d", null ],
+    [ "ConnectivityPolicy::DISCONNECT_BUDGET_MAX_SEC", "namespace_connectivity_policy.html#a208dc292832c173cdefee60da4070513", null ],
+    [ "ConnectivityPolicy::DISCONNECT_BUDGET_MIN_SEC", "namespace_connectivity_policy.html#a83d6d83252af21bc850a03598a81411b", null ],
+    [ "ConnectivityPolicy::DISCONNECT_CLOUD_DEFAULT_SEC", "namespace_connectivity_policy.html#ac5ae769c843502bc5096f6ae7d09678f", null ],
+    [ "ConnectivityPolicy::DISCONNECT_MODEM_DEFAULT_SEC", "namespace_connectivity_policy.html#a705397f035907905d74eb58006a987c2", null ],
+    [ "ConnectivityPolicy::DISCONNECT_STANDBY_MAX_MS", "namespace_connectivity_policy.html#a27680d5a2fe0f28206eed36f939f763d", null ],
+    [ "ConnectivityPolicy::FIRMWARE_UPDATE_MAX_MS", "namespace_connectivity_policy.html#aca78df6b9ce0caf57f4672e8c0b15f72", null ],
+    [ "ConnectivityPolicy::WEBHOOK_LONGTERM_ALERT40_SEC", "namespace_connectivity_policy.html#a2bf83afe32c0f44b32a6cb4d48e6a402", null ],
+    [ "ConnectivityPolicy::WEBHOOK_LONGTERM_CONNECTED_RECENTLY_SEC", "namespace_connectivity_policy.html#aec173e6da0225c588ff07235628b1b16", null ],
+    [ "ConnectivityPolicy::WEBHOOK_LONGTERM_ESCALATE_TO_ERROR_SEC", "namespace_connectivity_policy.html#a8c2c9ae6d7ba0414db36943cd01d78a4", null ],
+    [ "ConnectivityPolicy::WEBHOOK_LONGTERM_ESCALATION_COOLDOWN_SEC", "namespace_connectivity_policy.html#a265ffd204ee54129193460d456e828b5", null ],
+    [ "ConnectivityPolicy::WEBHOOK_LONGTERM_FORCE_CONNECT_MIN_INTERVAL_SEC", "namespace_connectivity_policy.html#ab0ffdd31eacb54b27effeb2600a1fbc6", null ]
+];

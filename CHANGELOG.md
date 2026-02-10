@@ -240,3 +240,6 @@ This release fundamentally restructures device configuration to use four indepen
 ## 3.24 – 2026-02-09
 - Implmeented Occupancy
 
+## 3.24 – 2026-02-10
+- Optimized to reduce complexity / improve maintainability
+

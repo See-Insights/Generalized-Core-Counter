@@ -4,4 +4,4 @@
 // Keep the value in sync with the Doxyfile PROJECT_NUMBER.
 
 const char* FIRMWARE_VERSION = "3.24";
-const char* FIRMWARE_RELEASE_NOTES = "Implmeented Occupancy";
+const char* FIRMWARE_RELEASE_NOTES = "Optimized to reduce complexity / improve maintainability";

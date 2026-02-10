@@ -1,11 +1,11 @@
 var searchData=
 [
-  ['particle_5ffunctions_0',['Particle_Functions',['../class_particle___functions.html#af4f9704a1c5bdd9983d7803ef53d8894',1,'Particle_Functions::Particle_Functions()'],['../class_particle___functions.html#a5e1c905daf41ddd01790ccd384310285',1,'Particle_Functions::Particle_Functions(const Particle_Functions &amp;)=delete']]],
-  ['probetmp112present_1',['probeTmp112Present',['../namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a452bb1633016be3c71fffc2fe5d5a0d7',1,'anonymous_namespace{SensorManager.cpp}']]],
-  ['product_5fversion_2',['PRODUCT_VERSION',['../_generalized-_core-_counter_8cpp.html#a0096c2cc976b98298ae0d988896cb51f',1,'Generalized-Core-Counter.cpp']]],
-  ['publishdata_3',['publishData',['../_generalized-_core-_counter_8cpp.html#a6e8d6c80794e3a266d4ef6b976e9c27c',1,'publishData():&#160;Generalized-Core-Counter.cpp'],['../_state___common_8h.html#a6e8d6c80794e3a266d4ef6b976e9c27c',1,'publishData():&#160;Generalized-Core-Counter.cpp'],['../_state_machine_8h.html#a6e8d6c80794e3a266d4ef6b976e9c27c',1,'publishData():&#160;Generalized-Core-Counter.cpp']]],
-  ['publishdatatoledger_4',['publishDataToLedger',['../class_cloud.html#a832b2fee272f68202c5877a0b2fee7c0',1,'Cloud']]],
-  ['publishdiagnosticsafe_5',['publishDiagnosticSafe',['../_generalized-_core-_counter_8cpp.html#a5b6d4035a9304bc53863ee513f708b0d',1,'publishDiagnosticSafe(const char *eventName, const char *data, PublishFlags flags):&#160;Generalized-Core-Counter.cpp'],['../_my_persistent_data_8cpp.html#ab7e9803d96548944e5e40d23163484c6',1,'publishDiagnosticSafe(const char *eventName, const char *data, PublishFlags flags=PRIVATE):&#160;Generalized-Core-Counter.cpp'],['../_state___common_8h.html#a5b6d4035a9304bc53863ee513f708b0d',1,'publishDiagnosticSafe(const char *eventName, const char *data, PublishFlags flags):&#160;Generalized-Core-Counter.cpp']]],
-  ['publishstartupstatus_6',['publishStartupStatus',['../_generalized-_core-_counter_8cpp.html#a3b52d4e2736530265377e967979feaf9',1,'Generalized-Core-Counter.cpp']]],
-  ['publishstatetransition_7',['publishStateTransition',['../_generalized-_core-_counter_8cpp.html#afb2932b86bac021e349213b370798543',1,'publishStateTransition():&#160;Generalized-Core-Counter.cpp'],['../_state_machine_8h.html#afb2932b86bac021e349213b370798543',1,'publishStateTransition():&#160;Generalized-Core-Counter.cpp']]]
+  ['markconnectattempt_0',['markConnectAttempt',['../struct_observability_1_1_wake_cycle_stats.html#a327ce298dfe7873cea5a4f044d72a6f9',1,'Observability::WakeCycleStats']]],
+  ['markconnectrequested_1',['markConnectRequested',['../struct_observability_1_1_wake_cycle_stats.html#ae6a8dba3bd4f581c5726adba7bf660a4',1,'Observability::WakeCycleStats']]],
+  ['markconnectsuccess_2',['markConnectSuccess',['../struct_observability_1_1_wake_cycle_stats.html#a7b8c7a4fad23ff7a4db0cd7d69fc1fa6',1,'Observability::WakeCycleStats']]],
+  ['markconnecttimeout_3',['markConnectTimeout',['../struct_observability_1_1_wake_cycle_stats.html#a486511421df5013e26a321e2d97c0ae3',1,'Observability::WakeCycleStats']]],
+  ['markserviceend_4',['markServiceEnd',['../struct_observability_1_1_wake_cycle_stats.html#a982e3f2d0ff9684f3b526d1e59fa8fb9',1,'Observability::WakeCycleStats']]],
+  ['markservicestart_5',['markServiceStart',['../struct_observability_1_1_wake_cycle_stats.html#ac896f2405780855cfbac9b6cf5e290a3',1,'Observability::WakeCycleStats']]],
+  ['markteardownend_6',['markTeardownEnd',['../struct_observability_1_1_wake_cycle_stats.html#a9bf47d42ef1c61499ac97d8d94230ebc',1,'Observability::WakeCycleStats']]],
+  ['markteardownstart_7',['markTeardownStart',['../struct_observability_1_1_wake_cycle_stats.html#a93cb2af6f695e06f35854db036ee0c80',1,'Observability::WakeCycleStats']]]
 ];

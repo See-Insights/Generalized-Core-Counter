@@ -1,5 +1,4 @@
 var searchData=
 [
-  ['sensortype_0',['SensorType',['../_sensor_factory_8h.html#a87ca7b4499ea761999a872674eba32af',1,'SensorFactory.h']]],
-  ['state_1',['State',['../_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8',1,'StateMachine.h']]]
+  ['reportingmode_0',['ReportingMode',['../_my_persistent_data_8h.html#a593379c5e4fb1c33353cf3d309d8bac7',1,'MyPersistentData.h']]]
 ];

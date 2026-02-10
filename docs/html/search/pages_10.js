@@ -1,6 +1,5 @@
 var searchData=
 [
-  ['tasks_0',['How-To: Common Configuration Tasks',['../index.html#autotoc_md25',1,'']]],
-  ['the_20firmware_1',['Extending the Firmware',['../index.html#autotoc_md29',1,'']]],
-  ['to_3a_20common_20configuration_20tasks_2',['How-To: Common Configuration Tasks',['../index.html#autotoc_md25',1,'']]]
+  ['up_20webhooks_20in_20particle_20console_0',['Setting Up Webhooks in Particle Console',['../index.html#autotoc_md27',1,'']]],
+  ['updates_1',['Offline Data Retention &amp;amp; Firmware Updates',['../index.html#autotoc_md39',1,'']]]
 ];

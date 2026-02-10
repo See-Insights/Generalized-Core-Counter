@@ -1,9 +1,8 @@
 var searchData=
 [
-  ['particle_20console_0',['Setup in Particle Console',['../index.html#autotoc_md22',1,'']]],
-  ['pattern_1',['Sensor Interface Pattern',['../index.html#autotoc_md7',1,'']]],
-  ['payload_2',['Payload',['../index.html#autotoc_md19',1,'Counting Mode Payload'],['../index.html#autotoc_md20',1,'Occupancy Mode Payload']]],
-  ['persistent_20storage_3',['Persistent Storage',['../index.html#autotoc_md10',1,'']]],
-  ['pir_20sensor_20on_20carrier_4',['Carrier board header (PIR sensor on carrier)',['../device__pinout_8h.html#autotoc_md0',1,'']]],
-  ['pmic_20monitoring_20remediation_20boron_20only_5',['PMIC Monitoring &amp;amp; Remediation (Boron Only)',['../index.html#autotoc_md35',1,'']]]
+  ['recovery_20strategy_0',['Error Recovery Strategy',['../index.html#autotoc_md43',1,'']]],
+  ['remediation_20boron_20only_1',['PMIC Monitoring &amp;amp; Remediation (Boron Only)',['../index.html#autotoc_md42',1,'']]],
+  ['reporting_2',['Data Reporting',['../index.html#autotoc_md20',1,'']]],
+  ['resolution_20examples_3',['Webhook Resolution Examples',['../index.html#autotoc_md26',1,'']]],
+  ['retention_20firmware_20updates_4',['Offline Data Retention &amp;amp; Firmware Updates',['../index.html#autotoc_md39',1,'']]]
 ];

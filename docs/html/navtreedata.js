@@ -28,55 +28,63 @@ var NAVTREE =
     [ "Overview", "index.html#autotoc_md2", null ],
     [ "Features", "index.html#autotoc_md3", null ],
     [ "Hardware", "index.html#autotoc_md4", null ],
-    [ "Documentation", "index.html#autotoc_md5", null ],
-    [ "Architecture", "index.html#autotoc_md6", [
-      [ "Sensor Interface Pattern", "index.html#autotoc_md7", null ],
-      [ "State Machine", "index.html#autotoc_md8", null ],
-      [ "Application State Machine &amp; Handlers", "index.html#autotoc_md9", null ],
-      [ "Persistent Storage", "index.html#autotoc_md10", null ]
+    [ "Occupancy Mode Details", "index.html#autotoc_md5", null ],
+    [ "Documentation", "index.html#autotoc_md6", null ],
+    [ "Architecture", "index.html#autotoc_md7", [
+      [ "Sensor Interface Pattern", "index.html#autotoc_md8", null ],
+      [ "State Machine", "index.html#autotoc_md9", null ],
+      [ "Application State Machine &amp; Handlers", "index.html#autotoc_md10", null ],
+      [ "Wake-Cycle Observability (Field Diagnostics)", "index.html#autotoc_md11", null ],
+      [ "Persistent Storage", "index.html#autotoc_md12", null ]
     ] ],
-    [ "Configuration Management", "index.html#autotoc_md11", [
-      [ "Ledger Architecture", "index.html#autotoc_md12", null ],
-      [ "Configuration Structure", "index.html#autotoc_md13", null ],
-      [ "Mode Values", "index.html#autotoc_md14", null ]
+    [ "Configuration Management", "index.html#autotoc_md13", [
+      [ "Ledger Architecture", "index.html#autotoc_md14", null ],
+      [ "Configuration Structure", "index.html#autotoc_md15", null ],
+      [ "Mode Values", "index.html#autotoc_md16", null ]
     ] ],
-    [ "Device Commissioning Workflow", "index.html#autotoc_md15", [
-      [ "Configuration Management Flow", "index.html#autotoc_md16", null ]
+    [ "Device Commissioning Workflow", "index.html#autotoc_md17", [
+      [ "Configuration Management Flow", "index.html#autotoc_md18", null ]
     ] ],
-    [ "Offline Device Management", "index.html#autotoc_md17", null ],
-    [ "Data Reporting", "index.html#autotoc_md18", [
-      [ "Counting Mode Payload", "index.html#autotoc_md19", null ],
-      [ "Occupancy Mode Payload", "index.html#autotoc_md20", null ]
+    [ "Offline Device Management", "index.html#autotoc_md19", null ],
+    [ "Data Reporting", "index.html#autotoc_md20", [
+      [ "Counting Mode Payload", "index.html#autotoc_md21", null ],
+      [ "Occupancy Mode Payload", "index.html#autotoc_md22", null ]
     ] ],
-    [ "Getting Started", "index.html#autotoc_md21", [
-      [ "Setup in Particle Console", "index.html#autotoc_md22", null ],
-      [ "Flash Firmware", "index.html#autotoc_md23", null ],
-      [ "Monitor Operation", "index.html#autotoc_md24", null ]
+    [ "Webhook Configuration", "index.html#autotoc_md23", [
+      [ "Overview", "index.html#autotoc_md24", null ],
+      [ "Configuration Method", "index.html#autotoc_md25", null ],
+      [ "Webhook Resolution Examples", "index.html#autotoc_md26", null ],
+      [ "Setting Up Webhooks in Particle Console", "index.html#autotoc_md27", null ],
+      [ "Multiple Products Example", "index.html#autotoc_md28", null ],
+      [ "Monitoring Webhook Activity", "index.html#autotoc_md29", null ],
+      [ "Troubleshooting", "index.html#autotoc_md30", null ]
     ] ],
-    [ "How-To: Common Configuration Tasks", "index.html#autotoc_md25", [
-      [ "Creating Device-Specific Settings", "index.html#autotoc_md26", null ],
-      [ "Common Customizations", "index.html#autotoc_md27", null ],
-      [ "Verifying Configuration Applied", "index.html#autotoc_md28", null ]
+    [ "Getting Started", "index.html#autotoc_md31", [
+      [ "Setup in Particle Console", "index.html#autotoc_md32", null ],
+      [ "Flash Firmware", "index.html#autotoc_md33", null ],
+      [ "Monitor Operation", "index.html#autotoc_md34", null ]
     ] ],
-    [ "Extending the Firmware", "index.html#autotoc_md29", [
-      [ "Adding a New Sensor", "index.html#autotoc_md30", null ]
+    [ "How-To: Common Configuration Tasks", "index.html#autotoc_md35", [
+      [ "Creating Device-Specific Settings", "index.html#autotoc_md36", null ],
+      [ "Common Customizations", "index.html#autotoc_md37", null ]
     ] ],
-    [ "Memory Constraints", "index.html#autotoc_md31", null ],
-    [ "Offline Data Retention &amp; Firmware Updates", "index.html#autotoc_md32", null ],
-    [ "Error Handling &amp; Alert System", "index.html#autotoc_md33", [
-      [ "Alert Severity Levels", "index.html#autotoc_md34", null ],
-      [ "PMIC Monitoring &amp; Remediation (Boron Only)", "index.html#autotoc_md35", null ],
-      [ "Error Recovery Strategy", "index.html#autotoc_md36", null ]
+    [ "Memory Constraints", "index.html#autotoc_md38", null ],
+    [ "Offline Data Retention &amp; Firmware Updates", "index.html#autotoc_md39", null ],
+    [ "Error Handling &amp; Alert System", "index.html#autotoc_md40", [
+      [ "Alert Severity Levels", "index.html#autotoc_md41", null ],
+      [ "PMIC Monitoring &amp; Remediation (Boron Only)", "index.html#autotoc_md42", null ],
+      [ "Error Recovery Strategy", "index.html#autotoc_md43", null ]
     ] ],
-    [ "Dependencies", "index.html#autotoc_md37", null ],
-    [ "Contributing", "index.html#autotoc_md38", null ],
-    [ "License", "index.html#autotoc_md39", null ],
-    [ "Support", "index.html#autotoc_md40", null ],
+    [ "Dependencies", "index.html#autotoc_md44", null ],
+    [ "Contributing", "index.html#autotoc_md45", null ],
+    [ "License", "index.html#autotoc_md46", null ],
+    [ "Support", "index.html#autotoc_md47", null ],
     [ "Namespaces", "namespaces.html", [
       [ "Namespace List", "namespaces.html", "namespaces_dup" ],
       [ "Namespace Members", "namespacemembers.html", [
         [ "All", "namespacemembers.html", null ],
-        [ "Functions", "namespacemembers_func.html", null ]
+        [ "Functions", "namespacemembers_func.html", null ],
+        [ "Variables", "namespacemembers_vars.html", null ]
       ] ]
     ] ],
     [ "Classes", "annotated.html", [
@@ -85,8 +93,9 @@ var NAVTREE =
       [ "Class Hierarchy", "hierarchy.html", "hierarchy" ],
       [ "Class Members", "functions.html", [
         [ "All", "functions.html", "functions_dup" ],
-        [ "Functions", "functions_func.html", null ],
-        [ "Variables", "functions_vars.html", null ]
+        [ "Functions", "functions_func.html", "functions_func" ],
+        [ "Variables", "functions_vars.html", null ],
+        [ "Enumerations", "functions_enum.html", null ]
       ] ]
     ] ],
     [ "Files", "files.html", [
@@ -105,9 +114,10 @@ var NAVTREE =
 
 var NAVTREEINDEX =
 [
-"_cloud_8cpp.html",
-"class_sensor_manager.html#a3caa244323f9a9851b1097baeaec7736",
-"functions_v.html"
+"_battery_backoff_8cpp.html",
+"class_p_i_r_sensor.html#a0f0d1a8a3d010e2fbef7acaed0b381b7",
+"classsys_status_data_1_1_sys_data.html#ae906b46965fe38a590186efd83d5673b",
+"struct_observability_1_1_wake_cycle_stats.html#a7b8c7a4fad23ff7a4db0cd7d69fc1fa6"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronization';

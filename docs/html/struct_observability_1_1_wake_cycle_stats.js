@@ -1,0 +1,44 @@
+var struct_observability_1_1_wake_cycle_stats =
+[
+    [ "ConnectAttemptType", "struct_observability_1_1_wake_cycle_stats.html#a54f787bfc1fab38f76cbd367716e8c12", [
+      [ "NONE", "struct_observability_1_1_wake_cycle_stats.html#a54f787bfc1fab38f76cbd367716e8c12ab50339a10e1de285ac99d4c3990b8693", null ],
+      [ "NORMAL", "struct_observability_1_1_wake_cycle_stats.html#a54f787bfc1fab38f76cbd367716e8c12a1e23852820b9154316c7c06e2b7ba051", null ],
+      [ "DEEP", "struct_observability_1_1_wake_cycle_stats.html#a54f787bfc1fab38f76cbd367716e8c12ac7489a84585b023358dc07a421411f45", null ]
+    ] ],
+    [ "ConnectResult", "struct_observability_1_1_wake_cycle_stats.html#aba2be75384b01e768f8572821ec378b3", [
+      [ "NOT_ATTEMPTED", "struct_observability_1_1_wake_cycle_stats.html#aba2be75384b01e768f8572821ec378b3a44351b1ee085a81f2c6fe6fb26d6e379", null ],
+      [ "SUCCESS", "struct_observability_1_1_wake_cycle_stats.html#aba2be75384b01e768f8572821ec378b3ad0749aaba8b833466dfcbb0428e4f89c", null ],
+      [ "TIMEOUT", "struct_observability_1_1_wake_cycle_stats.html#aba2be75384b01e768f8572821ec378b3a070a0fb40f6c308ab544b227660aadff", null ],
+      [ "ABORTED", "struct_observability_1_1_wake_cycle_stats.html#aba2be75384b01e768f8572821ec378b3a4e6c860e5da10e31c5fd9cb76ddc2025", null ]
+    ] ],
+    [ "finalizeBeforeSleep", "struct_observability_1_1_wake_cycle_stats.html#aea81be20e9c86e2a7ed3f6cf69c1c299", null ],
+    [ "markConnectAttempt", "struct_observability_1_1_wake_cycle_stats.html#a327ce298dfe7873cea5a4f044d72a6f9", null ],
+    [ "markConnectRequested", "struct_observability_1_1_wake_cycle_stats.html#ae6a8dba3bd4f581c5726adba7bf660a4", null ],
+    [ "markConnectSuccess", "struct_observability_1_1_wake_cycle_stats.html#a7b8c7a4fad23ff7a4db0cd7d69fc1fa6", null ],
+    [ "markConnectTimeout", "struct_observability_1_1_wake_cycle_stats.html#a486511421df5013e26a321e2d97c0ae3", null ],
+    [ "markServiceEnd", "struct_observability_1_1_wake_cycle_stats.html#a982e3f2d0ff9684f3b526d1e59fa8fb9", null ],
+    [ "markServiceStart", "struct_observability_1_1_wake_cycle_stats.html#ac896f2405780855cfbac9b6cf5e290a3", null ],
+    [ "markTeardownEnd", "struct_observability_1_1_wake_cycle_stats.html#a9bf47d42ef1c61499ac97d8d94230ebc", null ],
+    [ "markTeardownStart", "struct_observability_1_1_wake_cycle_stats.html#a93cb2af6f695e06f35854db036ee0c80", null ],
+    [ "resetOnWake", "struct_observability_1_1_wake_cycle_stats.html#a06cab85b425af73192f92487cb60d163", null ],
+    [ "battery_soc_tenths", "struct_observability_1_1_wake_cycle_stats.html#a2455d3a9b38024954fc703703e1dba25", null ],
+    [ "cloud_connected_before_sleep", "struct_observability_1_1_wake_cycle_stats.html#afaa3aedb965db4815b2a784a2a3fed9a", null ],
+    [ "connect_attempt_type", "struct_observability_1_1_wake_cycle_stats.html#a155af924e1b55eab6cd2cf864650ce5a", null ],
+    [ "connect_budget_ms", "struct_observability_1_1_wake_cycle_stats.html#a0ca38461ba43bb0eea8c264d0309eb52", null ],
+    [ "connect_duration_ms", "struct_observability_1_1_wake_cycle_stats.html#a75d2d823681ea2a2330f5a634ad13d1a", null ],
+    [ "connect_result", "struct_observability_1_1_wake_cycle_stats.html#ad47d6d031d7118d303183f6e80013ec6", null ],
+    [ "connect_start_ms", "struct_observability_1_1_wake_cycle_stats.html#a20ff6a1af3902c292cdc9f83d928fd67", null ],
+    [ "is_charging", "struct_observability_1_1_wake_cycle_stats.html#a82cd9eed09d7ab26ccb1973721768364", null ],
+    [ "last_success_epoch", "struct_observability_1_1_wake_cycle_stats.html#a8171a64cc0ec588fbaf9b6ddd140188e", null ],
+    [ "publish_queue_depth_after_connect", "struct_observability_1_1_wake_cycle_stats.html#ac597d87ecbd1d97d3f49e31a51a7b318", null ],
+    [ "publish_queue_depth_before_connect", "struct_observability_1_1_wake_cycle_stats.html#ac201aab506b4127b8e799d7bbb9e3d30", null ],
+    [ "publish_queue_depth_before_sleep", "struct_observability_1_1_wake_cycle_stats.html#a153cd884d191ed1510ab3793038534d3", null ],
+    [ "radio_on_before_sleep", "struct_observability_1_1_wake_cycle_stats.html#ab7896103414826bd3d8cf98cdb87a3d2", null ],
+    [ "service_duration_ms", "struct_observability_1_1_wake_cycle_stats.html#a48a2aa2721f2dd52c820b38573792571", null ],
+    [ "service_start_ms", "struct_observability_1_1_wake_cycle_stats.html#a7613ccc86ac3f35b4c6e46854f25ec3d", null ],
+    [ "teardown_duration_ms", "struct_observability_1_1_wake_cycle_stats.html#a01919984ad1f9ed240ef2dcebb566593", null ],
+    [ "teardown_start_ms", "struct_observability_1_1_wake_cycle_stats.html#a68409cb3ee5a196278ea4d3ea0990150", null ],
+    [ "total_awake_ms", "struct_observability_1_1_wake_cycle_stats.html#a4eed46fd424bbf249324230bb7db9f6a", null ],
+    [ "use_network_standby", "struct_observability_1_1_wake_cycle_stats.html#ade054eaeb428aa751dcef541400d59bc", null ],
+    [ "wake_start_ms", "struct_observability_1_1_wake_cycle_stats.html#a07867322eacd08453e641f274641a853", null ]
+];
