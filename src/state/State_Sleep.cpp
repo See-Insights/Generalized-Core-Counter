@@ -5,6 +5,7 @@
 #include "state/State_Common.h"
 #include "Config.h"
 #include "Cloud.h"
+#include "Connectivity.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
 #include "PublishQueuePosixRK.h"
@@ -229,7 +230,7 @@ void handleSleepingState() {
   if (Particle.connected() && !disconnectRequested) {
     if (useNetworkStandbyEffective) {
       Log.info("SLEEP: requesting cloud disconnect (network standby enabled)");
-      requestCloudDisconnectOnly();
+      Connectivity::requestCloudDisconnectOnly();
     } else {
       Log.info("SLEEP: requesting cloud disconnect + modem off");
       requestFullDisconnectAndRadioOff();
