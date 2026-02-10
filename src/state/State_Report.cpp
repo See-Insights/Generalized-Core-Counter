@@ -1,6 +1,7 @@
 #include "state/State_Common.h"
 #include "Config.h"
 #include "Cloud.h"
+#include "LocalTimeCache.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
 #include "PublishQueuePosixRK.h"
@@ -24,12 +25,11 @@ void handleReportingState() {
   if (Time.isValid()) {
     time_t lastReport = sysStatus.get_lastReport();
     if (lastReport != 0) {
-      LocalTimeConvert convNow;
-      convNow.withConfig(LocalTime::instance().getConfig()).withTime(now).convert();
+      const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
       LocalTimeConvert convLast;
       convLast.withConfig(LocalTime::instance().getConfig()).withTime(lastReport).convert();
 
-      LocalTimeYMD ymdNow = convNow.getLocalTimeYMD();
+      LocalTimeYMD ymdNow = snapshot.localYmd;
       LocalTimeYMD ymdLast = convLast.getLocalTimeYMD();
 
       if (ymdNow.getYear() != ymdLast.getYear() ||

@@ -6,6 +6,7 @@
 #include "Config.h"
 #include "Cloud.h"
 #include "Connectivity.h"
+#include "LocalTimeCache.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
 #include "PublishQueuePosixRK.h"
@@ -32,9 +33,8 @@ void handleSleepingState() {
     operationsCompleteLogged = false;  // Reset flag on state entry
     // One-time diagnostic on entry so logs clearly show the device's view of park hours.
     if (Time.isValid()) {
-      LocalTimeConvert conv;
-      conv.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
-      uint8_t hour = (uint8_t)(conv.getLocalTimeHMS().toSeconds() / 3600);
+      const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
+      uint8_t hour = snapshot.localHour;
       Log.info("SLEEP entry: parkHours %02u-%02u localHour=%02u => %s",
                sysStatus.get_openTime(), sysStatus.get_closeTime(), hour,
                isWithinOpenHours() ? "OPEN" : "CLOSED");
@@ -306,9 +306,8 @@ void handleSleepingState() {
     // still get a cold boot at next opening time.
     if (!session.hibernateDisabledForSession) {
       // Diagnostic logging to help debug alert 16 issues
-      LocalTimeConvert diagConv;
-      diagConv.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
-      uint8_t currentHour = (uint8_t)(diagConv.getLocalTimeHMS().toSeconds() / 3600);
+      const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
+      uint8_t currentHour = snapshot.localHour;
       Log.info("Entering HIBERNATE: Time.isValid=%d localHour=%d openTime=%d closeTime=%d",
                Time.isValid(), currentHour, sysStatus.get_openTime(), sysStatus.get_closeTime());
       Log.info("Outside opening hours - entering NIGHT HIBERNATE sleep for %d seconds", nightSleepSec);
@@ -518,9 +517,8 @@ void handleSleepingState() {
 
   // Diagnostic: confirm open/closed decision at wake.
   if (Time.isValid()) {
-    LocalTimeConvert convWake;
-    convWake.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
-    uint8_t hour = (uint8_t)(convWake.getLocalTimeHMS().toSeconds() / 3600);
+    const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
+    uint8_t hour = snapshot.localHour;
     Log.info("Wake eval: parkHours %02u-%02u localHour=%02u => %s",
              sysStatus.get_openTime(), sysStatus.get_closeTime(), hour,
              isWithinOpenHours() ? "OPEN" : "CLOSED");

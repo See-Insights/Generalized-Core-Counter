@@ -33,6 +33,7 @@ PRODUCT_VERSION(3);
 #include "device_pinout.h"           // Platform-specific pin definitions
 #include "AB1805_RK.h"               // RTC and hardware watchdog
 #include "LocalTimeRK.h"             // Timezone conversion (UTC to local)
+#include "LocalTimeCache.h"          // Cached LocalTimeRK conversions
 
 // Persistent data and configuration
 #include "MyPersistentData.h"        // FRAM-backed sysStatus, current, sensorConfig
@@ -461,23 +462,7 @@ static void appWatchdogHandler() {
   System.reset();
 }
 
-// Helper to determine whether current *local* time is within park open hours.
-// Local time is derived from LocalTimeRK using the configured timezone.
-// If time is not yet valid, we treat it as "open" so the device can start
-// sensing while it acquires time and configuration.
-bool isWithinOpenHours() {
-  if (!Time.isValid()) {
-    return true;
-  }
-
-  uint8_t openHour = sysStatus.get_openTime();
-  uint8_t closeHour = sysStatus.get_closeTime();
-  // Use LocalTimeRK to convert UTC to local hour based on the
-  // configured timezone (see setup()).
-  LocalTimeConvert tempConv;
-  tempConv.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
-  uint8_t hour = (uint8_t)(tempConv.getLocalTimeHMS().toSeconds() / 3600);
-
+static bool isWithinOpenHoursForHour(uint8_t hour, uint8_t openHour, uint8_t closeHour) {
   if (openHour < closeHour) {
     // Simple daytime window, e.g. 6 -> 22
     return (hour >= openHour) && (hour < closeHour);
@@ -490,25 +475,15 @@ bool isWithinOpenHours() {
   }
 }
 
-// Helper to compute seconds until next park opening time (local time)
-int secondsUntilNextOpen() {
-  if (!Time.isValid()) {
-    // Fallback: 1 hour if time is not yet valid
-    return 3600;
-  }
-
-  uint8_t openHour = sysStatus.get_openTime();
-  uint8_t closeHour = sysStatus.get_closeTime();
-
-  LocalTimeConvert tempConv;
-  tempConv.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
-  uint32_t secondsOfDay = tempConv.getLocalTimeHMS().toSeconds();
-
+static int secondsUntilNextOpenForSeconds(uint32_t secondsOfDay,
+                                          uint8_t openHour,
+                                          uint8_t closeHour,
+                                          bool openNow) {
   uint32_t openSec = (uint8_t)openHour * 3600;
   uint32_t closeSec = (uint8_t)closeHour * 3600;
 
   // Normalize: if we're currently within opening hours, next open is tomorrow
-  if (isWithinOpenHours()) {
+  if (openNow) {
     return (int)((24 * 3600UL - secondsOfDay) + openSec);
   }
 
@@ -527,7 +502,7 @@ int secondsUntilNextOpen() {
       // During the closed gap today
       return (int)(openSec - secondsOfDay);
     } else {
-      // Otherwise next open is later today or tomorrow, but isWithinOpenHours()
+      // Otherwise next open is later today or tomorrow, but openNow
       // was already false so this path will generally be rare; fall back to 1 hour
       return 3600;
     }
@@ -535,6 +510,42 @@ int secondsUntilNextOpen() {
     // openHour == closeHour: always open; should not normally reach here
     return 3600;
   }
+}
+
+
+// Helper to determine whether current *local* time is within park open hours.
+// Local time is derived from LocalTimeRK using the configured timezone.
+// If time is not yet valid, we treat it as "open" so the device can start
+// sensing while it acquires time and configuration.
+bool isWithinOpenHours() {
+  if (!Time.isValid()) {
+    return true;
+  }
+
+  uint8_t openHour = sysStatus.get_openTime();
+  uint8_t closeHour = sysStatus.get_closeTime();
+  const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
+  const uint8_t hour = snapshot.localHour;
+  const bool openNow = isWithinOpenHoursForHour(hour, openHour, closeHour);
+
+  return openNow;
+}
+
+// Helper to compute seconds until next park opening time (local time)
+int secondsUntilNextOpen() {
+  if (!Time.isValid()) {
+    // Fallback: 1 hour if time is not yet valid
+    return 3600;
+  }
+
+  uint8_t openHour = sysStatus.get_openTime();
+  uint8_t closeHour = sysStatus.get_closeTime();
+  const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
+  const bool openNow = isWithinOpenHoursForHour(snapshot.localHour, openHour, closeHour);
+  const int secondsUntil = secondsUntilNextOpenForSeconds(
+      snapshot.localSecondsOfDay, openHour, closeHour, openNow);
+
+  return secondsUntil;
 }
 
 /**
