@@ -1,6 +1,7 @@
 #include "state/State_Common.h"
 #include "Config.h"
 #include "Cloud.h"
+#include "ConnectivityPolicy.h"
 #include "LocalTimeCache.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
@@ -75,7 +76,7 @@ void handleReportingState() {
       // Only evaluate long-term health when we're not already in the middle of
       // the short-term response window.
       if (!session.awaitingWebhookResponse) {
-        if (ageSec > (3L * 3600L)) {
+        if (ageSec > ConnectivityPolicy::WEBHOOK_LONGTERM_ALERT40_SEC) {
           if (current.get_alertCode() != 40) {
             Log.info("No successful webhook response for >3 hours during OPEN hours (age=%ld sec) - raising alert 40",
                      ageSec);
@@ -86,7 +87,7 @@ void handleReportingState() {
           // so we can validate the integration path during open hours.
           // Backoff: do not force connect more often than every 30 minutes.
           time_t lastConn = sysStatus.get_lastConnection();
-          if (lastConn == 0 || (now - lastConn) > (30L * 60L)) {
+          if (lastConn == 0 || (now - lastConn) > ConnectivityPolicy::WEBHOOK_LONGTERM_FORCE_CONNECT_MIN_INTERVAL_SEC) {
             forceConnectForLongTermWebhook = true;
           }
         }
@@ -95,11 +96,11 @@ void handleReportingState() {
         // we have connected recently but still aren't seeing hook responses,
         // escalate via ERROR_STATE (soft reset policy applies there).
         // Backoff: at most once every 3 hours.
-        if (ageSec > (6L * 3600L) && current.get_alertCode() == 40) {
+        if (ageSec > ConnectivityPolicy::WEBHOOK_LONGTERM_ESCALATE_TO_ERROR_SEC && current.get_alertCode() == 40) {
           time_t lastConn = sysStatus.get_lastConnection();
-          bool connectedRecently = (lastConn != 0 && (now - lastConn) < (2L * 3600L));
+          bool connectedRecently = (lastConn != 0 && (now - lastConn) < ConnectivityPolicy::WEBHOOK_LONGTERM_CONNECTED_RECENTLY_SEC);
           time_t lastEscalation = current.get_lastAlertTime();
-          bool cooldownPassed = (lastEscalation == 0 || (now - lastEscalation) > (3L * 3600L));
+          bool cooldownPassed = (lastEscalation == 0 || (now - lastEscalation) > ConnectivityPolicy::WEBHOOK_LONGTERM_ESCALATION_COOLDOWN_SEC);
           if (connectedRecently && cooldownPassed) {
             Log.warn("Webhook long-term failure persists (age=%ld sec) - escalating to ERROR_STATE (backoff ok)", ageSec);
             // Repurpose lastAlertTime as our escalation timestamp for alert 40.
@@ -171,7 +172,8 @@ void handleReportingState() {
     // Check if current time is aligned to the effective interval boundary
     // Allow 30 second tolerance for timer jitter and processing overhead
     time_t offset = now % effectiveInterval;
-    bool isAligned = (offset <= 30) || (offset >= effectiveInterval - 30);
+    bool isAligned = (offset <= ConnectivityPolicy::CONNECT_ALIGNMENT_TOLERANCE_SEC) ||
+             (offset >= effectiveInterval - ConnectivityPolicy::CONNECT_ALIGNMENT_TOLERANCE_SEC);
     
     const char* tierName = (newTier == TIER_HEALTHY ? "HEALTHY" : 
                             newTier == TIER_CONSERVING ? "CONSERVING" :

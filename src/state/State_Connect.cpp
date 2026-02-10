@@ -7,6 +7,7 @@
 #include "SensorManager.h"
 #include "device_pinout.h"
 #include "SensorDefinitions.h"
+#include "ConnectivityPolicy.h"
 
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
@@ -16,7 +17,7 @@
 // giving up and returning to normal low-power operation. Mirrors the
 // Wake-Publish-Sleep Cellular example, which uses a 5 minute budget
 // for firmware updates before going back to sleep.
-static const unsigned long firmwareUpdateMaxMs = 5UL * 60UL * 1000UL;
+static const unsigned long firmwareUpdateMaxMs = ConnectivityPolicy::FIRMWARE_UPDATE_MAX_MS;
 
 bool isRadioPoweredOn() {
 #if Wiring_WiFi
@@ -70,7 +71,7 @@ void handleConnectingState() {
   static bool lastEnteredFromReporting = false;  // Whether we came from REPORTING_STATE
   static bool connectRequested = false;
   static bool postConnectDone = false;
-  static unsigned long budgetMs = 5UL * 60UL * 1000UL; // Connection timeout budget
+  static unsigned long budgetMs = ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS; // Connection timeout budget
 
   if (state != oldState) {
     publishStateTransition();
@@ -86,27 +87,29 @@ void handleConnectingState() {
     // Base budget: 300s (5 minutes) - adequate for normal connection + IMSI cycling
     // Deep budget: 660s (11 minutes) - allows full modem reset periodically
     
-    budgetMs = 5UL * 60UL * 1000UL; // Default 5 minutes
+    budgetMs = ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS; // Default 5 minutes
     uint16_t configuredBudgetSec = sysStatus.get_connectAttemptBudgetSec();
     
     // Use ledger-configured budget if valid, ensuring minimum 120s per Particle docs
-    if (configuredBudgetSec >= 120 && configuredBudgetSec <= 900) {
+    if (configuredBudgetSec >= ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MIN_SEC &&
+        configuredBudgetSec <= ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MAX_SEC) {
       budgetMs = (unsigned long)configuredBudgetSec * 1000UL;
-    } else if (configuredBudgetSec > 0 && configuredBudgetSec < 120) {
+    } else if (configuredBudgetSec > 0 && configuredBudgetSec < ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MIN_SEC) {
       Log.warn("Configured budget %us below 120s minimum, using 300s default", configuredBudgetSec);
-      budgetMs = 5UL * 60UL * 1000UL;
+      budgetMs = ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS;
     }
     
     // Implement periodic deep attempts for full modem reset capability
     uint8_t attemptCounter = sysStatus.get_connectionAttemptCounter();
     float currentSoC = current.get_stateOfCharge();
-    bool allowDeepAttempt = (attemptCounter >= 3) || (currentSoC > 50.0f);
+    bool allowDeepAttempt = (attemptCounter >= ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD) ||
+                (currentSoC > ConnectivityPolicy::DEEP_ATTEMPT_SOC_THRESHOLD);
     
     if (allowDeepAttempt) {
       // Every 4th attempt (counter 0-3, resets at 3) OR when battery >50%,
       // allow 11 minutes for full modem reset
-      budgetMs = 11UL * 60UL * 1000UL;
-      if (attemptCounter >= 3) {
+      budgetMs = ConnectivityPolicy::CONNECT_BUDGET_DEEP_MS;
+      if (attemptCounter >= ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD) {
         Log.info("Deep connection attempt #%d - allowing 11 min for modem reset", attemptCounter + 1);
         sysStatus.set_connectionAttemptCounter(0);  // Reset counter after deep attempt
       } else {
@@ -154,7 +157,7 @@ void handleConnectingState() {
       // Increment connection attempt counter for periodic deep attempts
       // (unless we just did a deep attempt which already reset counter to 0)
       uint8_t attemptCounter = sysStatus.get_connectionAttemptCounter();
-      if (attemptCounter < 3) {
+      if (attemptCounter < ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD) {
         sysStatus.set_connectionAttemptCounter(attemptCounter + 1);
         Log.trace("Connection attempt counter: %d → %d", attemptCounter, attemptCounter + 1);
       }

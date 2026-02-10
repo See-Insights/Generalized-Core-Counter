@@ -6,6 +6,7 @@
 #include "Config.h"
 #include "Cloud.h"
 #include "Connectivity.h"
+#include "ConnectivityPolicy.h"
 #include "LocalTimeCache.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
@@ -79,7 +80,7 @@ void handleSleepingState() {
   // NOTE: This code is non-blocking at application level (Particle.process() called)
   // but blocks state transition until prerequisites complete or timeout.
   static unsigned long cloudSyncStartMs = 0;
-  const unsigned long CLOUD_SYNC_TIMEOUT_MS = 30000; // 30 second budget
+  const unsigned long CLOUD_SYNC_TIMEOUT_MS = ConnectivityPolicy::CLOUD_OPS_GATE_TIMEOUT_MS;
 
   // ********** Non-blocking disconnect + modem power-down **********
   // Device OS already manages the asynchronous cloud session teardown once
@@ -122,7 +123,7 @@ void handleSleepingState() {
       if (elapsedMs < CLOUD_SYNC_TIMEOUT_MS) {
         // Still within budget - log status every 5 seconds
         static unsigned long lastStatusLogMs = 0;
-        if ((millis() - lastStatusLogMs) > 5000UL) {
+        if ((millis() - lastStatusLogMs) > ConnectivityPolicy::CLOUD_OPS_STATUS_LOG_INTERVAL_MS) {
           Log.info("SLEEP: Waiting for cloud operations - queue:%s ledgers:%s updates:%s webhook:%s (%lu/%lu ms)",
                    queueEmpty ? "Y" : "N",
                    ledgersSynced ? "Y" : "N",
@@ -202,13 +203,15 @@ void handleSleepingState() {
   auto computeDisconnectBudgetMs = [&]() -> unsigned long {
     // Use ledger-configured budgets when available, with conservative defaults.
     uint16_t cloudBudgetSec = sysStatus.get_cloudDisconnectBudgetSec();
-    if (cloudBudgetSec < 5 || cloudBudgetSec > 120) {
-      cloudBudgetSec = 15;
+    if (cloudBudgetSec < ConnectivityPolicy::DISCONNECT_BUDGET_MIN_SEC ||
+        cloudBudgetSec > ConnectivityPolicy::DISCONNECT_BUDGET_MAX_SEC) {
+      cloudBudgetSec = ConnectivityPolicy::DISCONNECT_CLOUD_DEFAULT_SEC;
     }
 
     uint16_t modemBudgetSec = sysStatus.get_modemOffBudgetSec();
-    if (modemBudgetSec < 5 || modemBudgetSec > 120) {
-      modemBudgetSec = 30;
+    if (modemBudgetSec < ConnectivityPolicy::DISCONNECT_BUDGET_MIN_SEC ||
+        modemBudgetSec > ConnectivityPolicy::DISCONNECT_BUDGET_MAX_SEC) {
+      modemBudgetSec = ConnectivityPolicy::DISCONNECT_MODEM_DEFAULT_SEC;
     }
 
     unsigned long budgetMs = (unsigned long)((modemBudgetSec > cloudBudgetSec) ? modemBudgetSec : cloudBudgetSec) * 1000UL;
@@ -217,8 +220,8 @@ void handleSleepingState() {
     // want to burn connection budget waiting for a perfect teardown.
     if (useNetworkStandbyEffective) {
       budgetMs = (unsigned long)cloudBudgetSec * 1000UL;
-      if (budgetMs > 5000UL) {
-        budgetMs = 5000UL;
+      if (budgetMs > ConnectivityPolicy::DISCONNECT_STANDBY_MAX_MS) {
+        budgetMs = ConnectivityPolicy::DISCONNECT_STANDBY_MAX_MS;
       }
     }
     return budgetMs;
@@ -477,19 +480,19 @@ void handleSleepingState() {
   // Photon2 USB serial needs time to re-enumerate after sleep.
   // Must re-initialize before any Log.info() calls to avoid corrupted output.
   Serial.begin();  // Re-initialize serial port
-  delay(500);     // Give USB time to re-enumerate
+  delay(ConnectivityPolicy::DEBUG_SERIAL_REENUM_DELAY_MS);     // Give USB time to re-enumerate
   
   // Use blocking wait for serial connection - waitFor() is non-blocking
   // and the device would go back to sleep before connection established
   unsigned long serialWaitStart = millis();
-  while (!Serial.isConnected() && (millis() - serialWaitStart) < 30000) {
+  while (!Serial.isConnected() && (millis() - serialWaitStart) < ConnectivityPolicy::DEBUG_SERIAL_WAIT_TIMEOUT_MS) {
     // Feed application watchdog during the wait to prevent reset
     Particle.process();
-    delay(100);  // Blocking wait for serial connection
+    delay(ConnectivityPolicy::DEBUG_SERIAL_WAIT_POLL_DELAY_MS);  // Blocking wait for serial connection
   }
   
   if (Serial.isConnected()) {
-    delay(500);  // Extra settling time after connection
+    delay(ConnectivityPolicy::DEBUG_SERIAL_POST_CONNECT_DELAY_MS);  // Extra settling time after connection
     Log.info("Serial reconnected after %lu ms", (millis() - serialWaitStart));
   } else {
     Log.warn("Serial did not reconnect within 30s - continuing without serial");
