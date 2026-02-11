@@ -1,5 +1,5 @@
 // src/PIRSensor.cpp
-#include "PIRSensor.h"
+#include "sensors/PIRSensor.h"
 #include "device_pinout.h"
 
 // Static ISR flag and a simple counter so we can see

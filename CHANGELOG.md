@@ -6,7 +6,18 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- Boron PMIC remediation is now non-blocking (removed `delay()`-based charge cycling to keep `loop()` responsive).
+- (none)
+
+## 3.26 – 2026-02-11
+
+### Added
+
+- Added `ThrashGuard` to detect lack-of-progress thrashing with tiered recovery (backoff, disconnect+sleep, reset) and retained counters.
+- Added progress markers at state transitions and key milestones (connect start/success, ledger sync, queue drain, sleep attempt/return).
+
+### Fixed
+
+- ULTRA_LOW_POWER sleep now uses valid button edge (FALLING) and handles invalid sleep configs with STOP fallback to prevent tight wake/sleep loops.
 
 ## 3.25 – 2026-02-10
 

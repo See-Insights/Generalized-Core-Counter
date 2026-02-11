@@ -557,7 +557,7 @@ bool currentStatusData::validate(size_t dataSize) {
         // totalOccupiedSeconds is "today" and should never exceed 24 hours.
         uint32_t totalOccupied = current.get_totalOccupiedSeconds();
         if (totalOccupied > 24UL * 3600UL) {
-            Log.warn("Current: totalOccupiedSeconds invalid (%lu) - resetting", (unsigned long)totalOccupied);
+            Log.warn("Current: totalOccupiedSeconds invalid (%lu sec) - resetting", (unsigned long)totalOccupied);
             current.set_totalOccupiedSeconds(0);
         }
 

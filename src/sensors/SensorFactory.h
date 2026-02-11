@@ -2,8 +2,8 @@
 #ifndef SENSORFACTORY_H
 #define SENSORFACTORY_H
 
-#include "ISensor.h"
-#include "PIRSensor.h"  // PIR is the default sensor
+#include "sensors/ISensor.h"
+#include "sensors/PIRSensor.h"  // PIR is the default sensor
 
 // Future sensors can be added here:
 // #include "GestureFaceSensor.h"

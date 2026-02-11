@@ -1,4 +1,4 @@
-#include "Cloud.h"
+#include "cloud/Cloud.h"
 
 // *************** Battery-Aware Connection Management ***************
 

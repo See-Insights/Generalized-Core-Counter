@@ -12,18 +12,18 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include "BuildProfile.h"
+
 /**
  * @brief Debug serial configuration
  * 
- * Uncomment this line to enable waitFor(Serial.isConnected) on startup
- * and after waking from sleep. This allows you to connect a USB serial
- * terminal to see early boot and wake logs that would otherwise be missed.
+ * Blocking USB-serial waits are controlled by build profile flags:
+ * - DEV builds may opt-in with ALLOW_BLOCKING_SERIAL_WAITS=1
+ * - FIELD builds never block (default)
  * 
- * WARNING: When enabled, the device will pause for up to 10 seconds waiting
- * for serial connection at boot and after each sleep wake. Only enable this
- * for debugging; leave it commented out for production deployments.
+ * Logging remains enabled regardless of these flags.
  */
-#define DEBUG_SERIAL
+// #define DEBUG_SERIAL
 
 /**
  * @brief Sensor type ID mapping (for sysStatus.sensorType).

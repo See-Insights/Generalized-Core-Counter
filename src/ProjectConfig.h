@@ -1,3 +1,13 @@
+/**
+ * @file ProjectConfig.h
+ * @brief Project-wide configuration hooks for product-specific settings.
+ *
+ * @details
+ * Provides legacy configuration helpers (for example, a webhook name) so
+ * multiple products can share the same core firmware with minimal changes.
+ * Cloud configuration now supersedes most of these values, but this header
+ * remains for compatibility and documentation.
+ */
 #pragma once
 
 // Project-wide configuration hooks for product-specific settings

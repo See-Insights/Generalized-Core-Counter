@@ -1,4 +1,4 @@
-#include "Cloud.h"
+#include "cloud/Cloud.h"
 
 void Cloud::mergeConfiguration() {
     // Get data from both ledgers

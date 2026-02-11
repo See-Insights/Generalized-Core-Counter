@@ -1,13 +1,14 @@
 #include "state/State_Common.h"
 #include "Config.h"
-#include "Cloud.h"
+#include "cloud/Cloud.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
 #include "PublishQueuePosixRK.h"
-#include "SensorManager.h"
+#include "sensors/SensorManager.h"
 #include "device_pinout.h"
-#include "SensorDefinitions.h"
+#include "sensors/SensorDefinitions.h"
 #include "AB1805_RK.h"
+#include "power/Connectivity.h"
 
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
@@ -106,7 +107,7 @@ void handleErrorState() {
 
     // Safety: regardless of recovery choice, do not leave radio/modem powered
     // while we sit in ERROR_STATE waiting for reset.
-    requestFullDisconnectAndRadioOff();
+    Connectivity::requestFullDisconnectAndRadioOff();
 
     // In INTERMITTENT or DISCONNECTED modes, avoid reset loops for connectivity/sleep alerts.
     if (sysStatus.get_connectionMode() != CONNECTED) {

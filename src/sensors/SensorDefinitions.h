@@ -2,7 +2,7 @@
 #ifndef SENSORDEFINITIONS_H
 #define SENSORDEFINITIONS_H
 
-#include "SensorFactory.h"
+#include "sensors/SensorFactory.h"
 
 /**
  * @brief Static metadata for each supported sensor type.

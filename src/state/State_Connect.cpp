@@ -1,13 +1,16 @@
 #include "state/State_Common.h"
 #include "Config.h"
-#include "Cloud.h"
+#include "cloud/Cloud.h"
 #include "DeviceInfoLedger.h"
 #include "MyPersistentData.h"
 #include "PublishQueuePosixRK.h"
-#include "SensorManager.h"
+#include "sensors/SensorManager.h"
 #include "device_pinout.h"
-#include "SensorDefinitions.h"
-#include "ConnectivityPolicy.h"
+#include "sensors/SensorDefinitions.h"
+#include "power/ConnectivityPolicy.h"
+#include "power/Connectivity.h"
+#include "observability/WakeCycleStats.h"
+#include "ThrashGuard.h"
 
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
@@ -18,31 +21,6 @@
 // Wake-Publish-Sleep Cellular example, which uses a 5 minute budget
 // for firmware updates before going back to sleep.
 static const unsigned long firmwareUpdateMaxMs = ConnectivityPolicy::FIRMWARE_UPDATE_MAX_MS;
-
-bool isRadioPoweredOn() {
-#if Wiring_WiFi
-  return WiFi.isOn();
-#elif Wiring_Cellular
-  return Cellular.isOn();
-#else
-  return false;
-#endif
-}
-
-void requestRadioPowerOff() {
-#if Wiring_Cellular
-  Cellular.disconnect();
-  Cellular.off();
-#elif Wiring_WiFi
-  WiFi.disconnect();
-  WiFi.off();
-#endif
-}
-
-void requestFullDisconnectAndRadioOff() {
-  Particle.disconnect();
-  requestRadioPowerOff();
-}
 
 /**
  * @brief CONNECTING_STATE: establish cloud connection using a phased,
@@ -104,6 +82,16 @@ void handleConnectingState() {
     float currentSoC = current.get_stateOfCharge();
     bool allowDeepAttempt = (attemptCounter >= ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD) ||
                 (currentSoC > ConnectivityPolicy::DEEP_ATTEMPT_SOC_THRESHOLD);
+
+    // Observability: record connect attempt type + budget + queue depth (cheap).
+    {
+      const uint16_t pending = (uint16_t)PublishQueuePosix::instance().getNumEvents();
+      Observability::cycleStats().markConnectAttempt(
+          allowDeepAttempt ? Observability::WakeCycleStats::ConnectAttemptType::DEEP
+                           : Observability::WakeCycleStats::ConnectAttemptType::NORMAL,
+          (uint32_t)budgetMs,
+          pending);
+    }
     
     if (allowDeepAttempt) {
       // Every 4th attempt (counter 0-3, resets at 3) OR when battery >50%,
@@ -138,12 +126,24 @@ void handleConnectingState() {
     Log.info("Requesting Particle cloud connection");
     Particle.connect();
     connectRequested = true;
+    thrashGuard.markProgress("CONNECT_START");
+
+    // Observability: mark connect request start timestamp (millis-based).
+    Observability::cycleStats().markConnectRequested(connectionStartTimeStamp);
   }
 
   if (Particle.connected()) {
     if (!postConnectDone) {
+      thrashGuard.markProgress("CLOUD_CONNECTED");
       connectedStartMs = millis();
       sysStatus.set_lastConnection(Time.now());
+
+      // Observability: connect succeeded + begin service window.
+      Observability::cycleStats().markConnectSuccess(
+          (uint32_t)(connectedStartMs - connectionStartTimeStamp),
+          (uint16_t)PublishQueuePosix::instance().getNumEvents(),
+          sysStatus.get_lastConnection());
+      Observability::cycleStats().markServiceStart((uint32_t)connectedStartMs);
 
       // Short-term webhook supervision: start the response window only after
       // a successful cloud connection, and only if a webhook publish was queued.
@@ -179,9 +179,12 @@ void handleConnectingState() {
       if (!configOk) {
         Log.warn("Configuration apply failed (will raise alert 41)");
         current.raiseAlert(41);
-      } else if (current.get_alertCode() == 41) {
-        Log.info("Configuration apply succeeded - clearing stale alert 41");
-        current.set_alertCode(0);
+      } else {
+        thrashGuard.markProgress("LEDGER_SYNC_OK");
+        if (current.get_alertCode() == 41) {
+          Log.info("Configuration apply succeeded - clearing stale alert 41");
+          current.set_alertCode(0);
+        }
       }
 
       if (!lastEnteredFromReporting) {
@@ -201,6 +204,7 @@ void handleConnectingState() {
       postConnectDone = true;
     }
 
+    thrashGuard.markProgress("OTA_CHECKED");
     if (System.updatesPending()) {
       Log.info("Updates pending after connect - transitioning to FIRMWARE_UPDATE_STATE");
       state = FIRMWARE_UPDATE_STATE;
@@ -218,8 +222,12 @@ void handleConnectingState() {
   if (elapsedMs > budgetMs) {
     Log.warn("Connection attempt exceeded budget (%lu ms > %lu ms) - raising alert 31",
              (unsigned long)elapsedMs, (unsigned long)budgetMs);
+
+    // Observability: connect attempt timed out.
+    Observability::cycleStats().markConnectTimeout((uint32_t)elapsedMs);
+
     current.raiseAlert(31);
-    requestFullDisconnectAndRadioOff();
+    Connectivity::requestFullDisconnectAndRadioOff();
     state = SLEEPING_STATE;
   }
 }

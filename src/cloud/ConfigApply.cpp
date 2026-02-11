@@ -1,4 +1,4 @@
-#include "Cloud.h"
+#include "cloud/Cloud.h"
 
 bool Cloud::applyConfigurationFromLedger() {
     bool success = true;

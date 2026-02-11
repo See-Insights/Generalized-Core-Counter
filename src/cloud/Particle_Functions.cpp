@@ -1,6 +1,6 @@
-#include "Particle_Functions.h"
+#include "cloud/Particle_Functions.h"
 #include "Particle.h"
-#include "SensorManager.h"
+#include "sensors/SensorManager.h"
 #include "MyPersistentData.h"  // For sysStatus (serialConnected configuration)
 
 // Prototypes and System Mode calls

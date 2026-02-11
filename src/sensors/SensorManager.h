@@ -14,7 +14,7 @@
 #define SENSORMANAGER_H
 
 #include "Particle.h"
-#include "ISensor.h"
+#include "sensors/ISensor.h"
 
 extern char internalTempStr[16];
 extern char signalStr[64];

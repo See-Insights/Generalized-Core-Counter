@@ -24,6 +24,9 @@
 
 // Global configuration (includes DEBUG_SERIAL define)
 #include "Config.h"
+#include "power/Connectivity.h"
+#include "observability/WakeCycleStats.h"
+#include "ThrashGuard.h"
 
 // Firmware version recognized by Particle Product firmware management
 // Bump this integer whenever you cut a new production release.
@@ -33,24 +36,24 @@ PRODUCT_VERSION(3);
 #include "device_pinout.h"           // Platform-specific pin definitions
 #include "AB1805_RK.h"               // RTC and hardware watchdog
 #include "LocalTimeRK.h"             // Timezone conversion (UTC to local)
-#include "LocalTimeCache.h"          // Cached LocalTimeRK conversions
+#include "time/LocalTimeCache.h"          // Cached LocalTimeRK conversions
 
 // Persistent data and configuration
 #include "MyPersistentData.h"        // FRAM-backed sysStatus, current, sensorConfig
 
 // Cloud connectivity and data publishing
-#include "Cloud.h"                   // Particle Ledger integration (config + data)
+#include "cloud/Cloud.h"                   // Particle Ledger integration (config + data)
 #include "PublishQueuePosixRK.h"     // File-backed persistent event queue
-#include "Particle_Functions.h"      // Particle.function() and Particle.variable() registration
+#include "cloud/Particle_Functions.h"      // Particle.function() and Particle.variable() registration
 
 // Sensor abstraction layer
-#include "SensorManager.h"           // Singleton managing active sensor instance
-#include "SensorFactory.h"           // Factory for creating sensor instances by type
-#include "SensorDefinitions.h"       // SensorType enum and counting mode constants
+#include "sensors/SensorManager.h"           // Singleton managing active sensor instance
+#include "sensors/SensorFactory.h"           // Factory for creating sensor instances by type
+#include "sensors/SensorDefinitions.h"       // SensorType enum and counting mode constants
 
 // State machine implementation
-#include "StateMachine.h"            // State enum and global state variables
-#include "StateHandlers.h"           // Handler functions for each state
+#include "state/StateMachine.h"            // State enum and global state variables
+#include "state/StateHandlers.h"           // Handler functions for each state
 
 // Application metadata
 #include "Version.h"                 // FIRMWARE_VERSION and FIRMWARE_RELEASE_NOTES
@@ -125,14 +128,17 @@ unsigned long connectedStartMs = 0;
 const unsigned long resetWait = 30000;      // Error state dwell before reset
 
 void setup() {
-  // Wait for serial connection when DEBUG_SERIAL is enabled
-#ifdef DEBUG_SERIAL
+  // Wait for serial connection only in explicit DEV builds
+#if ALLOW_BLOCKING_SERIAL_WAITS
   waitFor(Serial.isConnected, 10000);
   delay(1000);
 #endif
 
   Log.info("===== Firmware Version %s =====", FIRMWARE_VERSION);
   Log.info("===== Release Notes: %s =====", FIRMWARE_RELEASE_NOTES);
+
+  // Observability: start a new wake cycle on cold boot.
+  Observability::cycleStats().resetOnWake(millis());
   
   System.on(out_of_memory,
             outOfMemoryHandler); // Enabling an out of memory handler is a good
@@ -167,12 +173,10 @@ void setup() {
   // by calling Particle.connect() from CONNECTING_STATE.
 #if Wiring_WiFi
   Log.info("Platform connectivity: WiFi (radio off until CONNECTING_STATE)");
-  WiFi.disconnect();
-  WiFi.off();
+  Connectivity::requestRadioPowerOff();
 #elif Wiring_Cellular
   Log.info("Platform connectivity: Cellular (radio off until CONNECTING_STATE)");
-  Cellular.disconnect();
-  Cellular.off();
+  Connectivity::requestRadioPowerOff();
 #else
   Log.info("Platform connectivity: default (Particle.connect only)");
   // Fallback: rely on Particle.connect() in CONNECTING_STATE
@@ -181,6 +185,15 @@ void setup() {
   Particle_Functions::instance().setup(); // Initialize the Particle functions
 
   initializePinModes(); // Initialize the pin modes
+
+  // Recovery path: if the user holds the service button during reset/wake,
+  // force a cloud connection regardless of opening-hours logic.
+  // This allows ledger changes (e.g., opening hours) to be pulled down to
+  // recover a device that would otherwise immediately sleep.
+  if (digitalRead(BUTTON_PIN) == LOW) { // Active-low user button
+    Log.info("Boot override: user button held - forcing CONNECTING_STATE");
+    state = CONNECTING_STATE;
+  }
 
   sysStatus.setup();    // Initialize persistent storage
   sensorConfig.setup(); // Initialize the sensor configuration
@@ -394,6 +407,8 @@ void loop() {
     break;
   }
 
+  thrashGuard.loop(state, millis());
+
   ab1805.loop(); // Keeps the RTC synchronized with the device clock
 
   // Housekeeping for each transit of the main loop
@@ -556,6 +571,10 @@ int secondsUntilNextOpen() {
  *    and enqueues it via PublishQueuePosix to the "Ubidots-Parking-Hook-v1" event.
  * 2) Updates the Particle Ledger "device-data" with a richer JSON snapshot
  *    via Cloud::publishDataToLedger() for Console visibility.
+ *
+ * Occupancy reporting note:
+ * - dailyoccupancy is reported in whole minutes (derived from total seconds).
+ * - device-data uses totalOccupiedSec but it is also in minutes for consistency.
  */
 void publishData() {
   // Legacy Ubidots context strings describing battery state
@@ -594,12 +613,13 @@ void publishData() {
   // Build webhook payload based on sensor mode
   if (sensorMode == OCCUPANCY) {
     const unsigned long timeStampValue = nowStampSec;
+    const unsigned long totalOccupiedMinutes = (unsigned long)(current.get_totalOccupiedSeconds() / 60UL);
 
     // Occupancy mode webhook format (occupancy as 0/1 numeric value)
     snprintf(data, sizeof(data),
              "{\"occupancy\":%d,\"dailyoccupancy\":%lu,\"battery\":%4.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"alerts\":%i,\"resets\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
              current.get_occupied() ? 1 : 0,
-             (unsigned long)current.get_totalOccupiedSeconds(),
+             totalOccupiedMinutes,
              stateOfCharge,
              batteryContext[battState],
              current.get_internalTempC(),
@@ -608,10 +628,10 @@ void publishData() {
              sysStatus.get_lastConnectionDuration(),
              timeStampValue);
 
-    // Log occupancy state and total seconds
-    Log.info("Report payload: occupancy=%d totalSeconds=%lu alert=%d",
+    // Log occupancy state and total minutes
+    Log.info("Report payload: occupancy=%d totalMinutes=%lu alert=%d",
              current.get_occupied() ? 1 : 0,
-             (unsigned long)current.get_totalOccupiedSeconds(),
+             totalOccupiedMinutes,
              (int)current.get_alertCode());
   } else {
     const unsigned long timeStampValue = endOfPrevHourStampSec;
@@ -791,6 +811,8 @@ bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags
  */
 void publishStateTransition() {
   char stateTransitionString[256];
+  thrashGuard.recordStateTransition(oldState, state);
+  thrashGuard.markProgress("STATE_TRANSITION");
   if (state == IDLE_STATE) {
     if (!Time.isValid())
       snprintf(stateTransitionString, sizeof(stateTransitionString),

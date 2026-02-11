@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Particle.h"
-#include "StateHandlers.h"
-#include "StateMachine.h"
+#include "state/StateHandlers.h"
+#include "state/StateMachine.h"
 
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
@@ -13,11 +13,6 @@
 
 // Implemented in State_Idle.cpp
 void ensureSensorEnabled(const char* context);
-
-// Implemented in State_Connect.cpp
-bool isRadioPoweredOn();
-void requestRadioPowerOff();
-void requestFullDisconnectAndRadioOff();
 
 // Defined in Generalized-Core-Counter.cpp
 extern bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags);

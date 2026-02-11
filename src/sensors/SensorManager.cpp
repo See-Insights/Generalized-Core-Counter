@@ -5,9 +5,9 @@ const char *batteryContext[7] = {"Unknown",    "Not Charging", "Charging",
                                  "Diconnected"};
 
 // Particle Functions
-#include "SensorManager.h"
+#include "sensors/SensorManager.h"
 #include "MyPersistentData.h"  // Access sysStatus/sensorConfig
-#include "SensorFactory.h"
+#include "sensors/SensorFactory.h"
 #include "device_pinout.h"     // TMP36_SENSE_PIN for enclosure temperature
 
 // Device-specific includes and definitions
@@ -282,6 +282,13 @@ bool SensorManager::batteryState() {
   static uint8_t remediationLevel = 0; // 0=none, 1=soft reset, 2=power cycle
   static uint8_t consecutiveFaults = 0;
   const unsigned long REMEDIATION_COOLDOWN = 3600000; // 1 hour between attempts
+
+  // Non-blocking remediation state machine (replaces delay-based sequencing)
+  // Keeps loop() responsive while still performing the same charge-cycle actions.
+  static bool remediationInProgress = false;
+  static uint8_t remediationActiveLevel = 0; // 0=none, 1=soft, 2=aggressive
+  static uint8_t remediationPhase = 0;       // 0=start, 1=wait
+  static unsigned long remediationPhaseStartMs = 0;
   
   // Check if charging is intentionally disabled due to temperature BEFORE attempting remediation
   bool safeToCharge = isItSafeToCharge();
@@ -289,7 +296,8 @@ bool SensorManager::batteryState() {
   PMIC pmic(true); // true = lock I2C during operations
   
   // Read REG09 (Fault Register)
-  byte faultReg = pmic.readFaultRegister();
+  // NOTE: Use public API; PMIC::readRegister() is private in DeviceOS 6.3.4.
+  byte faultReg = pmic.getFault();
   
   // Check for charging faults (bits 3-5: CHRG_FAULT)
   if (faultReg & 0x38) {
@@ -325,47 +333,89 @@ bool SensorManager::batteryState() {
                (double)current.get_internalTempC());
       // Don't escalate fault counters when temperature is the issue
       // Temperature will recover naturally without intervention
+        remediationInProgress = false;
+        remediationActiveLevel = 0;
+        remediationPhase = 0;
     } else {
       unsigned long now = millis();
-      if (now - lastRemediationAttempt > REMEDIATION_COOLDOWN) {
-        // Escalate remediation level based on consecutive faults
-        if (consecutiveFaults >= 3 && remediationLevel < 2) {
-          remediationLevel = 2; // Escalate to power cycle reset
-        } else if (consecutiveFaults >= 2 && remediationLevel < 1) {
-          remediationLevel = 1; // Escalate to disable/enable charging
+        // If we have an in-progress remediation, advance it without blocking.
+        if (remediationInProgress) {
+          switch (remediationActiveLevel) {
+            case 1: {
+              // Level 1: disableCharging -> wait 500ms -> enableCharging
+              if (remediationPhase == 0) {
+                pmic.disableCharging();
+                remediationPhaseStartMs = now;
+                remediationPhase = 1;
+              } else if (now - remediationPhaseStartMs >= 500UL) {
+                pmic.enableCharging();
+                Log.info("PMIC: Charging re-enabled after soft reset");
+                remediationInProgress = false;
+                remediationActiveLevel = 0;
+                remediationPhase = 0;
+                lastRemediationAttempt = now;
+              }
+              break;
+            }
+            case 2: {
+              // Level 2: disableCharging -> wait 1000ms -> set watchdog -> enableCharging
+              if (remediationPhase == 0) {
+                pmic.disableCharging();
+                remediationPhaseStartMs = now;
+                remediationPhase = 1;
+              } else if (now - remediationPhaseStartMs >= 1000UL) {
+                // Set watchdog to force reset if charging doesn't recover
+                pmic.setWatchdog(0b01); // 40 seconds
+                pmic.enableCharging();
+                Log.info("PMIC: Charging re-enabled with watchdog supervision");
+                remediationInProgress = false;
+                remediationActiveLevel = 0;
+                remediationPhase = 0;
+                remediationLevel = 0; // Reset level after power cycle attempt
+                lastRemediationAttempt = now;
+              }
+              break;
+            }
+            default:
+              remediationInProgress = false;
+              remediationActiveLevel = 0;
+              remediationPhase = 0;
+              break;
+          }
+        } else {
+          // Not in progress; decide whether to start a remediation attempt.
+          if (now - lastRemediationAttempt > REMEDIATION_COOLDOWN) {
+            // Escalate remediation level based on consecutive faults
+            if (consecutiveFaults >= 3 && remediationLevel < 2) {
+              remediationLevel = 2; // Escalate to power cycle reset
+            } else if (consecutiveFaults >= 2 && remediationLevel < 1) {
+              remediationLevel = 1; // Escalate to disable/enable charging
+            }
+
+            switch (remediationLevel) {
+              case 1:
+                Log.warn("PMIC: Attempting soft remediation - cycle charging (level 1)");
+                remediationInProgress = true;
+                remediationActiveLevel = 1;
+                remediationPhase = 0;
+                break;
+
+              case 2:
+                Log.error("PMIC: Attempting aggressive remediation - power cycle reset (level 2)");
+                remediationInProgress = true;
+                remediationActiveLevel = 2;
+                remediationPhase = 0;
+                break;
+
+              default:
+                Log.info("PMIC: Fault detected but remediation level 0 - monitoring only");
+                break;
+            }
+          } else {
+            unsigned long remainingCooldown = (REMEDIATION_COOLDOWN - (now - lastRemediationAttempt)) / 60000;
+            Log.info("PMIC: Fault detected but in cooldown period (%lu min remaining)", remainingCooldown);
+          }
         }
-        
-        // Apply remediation based on level
-        switch(remediationLevel) {
-          case 1:
-            Log.warn("PMIC: Attempting soft remediation - cycle charging (level 1)");
-            pmic.disableCharging();
-            delay(500);
-            pmic.enableCharging();
-            Log.info("PMIC: Charging re-enabled after soft reset");
-            break;
-            
-          case 2:
-            Log.error("PMIC: Attempting aggressive remediation - power cycle reset (level 2)");
-            pmic.disableCharging();
-            delay(1000);
-            // Set watchdog to force reset in 10 seconds if charging doesn't recover
-            pmic.setWatchdog(0b01); // 40 seconds
-            pmic.enableCharging();
-            Log.info("PMIC: Charging re-enabled with watchdog supervision");
-            remediationLevel = 0; // Reset level after power cycle attempt
-            break;
-            
-          default:
-            Log.info("PMIC: Fault detected but remediation level 0 - monitoring only");
-            break;
-        }
-        
-        lastRemediationAttempt = now;
-      } else {
-        unsigned long remainingCooldown = (REMEDIATION_COOLDOWN - (now - lastRemediationAttempt)) / 60000;
-        Log.info("PMIC: Fault detected but in cooldown period (%lu min remaining)", remainingCooldown);
-      }
     }
   } else {
     // No faults detected - clear counters if charging is healthy
@@ -373,6 +423,11 @@ bool SensorManager::batteryState() {
       Log.info("PMIC: Charging healthy - clearing fault counters");
       consecutiveFaults = 0;
       remediationLevel = 0;
+
+        // Clear any pending remediation sequencing now that faults are gone.
+        remediationInProgress = false;
+        remediationActiveLevel = 0;
+        remediationPhase = 0;
       
       // Clear PMIC-related alerts if they were active
       int8_t currentAlert = current.get_alertCode();
@@ -385,7 +440,7 @@ bool SensorManager::batteryState() {
   }
   
   // Read REG08 (System Status Register) for additional diagnostics
-  byte systemStatus = pmic.readSystemStatusRegister();
+  byte systemStatus = pmic.getSystemStatus();
   uint8_t chargeStatus = (systemStatus >> 4) & 0x03;
   bool vbusGood = (systemStatus & 0x80) != 0;
   uint8_t thermalStatus = systemStatus & 0x03;

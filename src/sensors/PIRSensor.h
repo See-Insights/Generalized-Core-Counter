@@ -2,7 +2,7 @@
 #ifndef PIRSENSOR_H
 #define PIRSENSOR_H
 
-#include "ISensor.h"
+#include "sensors/ISensor.h"
 #include "Particle.h"
 #include "device_pinout.h"
 #include "MyPersistentData.h"  // for sysStatus (verboseMode)

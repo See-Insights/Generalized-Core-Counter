@@ -1,12 +1,13 @@
 #include "state/State_Common.h"
 #include "Config.h"
-#include "Cloud.h"
+#include "cloud/Cloud.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
 #include "PublishQueuePosixRK.h"
-#include "SensorManager.h"
+#include "sensors/SensorManager.h"
 #include "device_pinout.h"
-#include "SensorDefinitions.h"
+#include "sensors/SensorDefinitions.h"
+#include "ThrashGuard.h"
 
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
@@ -140,6 +141,18 @@ void handleIdleState() {
   // publish queue has fully drained so we can confirm that any
   // pending offline events (for example, from before boot) have
   // been flushed.
+  {
+    static uint16_t lastQueueDepth = 0xFFFF;
+    if (Particle.connected()) {
+      uint16_t depth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
+      if (lastQueueDepth != 0xFFFF && depth < lastQueueDepth) {
+        thrashGuard.markProgress("QUEUE_DRAIN");
+      }
+      lastQueueDepth = depth;
+    } else {
+      lastQueueDepth = 0xFFFF;
+    }
+  }
   if (session.firstConnectionObserved && !session.firstConnectionQueueDrainedLogged && Particle.connected()) {
     if (PublishQueuePosix::instance().getCanSleep() &&
         PublishQueuePosix::instance().getNumEvents() == 0) {

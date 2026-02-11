@@ -1,14 +1,14 @@
 #include "state/State_Common.h"
 #include "Config.h"
-#include "Cloud.h"
-#include "ConnectivityPolicy.h"
-#include "LocalTimeCache.h"
+#include "cloud/Cloud.h"
+#include "power/ConnectivityPolicy.h"
+#include "time/LocalTimeCache.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
 #include "PublishQueuePosixRK.h"
-#include "SensorManager.h"
+#include "sensors/SensorManager.h"
 #include "device_pinout.h"
-#include "SensorDefinitions.h"
+#include "sensors/SensorDefinitions.h"
 
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.

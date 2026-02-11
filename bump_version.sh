@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Simple helper to bump firmware version, release notes, Doxygen project number,
-# and append to the changelog.
+# README version header, and append to the changelog.
 #
 # Usage:
 #   ./bump_version.sh 3.02 "Fix PIR debounce timing"
@@ -39,6 +39,7 @@ cd "$ROOT_DIR"
 VERSION_FILE="src/Version.cpp"
 DOXYFILE="Doxyfile"
 CHANGELOG="CHANGELOG.md"
+README="README.md"
 
 if [ ! -f "$VERSION_FILE" ]; then
   echo "Error: $VERSION_FILE not found"
@@ -50,6 +51,11 @@ if [ ! -f "$DOXYFILE" ]; then
   exit 1
 fi
 
+if [ ! -f "$README" ]; then
+  echo "Error: $README not found"
+  exit 1
+fi
+
 # Update firmware version in Version.cpp
 sed -i '' "s/^const char\\* FIRMWARE_VERSION.*/const char* FIRMWARE_VERSION = \"${VERSION_ESCAPED}\";/" "$VERSION_FILE"
 
@@ -58,6 +64,9 @@ sed -i '' "s/^const char\\* FIRMWARE_RELEASE_NOTES.*/const char* FIRMWARE_RELEAS
 
 # Update Doxygen project number
 sed -i '' "s/^PROJECT_NUMBER.*/PROJECT_NUMBER         = \"${VERSION_ESCAPED}\"/" "$DOXYFILE"
+
+# Update README version line
+sed -i '' "s/^\*\*Version:\*\*.*/\*\*Version:\*\* ${VERSION_ESCAPED} | \*\*Latest:\*\* ${NOTES_ESCAPED}/" "$README"
 
 # Append to CHANGELOG.md
 DATE="$(date +%Y-%m-%d)"

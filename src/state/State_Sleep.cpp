@@ -1,20 +1,19 @@
-// Enable debug serial wait for sleep debugging
-// This must be defined before any includes to ensure it's available
-#define DEBUG_SERIAL
-
+#include "BuildProfile.h"
 #include "state/State_Common.h"
 #include "Config.h"
-#include "Cloud.h"
-#include "Connectivity.h"
-#include "ConnectivityPolicy.h"
-#include "LocalTimeCache.h"
+#include "cloud/Cloud.h"
+#include "power/Connectivity.h"
+#include "power/ConnectivityPolicy.h"
+#include "time/LocalTimeCache.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
 #include "PublishQueuePosixRK.h"
-#include "SensorManager.h"
+#include "sensors/SensorManager.h"
 #include "device_pinout.h"
-#include "SensorDefinitions.h"
+#include "sensors/SensorDefinitions.h"
 #include "AB1805_RK.h"
+#include "observability/WakeCycleStats.h"
+#include "ThrashGuard.h"
 
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
@@ -115,6 +114,15 @@ void handleSleepingState() {
     bool updatesChecked = !System.updatesPending();
     bool webhookConfirmed = !session.awaitingWebhookResponse;
 
+    {
+      static uint16_t lastQueueDepth = 0xFFFF;
+      uint16_t depth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
+      if (lastQueueDepth != 0xFFFF && depth < lastQueueDepth) {
+        thrashGuard.markProgress("QUEUE_DRAIN");
+      }
+      lastQueueDepth = depth;
+    }
+
     bool allComplete = queueEmpty && ledgersSynced && updatesChecked && webhookConfirmed;
 
     if (!allComplete) {
@@ -168,7 +176,11 @@ void handleSleepingState() {
       // One-time diagnostic to explain disconnect decisions; helps catch
       // cases where disconnect is skipped due to connectivity state.
       Log.info("SLEEP: disconnect context connected=%d radioOn=%d standbyEffective=%d occupied=%d",
-               Particle.connected(), isRadioPoweredOn(), useNetworkStandbyEffective, current.get_occupied());
+               Particle.connected(), Connectivity::isRadioPoweredOn(), useNetworkStandbyEffective, current.get_occupied());
+
+      // Observability: end of service window (ledger sync + queue drain + OTA check + webhook).
+      Observability::cycleStats().markServiceEnd(millis());
+
       operationsCompleteLogged = true;
     }
   } else {
@@ -180,7 +192,7 @@ void handleSleepingState() {
   // We only need to tear down the cloud session (quickly) before sleeping.
   bool stillOn;
 #if Wiring_Cellular
-  stillOn = useNetworkStandbyEffective ? Particle.connected() : (Particle.connected() || isRadioPoweredOn());
+  stillOn = useNetworkStandbyEffective ? Particle.connected() : (Particle.connected() || Connectivity::isRadioPoweredOn());
 #else
   // On WiFi platforms, waiting for WiFi.isOn() to flip false can take a long
   // time and is not required for safe low-power sleep. Only gate on cloud.
@@ -190,9 +202,9 @@ void handleSleepingState() {
   // If cloud is already offline but the radio is still on (common after a transient
   // cloud drop), power down the radio before sleeping (unless using standby).
 #if Wiring_Cellular
-  if (!disconnectRequested && !useNetworkStandbyEffective && !Particle.connected() && isRadioPoweredOn()) {
+  if (!disconnectRequested && !useNetworkStandbyEffective && !Particle.connected() && Connectivity::isRadioPoweredOn()) {
     Log.info("SLEEP: cloud offline but radio still on - powering down radio");
-    requestRadioPowerOff();
+    Connectivity::requestRadioPowerOff();
     disconnectRequested = true;
     disconnectRequestStartMs = millis();
     return;
@@ -236,10 +248,14 @@ void handleSleepingState() {
       Connectivity::requestCloudDisconnectOnly();
     } else {
       Log.info("SLEEP: requesting cloud disconnect + modem off");
-      requestFullDisconnectAndRadioOff();
+      Connectivity::requestFullDisconnectAndRadioOff();
     }
     disconnectRequested = true;
     disconnectRequestStartMs = millis();
+
+    // Observability: teardown window start.
+    Observability::cycleStats().markTeardownStart((uint32_t)disconnectRequestStartMs, useNetworkStandbyEffective);
+
     return;
   }
 
@@ -253,14 +269,18 @@ void handleSleepingState() {
           // Best-effort: if cloud/radio teardown is stalling, force the radio off
           // so we don't repeatedly wake with the Wi-Fi stack trying to reconnect.
 #if Wiring_WiFi
-          requestRadioPowerOff();
+          Connectivity::requestRadioPowerOff();
 #elif Wiring_Cellular
           if (!useNetworkStandbyEffective) {
-            requestRadioPowerOff();
+            Connectivity::requestRadioPowerOff();
           }
 #endif
 
           ignoreDisconnectFailure = true;
+
+          // Observability: teardown ended due to budget exceed (best-effort path).
+          Observability::cycleStats().markTeardownEnd(millis());
+
           disconnectRequested = false;
           disconnectRequestStartMs = 0;
         } else {
@@ -278,6 +298,11 @@ void handleSleepingState() {
         Particle.process();
         return;
       }
+  }
+
+  // Observability: teardown completed (bounded wait finished and we are proceeding to sleep).
+  if (disconnectRequested && !stillOn) {
+    Observability::cycleStats().markTeardownEnd(millis());
   }
 
   int nightSleepSec = -1;
@@ -431,17 +456,87 @@ void handleSleepingState() {
     Log.info("Entering ULTRA_LOW_POWER sleep for %d seconds (wakes at boundary or on GPIO)", wakeInSeconds);
   }
 
+  // -----------------------------------------------------------------------
+  // Minimal end-of-cycle observability (one compact line per wake cycle)
+  // -----------------------------------------------------------------------
+  {
+    const uint16_t qDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
+    const float soc = current.get_stateOfCharge();
+    const uint16_t socTenths = (soc >= 0.0f && soc <= 100.0f) ? (uint16_t)(soc * 10.0f + 0.5f) : 0xFFFF;
+    const uint8_t battState = (uint8_t)current.get_batteryState();
+    const uint8_t isCharging = (battState == 0) ? 0xFF : ((battState == 2) ? 1 : 0); // 0=Unknown, 2=Charging
+
+    Observability::cycleStats().finalizeBeforeSleep(
+        millis(),
+        Particle.connected(),
+        Connectivity::isRadioPoweredOn(),
+        qDepth,
+        socTenths,
+        isCharging,
+        sysStatus.get_lastConnection());
+
+    // Invariants (log-only): detect regressions without affecting behavior.
+    // Ceiling is derived from existing budgets and includes firmware update time.
+    const unsigned long awakeCeilingMs =
+        (unsigned long)ConnectivityPolicy::CONNECT_BUDGET_DEEP_MS +
+        (unsigned long)ConnectivityPolicy::FIRMWARE_UPDATE_MAX_MS +
+        (unsigned long)ConnectivityPolicy::CLOUD_OPS_GATE_TIMEOUT_MS +
+        (unsigned long)ConnectivityPolicy::DISCONNECT_MODEM_DEFAULT_SEC * 1000UL +
+        30000UL; // slack
+
+    // Debug builds may intentionally stay awake longer for diagnostics.
+    const bool allowCeilingOver = (DEV_BUILD != 0);
+    if (!allowCeilingOver && Observability::cycleStats().total_awake_ms > awakeCeilingMs) {
+      Log.warn("INV: awake_ms=%lu > ceiling_ms=%lu", (unsigned long)Observability::cycleStats().total_awake_ms,
+               (unsigned long)awakeCeilingMs);
+    }
+
+    if (!useNetworkStandby) {
+      if (Particle.connected() || Connectivity::isRadioPoweredOn()) {
+        Log.warn("INV: entering sleep with cloud=%d radioOn=%d (standby=0)",
+                 (int)Particle.connected(), (int)Connectivity::isRadioPoweredOn());
+      }
+    } else {
+      if (Particle.connected()) {
+        Log.warn("INV: entering sleep with cloud still connected (standby=1)");
+      }
+    }
+
+    // Connect duration should be within the selected budget when an attempt was made.
+    if (Observability::cycleStats().connect_attempt_type != Observability::WakeCycleStats::ConnectAttemptType::NONE &&
+        Observability::cycleStats().connect_budget_ms > 0 &&
+        Observability::cycleStats().connect_duration_ms > (Observability::cycleStats().connect_budget_ms + 1000UL)) {
+      Log.warn("INV: connect_ms=%lu > budget_ms=%lu", (unsigned long)Observability::cycleStats().connect_duration_ms,
+               (unsigned long)Observability::cycleStats().connect_budget_ms);
+    }
+
+    // One compact line for field parsing.
+    Log.info(
+      "CYCLE end awake=%lums conn=%s/%s/%lums svc=%lums td=%lums q=%d/%d/%d soc=%.1f%% chg=%d lastOk=%ld",
+        (unsigned long)Observability::cycleStats().total_awake_ms,
+        Observability::toString(Observability::cycleStats().connect_attempt_type),
+        Observability::toString(Observability::cycleStats().connect_result),
+        (unsigned long)Observability::cycleStats().connect_duration_ms,
+        (unsigned long)Observability::cycleStats().service_duration_ms,
+        (unsigned long)Observability::cycleStats().teardown_duration_ms,
+      (int)(Observability::cycleStats().publish_queue_depth_before_connect == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_before_connect),
+      (int)(Observability::cycleStats().publish_queue_depth_after_connect == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_after_connect),
+      (int)(Observability::cycleStats().publish_queue_depth_before_sleep == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_before_sleep),
+        (double)(Observability::cycleStats().battery_soc_tenths == 0xFFFF ? -1.0 : ((double)Observability::cycleStats().battery_soc_tenths / 10.0)),
+      (int)(Observability::cycleStats().is_charging == 0xFF ? -1 : (int)Observability::cycleStats().is_charging),
+        (long)Observability::cycleStats().last_success_epoch);
+  }
+
   // On WiFi platforms, ensure the radio is actually OFF before entering
   // ULTRA_LOW_POWER. If the cloud/radio was left on, the device can flash
   // green briefly on wake as WiFi attempts to reconnect.
 #if Wiring_WiFi
   if (!useNetworkStandby) {
     if (Particle.connected()) {
-      Particle.disconnect();
+      Connectivity::requestCloudDisconnectOnly();
     }
     if (WiFi.isOn()) {
-      WiFi.disconnect();
-      WiFi.off();
+      Connectivity::requestRadioPowerOff();
     }
   }
 #endif
@@ -449,7 +544,7 @@ void handleSleepingState() {
   ab1805.stopWDT();
   
   config.mode(SystemSleepMode::ULTRA_LOW_POWER)
-    .gpio(BUTTON_PIN, CHANGE)    // Service button wake
+    .gpio(BUTTON_PIN, FALLING)    // Service button wake (active-low)
     .gpio(intPin, RISING);        // PIR sensor wake (active HIGH on detect)
     
   // Add network standby for occupancy mode to avoid reconnection delays
@@ -464,9 +559,44 @@ void handleSleepingState() {
 #endif
   }
   
-  config.duration(wakeInSeconds * 1000L);  // Timer-based wake at reporting boundary
-  
+  config.duration((uint32_t)wakeInSeconds * 1000UL);  // Timer-based wake at reporting boundary
+
+  thrashGuard.markProgress("SLEEP_ATTEMPT");
   SystemSleepResult result = System.sleep(config);
+
+  // If Device OS rejects the sleep configuration, System.sleep() returns
+  // immediately and the wake pin will be invalid (65535). Without handling
+  // that error, the state machine will interpret it as a timer wake and can
+  // thrash in a tight loop.
+  if (result.error() != SYSTEM_ERROR_NONE) {
+    thrashGuard.markProgress("SLEEP_RETURNED");
+    Log.error("ULTRA_LOW_POWER sleep failed err=%d (wakeIn=%d sec, button=%d pir=%d) - falling back to STOP", (int)result.error(), wakeInSeconds, (int)BUTTON_PIN, (int)intPin);
+    current.raiseAlert(16);
+
+    // STOP generally supports a wider set of wake pins on some platforms.
+    config = SystemSleepConfiguration();
+    config.mode(SystemSleepMode::STOP)
+      .gpio(BUTTON_PIN, FALLING)
+      .gpio(intPin, RISING)
+      .duration((uint32_t)wakeInSeconds * 1000UL);
+    result = System.sleep(config);
+
+    if (result.error() != SYSTEM_ERROR_NONE) {
+      Log.error("STOP sleep fallback failed err=%d (wakeIn=%d sec) - using timer-only STOP sleep", (int)result.error(), wakeInSeconds);
+      config = SystemSleepConfiguration();
+      config.mode(SystemSleepMode::STOP)
+        .duration((uint32_t)wakeInSeconds * 1000UL);
+      result = System.sleep(config);
+
+      if (result.error() != SYSTEM_ERROR_NONE) {
+        Log.error("All sleep attempts failed err=%d - delaying to avoid tight loop", (int)result.error());
+        ab1805.resumeWDT();
+        delay(1000);
+        state = ERROR_STATE;
+        return;
+      }
+    }
+  }
   
   // Clear any pending interrupts on wake pins after sleep to ensure clean state
   // This is critical for proper interrupt handling after wake
@@ -480,8 +610,10 @@ void handleSleepingState() {
   // Photon2 USB serial needs time to re-enumerate after sleep.
   // Must re-initialize before any Log.info() calls to avoid corrupted output.
   Serial.begin();  // Re-initialize serial port
+
+#if ALLOW_BLOCKING_SERIAL_WAITS
   delay(ConnectivityPolicy::DEBUG_SERIAL_REENUM_DELAY_MS);     // Give USB time to re-enumerate
-  
+
   // Use blocking wait for serial connection - waitFor() is non-blocking
   // and the device would go back to sleep before connection established
   unsigned long serialWaitStart = millis();
@@ -490,13 +622,14 @@ void handleSleepingState() {
     Particle.process();
     delay(ConnectivityPolicy::DEBUG_SERIAL_WAIT_POLL_DELAY_MS);  // Blocking wait for serial connection
   }
-  
+
   if (Serial.isConnected()) {
     delay(ConnectivityPolicy::DEBUG_SERIAL_POST_CONNECT_DELAY_MS);  // Extra settling time after connection
     Log.info("Serial reconnected after %lu ms", (millis() - serialWaitStart));
   } else {
     Log.warn("Serial did not reconnect within 30s - continuing without serial");
   }
+#endif // ALLOW_BLOCKING_SERIAL_WAITS
 #endif // DEBUG_SERIAL
 
   // Re-attach user button interrupt after sleep (sleep may have detached it)
@@ -514,6 +647,9 @@ void handleSleepingState() {
   SystemSleepWakeupReason reason = result.wakeupReason();
   Log.info("Woke from ULTRA_LOW_POWER: wakeupReason=%d pin=%d (pir=%d button=%d timer=%d)",
            (int)reason, (int)wakePin, pirWake, buttonWake, timerWake);
+
+  // Observability: start of a new wake cycle (ULP return path).
+  Observability::cycleStats().resetOnWake(millis());
   
   // LED will be turned on with proper timeout by PIR wake processing below
   // Don't turn it on here without timeout as it causes false LED timeout detection
