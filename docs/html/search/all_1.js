@@ -10,10 +10,11 @@ var searchData=
   ['allow_5fblocking_5fserial_5fwaits_7',['ALLOW_BLOCKING_SERIAL_WAITS',['../_build_profile_8h.html#a862e5c5913487ba4049590c35342976c',1,'BuildProfile.h']]],
   ['anonymous_5fnamespace_7blocaltimecache_2ecpp_7d_8',['anonymous_namespace{LocalTimeCache.cpp}',['../namespaceanonymous__namespace_02_local_time_cache_8cpp_03.html',1,'']]],
   ['anonymous_5fnamespace_7bsensormanager_2ecpp_7d_9',['anonymous_namespace{SensorManager.cpp}',['../namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html',1,'']]],
-  ['application_20state_20machine_20handlers_10',['Application State Machine &amp;amp; Handlers',['../index.html#autotoc_md10',1,'']]],
-  ['architecture_11',['Architecture',['../index.html#autotoc_md7',1,'Architecture'],['../index.html#autotoc_md14',1,'Ledger Architecture']]],
-  ['areledgerssynced_12',['areLedgersSynced',['../class_cloud.html#abd1e7289193949f93905243f7fb848cf',1,'Cloud']]],
-  ['aux1_13',['aux1',['../struct_sensor_data.html#ac7ac11fa966d2161a60b4ee1bc4c3264',1,'SensorData']]],
-  ['aux2_14',['aux2',['../struct_sensor_data.html#a3cc80364cff8be6a9ea11f1af9fcd690',1,'SensorData']]],
-  ['awaitingwebhookresponse_15',['awaitingWebhookResponse',['../struct_session_state.html#af7dffe574bae3e71f15882288106f58c',1,'SessionState']]]
+  ['anonymous_5fnamespace_7bthrashguard_2ecpp_7d_10',['anonymous_namespace{ThrashGuard.cpp}',['../namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html',1,'']]],
+  ['application_20state_20machine_20handlers_11',['Application State Machine &amp;amp; Handlers',['../index.html#autotoc_md10',1,'']]],
+  ['architecture_12',['Architecture',['../index.html#autotoc_md7',1,'Architecture'],['../index.html#autotoc_md14',1,'Ledger Architecture']]],
+  ['areledgerssynced_13',['areLedgersSynced',['../class_cloud.html#abd1e7289193949f93905243f7fb848cf',1,'Cloud']]],
+  ['aux1_14',['aux1',['../struct_sensor_data.html#ac7ac11fa966d2161a60b4ee1bc4c3264',1,'SensorData']]],
+  ['aux2_15',['aux2',['../struct_sensor_data.html#a3cc80364cff8be6a9ea11f1af9fcd690',1,'SensorData']]],
+  ['awaitingwebhookresponse_16',['awaitingWebhookResponse',['../struct_session_state.html#af7dffe574bae3e71f15882288106f58c',1,'SessionState']]]
 ];

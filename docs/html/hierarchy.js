@@ -19,5 +19,6 @@ var hierarchy =
     [ "SensorManager", "class_sensor_manager.html", null ],
     [ "SessionState", "struct_session_state.html", null ],
     [ "sysStatusData::SysData", "classsys_status_data_1_1_sys_data.html", null ],
+    [ "ThrashGuard", "class_thrash_guard.html", null ],
     [ "Observability::WakeCycleStats", "struct_observability_1_1_wake_cycle_stats.html", null ]
 ];

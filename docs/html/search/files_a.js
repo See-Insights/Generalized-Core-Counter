@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['version_2ecpp_0',['Version.cpp',['../_version_8cpp.html',1,'']]],
-  ['version_2eh_1',['Version.h',['../_version_8h.html',1,'']]]
+  ['thrashguard_2ecpp_0',['ThrashGuard.cpp',['../_thrash_guard_8cpp.html',1,'']]],
+  ['thrashguard_2eh_1',['ThrashGuard.h',['../_thrash_guard_8h.html',1,'']]]
 ];

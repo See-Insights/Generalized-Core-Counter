@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Fixed
+
+- Boron PMIC remediation is now non-blocking (removed `delay()`-based charge cycling to keep `loop()` responsive).
+
+## 3.25 – 2026-02-10
+
+### Changed
+
+- Refactored cloud responsibilities into focused modules (ledger I/O, merge, apply, status publishing) to reduce complexity and improve maintainability.
+- Centralized connectivity budgets and related guardrails in `ConnectivityPolicy` to avoid scattered magic numbers.
+- Added/validated local time snapshot caching for open-hours gating.
+- Consolidated duplicated connectivity/radio helper functions into a single canonical implementation.
+- Improved field/dev guardrails and wake-cycle observability (cycle summary logs and optional device-status fields).
+
+## 3.24 – 2026-02-09
+
+### Added
+
+- Implemented occupancy mode end-to-end on top of the orthogonal mode architecture.
+- Added support for real-time occupancy state-change reporting in keep-alive/standby connection modes.
+
 ## 3.23 – 2026-02-05
 
 ### BREAKING CHANGES - Orthogonal Mode Architecture Refactor
@@ -236,8 +259,6 @@ This release fundamentally restructures device configuration to use four indepen
 
 ## 3.20 – 2026-01-23
 - Added PMIC monitoring for Boron
-
-## 3.24 – 2026-02-09
 - Implmeented Occupancy
 
 ## 3.24 – 2026-02-10
@@ -245,4 +266,7 @@ This release fundamentally restructures device configuration to use four indepen
 
 ## 3.25 – 2026-02-10
 - Optimized to reduce complexity / improve maintainability
+
+## 3.26 – 2026-02-11
+- Added Thrash Guard - Fixed sleep bug
 

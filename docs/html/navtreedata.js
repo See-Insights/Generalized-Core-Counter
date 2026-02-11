@@ -115,9 +115,9 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "_battery_backoff_8cpp.html",
-"class_p_i_r_sensor.html#a0f0d1a8a3d010e2fbef7acaed0b381b7",
-"classsys_status_data_1_1_sys_data.html#ae906b46965fe38a590186efd83d5673b",
-"struct_observability_1_1_wake_cycle_stats.html#a7b8c7a4fad23ff7a4db0cd7d69fc1fa6"
+"class_i_sensor.html#a638047cc80e97814200be39478a9ee1d",
+"classsys_status_data_1_1_sys_data.html#a4f202b9573570e16bf24003a86571c55",
+"struct_observability_1_1_wake_cycle_stats.html#a2455d3a9b38024954fc703703e1dba25"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronization';

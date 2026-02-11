@@ -4,6 +4,13 @@ var namespaces_dup =
     [ "anonymous_namespace{SensorManager.cpp}", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html", [
       [ "probeTmp112Present", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a452bb1633016be3c71fffc2fe5d5a0d7", null ]
     ] ],
+    [ "anonymous_namespace{ThrashGuard.cpp}", "namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html", [
+      [ "BACKOFF_MS", "namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a7051561c04cc971e71f1db9dbc2a9b8f", null ],
+      [ "REASON_NOPROGRESS", "namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a520e89c249eda26c28608a22b7e620dc", null ],
+      [ "TIER2_WINDOW_MS", "namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afc75631d91905ff375e5056c5ddffafb", null ],
+      [ "TIER3_TRIP_COUNT", "namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#af396c832c1943dc159954049a9503303", null ],
+      [ "TIER3_WINDOW_MS", "namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afbb332fff9abe10374e0a8920493b9d2", null ]
+    ] ],
     [ "Connectivity", "namespace_connectivity.html", [
       [ "isRadioPoweredOn", "namespace_connectivity.html#a834c90315e1ac893f48fc5dfccbae3cf", null ],
       [ "requestCloudDisconnectOnly", "namespace_connectivity.html#a0e2777379673ce5006c16847bc640547", null ],

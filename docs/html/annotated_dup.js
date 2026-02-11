@@ -17,5 +17,6 @@ var annotated_dup =
     [ "SensorFactory", "class_sensor_factory.html", null ],
     [ "SensorManager", "class_sensor_manager.html", "class_sensor_manager" ],
     [ "SessionState", "struct_session_state.html", "struct_session_state" ],
-    [ "sysStatusData", "classsys_status_data.html", "classsys_status_data" ]
+    [ "sysStatusData", "classsys_status_data.html", "classsys_status_data" ],
+    [ "ThrashGuard", "class_thrash_guard.html", "class_thrash_guard" ]
 ];

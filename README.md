@@ -1,6 +1,6 @@
 # Generalized-Core-Counter
 
-**Version:** 3.25 | **Latest:** Optimized to reduce complexity / improve maintainability
+**Version:** 3.26 | **Latest:** Added Thrash Guard - Fixed sleep bug
 
 A generalized IoT firmware core for outdoor sensor devices supporting multiple operating modes and sensor types.
 
