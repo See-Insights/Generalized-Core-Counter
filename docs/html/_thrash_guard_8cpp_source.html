@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.26</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.27</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -95,147 +95,153 @@ $(function(){initNavTree('_thrash_guard_8cpp_source.html','',''); });
 <a href="_thrash_guard_8cpp.html">Go to the documentation of this file.</a><div class="fragment"><div class="line"><a id="l00001" name="l00001"></a><span class="lineno">    1</span><span class="preprocessor">#include &quot;<a class="code" href="_thrash_guard_8h.html">ThrashGuard.h</a>&quot;</span></div>
 <div class="line"><a id="l00002" name="l00002"></a><span class="lineno">    2</span><span class="preprocessor">#include &quot;<a class="code" href="_state_machine_8h.html">state/StateMachine.h</a>&quot;</span></div>
 <div class="line"><a id="l00003" name="l00003"></a><span class="lineno">    3</span><span class="preprocessor">#include &quot;<a class="code" href="_connectivity_8h.html">power/Connectivity.h</a>&quot;</span></div>
-<div class="line"><a id="l00004" name="l00004"></a><span class="lineno">    4</span> </div>
-<div class="line"><a id="l00005" name="l00005"></a><span class="lineno"><a class="line" href="_thrash_guard_8cpp.html#a09dfa8a5d5d3412e9f4a24f54595e5a0">    5</a></span><a class="code hl_class" href="class_thrash_guard.html">ThrashGuard</a> <a class="code hl_variable" href="_thrash_guard_8cpp.html#a09dfa8a5d5d3412e9f4a24f54595e5a0">thrashGuard</a>;</div>
-<div class="line"><a id="l00006" name="l00006"></a><span class="lineno">    6</span> </div>
-<div class="line"><a id="l00007" name="l00007"></a><span class="lineno"><a class="line" href="_thrash_guard_8cpp.html#aa27b7d360b53e8706dfe92aab25b5aa5">    7</a></span>retained uint16_t <a class="code hl_variable" href="_thrash_guard_8cpp.html#aa27b7d360b53e8706dfe92aab25b5aa5">thrashTripCount</a> = 0;</div>
-<div class="line"><a id="l00008" name="l00008"></a><span class="lineno"><a class="line" href="_thrash_guard_8cpp.html#a3f9c465b45599dab066e4d85fe4f3807">    8</a></span>retained uint16_t <a class="code hl_variable" href="_thrash_guard_8cpp.html#a3f9c465b45599dab066e4d85fe4f3807">thrashResetCount</a> = 0;</div>
-<div class="line"><a id="l00009" name="l00009"></a><span class="lineno"><a class="line" href="_thrash_guard_8cpp.html#a248d05cd249c3781ae19ac85e8c9ebd8">    9</a></span>retained uint8_t <a class="code hl_variable" href="_thrash_guard_8cpp.html#a248d05cd249c3781ae19ac85e8c9ebd8">lastThrashReason</a> = 0;</div>
-<div class="line"><a id="l00010" name="l00010"></a><span class="lineno">   10</span> </div>
-<div class="foldopen" id="foldopen00011" data-start="{" data-end="}">
-<div class="line"><a id="l00011" name="l00011"></a><span class="lineno"><a class="line" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html">   11</a></span><span class="keyword">namespace </span>{</div>
-<div class="line"><a id="l00012" name="l00012"></a><span class="lineno"><a class="line" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a7051561c04cc971e71f1db9dbc2a9b8f">   12</a></span><span class="keyword">constexpr</span> uint32_t <a class="code hl_variable" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a7051561c04cc971e71f1db9dbc2a9b8f">BACKOFF_MS</a> = 10 * 1000UL;</div>
-<div class="line"><a id="l00013" name="l00013"></a><span class="lineno"><a class="line" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afc75631d91905ff375e5056c5ddffafb">   13</a></span><span class="keyword">constexpr</span> uint32_t <a class="code hl_variable" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afc75631d91905ff375e5056c5ddffafb">TIER2_WINDOW_MS</a> = 10 * 60 * 1000UL;</div>
-<div class="line"><a id="l00014" name="l00014"></a><span class="lineno"><a class="line" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afbb332fff9abe10374e0a8920493b9d2">   14</a></span><span class="keyword">constexpr</span> uint32_t <a class="code hl_variable" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afbb332fff9abe10374e0a8920493b9d2">TIER3_WINDOW_MS</a> = 60 * 60 * 1000UL;</div>
-<div class="line"><a id="l00015" name="l00015"></a><span class="lineno"><a class="line" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#af396c832c1943dc159954049a9503303">   15</a></span><span class="keyword">constexpr</span> uint8_t <a class="code hl_variable" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#af396c832c1943dc159954049a9503303">TIER3_TRIP_COUNT</a> = 3;</div>
-<div class="line"><a id="l00016" name="l00016"></a><span class="lineno"><a class="line" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a520e89c249eda26c28608a22b7e620dc">   16</a></span><span class="keyword">constexpr</span> uint8_t <a class="code hl_variable" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a520e89c249eda26c28608a22b7e620dc">REASON_NOPROGRESS</a> = 1;</div>
-<div class="line"><a id="l00017" name="l00017"></a><span class="lineno">   17</span>} <span class="comment">// namespace</span></div>
-</div>
-<div class="line"><a id="l00018" name="l00018"></a><span class="lineno">   18</span> </div>
-<div class="foldopen" id="foldopen00019" data-start="{" data-end="}">
-<div class="line"><a id="l00019" name="l00019"></a><span class="lineno"><a class="line" href="class_thrash_guard.html#a01d31120b6c3584fdb7fb652a6efa2ac">   19</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="class_thrash_guard.html#a01d31120b6c3584fdb7fb652a6efa2ac">ThrashGuard::setLogCooldownMs</a>(uint32_t cooldownMs) {</div>
-<div class="line"><a id="l00020" name="l00020"></a><span class="lineno">   20</span>  logCooldownMs_ = cooldownMs;</div>
-<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span>}</div>
-</div>
-<div class="line"><a id="l00022" name="l00022"></a><span class="lineno">   22</span> </div>
-<div class="foldopen" id="foldopen00023" data-start="{" data-end="}">
-<div class="line"><a id="l00023" name="l00023"></a><span class="lineno"><a class="line" href="class_thrash_guard.html#a1b21cfe6c83e702a23427e3ae2450d98">   23</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="class_thrash_guard.html#a1b21cfe6c83e702a23427e3ae2450d98">ThrashGuard::markProgress</a>(<span class="keyword">const</span> <span class="keywordtype">char</span> *tag) {</div>
-<div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span>  <span class="keywordflow">if</span> (tag &amp;&amp; tag[0] != <span class="charliteral">&#39;\0&#39;</span>) {</div>
-<div class="line"><a id="l00025" name="l00025"></a><span class="lineno">   25</span>    strncpy(lastTag_, tag, <span class="keyword">sizeof</span>(lastTag_) - 1);</div>
-<div class="line"><a id="l00026" name="l00026"></a><span class="lineno">   26</span>    lastTag_[<span class="keyword">sizeof</span>(lastTag_) - 1] = <span class="charliteral">&#39;\0&#39;</span>;</div>
-<div class="line"><a id="l00027" name="l00027"></a><span class="lineno">   27</span>  }</div>
-<div class="line"><a id="l00028" name="l00028"></a><span class="lineno">   28</span>  lastProgressMs_ = millis();</div>
-<div class="line"><a id="l00029" name="l00029"></a><span class="lineno">   29</span>}</div>
-</div>
+<div class="line"><a id="l00004" name="l00004"></a><span class="lineno">    4</span><span class="preprocessor">#include &quot;<a class="code" href="_my_persistent_data_8h.html">MyPersistentData.h</a>&quot;</span></div>
+<div class="line"><a id="l00005" name="l00005"></a><span class="lineno">    5</span></div>
+<div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span> </div>
+<div class="line"><a id="l00025" name="l00025"></a><span class="lineno"><a class="line" href="_thrash_guard_8cpp.html#a09dfa8a5d5d3412e9f4a24f54595e5a0">   25</a></span><a class="code hl_class" href="class_thrash_guard.html">ThrashGuard</a> <a class="code hl_variable" href="_thrash_guard_8cpp.html#a09dfa8a5d5d3412e9f4a24f54595e5a0">thrashGuard</a>;</div>
+<div class="line"><a id="l00026" name="l00026"></a><span class="lineno">   26</span> </div>
+<div class="line"><a id="l00027" name="l00027"></a><span class="lineno"><a class="line" href="_thrash_guard_8cpp.html#aa27b7d360b53e8706dfe92aab25b5aa5">   27</a></span>retained uint16_t <a class="code hl_variable" href="_thrash_guard_8cpp.html#aa27b7d360b53e8706dfe92aab25b5aa5">thrashTripCount</a> = 0;</div>
+<div class="line"><a id="l00028" name="l00028"></a><span class="lineno"><a class="line" href="_thrash_guard_8cpp.html#a3f9c465b45599dab066e4d85fe4f3807">   28</a></span>retained uint16_t <a class="code hl_variable" href="_thrash_guard_8cpp.html#a3f9c465b45599dab066e4d85fe4f3807">thrashResetCount</a> = 0;</div>
+<div class="line"><a id="l00029" name="l00029"></a><span class="lineno"><a class="line" href="_thrash_guard_8cpp.html#a248d05cd249c3781ae19ac85e8c9ebd8">   29</a></span>retained uint8_t <a class="code hl_variable" href="_thrash_guard_8cpp.html#a248d05cd249c3781ae19ac85e8c9ebd8">lastThrashReason</a> = 0;</div>
 <div class="line"><a id="l00030" name="l00030"></a><span class="lineno">   30</span> </div>
 <div class="foldopen" id="foldopen00031" data-start="{" data-end="}">
-<div class="line"><a id="l00031" name="l00031"></a><span class="lineno"><a class="line" href="class_thrash_guard.html#a363e2fac16a9fad4bdebc0f54bea80a0">   31</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="class_thrash_guard.html#a363e2fac16a9fad4bdebc0f54bea80a0">ThrashGuard::recordStateTransition</a>(<span class="keywordtype">int</span> <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a0840b91aed028ae09ab1d7a4238569ec">oldState</a>, <span class="keywordtype">int</span> newState) {</div>
-<div class="line"><a id="l00032" name="l00032"></a><span class="lineno">   32</span>  (void)<a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a0840b91aed028ae09ab1d7a4238569ec">oldState</a>;</div>
-<div class="line"><a id="l00033" name="l00033"></a><span class="lineno">   33</span>  (void)newState;</div>
-<div class="line"><a id="l00034" name="l00034"></a><span class="lineno">   34</span>  <span class="comment">// State transitions represent forward progress in the state machine.</span></div>
-<div class="line"><a id="l00035" name="l00035"></a><span class="lineno">   35</span>  lastProgressMs_ = millis();</div>
-<div class="line"><a id="l00036" name="l00036"></a><span class="lineno">   36</span>}</div>
+<div class="line"><a id="l00031" name="l00031"></a><span class="lineno"><a class="line" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html">   31</a></span><span class="keyword">namespace </span>{</div>
+<div class="line"><a id="l00032" name="l00032"></a><span class="lineno"><a class="line" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a7051561c04cc971e71f1db9dbc2a9b8f">   32</a></span><span class="keyword">constexpr</span> uint32_t <a class="code hl_variable" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a7051561c04cc971e71f1db9dbc2a9b8f">BACKOFF_MS</a> = 10 * 1000UL;</div>
+<div class="line"><a id="l00033" name="l00033"></a><span class="lineno"><a class="line" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afc75631d91905ff375e5056c5ddffafb">   33</a></span><span class="keyword">constexpr</span> uint32_t <a class="code hl_variable" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afc75631d91905ff375e5056c5ddffafb">TIER2_WINDOW_MS</a> = 10 * 60 * 1000UL;</div>
+<div class="line"><a id="l00034" name="l00034"></a><span class="lineno"><a class="line" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afbb332fff9abe10374e0a8920493b9d2">   34</a></span><span class="keyword">constexpr</span> uint32_t <a class="code hl_variable" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afbb332fff9abe10374e0a8920493b9d2">TIER3_WINDOW_MS</a> = 60 * 60 * 1000UL;</div>
+<div class="line"><a id="l00035" name="l00035"></a><span class="lineno"><a class="line" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#af396c832c1943dc159954049a9503303">   35</a></span><span class="keyword">constexpr</span> uint8_t <a class="code hl_variable" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#af396c832c1943dc159954049a9503303">TIER3_TRIP_COUNT</a> = 3;</div>
+<div class="line"><a id="l00036" name="l00036"></a><span class="lineno"><a class="line" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a520e89c249eda26c28608a22b7e620dc">   36</a></span><span class="keyword">constexpr</span> uint8_t <a class="code hl_variable" href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a520e89c249eda26c28608a22b7e620dc">REASON_NOPROGRESS</a> = 1;</div>
+<div class="line"><a id="l00037" name="l00037"></a><span class="lineno">   37</span>} <span class="comment">// namespace</span></div>
 </div>
-<div class="line"><a id="l00037" name="l00037"></a><span class="lineno">   37</span> </div>
-<div class="line"><a id="l00038" name="l00038"></a><span class="lineno">   38</span>uint32_t ThrashGuard::timeoutForStateSec(<span class="keywordtype">int</span> currentState)<span class="keyword"> const </span>{</div>
-<div class="line"><a id="l00039" name="l00039"></a><span class="lineno">   39</span>  <span class="keywordflow">switch</span> (currentState) {</div>
-<div class="line"><a id="l00040" name="l00040"></a><span class="lineno">   40</span>  <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24">SLEEPING_STATE</a>:</div>
-<div class="line"><a id="l00041" name="l00041"></a><span class="lineno">   41</span>    <span class="keywordflow">return</span> 30;</div>
-<div class="line"><a id="l00042" name="l00042"></a><span class="lineno">   42</span>  <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a549bd89b38411c3eb84cead55c7df867">CONNECTING_STATE</a>:</div>
-<div class="line"><a id="l00043" name="l00043"></a><span class="lineno">   43</span>    <span class="keywordflow">return</span> 120;</div>
-<div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span>  <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a927b7910140065b2cef01ac3557b91a6">REPORTING_STATE</a>:</div>
-<div class="line"><a id="l00045" name="l00045"></a><span class="lineno">   45</span>    <span class="keywordflow">return</span> 120;</div>
-<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span>  <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a6d4ca25a3d420813862ff4e2e874373e">FIRMWARE_UPDATE_STATE</a>:</div>
-<div class="line"><a id="l00047" name="l00047"></a><span class="lineno">   47</span>    <span class="keywordflow">return</span> 180;</div>
-<div class="line"><a id="l00048" name="l00048"></a><span class="lineno">   48</span>  <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8ae6345fad0beb5f8f70fed55dcdae6003">INITIALIZATION_STATE</a>:</div>
-<div class="line"><a id="l00049" name="l00049"></a><span class="lineno">   49</span>  <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aa07813f3418b83dc769daa78689fb9c3">ERROR_STATE</a>:</div>
-<div class="line"><a id="l00050" name="l00050"></a><span class="lineno">   50</span>    <span class="keywordflow">return</span> 60;</div>
-<div class="line"><a id="l00051" name="l00051"></a><span class="lineno">   51</span>  <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aeca4500f6f729608a014643f8c8f4003">IDLE_STATE</a>:</div>
-<div class="line"><a id="l00052" name="l00052"></a><span class="lineno">   52</span>  <span class="keywordflow">default</span>:</div>
-<div class="line"><a id="l00053" name="l00053"></a><span class="lineno">   53</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><a id="l00054" name="l00054"></a><span class="lineno">   54</span>  }</div>
-<div class="line"><a id="l00055" name="l00055"></a><span class="lineno">   55</span>}</div>
-<div class="line"><a id="l00056" name="l00056"></a><span class="lineno">   56</span> </div>
-<div class="line"><a id="l00057" name="l00057"></a><span class="lineno">   57</span><span class="keywordtype">void</span> ThrashGuard::logTrip(<span class="keywordtype">int</span> currentState, uint32_t noprogSec, <span class="keyword">const</span> <span class="keywordtype">char</span> *tag, <span class="keywordtype">int</span> tier, <span class="keyword">const</span> <span class="keywordtype">char</span> *action) {</div>
-<div class="line"><a id="l00058" name="l00058"></a><span class="lineno">   58</span>  <span class="keywordflow">if</span> (lastLogMs_ != 0 &amp;&amp; (millis() - lastLogMs_) &lt; logCooldownMs_) {</div>
-<div class="line"><a id="l00059" name="l00059"></a><span class="lineno">   59</span>    <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span>  }</div>
-<div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span>  lastLogMs_ = millis();</div>
-<div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span> </div>
-<div class="line"><a id="l00063" name="l00063"></a><span class="lineno">   63</span>  Log.warn(<span class="stringliteral">&quot;THRASH st=%s noprog=%lus last=%s tier=%d action=%s&quot;</span>,</div>
-<div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span>           <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#abcd5d33fa869a1d746ac85a5f6ac720b">stateNames</a>[currentState],</div>
-<div class="line"><a id="l00065" name="l00065"></a><span class="lineno">   65</span>           (<span class="keywordtype">unsigned</span> <span class="keywordtype">long</span>)noprogSec,</div>
-<div class="line"><a id="l00066" name="l00066"></a><span class="lineno">   66</span>           tag ? tag : <span class="stringliteral">&quot;?&quot;</span>,</div>
-<div class="line"><a id="l00067" name="l00067"></a><span class="lineno">   67</span>           tier,</div>
-<div class="line"><a id="l00068" name="l00068"></a><span class="lineno">   68</span>           action ? action : <span class="stringliteral">&quot;-&quot;</span>);</div>
-<div class="line"><a id="l00069" name="l00069"></a><span class="lineno">   69</span>}</div>
-<div class="line"><a id="l00070" name="l00070"></a><span class="lineno">   70</span> </div>
-<div class="foldopen" id="foldopen00071" data-start="{" data-end="}">
-<div class="line"><a id="l00071" name="l00071"></a><span class="lineno"><a class="line" href="class_thrash_guard.html#a560149abb82cc5c42e3c7ebd2bec7b5c">   71</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="class_thrash_guard.html#a560149abb82cc5c42e3c7ebd2bec7b5c">ThrashGuard::loop</a>(<span class="keywordtype">int</span> currentState, uint32_t nowMs) {</div>
-<div class="line"><a id="l00072" name="l00072"></a><span class="lineno">   72</span>  uint32_t timeoutSec = timeoutForStateSec(currentState);</div>
-<div class="line"><a id="l00073" name="l00073"></a><span class="lineno">   73</span>  <span class="keywordflow">if</span> (timeoutSec == 0) {</div>
-<div class="line"><a id="l00074" name="l00074"></a><span class="lineno">   74</span>    <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00075" name="l00075"></a><span class="lineno">   75</span>  }</div>
+<div class="line"><a id="l00038" name="l00038"></a><span class="lineno">   38</span> </div>
+<div class="foldopen" id="foldopen00039" data-start="{" data-end="}">
+<div class="line"><a id="l00039" name="l00039"></a><span class="lineno"><a class="line" href="class_thrash_guard.html#a01d31120b6c3584fdb7fb652a6efa2ac">   39</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="class_thrash_guard.html#a01d31120b6c3584fdb7fb652a6efa2ac">ThrashGuard::setLogCooldownMs</a>(uint32_t cooldownMs) {</div>
+<div class="line"><a id="l00040" name="l00040"></a><span class="lineno">   40</span>  logCooldownMs_ = cooldownMs;</div>
+<div class="line"><a id="l00041" name="l00041"></a><span class="lineno">   41</span>}</div>
+</div>
+<div class="line"><a id="l00042" name="l00042"></a><span class="lineno">   42</span> </div>
+<div class="foldopen" id="foldopen00043" data-start="{" data-end="}">
+<div class="line"><a id="l00043" name="l00043"></a><span class="lineno"><a class="line" href="class_thrash_guard.html#a1b21cfe6c83e702a23427e3ae2450d98">   43</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="class_thrash_guard.html#a1b21cfe6c83e702a23427e3ae2450d98">ThrashGuard::markProgress</a>(<span class="keyword">const</span> <span class="keywordtype">char</span> *tag) {</div>
+<div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span>  <span class="keywordflow">if</span> (tag &amp;&amp; tag[0] != <span class="charliteral">&#39;\0&#39;</span>) {</div>
+<div class="line"><a id="l00045" name="l00045"></a><span class="lineno">   45</span>    strncpy(lastTag_, tag, <span class="keyword">sizeof</span>(lastTag_) - 1);</div>
+<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span>    lastTag_[<span class="keyword">sizeof</span>(lastTag_) - 1] = <span class="charliteral">&#39;\0&#39;</span>;</div>
+<div class="line"><a id="l00047" name="l00047"></a><span class="lineno">   47</span>  }</div>
+<div class="line"><a id="l00048" name="l00048"></a><span class="lineno">   48</span>  lastProgressMs_ = millis();</div>
+<div class="line"><a id="l00049" name="l00049"></a><span class="lineno">   49</span>}</div>
+</div>
+<div class="line"><a id="l00050" name="l00050"></a><span class="lineno">   50</span> </div>
+<div class="foldopen" id="foldopen00051" data-start="{" data-end="}">
+<div class="line"><a id="l00051" name="l00051"></a><span class="lineno"><a class="line" href="class_thrash_guard.html#a363e2fac16a9fad4bdebc0f54bea80a0">   51</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="class_thrash_guard.html#a363e2fac16a9fad4bdebc0f54bea80a0">ThrashGuard::recordStateTransition</a>(<span class="keywordtype">int</span> <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a0840b91aed028ae09ab1d7a4238569ec">oldState</a>, <span class="keywordtype">int</span> newState) {</div>
+<div class="line"><a id="l00052" name="l00052"></a><span class="lineno">   52</span>  (void)<a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a0840b91aed028ae09ab1d7a4238569ec">oldState</a>;</div>
+<div class="line"><a id="l00053" name="l00053"></a><span class="lineno">   53</span>  (void)newState;</div>
+<div class="line"><a id="l00054" name="l00054"></a><span class="lineno">   54</span>  <span class="comment">// State transitions represent forward progress in the state machine.</span></div>
+<div class="line"><a id="l00055" name="l00055"></a><span class="lineno">   55</span>  lastProgressMs_ = millis();</div>
+<div class="line"><a id="l00056" name="l00056"></a><span class="lineno">   56</span>}</div>
+</div>
+<div class="line"><a id="l00057" name="l00057"></a><span class="lineno">   57</span> </div>
+<div class="line"><a id="l00058" name="l00058"></a><span class="lineno">   58</span>uint32_t ThrashGuard::timeoutForStateSec(<span class="keywordtype">int</span> currentState)<span class="keyword"> const </span>{</div>
+<div class="line"><a id="l00059" name="l00059"></a><span class="lineno">   59</span>  <span class="keywordflow">switch</span> (currentState) {</div>
+<div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span>  <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24">SLEEPING_STATE</a>:</div>
+<div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span>    <span class="keywordflow">return</span> 60;  <span class="comment">// Increased from 30s to allow for cloud operations sync (30s) + sleep prep</span></div>
+<div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span>  <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a549bd89b38411c3eb84cead55c7df867">CONNECTING_STATE</a>:</div>
+<div class="line"><a id="l00063" name="l00063"></a><span class="lineno">   63</span>    <span class="keywordflow">return</span> 120;</div>
+<div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span>  <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a927b7910140065b2cef01ac3557b91a6">REPORTING_STATE</a>:</div>
+<div class="line"><a id="l00065" name="l00065"></a><span class="lineno">   65</span>    <span class="keywordflow">return</span> 120;</div>
+<div class="line"><a id="l00066" name="l00066"></a><span class="lineno">   66</span>  <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a6d4ca25a3d420813862ff4e2e874373e">FIRMWARE_UPDATE_STATE</a>:</div>
+<div class="line"><a id="l00067" name="l00067"></a><span class="lineno">   67</span>    <span class="keywordflow">return</span> 180;</div>
+<div class="line"><a id="l00068" name="l00068"></a><span class="lineno">   68</span>  <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8ae6345fad0beb5f8f70fed55dcdae6003">INITIALIZATION_STATE</a>:</div>
+<div class="line"><a id="l00069" name="l00069"></a><span class="lineno">   69</span>  <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aa07813f3418b83dc769daa78689fb9c3">ERROR_STATE</a>:</div>
+<div class="line"><a id="l00070" name="l00070"></a><span class="lineno">   70</span>    <span class="keywordflow">return</span> 60;</div>
+<div class="line"><a id="l00071" name="l00071"></a><span class="lineno">   71</span>  <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aeca4500f6f729608a014643f8c8f4003">IDLE_STATE</a>:</div>
+<div class="line"><a id="l00072" name="l00072"></a><span class="lineno">   72</span>  <span class="keywordflow">default</span>:</div>
+<div class="line"><a id="l00073" name="l00073"></a><span class="lineno">   73</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><a id="l00074" name="l00074"></a><span class="lineno">   74</span>  }</div>
+<div class="line"><a id="l00075" name="l00075"></a><span class="lineno">   75</span>}</div>
 <div class="line"><a id="l00076" name="l00076"></a><span class="lineno">   76</span> </div>
-<div class="line"><a id="l00077" name="l00077"></a><span class="lineno">   77</span>  <span class="keywordflow">if</span> (lastProgressMs_ == 0) {</div>
-<div class="line"><a id="l00078" name="l00078"></a><span class="lineno">   78</span>    lastProgressMs_ = nowMs;</div>
+<div class="line"><a id="l00077" name="l00077"></a><span class="lineno">   77</span><span class="keywordtype">void</span> ThrashGuard::logTrip(<span class="keywordtype">int</span> currentState, uint32_t noprogSec, <span class="keyword">const</span> <span class="keywordtype">char</span> *tag, <span class="keywordtype">int</span> tier, <span class="keyword">const</span> <span class="keywordtype">char</span> *action) {</div>
+<div class="line"><a id="l00078" name="l00078"></a><span class="lineno">   78</span>  <span class="keywordflow">if</span> (lastLogMs_ != 0 &amp;&amp; (millis() - lastLogMs_) &lt; logCooldownMs_) {</div>
 <div class="line"><a id="l00079" name="l00079"></a><span class="lineno">   79</span>    <span class="keywordflow">return</span>;</div>
 <div class="line"><a id="l00080" name="l00080"></a><span class="lineno">   80</span>  }</div>
-<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span> </div>
-<div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span>  <span class="keywordflow">if</span> (nowMs &lt; backoffUntilMs_) {</div>
-<div class="line"><a id="l00083" name="l00083"></a><span class="lineno">   83</span>    <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00084" name="l00084"></a><span class="lineno">   84</span>  }</div>
-<div class="line"><a id="l00085" name="l00085"></a><span class="lineno">   85</span> </div>
-<div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span>  uint32_t elapsedMs = nowMs - lastProgressMs_;</div>
-<div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span>  <span class="keywordflow">if</span> (elapsedMs &lt; (timeoutSec * 1000UL)) {</div>
-<div class="line"><a id="l00088" name="l00088"></a><span class="lineno">   88</span>    <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span>  }</div>
+<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span>  lastLogMs_ = millis();</div>
+<div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span> </div>
+<div class="line"><a id="l00083" name="l00083"></a><span class="lineno">   83</span>  Log.warn(<span class="stringliteral">&quot;THRASH st=%s noprog=%lus last=%s tier=%d action=%s&quot;</span>,</div>
+<div class="line"><a id="l00084" name="l00084"></a><span class="lineno">   84</span>           <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#abcd5d33fa869a1d746ac85a5f6ac720b">stateNames</a>[currentState],</div>
+<div class="line"><a id="l00085" name="l00085"></a><span class="lineno">   85</span>           (<span class="keywordtype">unsigned</span> <span class="keywordtype">long</span>)noprogSec,</div>
+<div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span>           tag ? tag : <span class="stringliteral">&quot;?&quot;</span>,</div>
+<div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span>           tier,</div>
+<div class="line"><a id="l00088" name="l00088"></a><span class="lineno">   88</span>           action ? action : <span class="stringliteral">&quot;-&quot;</span>);</div>
+<div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span>}</div>
 <div class="line"><a id="l00090" name="l00090"></a><span class="lineno">   90</span> </div>
-<div class="line"><a id="l00091" name="l00091"></a><span class="lineno">   91</span>  <a class="code hl_variable" href="_thrash_guard_8h.html#aa27b7d360b53e8706dfe92aab25b5aa5">thrashTripCount</a>++;</div>
-<div class="line"><a id="l00092" name="l00092"></a><span class="lineno">   92</span>  <a class="code hl_variable" href="_thrash_guard_8h.html#a248d05cd249c3781ae19ac85e8c9ebd8">lastThrashReason</a> = REASON_NOPROGRESS;</div>
-<div class="line"><a id="l00093" name="l00093"></a><span class="lineno">   93</span> </div>
-<div class="line"><a id="l00094" name="l00094"></a><span class="lineno">   94</span>  <span class="keywordflow">if</span> (windowStartMs_ == 0 || (nowMs - windowStartMs_) &gt; TIER3_WINDOW_MS) {</div>
-<div class="line"><a id="l00095" name="l00095"></a><span class="lineno">   95</span>    windowStartMs_ = nowMs;</div>
-<div class="line"><a id="l00096" name="l00096"></a><span class="lineno">   96</span>    recentTripCount_ = 0;</div>
-<div class="line"><a id="l00097" name="l00097"></a><span class="lineno">   97</span>  }</div>
-<div class="line"><a id="l00098" name="l00098"></a><span class="lineno">   98</span>  recentTripCount_++;</div>
-<div class="line"><a id="l00099" name="l00099"></a><span class="lineno">   99</span> </div>
-<div class="line"><a id="l00100" name="l00100"></a><span class="lineno">  100</span>  <span class="keywordtype">int</span> tier = 1;</div>
-<div class="line"><a id="l00101" name="l00101"></a><span class="lineno">  101</span>  <span class="keywordflow">if</span> (lastTripMs_ != 0 &amp;&amp; (nowMs - lastTripMs_) &lt;= TIER2_WINDOW_MS) {</div>
-<div class="line"><a id="l00102" name="l00102"></a><span class="lineno">  102</span>    tier = 2;</div>
-<div class="line"><a id="l00103" name="l00103"></a><span class="lineno">  103</span>  }</div>
-<div class="line"><a id="l00104" name="l00104"></a><span class="lineno">  104</span>  <span class="keywordflow">if</span> ((nowMs - windowStartMs_) &lt;= TIER3_WINDOW_MS &amp;&amp; recentTripCount_ &gt;= TIER3_TRIP_COUNT) {</div>
-<div class="line"><a id="l00105" name="l00105"></a><span class="lineno">  105</span>    tier = 3;</div>
-<div class="line"><a id="l00106" name="l00106"></a><span class="lineno">  106</span>  }</div>
-<div class="line"><a id="l00107" name="l00107"></a><span class="lineno">  107</span> </div>
-<div class="line"><a id="l00108" name="l00108"></a><span class="lineno">  108</span>  lastTripMs_ = nowMs;</div>
-<div class="line"><a id="l00109" name="l00109"></a><span class="lineno">  109</span>  backoffUntilMs_ = nowMs + BACKOFF_MS;</div>
+<div class="foldopen" id="foldopen00091" data-start="{" data-end="}">
+<div class="line"><a id="l00091" name="l00091"></a><span class="lineno"><a class="line" href="class_thrash_guard.html#a560149abb82cc5c42e3c7ebd2bec7b5c">   91</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="class_thrash_guard.html#a560149abb82cc5c42e3c7ebd2bec7b5c">ThrashGuard::loop</a>(<span class="keywordtype">int</span> currentState, uint32_t nowMs) {</div>
+<div class="line"><a id="l00092" name="l00092"></a><span class="lineno">   92</span>  uint32_t timeoutSec = timeoutForStateSec(currentState);</div>
+<div class="line"><a id="l00093" name="l00093"></a><span class="lineno">   93</span>  <span class="keywordflow">if</span> (timeoutSec == 0) {</div>
+<div class="line"><a id="l00094" name="l00094"></a><span class="lineno">   94</span>    <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00095" name="l00095"></a><span class="lineno">   95</span>  }</div>
+<div class="line"><a id="l00096" name="l00096"></a><span class="lineno">   96</span> </div>
+<div class="line"><a id="l00097" name="l00097"></a><span class="lineno">   97</span>  <span class="keywordflow">if</span> (lastProgressMs_ == 0) {</div>
+<div class="line"><a id="l00098" name="l00098"></a><span class="lineno">   98</span>    lastProgressMs_ = nowMs;</div>
+<div class="line"><a id="l00099" name="l00099"></a><span class="lineno">   99</span>    <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00100" name="l00100"></a><span class="lineno">  100</span>  }</div>
+<div class="line"><a id="l00101" name="l00101"></a><span class="lineno">  101</span> </div>
+<div class="line"><a id="l00102" name="l00102"></a><span class="lineno">  102</span>  <span class="keywordflow">if</span> (nowMs &lt; backoffUntilMs_) {</div>
+<div class="line"><a id="l00103" name="l00103"></a><span class="lineno">  103</span>    <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00104" name="l00104"></a><span class="lineno">  104</span>  }</div>
+<div class="line"><a id="l00105" name="l00105"></a><span class="lineno">  105</span> </div>
+<div class="line"><a id="l00106" name="l00106"></a><span class="lineno">  106</span>  uint32_t elapsedMs = nowMs - lastProgressMs_;</div>
+<div class="line"><a id="l00107" name="l00107"></a><span class="lineno">  107</span>  <span class="keywordflow">if</span> (elapsedMs &lt; (timeoutSec * 1000UL)) {</div>
+<div class="line"><a id="l00108" name="l00108"></a><span class="lineno">  108</span>    <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00109" name="l00109"></a><span class="lineno">  109</span>  }</div>
 <div class="line"><a id="l00110" name="l00110"></a><span class="lineno">  110</span> </div>
-<div class="line"><a id="l00111" name="l00111"></a><span class="lineno">  111</span>  <span class="keyword">const</span> uint32_t noprogSec = elapsedMs / 1000UL;</div>
-<div class="line"><a id="l00112" name="l00112"></a><span class="lineno">  112</span> </div>
-<div class="line"><a id="l00113" name="l00113"></a><span class="lineno">  113</span>  <span class="keywordflow">if</span> (tier == 1) {</div>
-<div class="line"><a id="l00114" name="l00114"></a><span class="lineno">  114</span>    logTrip(currentState, noprogSec, lastTag_, 1, <span class="stringliteral">&quot;backoff&quot;</span>);</div>
-<div class="line"><a id="l00115" name="l00115"></a><span class="lineno">  115</span>    <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00116" name="l00116"></a><span class="lineno">  116</span>  }</div>
-<div class="line"><a id="l00117" name="l00117"></a><span class="lineno">  117</span> </div>
-<div class="line"><a id="l00118" name="l00118"></a><span class="lineno">  118</span>  <span class="keywordflow">if</span> (tier == 2) {</div>
-<div class="line"><a id="l00119" name="l00119"></a><span class="lineno">  119</span>    logTrip(currentState, noprogSec, lastTag_, 2, <span class="stringliteral">&quot;disconnect+sleep&quot;</span>);</div>
-<div class="line"><a id="l00120" name="l00120"></a><span class="lineno">  120</span>    <a class="code hl_function" href="namespace_connectivity.html#a50bb34193371f247ff8639d8fba69409">Connectivity::requestFullDisconnectAndRadioOff</a>();</div>
-<div class="line"><a id="l00121" name="l00121"></a><span class="lineno">  121</span>    <span class="keywordflow">if</span> (<a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a> != <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24">SLEEPING_STATE</a>) {</div>
-<div class="line"><a id="l00122" name="l00122"></a><span class="lineno">  122</span>      <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a> = <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24">SLEEPING_STATE</a>;</div>
-<div class="line"><a id="l00123" name="l00123"></a><span class="lineno">  123</span>    }</div>
-<div class="line"><a id="l00124" name="l00124"></a><span class="lineno">  124</span>    <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00125" name="l00125"></a><span class="lineno">  125</span>  }</div>
-<div class="line"><a id="l00126" name="l00126"></a><span class="lineno">  126</span> </div>
-<div class="line"><a id="l00127" name="l00127"></a><span class="lineno">  127</span>  logTrip(currentState, noprogSec, lastTag_, 3, <span class="stringliteral">&quot;reset&quot;</span>);</div>
-<div class="line"><a id="l00128" name="l00128"></a><span class="lineno">  128</span>  <a class="code hl_variable" href="_thrash_guard_8h.html#a3f9c465b45599dab066e4d85fe4f3807">thrashResetCount</a>++;</div>
-<div class="line"><a id="l00129" name="l00129"></a><span class="lineno">  129</span>  System.reset();</div>
-<div class="line"><a id="l00130" name="l00130"></a><span class="lineno">  130</span>}</div>
+<div class="line"><a id="l00111" name="l00111"></a><span class="lineno">  111</span>  <a class="code hl_variable" href="_thrash_guard_8h.html#aa27b7d360b53e8706dfe92aab25b5aa5">thrashTripCount</a>++;</div>
+<div class="line"><a id="l00112" name="l00112"></a><span class="lineno">  112</span>  <a class="code hl_variable" href="_thrash_guard_8h.html#a248d05cd249c3781ae19ac85e8c9ebd8">lastThrashReason</a> = REASON_NOPROGRESS;</div>
+<div class="line"><a id="l00113" name="l00113"></a><span class="lineno">  113</span> </div>
+<div class="line"><a id="l00114" name="l00114"></a><span class="lineno">  114</span>  <span class="keywordflow">if</span> (windowStartMs_ == 0 || (nowMs - windowStartMs_) &gt; TIER3_WINDOW_MS) {</div>
+<div class="line"><a id="l00115" name="l00115"></a><span class="lineno">  115</span>    windowStartMs_ = nowMs;</div>
+<div class="line"><a id="l00116" name="l00116"></a><span class="lineno">  116</span>    recentTripCount_ = 0;</div>
+<div class="line"><a id="l00117" name="l00117"></a><span class="lineno">  117</span>  }</div>
+<div class="line"><a id="l00118" name="l00118"></a><span class="lineno">  118</span>  recentTripCount_++;</div>
+<div class="line"><a id="l00119" name="l00119"></a><span class="lineno">  119</span> </div>
+<div class="line"><a id="l00120" name="l00120"></a><span class="lineno">  120</span>  <span class="keywordtype">int</span> tier = 1;</div>
+<div class="line"><a id="l00121" name="l00121"></a><span class="lineno">  121</span>  <span class="keywordflow">if</span> (lastTripMs_ != 0 &amp;&amp; (nowMs - lastTripMs_) &lt;= TIER2_WINDOW_MS) {</div>
+<div class="line"><a id="l00122" name="l00122"></a><span class="lineno">  122</span>    tier = 2;</div>
+<div class="line"><a id="l00123" name="l00123"></a><span class="lineno">  123</span>  }</div>
+<div class="line"><a id="l00124" name="l00124"></a><span class="lineno">  124</span>  <span class="keywordflow">if</span> ((nowMs - windowStartMs_) &lt;= TIER3_WINDOW_MS &amp;&amp; recentTripCount_ &gt;= TIER3_TRIP_COUNT) {</div>
+<div class="line"><a id="l00125" name="l00125"></a><span class="lineno">  125</span>    tier = 3;</div>
+<div class="line"><a id="l00126" name="l00126"></a><span class="lineno">  126</span>  }</div>
+<div class="line"><a id="l00127" name="l00127"></a><span class="lineno">  127</span> </div>
+<div class="line"><a id="l00128" name="l00128"></a><span class="lineno">  128</span>  lastTripMs_ = nowMs;</div>
+<div class="line"><a id="l00129" name="l00129"></a><span class="lineno">  129</span>  backoffUntilMs_ = nowMs + BACKOFF_MS;</div>
+<div class="line"><a id="l00130" name="l00130"></a><span class="lineno">  130</span> </div>
+<div class="line"><a id="l00131" name="l00131"></a><span class="lineno">  131</span>  <span class="keyword">const</span> uint32_t noprogSec = elapsedMs / 1000UL;</div>
+<div class="line"><a id="l00132" name="l00132"></a><span class="lineno">  132</span> </div>
+<div class="line"><a id="l00133" name="l00133"></a><span class="lineno">  133</span>  <span class="keywordflow">if</span> (tier == 1) {</div>
+<div class="line"><a id="l00134" name="l00134"></a><span class="lineno">  134</span>    logTrip(currentState, noprogSec, lastTag_, 1, <span class="stringliteral">&quot;backoff&quot;</span>);</div>
+<div class="line"><a id="l00135" name="l00135"></a><span class="lineno">  135</span>    <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00136" name="l00136"></a><span class="lineno">  136</span>  }</div>
+<div class="line"><a id="l00137" name="l00137"></a><span class="lineno">  137</span> </div>
+<div class="line"><a id="l00138" name="l00138"></a><span class="lineno">  138</span>  <span class="keywordflow">if</span> (tier == 2) {</div>
+<div class="line"><a id="l00139" name="l00139"></a><span class="lineno">  139</span>    logTrip(currentState, noprogSec, lastTag_, 2, <span class="stringliteral">&quot;disconnect+sleep&quot;</span>);</div>
+<div class="line"><a id="l00140" name="l00140"></a><span class="lineno">  140</span>    <a class="code hl_define" href="_my_persistent_data_8h.html#a7ccda8a3a0f47702f9fa962899b0a3a1">current</a>.raiseAlert(17);  <span class="comment">// Alert 17: Thrash detected (tier 2)</span></div>
+<div class="line"><a id="l00141" name="l00141"></a><span class="lineno">  141</span>    <a class="code hl_function" href="namespace_connectivity.html#a50bb34193371f247ff8639d8fba69409">Connectivity::requestFullDisconnectAndRadioOff</a>();</div>
+<div class="line"><a id="l00142" name="l00142"></a><span class="lineno">  142</span>    <span class="keywordflow">if</span> (<a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a> != <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24">SLEEPING_STATE</a>) {</div>
+<div class="line"><a id="l00143" name="l00143"></a><span class="lineno">  143</span>      <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a> = <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24">SLEEPING_STATE</a>;</div>
+<div class="line"><a id="l00144" name="l00144"></a><span class="lineno">  144</span>    }</div>
+<div class="line"><a id="l00145" name="l00145"></a><span class="lineno">  145</span>    <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00146" name="l00146"></a><span class="lineno">  146</span>  }</div>
+<div class="line"><a id="l00147" name="l00147"></a><span class="lineno">  147</span> </div>
+<div class="line"><a id="l00148" name="l00148"></a><span class="lineno">  148</span>  logTrip(currentState, noprogSec, lastTag_, 3, <span class="stringliteral">&quot;reset&quot;</span>);</div>
+<div class="line"><a id="l00149" name="l00149"></a><span class="lineno">  149</span>  <a class="code hl_define" href="_my_persistent_data_8h.html#a7ccda8a3a0f47702f9fa962899b0a3a1">current</a>.raiseAlert(17);  <span class="comment">// Alert 17: Severe thrash detected (tier 3 - reset)</span></div>
+<div class="line"><a id="l00150" name="l00150"></a><span class="lineno">  150</span>  <a class="code hl_variable" href="_thrash_guard_8h.html#a3f9c465b45599dab066e4d85fe4f3807">thrashResetCount</a>++;</div>
+<div class="line"><a id="l00151" name="l00151"></a><span class="lineno">  151</span>  System.reset();</div>
+<div class="line"><a id="l00152" name="l00152"></a><span class="lineno">  152</span>}</div>
 </div>
 <div class="ttc" id="a_connectivity_8h_html"><div class="ttname"><a href="_connectivity_8h.html">Connectivity.h</a></div></div>
 <div class="ttc" id="a_generalized-_core-_counter_8cpp_html_a0840b91aed028ae09ab1d7a4238569ec"><div class="ttname"><a href="_generalized-_core-_counter_8cpp.html#a0840b91aed028ae09ab1d7a4238569ec">oldState</a></div><div class="ttdeci">State oldState</div><div class="ttdef"><b>Definition</b> <a href="_generalized-_core-_counter_8cpp_source.html#l00110">Generalized-Core-Counter.cpp:110</a></div></div>
 <div class="ttc" id="a_generalized-_core-_counter_8cpp_html_a876b486d3a5241a126bd5751c5f70f79"><div class="ttname"><a href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a></div><div class="ttdeci">State state</div><div class="ttdef"><b>Definition</b> <a href="_generalized-_core-_counter_8cpp_source.html#l00109">Generalized-Core-Counter.cpp:109</a></div></div>
 <div class="ttc" id="a_generalized-_core-_counter_8cpp_html_abcd5d33fa869a1d746ac85a5f6ac720b"><div class="ttname"><a href="_generalized-_core-_counter_8cpp.html#abcd5d33fa869a1d746ac85a5f6ac720b">stateNames</a></div><div class="ttdeci">char stateNames[7][16]</div><div class="ttdef"><b>Definition</b> <a href="_generalized-_core-_counter_8cpp_source.html#l00106">Generalized-Core-Counter.cpp:106</a></div></div>
+<div class="ttc" id="a_my_persistent_data_8h_html"><div class="ttname"><a href="_my_persistent_data_8h.html">MyPersistentData.h</a></div><div class="ttdoc">Persistent Data Storage Structures - EEPROM/Retained Memory Management.</div></div>
+<div class="ttc" id="a_my_persistent_data_8h_html_a7ccda8a3a0f47702f9fa962899b0a3a1"><div class="ttname"><a href="_my_persistent_data_8h.html#a7ccda8a3a0f47702f9fa962899b0a3a1">current</a></div><div class="ttdeci">#define current</div><div class="ttdef"><b>Definition</b> <a href="_my_persistent_data_8h_source.html#l00041">MyPersistentData.h:41</a></div></div>
 <div class="ttc" id="a_state_machine_8h_html"><div class="ttname"><a href="_state_machine_8h.html">StateMachine.h</a></div></div>
 <div class="ttc" id="a_state_machine_8h_html_a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24"><div class="ttname"><a href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24">SLEEPING_STATE</a></div><div class="ttdeci">@ SLEEPING_STATE</div><div class="ttdef"><b>Definition</b> <a href="_state_machine_8h_source.html#l00011">StateMachine.h:11</a></div></div>
 <div class="ttc" id="a_state_machine_8h_html_a5d74787dedbc4e11c1ab15bf487e61f8a549bd89b38411c3eb84cead55c7df867"><div class="ttname"><a href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a549bd89b38411c3eb84cead55c7df867">CONNECTING_STATE</a></div><div class="ttdeci">@ CONNECTING_STATE</div><div class="ttdef"><b>Definition</b> <a href="_state_machine_8h_source.html#l00012">StateMachine.h:12</a></div></div>
@@ -244,25 +250,25 @@ $(function(){initNavTree('_thrash_guard_8cpp_source.html','',''); });
 <div class="ttc" id="a_state_machine_8h_html_a5d74787dedbc4e11c1ab15bf487e61f8aa07813f3418b83dc769daa78689fb9c3"><div class="ttname"><a href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aa07813f3418b83dc769daa78689fb9c3">ERROR_STATE</a></div><div class="ttdeci">@ ERROR_STATE</div><div class="ttdef"><b>Definition</b> <a href="_state_machine_8h_source.html#l00009">StateMachine.h:9</a></div></div>
 <div class="ttc" id="a_state_machine_8h_html_a5d74787dedbc4e11c1ab15bf487e61f8ae6345fad0beb5f8f70fed55dcdae6003"><div class="ttname"><a href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8ae6345fad0beb5f8f70fed55dcdae6003">INITIALIZATION_STATE</a></div><div class="ttdeci">@ INITIALIZATION_STATE</div><div class="ttdef"><b>Definition</b> <a href="_state_machine_8h_source.html#l00008">StateMachine.h:8</a></div></div>
 <div class="ttc" id="a_state_machine_8h_html_a5d74787dedbc4e11c1ab15bf487e61f8aeca4500f6f729608a014643f8c8f4003"><div class="ttname"><a href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aeca4500f6f729608a014643f8c8f4003">IDLE_STATE</a></div><div class="ttdeci">@ IDLE_STATE</div><div class="ttdef"><b>Definition</b> <a href="_state_machine_8h_source.html#l00010">StateMachine.h:10</a></div></div>
-<div class="ttc" id="a_thrash_guard_8cpp_html_a09dfa8a5d5d3412e9f4a24f54595e5a0"><div class="ttname"><a href="_thrash_guard_8cpp.html#a09dfa8a5d5d3412e9f4a24f54595e5a0">thrashGuard</a></div><div class="ttdeci">ThrashGuard thrashGuard</div><div class="ttdef"><b>Definition</b> <a href="#l00005">ThrashGuard.cpp:5</a></div></div>
-<div class="ttc" id="a_thrash_guard_8cpp_html_a248d05cd249c3781ae19ac85e8c9ebd8"><div class="ttname"><a href="_thrash_guard_8cpp.html#a248d05cd249c3781ae19ac85e8c9ebd8">lastThrashReason</a></div><div class="ttdeci">retained uint8_t lastThrashReason</div><div class="ttdef"><b>Definition</b> <a href="#l00009">ThrashGuard.cpp:9</a></div></div>
-<div class="ttc" id="a_thrash_guard_8cpp_html_a3f9c465b45599dab066e4d85fe4f3807"><div class="ttname"><a href="_thrash_guard_8cpp.html#a3f9c465b45599dab066e4d85fe4f3807">thrashResetCount</a></div><div class="ttdeci">retained uint16_t thrashResetCount</div><div class="ttdef"><b>Definition</b> <a href="#l00008">ThrashGuard.cpp:8</a></div></div>
-<div class="ttc" id="a_thrash_guard_8cpp_html_aa27b7d360b53e8706dfe92aab25b5aa5"><div class="ttname"><a href="_thrash_guard_8cpp.html#aa27b7d360b53e8706dfe92aab25b5aa5">thrashTripCount</a></div><div class="ttdeci">retained uint16_t thrashTripCount</div><div class="ttdef"><b>Definition</b> <a href="#l00007">ThrashGuard.cpp:7</a></div></div>
-<div class="ttc" id="a_thrash_guard_8h_html"><div class="ttname"><a href="_thrash_guard_8h.html">ThrashGuard.h</a></div></div>
-<div class="ttc" id="a_thrash_guard_8h_html_a248d05cd249c3781ae19ac85e8c9ebd8"><div class="ttname"><a href="_thrash_guard_8h.html#a248d05cd249c3781ae19ac85e8c9ebd8">lastThrashReason</a></div><div class="ttdeci">retained uint8_t lastThrashReason</div><div class="ttdef"><b>Definition</b> <a href="#l00009">ThrashGuard.cpp:9</a></div></div>
-<div class="ttc" id="a_thrash_guard_8h_html_a3f9c465b45599dab066e4d85fe4f3807"><div class="ttname"><a href="_thrash_guard_8h.html#a3f9c465b45599dab066e4d85fe4f3807">thrashResetCount</a></div><div class="ttdeci">retained uint16_t thrashResetCount</div><div class="ttdef"><b>Definition</b> <a href="#l00008">ThrashGuard.cpp:8</a></div></div>
-<div class="ttc" id="a_thrash_guard_8h_html_aa27b7d360b53e8706dfe92aab25b5aa5"><div class="ttname"><a href="_thrash_guard_8h.html#aa27b7d360b53e8706dfe92aab25b5aa5">thrashTripCount</a></div><div class="ttdeci">retained uint16_t thrashTripCount</div><div class="ttdef"><b>Definition</b> <a href="#l00007">ThrashGuard.cpp:7</a></div></div>
-<div class="ttc" id="aclass_thrash_guard_html"><div class="ttname"><a href="class_thrash_guard.html">ThrashGuard</a></div><div class="ttdef"><b>Definition</b> <a href="_thrash_guard_8h_source.html#l00005">ThrashGuard.h:5</a></div></div>
-<div class="ttc" id="aclass_thrash_guard_html_a01d31120b6c3584fdb7fb652a6efa2ac"><div class="ttname"><a href="class_thrash_guard.html#a01d31120b6c3584fdb7fb652a6efa2ac">ThrashGuard::setLogCooldownMs</a></div><div class="ttdeci">void setLogCooldownMs(uint32_t cooldownMs)</div><div class="ttdef"><b>Definition</b> <a href="#l00019">ThrashGuard.cpp:19</a></div></div>
-<div class="ttc" id="aclass_thrash_guard_html_a1b21cfe6c83e702a23427e3ae2450d98"><div class="ttname"><a href="class_thrash_guard.html#a1b21cfe6c83e702a23427e3ae2450d98">ThrashGuard::markProgress</a></div><div class="ttdeci">void markProgress(const char *tag)</div><div class="ttdef"><b>Definition</b> <a href="#l00023">ThrashGuard.cpp:23</a></div></div>
-<div class="ttc" id="aclass_thrash_guard_html_a363e2fac16a9fad4bdebc0f54bea80a0"><div class="ttname"><a href="class_thrash_guard.html#a363e2fac16a9fad4bdebc0f54bea80a0">ThrashGuard::recordStateTransition</a></div><div class="ttdeci">void recordStateTransition(int oldState, int newState)</div><div class="ttdef"><b>Definition</b> <a href="#l00031">ThrashGuard.cpp:31</a></div></div>
-<div class="ttc" id="aclass_thrash_guard_html_a560149abb82cc5c42e3c7ebd2bec7b5c"><div class="ttname"><a href="class_thrash_guard.html#a560149abb82cc5c42e3c7ebd2bec7b5c">ThrashGuard::loop</a></div><div class="ttdeci">void loop(int currentState, uint32_t nowMs)</div><div class="ttdef"><b>Definition</b> <a href="#l00071">ThrashGuard.cpp:71</a></div></div>
+<div class="ttc" id="a_thrash_guard_8cpp_html_a09dfa8a5d5d3412e9f4a24f54595e5a0"><div class="ttname"><a href="_thrash_guard_8cpp.html#a09dfa8a5d5d3412e9f4a24f54595e5a0">thrashGuard</a></div><div class="ttdeci">ThrashGuard thrashGuard</div><div class="ttdef"><b>Definition</b> <a href="#l00025">ThrashGuard.cpp:25</a></div></div>
+<div class="ttc" id="a_thrash_guard_8cpp_html_a248d05cd249c3781ae19ac85e8c9ebd8"><div class="ttname"><a href="_thrash_guard_8cpp.html#a248d05cd249c3781ae19ac85e8c9ebd8">lastThrashReason</a></div><div class="ttdeci">retained uint8_t lastThrashReason</div><div class="ttdef"><b>Definition</b> <a href="#l00029">ThrashGuard.cpp:29</a></div></div>
+<div class="ttc" id="a_thrash_guard_8cpp_html_a3f9c465b45599dab066e4d85fe4f3807"><div class="ttname"><a href="_thrash_guard_8cpp.html#a3f9c465b45599dab066e4d85fe4f3807">thrashResetCount</a></div><div class="ttdeci">retained uint16_t thrashResetCount</div><div class="ttdef"><b>Definition</b> <a href="#l00028">ThrashGuard.cpp:28</a></div></div>
+<div class="ttc" id="a_thrash_guard_8cpp_html_aa27b7d360b53e8706dfe92aab25b5aa5"><div class="ttname"><a href="_thrash_guard_8cpp.html#aa27b7d360b53e8706dfe92aab25b5aa5">thrashTripCount</a></div><div class="ttdeci">retained uint16_t thrashTripCount</div><div class="ttdef"><b>Definition</b> <a href="#l00027">ThrashGuard.cpp:27</a></div></div>
+<div class="ttc" id="a_thrash_guard_8h_html"><div class="ttname"><a href="_thrash_guard_8h.html">ThrashGuard.h</a></div><div class="ttdoc">State machine watchdog - prevents infinite loops and thrashing.</div></div>
+<div class="ttc" id="a_thrash_guard_8h_html_a248d05cd249c3781ae19ac85e8c9ebd8"><div class="ttname"><a href="_thrash_guard_8h.html#a248d05cd249c3781ae19ac85e8c9ebd8">lastThrashReason</a></div><div class="ttdeci">retained uint8_t lastThrashReason</div><div class="ttdef"><b>Definition</b> <a href="#l00029">ThrashGuard.cpp:29</a></div></div>
+<div class="ttc" id="a_thrash_guard_8h_html_a3f9c465b45599dab066e4d85fe4f3807"><div class="ttname"><a href="_thrash_guard_8h.html#a3f9c465b45599dab066e4d85fe4f3807">thrashResetCount</a></div><div class="ttdeci">retained uint16_t thrashResetCount</div><div class="ttdef"><b>Definition</b> <a href="#l00028">ThrashGuard.cpp:28</a></div></div>
+<div class="ttc" id="a_thrash_guard_8h_html_aa27b7d360b53e8706dfe92aab25b5aa5"><div class="ttname"><a href="_thrash_guard_8h.html#aa27b7d360b53e8706dfe92aab25b5aa5">thrashTripCount</a></div><div class="ttdeci">retained uint16_t thrashTripCount</div><div class="ttdef"><b>Definition</b> <a href="#l00027">ThrashGuard.cpp:27</a></div></div>
+<div class="ttc" id="aclass_thrash_guard_html"><div class="ttname"><a href="class_thrash_guard.html">ThrashGuard</a></div><div class="ttdef"><b>Definition</b> <a href="_thrash_guard_8h_source.html#l00026">ThrashGuard.h:26</a></div></div>
+<div class="ttc" id="aclass_thrash_guard_html_a01d31120b6c3584fdb7fb652a6efa2ac"><div class="ttname"><a href="class_thrash_guard.html#a01d31120b6c3584fdb7fb652a6efa2ac">ThrashGuard::setLogCooldownMs</a></div><div class="ttdeci">void setLogCooldownMs(uint32_t cooldownMs)</div><div class="ttdef"><b>Definition</b> <a href="#l00039">ThrashGuard.cpp:39</a></div></div>
+<div class="ttc" id="aclass_thrash_guard_html_a1b21cfe6c83e702a23427e3ae2450d98"><div class="ttname"><a href="class_thrash_guard.html#a1b21cfe6c83e702a23427e3ae2450d98">ThrashGuard::markProgress</a></div><div class="ttdeci">void markProgress(const char *tag)</div><div class="ttdef"><b>Definition</b> <a href="#l00043">ThrashGuard.cpp:43</a></div></div>
+<div class="ttc" id="aclass_thrash_guard_html_a363e2fac16a9fad4bdebc0f54bea80a0"><div class="ttname"><a href="class_thrash_guard.html#a363e2fac16a9fad4bdebc0f54bea80a0">ThrashGuard::recordStateTransition</a></div><div class="ttdeci">void recordStateTransition(int oldState, int newState)</div><div class="ttdef"><b>Definition</b> <a href="#l00051">ThrashGuard.cpp:51</a></div></div>
+<div class="ttc" id="aclass_thrash_guard_html_a560149abb82cc5c42e3c7ebd2bec7b5c"><div class="ttname"><a href="class_thrash_guard.html#a560149abb82cc5c42e3c7ebd2bec7b5c">ThrashGuard::loop</a></div><div class="ttdeci">void loop(int currentState, uint32_t nowMs)</div><div class="ttdef"><b>Definition</b> <a href="#l00091">ThrashGuard.cpp:91</a></div></div>
 <div class="ttc" id="anamespace_connectivity_html_a50bb34193371f247ff8639d8fba69409"><div class="ttname"><a href="namespace_connectivity.html#a50bb34193371f247ff8639d8fba69409">Connectivity::requestFullDisconnectAndRadioOff</a></div><div class="ttdeci">void requestFullDisconnectAndRadioOff()</div><div class="ttdef"><b>Definition</b> <a href="_connectivity_8h_source.html#l00027">Connectivity.h:27</a></div></div>
-<div class="ttc" id="anamespaceanonymous__namespace_02_thrash_guard_8cpp_03_html_a520e89c249eda26c28608a22b7e620dc"><div class="ttname"><a href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a520e89c249eda26c28608a22b7e620dc">anonymous_namespace{ThrashGuard.cpp}::REASON_NOPROGRESS</a></div><div class="ttdeci">constexpr uint8_t REASON_NOPROGRESS</div><div class="ttdef"><b>Definition</b> <a href="#l00016">ThrashGuard.cpp:16</a></div></div>
-<div class="ttc" id="anamespaceanonymous__namespace_02_thrash_guard_8cpp_03_html_a7051561c04cc971e71f1db9dbc2a9b8f"><div class="ttname"><a href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a7051561c04cc971e71f1db9dbc2a9b8f">anonymous_namespace{ThrashGuard.cpp}::BACKOFF_MS</a></div><div class="ttdeci">constexpr uint32_t BACKOFF_MS</div><div class="ttdef"><b>Definition</b> <a href="#l00012">ThrashGuard.cpp:12</a></div></div>
-<div class="ttc" id="anamespaceanonymous__namespace_02_thrash_guard_8cpp_03_html_af396c832c1943dc159954049a9503303"><div class="ttname"><a href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#af396c832c1943dc159954049a9503303">anonymous_namespace{ThrashGuard.cpp}::TIER3_TRIP_COUNT</a></div><div class="ttdeci">constexpr uint8_t TIER3_TRIP_COUNT</div><div class="ttdef"><b>Definition</b> <a href="#l00015">ThrashGuard.cpp:15</a></div></div>
-<div class="ttc" id="anamespaceanonymous__namespace_02_thrash_guard_8cpp_03_html_afbb332fff9abe10374e0a8920493b9d2"><div class="ttname"><a href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afbb332fff9abe10374e0a8920493b9d2">anonymous_namespace{ThrashGuard.cpp}::TIER3_WINDOW_MS</a></div><div class="ttdeci">constexpr uint32_t TIER3_WINDOW_MS</div><div class="ttdef"><b>Definition</b> <a href="#l00014">ThrashGuard.cpp:14</a></div></div>
-<div class="ttc" id="anamespaceanonymous__namespace_02_thrash_guard_8cpp_03_html_afc75631d91905ff375e5056c5ddffafb"><div class="ttname"><a href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afc75631d91905ff375e5056c5ddffafb">anonymous_namespace{ThrashGuard.cpp}::TIER2_WINDOW_MS</a></div><div class="ttdeci">constexpr uint32_t TIER2_WINDOW_MS</div><div class="ttdef"><b>Definition</b> <a href="#l00013">ThrashGuard.cpp:13</a></div></div>
+<div class="ttc" id="anamespaceanonymous__namespace_02_thrash_guard_8cpp_03_html_a520e89c249eda26c28608a22b7e620dc"><div class="ttname"><a href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a520e89c249eda26c28608a22b7e620dc">anonymous_namespace{ThrashGuard.cpp}::REASON_NOPROGRESS</a></div><div class="ttdeci">constexpr uint8_t REASON_NOPROGRESS</div><div class="ttdef"><b>Definition</b> <a href="#l00036">ThrashGuard.cpp:36</a></div></div>
+<div class="ttc" id="anamespaceanonymous__namespace_02_thrash_guard_8cpp_03_html_a7051561c04cc971e71f1db9dbc2a9b8f"><div class="ttname"><a href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a7051561c04cc971e71f1db9dbc2a9b8f">anonymous_namespace{ThrashGuard.cpp}::BACKOFF_MS</a></div><div class="ttdeci">constexpr uint32_t BACKOFF_MS</div><div class="ttdef"><b>Definition</b> <a href="#l00032">ThrashGuard.cpp:32</a></div></div>
+<div class="ttc" id="anamespaceanonymous__namespace_02_thrash_guard_8cpp_03_html_af396c832c1943dc159954049a9503303"><div class="ttname"><a href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#af396c832c1943dc159954049a9503303">anonymous_namespace{ThrashGuard.cpp}::TIER3_TRIP_COUNT</a></div><div class="ttdeci">constexpr uint8_t TIER3_TRIP_COUNT</div><div class="ttdef"><b>Definition</b> <a href="#l00035">ThrashGuard.cpp:35</a></div></div>
+<div class="ttc" id="anamespaceanonymous__namespace_02_thrash_guard_8cpp_03_html_afbb332fff9abe10374e0a8920493b9d2"><div class="ttname"><a href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afbb332fff9abe10374e0a8920493b9d2">anonymous_namespace{ThrashGuard.cpp}::TIER3_WINDOW_MS</a></div><div class="ttdeci">constexpr uint32_t TIER3_WINDOW_MS</div><div class="ttdef"><b>Definition</b> <a href="#l00034">ThrashGuard.cpp:34</a></div></div>
+<div class="ttc" id="anamespaceanonymous__namespace_02_thrash_guard_8cpp_03_html_afc75631d91905ff375e5056c5ddffafb"><div class="ttname"><a href="namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afc75631d91905ff375e5056c5ddffafb">anonymous_namespace{ThrashGuard.cpp}::TIER2_WINDOW_MS</a></div><div class="ttdeci">constexpr uint32_t TIER2_WINDOW_MS</div><div class="ttdef"><b>Definition</b> <a href="#l00033">ThrashGuard.cpp:33</a></div></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
 </div><!-- container -->

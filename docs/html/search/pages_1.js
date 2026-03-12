@@ -1,5 +1,8 @@
 var searchData=
 [
-  ['board_20header_20pir_20sensor_20on_20carrier_0',['Carrier board header (PIR sensor on carrier)',['../device__pinout_8h.html#autotoc_md0',1,'']]],
-  ['boron_20only_1',['PMIC Monitoring &amp;amp; Remediation (Boron Only)',['../index.html#autotoc_md42',1,'']]]
+  ['backoff_20all_20modes_0',['Connection Interval Backoff (All Modes)',['../index.html#autotoc_md45',1,'']]],
+  ['battery_20aware_20power_20management_1',['Battery-Aware Power Management',['../index.html#autotoc_md44',1,'']]],
+  ['battery_20protection_2',['Occupancy Mode Battery Protection',['../index.html#autotoc_md46',1,'']]],
+  ['board_20header_20pir_20sensor_20on_20carrier_3',['Carrier board header (PIR sensor on carrier)',['../device__pinout_8h.html#autotoc_md0',1,'']]],
+  ['boron_20only_4',['PMIC Monitoring &amp;amp; Remediation (Boron Only)',['../index.html#autotoc_md42',1,'']]]
 ];

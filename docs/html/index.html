@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.26</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.27</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -93,7 +93,7 @@ $(function(){initNavTree('index.html','',''); });
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><p><a class="anchor" id="md__r_e_a_d_m_e"></a></p>
-<p><b>Version:</b> 3.26 | <b>Latest:</b> Added Thrash Guard - Fixed sleep bug</p>
+<p><b>Version:</b> 3.27 | <b>Latest:</b> Soak fixes - Thrashing and power</p>
 <p>A generalized IoT firmware core for outdoor sensor devices supporting multiple operating modes and sensor types.</p>
 <h1 class="doxsection"><a class="anchor" id="autotoc_md2"></a>
 Overview</h1>
@@ -732,6 +732,7 @@ Alert Severity Levels</h2>
 <li><span class="tt">14</span>: Out of memory</li>
 <li><span class="tt">15</span>: Modem/disconnect failure</li>
 <li><span class="tt">16</span>: Repeated sleep failures (HIBERNATE/ULP)</li>
+<li><span class="tt">17</span>: <b><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8">State</a> machine thrash detected</b> (<a class="el" href="class_thrash_guard.html">ThrashGuard</a> timeout)</li>
 <li><span class="tt">20</span>: <b>PMIC thermal shutdown</b> (charging stopped due to temperature)</li>
 <li><span class="tt">21</span>: <b>PMIC charge timeout</b> (stuck charging - safety timer expired)</li>
 </ul>
@@ -784,6 +785,42 @@ Error Recovery Strategy</h2>
 <li>Alerts automatically clear when underlying condition resolves</li>
 </ul>
 <h1 class="doxsection"><a class="anchor" id="autotoc_md44"></a>
+Battery-Aware Power Management</h1>
+<p>The firmware implements multi-tier battery conservation:</p>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md45"></a>
+Connection Interval Backoff (All Modes)</h2>
+<p><b>4-Tier System:</b></p><ul>
+<li><b>HEALTHY</b> (&gt;70% SoC): Normal intervals (1x multiplier)</li>
+<li><b>CONSERVING</b> (50-70% SoC): 2x interval (half connections/day)</li>
+<li><b>CRITICAL</b> (30-50% SoC): 4x interval (quarter connections/day)</li>
+<li><b>SURVIVAL</b> (&lt;30% SoC): 12x interval (e.g., hourly → every 12hrs)</li>
+</ul>
+<p><b>Hysteresis:</b> Requires 5% higher SoC to move to better tier, preventing rapid tier thrashing.</p>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md46"></a>
+Occupancy Mode Battery Protection</h2>
+<p>For occupancy sensors using <span class="tt"><a class="el" href="_my_persistent_data_8h.html#a6ed5b36c9cd209c52088cb9029de61b3aee11d292bc1a043b66b0904732f75eef">INTERMITTENT_KEEP_ALIVE</a></span> mode:</p>
+<p><b>Above 70% (HEALTHY):</b></p><ul>
+<li>Maintains network standby for instant-on occupancy reporting</li>
+<li>Reports immediately on occupancy state changes</li>
+<li>No alignment delays</li>
+</ul>
+<p><b>Below 65% (CONSERVING or worse):</b></p><ul>
+<li><b>Automatically switches to INTERMITTENT mode</b></li>
+<li>Network standby disabled to save power</li>
+<li>Reports follow battery-tiered intervals (aligned boundaries)</li>
+<li>Occupancy changes still reported, but with connection overhead</li>
+</ul>
+<p><b>Recovery at 75%:</b></p><ul>
+<li>Switches back to KEEP_ALIVE mode</li>
+<li>Resumes instant occupancy change reporting</li>
+</ul>
+<p><b>Benefits:</b></p><ul>
+<li>Extends battery life during low charge</li>
+<li>Prevents deep discharge</li>
+<li>Automatic recovery when recharged</li>
+<li>User-transparent power management</li>
+</ul>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md47"></a>
 Dependencies</h1>
 <ul>
 <li>AB1805_RK: RTC and watchdog</li>
@@ -793,7 +830,7 @@ Dependencies</h1>
 <li>BackgroundPublishRK: Non-blocking publishes</li>
 <li>SequentialFileRK: File operations</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md45"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md48"></a>
 Contributing</h1>
 <p>When adding features:</p><ol type="1">
 <li><b>Maintain simplicity</b>: Keep core logic clean</li>
@@ -801,12 +838,12 @@ Contributing</h1>
 <li><b>Extend, don't modify</b>: Use factory pattern for new types</li>
 <li><b>Test remotely</b>: Ensure devices don't brick in field</li>
 </ol>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md46"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md49"></a>
 License</h1>
 <p>This project is licensed under the MIT License.</p>
 <p>You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of this software, subject to the conditions of the MIT License.</p>
 <p>See the top-level <span class="tt">LICENSE</span> file in this repository for the complete license text.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md47"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md50"></a>
 Support</h1>
 <p>For issues or questions, contact [Your Contact Info] </p>
 </div></div><!-- PageDoc -->

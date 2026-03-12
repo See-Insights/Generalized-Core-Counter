@@ -13,6 +13,6 @@ var searchData=
   ['storage_10',['Persistent Storage',['../index.html#autotoc_md12',1,'']]],
   ['strategy_11',['Error Recovery Strategy',['../index.html#autotoc_md43',1,'']]],
   ['structure_12',['Configuration Structure',['../index.html#autotoc_md15',1,'']]],
-  ['support_13',['Support',['../index.html#autotoc_md47',1,'']]],
+  ['support_13',['Support',['../index.html#autotoc_md50',1,'']]],
   ['system_14',['Error Handling &amp;amp; Alert System',['../index.html#autotoc_md40',1,'']]]
 ];

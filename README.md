@@ -1,6 +1,6 @@
 # Generalized-Core-Counter
 
-**Version:** 3.26 | **Latest:** Added Thrash Guard - Fixed sleep bug
+**Version:** 3.27 | **Latest:** Soak fixes - Thrashing and power
 
 A generalized IoT firmware core for outdoor sensor devices supporting multiple operating modes and sensor types.
 
@@ -702,6 +702,7 @@ The firmware implements a comprehensive alert system that monitors device health
 - `14`: Out of memory
 - `15`: Modem/disconnect failure
 - `16`: Repeated sleep failures (HIBERNATE/ULP)
+- `17`: **State machine thrash detected** (ThrashGuard timeout)
 - `20`: **PMIC thermal shutdown** (charging stopped due to temperature)
 - `21`: **PMIC charge timeout** (stuck charging - safety timer expired)
 
@@ -753,6 +754,45 @@ For Boron devices with BQ24195 PMIC, the firmware actively monitors charging hea
 - Configuration validation with range checking
 - Graceful degradation for remote deployments
 - Alerts automatically clear when underlying condition resolves
+
+## Battery-Aware Power Management
+
+The firmware implements multi-tier battery conservation:
+
+### Connection Interval Backoff (All Modes)
+
+**4-Tier System:**
+- **HEALTHY** (>70% SoC): Normal intervals (1x multiplier)
+- **CONSERVING** (50-70% SoC): 2x interval (half connections/day)
+- **CRITICAL** (30-50% SoC): 4x interval (quarter connections/day)
+- **SURVIVAL** (<30% SoC): 12x interval (e.g., hourly → every 12hrs)
+
+**Hysteresis:** Requires 5% higher SoC to move to better tier, preventing rapid tier thrashing.
+
+### Occupancy Mode Battery Protection
+
+For occupancy sensors using `INTERMITTENT_KEEP_ALIVE` mode:
+
+**Above 70% (HEALTHY):**
+- Maintains network standby for instant-on occupancy reporting
+- Reports immediately on occupancy state changes
+- No alignment delays
+
+**Below 65% (CONSERVING or worse):**
+- **Automatically switches to INTERMITTENT mode**
+- Network standby disabled to save power
+- Reports follow battery-tiered intervals (aligned boundaries)
+- Occupancy changes still reported, but with connection overhead
+
+**Recovery at 75%:**
+- Switches back to KEEP_ALIVE mode
+- Resumes instant occupancy change reporting
+
+**Benefits:**
+- Extends battery life during low charge
+- Prevents deep discharge
+- Automatic recovery when recharged
+- User-transparent power management
 
 ## Dependencies
 

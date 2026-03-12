@@ -11,13 +11,14 @@ var searchData=
   ['configuration_20method_8',['Configuration Method',['../index.html#autotoc_md25',1,'']]],
   ['configuration_20structure_9',['Configuration Structure',['../index.html#autotoc_md15',1,'']]],
   ['configuration_20tasks_10',['How-To: Common Configuration Tasks',['../index.html#autotoc_md35',1,'']]],
-  ['console_11',['Console',['../index.html#autotoc_md27',1,'Setting Up Webhooks in Particle Console'],['../index.html#autotoc_md32',1,'Setup in Particle Console']]],
-  ['constraints_12',['Memory Constraints',['../index.html#autotoc_md38',1,'']]],
-  ['contributing_13',['Contributing',['../index.html#autotoc_md45',1,'']]],
-  ['core_20counter_14',['Generalized-Core-Counter',['../index.html',1,'']]],
-  ['counter_15',['Generalized-Core-Counter',['../index.html',1,'']]],
-  ['counting_20mode_20payload_16',['Counting Mode Payload',['../index.html#autotoc_md21',1,'']]],
-  ['creating_20device_20specific_20settings_17',['Creating Device-Specific Settings',['../index.html#autotoc_md36',1,'']]],
-  ['customizations_18',['Common Customizations',['../index.html#autotoc_md37',1,'']]],
-  ['cycle_20observability_20field_20diagnostics_19',['Wake-Cycle Observability (Field Diagnostics)',['../index.html#autotoc_md11',1,'']]]
+  ['connection_20interval_20backoff_20all_20modes_11',['Connection Interval Backoff (All Modes)',['../index.html#autotoc_md45',1,'']]],
+  ['console_12',['Console',['../index.html#autotoc_md27',1,'Setting Up Webhooks in Particle Console'],['../index.html#autotoc_md32',1,'Setup in Particle Console']]],
+  ['constraints_13',['Memory Constraints',['../index.html#autotoc_md38',1,'']]],
+  ['contributing_14',['Contributing',['../index.html#autotoc_md48',1,'']]],
+  ['core_20counter_15',['Generalized-Core-Counter',['../index.html',1,'']]],
+  ['counter_16',['Generalized-Core-Counter',['../index.html',1,'']]],
+  ['counting_20mode_20payload_17',['Counting Mode Payload',['../index.html#autotoc_md21',1,'']]],
+  ['creating_20device_20specific_20settings_18',['Creating Device-Specific Settings',['../index.html#autotoc_md36',1,'']]],
+  ['customizations_19',['Common Customizations',['../index.html#autotoc_md37',1,'']]],
+  ['cycle_20observability_20field_20diagnostics_20',['Wake-Cycle Observability (Field Diagnostics)',['../index.html#autotoc_md11',1,'']]]
 ];

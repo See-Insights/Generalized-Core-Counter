@@ -75,10 +75,14 @@ var NAVTREE =
       [ "PMIC Monitoring &amp; Remediation (Boron Only)", "index.html#autotoc_md42", null ],
       [ "Error Recovery Strategy", "index.html#autotoc_md43", null ]
     ] ],
-    [ "Dependencies", "index.html#autotoc_md44", null ],
-    [ "Contributing", "index.html#autotoc_md45", null ],
-    [ "License", "index.html#autotoc_md46", null ],
-    [ "Support", "index.html#autotoc_md47", null ],
+    [ "Battery-Aware Power Management", "index.html#autotoc_md44", [
+      [ "Connection Interval Backoff (All Modes)", "index.html#autotoc_md45", null ],
+      [ "Occupancy Mode Battery Protection", "index.html#autotoc_md46", null ]
+    ] ],
+    [ "Dependencies", "index.html#autotoc_md47", null ],
+    [ "Contributing", "index.html#autotoc_md48", null ],
+    [ "License", "index.html#autotoc_md49", null ],
+    [ "Support", "index.html#autotoc_md50", null ],
     [ "Namespaces", "namespaces.html", [
       [ "Namespace List", "namespaces.html", "namespaces_dup" ],
       [ "Namespace Members", "namespacemembers.html", [
@@ -117,7 +121,7 @@ var NAVTREEINDEX =
 "_battery_backoff_8cpp.html",
 "class_i_sensor.html#a638047cc80e97814200be39478a9ee1d",
 "classsys_status_data_1_1_sys_data.html#a4f202b9573570e16bf24003a86571c55",
-"struct_observability_1_1_wake_cycle_stats.html#a2455d3a9b38024954fc703703e1dba25"
+"struct_observability_1_1_wake_cycle_stats.html#a20ff6a1af3902c292cdc9f83d928fd67"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronization';

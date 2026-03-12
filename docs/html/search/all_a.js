@@ -18,7 +18,7 @@ var searchData=
   ['ledofftime_15',['ledOffTime',['../device__pinout_8cpp.html#a5da8aad32460f76191dfdc104f686d86',1,'device_pinout.cpp']]],
   ['ledpower_16',['ledPower',['../device__pinout_8cpp.html#acd13ce86cf516466e21e068ed7306716',1,'ledPower:&#160;device_pinout.cpp'],['../device__pinout_8h.html#acd13ce86cf516466e21e068ed7306716',1,'ledPower:&#160;device_pinout.cpp']]],
   ['levels_17',['Alert Severity Levels',['../index.html#autotoc_md41',1,'']]],
-  ['license_18',['License',['../index.html#autotoc_md46',1,'']]],
+  ['license_18',['License',['../index.html#autotoc_md49',1,'']]],
   ['loadconfigurationfromcloud_19',['loadConfigurationFromCloud',['../class_cloud.html#a82b4714d5ad360e54ad9bece976b3860',1,'Cloud']]],
   ['loadcurrentdefaults_20',['loadCurrentDefaults',['../classsensor_config_data.html#ab0c5246d4922e5ba31a98bb851b3700d',1,'sensorConfigData::loadCurrentDefaults()'],['../classcurrent_status_data.html#a42fdb519c32a085acac40da233c78d27',1,'currentStatusData::loadCurrentDefaults()']]],
   ['localhour_21',['localHour',['../struct_local_time_cache_1_1_local_time_snapshot.html#a01e4cfe14a6e3cf4710365d32952e795',1,'LocalTimeCache::LocalTimeSnapshot']]],

@@ -281,3 +281,6 @@ This release fundamentally restructures device configuration to use four indepen
 ## 3.26 – 2026-02-11
 - Added Thrash Guard - Fixed sleep bug
 
+## 3.27 – 2026-03-12
+- Soak fixes - Thrashing and power
+
