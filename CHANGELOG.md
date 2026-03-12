@@ -8,6 +8,22 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## 3.27 – 2026-03-12
+
+### Fixed
+
+- **ThrashGuard timeout protection**: Fixed ThrashGuard timeout conflicts in SLEEPING_STATE that caused spurious resets (RESET_REASON_USER/140).
+  - Increased SLEEPING_STATE timeout from 30s to 60s to accommodate cloud operations sync (30s) + disconnect wait.
+  - Added progress markers for serial reconnection (`SERIAL_WAIT`), cloud operations (`CLOUD_OPS_WAIT`), and disconnect wait (`DISCONNECT_WAIT`).
+  - Added `WAKE_FROM_SLEEP` progress marker immediately after resuming from sleep.
+
+### Added
+
+- **Alert code 17**: State machine thrash detection alert raised on tier 2/3 thrash events, reported via webhooks to Ubidots.
+- **Battery-aware connectivity for occupancy mode**: Automatically switches from `INTERMITTENT_KEEP_ALIVE` to `INTERMITTENT` when battery drops below 65% (CONSERVING tier) to save power, re-enables at 75% (HEALTHY tier).
+- **ThrashGuard diagnostic variables**: Added `thrashTrips` and `thrashResets` Particle variables for remote monitoring.
+- **Comprehensive ThrashGuard documentation**: Doxygen comments explaining tier system, state-specific timeouts, and escalation behavior.
+
 ## 3.26 – 2026-02-11
 
 ### Added
