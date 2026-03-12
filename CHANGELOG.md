@@ -300,3 +300,6 @@ This release fundamentally restructures device configuration to use four indepen
 ## 3.27 – 2026-03-12
 - Soak fixes - Thrashing and power
 
+## 3.28 – 2026-03-13
+- Bug fix - debounce timer reset
+

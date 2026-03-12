@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.27</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.28</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -863,69 +863,74 @@ $(function(){initNavTree('_state___sleep_8cpp_source.html','',''); });
 <div class="line"><a id="l00772" name="l00772"></a><span class="lineno">  772</span>          <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a> = <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a927b7910140065b2cef01ac3557b91a6">REPORTING_STATE</a>;</div>
 <div class="line"><a id="l00773" name="l00773"></a><span class="lineno">  773</span>          <span class="keywordflow">return</span>;</div>
 <div class="line"><a id="l00774" name="l00774"></a><span class="lineno">  774</span>        } <span class="keywordflow">else</span> {</div>
-<div class="line"><a id="l00775" name="l00775"></a><span class="lineno">  775</span>          <span class="comment">// Already occupied - motion detected, LED stays on</span></div>
-<div class="line"><a id="l00776" name="l00776"></a><span class="lineno">  776</span>          Log.info(<span class="stringliteral">&quot;Motion from PIR wake - space remains occupied&quot;</span>);</div>
-<div class="line"><a id="l00777" name="l00777"></a><span class="lineno">  777</span>        }</div>
-<div class="line"><a id="l00778" name="l00778"></a><span class="lineno">  778</span>        <a class="code hl_define" href="_my_persistent_data_8h.html#a7ccda8a3a0f47702f9fa962899b0a3a1">current</a>.set_lastOccupancyEvent(millis());</div>
-<div class="line"><a id="l00779" name="l00779"></a><span class="lineno">  779</span>      }</div>
-<div class="line"><a id="l00780" name="l00780"></a><span class="lineno">  780</span>    }</div>
-<div class="line"><a id="l00781" name="l00781"></a><span class="lineno">  781</span> </div>
-<div class="line"><a id="l00782" name="l00782"></a><span class="lineno">  782</span>    <span class="comment">// For COUNTING mode: Turn off LED if flash completed during sleep</span></div>
-<div class="line"><a id="l00783" name="l00783"></a><span class="lineno">  783</span>    <span class="keywordflow">if</span> (<a class="code hl_define" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a>.get_sensorMode() == <a class="code hl_enumvalue" href="_my_persistent_data_8h.html#abc47929dd59afff19be8147ebe8fa684aceae44f0ce8284b8a154151dfcb28ab1">COUNTING</a> &amp;&amp; <a class="code hl_function" href="device__pinout_8cpp.html#aa5c84bc5bc9f73dc2c69e1f4bec97dff">signalLEDTimeRemaining</a>() == 0 &amp;&amp; <a class="code hl_function" href="device__pinout_8cpp.html#ab375e3936269f4b236b7d91f75c494d7">signalLEDStatus</a>()) {</div>
-<div class="line"><a id="l00784" name="l00784"></a><span class="lineno">  784</span>      <a class="code hl_function" href="device__pinout_8cpp.html#ad63999ac220a78e60d4555051748e5b3">signalLED</a>(<span class="keyword">false</span>);</div>
+<div class="line"><a id="l00775" name="l00775"></a><span class="lineno">  775</span>          <span class="comment">// Already occupied - motion detected during debounce, restart timer</span></div>
+<div class="line"><a id="l00776" name="l00776"></a><span class="lineno">  776</span>          uint32_t debounceMs = <a class="code hl_define" href="_my_persistent_data_8h.html#a0b7dcc5eefa72dd2fef2a6d42bbb3421">sensorConfig</a>.get_sensorSetting1();</div>
+<div class="line"><a id="l00777" name="l00777"></a><span class="lineno">  777</span>          <span class="keywordflow">if</span> (debounceMs == 0) {</div>
+<div class="line"><a id="l00778" name="l00778"></a><span class="lineno">  778</span>            debounceMs = 60000; <span class="comment">// default 60s</span></div>
+<div class="line"><a id="l00779" name="l00779"></a><span class="lineno">  779</span>          }</div>
+<div class="line"><a id="l00780" name="l00780"></a><span class="lineno">  780</span>          <a class="code hl_function" href="device__pinout_8cpp.html#ad63999ac220a78e60d4555051748e5b3">signalLED</a>(<span class="keyword">true</span>, debounceMs);  <span class="comment">// Restart LED timer</span></div>
+<div class="line"><a id="l00781" name="l00781"></a><span class="lineno">  781</span>          Log.info(<span class="stringliteral">&quot;Motion from PIR wake - space remains occupied (timer reset to %lu sec)&quot;</span>, debounceMs/1000);</div>
+<div class="line"><a id="l00782" name="l00782"></a><span class="lineno">  782</span>        }</div>
+<div class="line"><a id="l00783" name="l00783"></a><span class="lineno">  783</span>        <a class="code hl_define" href="_my_persistent_data_8h.html#a7ccda8a3a0f47702f9fa962899b0a3a1">current</a>.set_lastOccupancyEvent(millis());</div>
+<div class="line"><a id="l00784" name="l00784"></a><span class="lineno">  784</span>      }</div>
 <div class="line"><a id="l00785" name="l00785"></a><span class="lineno">  785</span>    }</div>
 <div class="line"><a id="l00786" name="l00786"></a><span class="lineno">  786</span> </div>
-<div class="line"><a id="l00787" name="l00787"></a><span class="lineno">  787</span>    <span class="comment">// Timer wake = scheduled report. No checks, no gates.</span></div>
-<div class="line"><a id="l00788" name="l00788"></a><span class="lineno">  788</span>    <span class="comment">// We trust that the system timer woke us at the correct boundary.</span></div>
-<div class="line"><a id="l00789" name="l00789"></a><span class="lineno">  789</span>    <span class="keywordflow">if</span> (timerWake) {</div>
-<div class="line"><a id="l00790" name="l00790"></a><span class="lineno">  790</span>      <span class="comment">// In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, suppress periodic reports</span></div>
-<div class="line"><a id="l00791" name="l00791"></a><span class="lineno">  791</span>      <span class="comment">// while occupied so occupancy=1 is only reported on 0-&gt;1 transition.</span></div>
-<div class="line"><a id="l00792" name="l00792"></a><span class="lineno">  792</span>      <span class="keywordflow">if</span> (<a class="code hl_define" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a>.get_sensorMode() == <a class="code hl_enumvalue" href="_my_persistent_data_8h.html#abc47929dd59afff19be8147ebe8fa684a8b18dbf065aa2ac73e51fa136a4e673d">OCCUPANCY</a> &amp;&amp; <a class="code hl_define" href="_my_persistent_data_8h.html#a7ccda8a3a0f47702f9fa962899b0a3a1">current</a>.get_occupied() &amp;&amp;</div>
-<div class="line"><a id="l00793" name="l00793"></a><span class="lineno">  793</span>          <a class="code hl_define" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a>.get_connectionMode() == <a class="code hl_enumvalue" href="_my_persistent_data_8h.html#a6ed5b36c9cd209c52088cb9029de61b3aee11d292bc1a043b66b0904732f75eef">INTERMITTENT_KEEP_ALIVE</a>) {</div>
-<div class="line"><a id="l00794" name="l00794"></a><span class="lineno">  794</span>        Log.info(<span class="stringliteral">&quot;WAKE: Timer wake while OCCUPIED (KEEP_ALIVE) - suppressing scheduled report&quot;</span>);</div>
-<div class="line"><a id="l00795" name="l00795"></a><span class="lineno">  795</span>        <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a> = <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24">SLEEPING_STATE</a>;</div>
-<div class="line"><a id="l00796" name="l00796"></a><span class="lineno">  796</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00797" name="l00797"></a><span class="lineno">  797</span>      }</div>
-<div class="line"><a id="l00798" name="l00798"></a><span class="lineno">  798</span> </div>
-<div class="line"><a id="l00799" name="l00799"></a><span class="lineno">  799</span>      Log.info(<span class="stringliteral">&quot;WAKE: Timer wake - reason=SCHEDULED_REPORT transitioning to REPORTING_STATE&quot;</span>);</div>
-<div class="line"><a id="l00800" name="l00800"></a><span class="lineno">  800</span>      <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a> = <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a927b7910140065b2cef01ac3557b91a6">REPORTING_STATE</a>;</div>
-<div class="line"><a id="l00801" name="l00801"></a><span class="lineno">  801</span>      <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00802" name="l00802"></a><span class="lineno">  802</span>    }</div>
+<div class="line"><a id="l00787" name="l00787"></a><span class="lineno">  787</span>    <span class="comment">// For COUNTING mode: Turn off LED if flash completed during sleep</span></div>
+<div class="line"><a id="l00788" name="l00788"></a><span class="lineno">  788</span>    <span class="keywordflow">if</span> (<a class="code hl_define" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a>.get_sensorMode() == <a class="code hl_enumvalue" href="_my_persistent_data_8h.html#abc47929dd59afff19be8147ebe8fa684aceae44f0ce8284b8a154151dfcb28ab1">COUNTING</a> &amp;&amp; <a class="code hl_function" href="device__pinout_8cpp.html#aa5c84bc5bc9f73dc2c69e1f4bec97dff">signalLEDTimeRemaining</a>() == 0 &amp;&amp; <a class="code hl_function" href="device__pinout_8cpp.html#ab375e3936269f4b236b7d91f75c494d7">signalLEDStatus</a>()) {</div>
+<div class="line"><a id="l00789" name="l00789"></a><span class="lineno">  789</span>      <a class="code hl_function" href="device__pinout_8cpp.html#ad63999ac220a78e60d4555051748e5b3">signalLED</a>(<span class="keyword">false</span>);</div>
+<div class="line"><a id="l00790" name="l00790"></a><span class="lineno">  790</span>    }</div>
+<div class="line"><a id="l00791" name="l00791"></a><span class="lineno">  791</span> </div>
+<div class="line"><a id="l00792" name="l00792"></a><span class="lineno">  792</span>    <span class="comment">// Timer wake = scheduled report. No checks, no gates.</span></div>
+<div class="line"><a id="l00793" name="l00793"></a><span class="lineno">  793</span>    <span class="comment">// We trust that the system timer woke us at the correct boundary.</span></div>
+<div class="line"><a id="l00794" name="l00794"></a><span class="lineno">  794</span>    <span class="keywordflow">if</span> (timerWake) {</div>
+<div class="line"><a id="l00795" name="l00795"></a><span class="lineno">  795</span>      <span class="comment">// In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, suppress periodic reports</span></div>
+<div class="line"><a id="l00796" name="l00796"></a><span class="lineno">  796</span>      <span class="comment">// while occupied so occupancy=1 is only reported on 0-&gt;1 transition.</span></div>
+<div class="line"><a id="l00797" name="l00797"></a><span class="lineno">  797</span>      <span class="keywordflow">if</span> (<a class="code hl_define" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a>.get_sensorMode() == <a class="code hl_enumvalue" href="_my_persistent_data_8h.html#abc47929dd59afff19be8147ebe8fa684a8b18dbf065aa2ac73e51fa136a4e673d">OCCUPANCY</a> &amp;&amp; <a class="code hl_define" href="_my_persistent_data_8h.html#a7ccda8a3a0f47702f9fa962899b0a3a1">current</a>.get_occupied() &amp;&amp;</div>
+<div class="line"><a id="l00798" name="l00798"></a><span class="lineno">  798</span>          <a class="code hl_define" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a>.get_connectionMode() == <a class="code hl_enumvalue" href="_my_persistent_data_8h.html#a6ed5b36c9cd209c52088cb9029de61b3aee11d292bc1a043b66b0904732f75eef">INTERMITTENT_KEEP_ALIVE</a>) {</div>
+<div class="line"><a id="l00799" name="l00799"></a><span class="lineno">  799</span>        Log.info(<span class="stringliteral">&quot;WAKE: Timer wake while OCCUPIED (KEEP_ALIVE) - suppressing scheduled report&quot;</span>);</div>
+<div class="line"><a id="l00800" name="l00800"></a><span class="lineno">  800</span>        <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a> = <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24">SLEEPING_STATE</a>;</div>
+<div class="line"><a id="l00801" name="l00801"></a><span class="lineno">  801</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00802" name="l00802"></a><span class="lineno">  802</span>      }</div>
 <div class="line"><a id="l00803" name="l00803"></a><span class="lineno">  803</span> </div>
-<div class="line"><a id="l00804" name="l00804"></a><span class="lineno">  804</span>    <span class="comment">// For PIR wakes, check if reporting is also due (opportunistic reporting)</span></div>
-<div class="line"><a id="l00805" name="l00805"></a><span class="lineno">  805</span>    <span class="keywordflow">if</span> (pirWake &amp;&amp; Time.isValid() &amp;&amp; <a class="code hl_function" href="_generalized-_core-_counter_8cpp.html#adaf14f9ee408635f2c952b99aaeda484">isWithinOpenHours</a>()) {</div>
-<div class="line"><a id="l00806" name="l00806"></a><span class="lineno">  806</span>      <span class="comment">// In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, do not opportunistically</span></div>
-<div class="line"><a id="l00807" name="l00807"></a><span class="lineno">  807</span>      <span class="comment">// report while occupied; PIR hits should only reset debounce.</span></div>
-<div class="line"><a id="l00808" name="l00808"></a><span class="lineno">  808</span>      <span class="keywordflow">if</span> (<a class="code hl_define" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a>.get_sensorMode() == <a class="code hl_enumvalue" href="_my_persistent_data_8h.html#abc47929dd59afff19be8147ebe8fa684a8b18dbf065aa2ac73e51fa136a4e673d">OCCUPANCY</a> &amp;&amp; <a class="code hl_define" href="_my_persistent_data_8h.html#a7ccda8a3a0f47702f9fa962899b0a3a1">current</a>.get_occupied() &amp;&amp;</div>
-<div class="line"><a id="l00809" name="l00809"></a><span class="lineno">  809</span>          <a class="code hl_define" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a>.get_connectionMode() == <a class="code hl_enumvalue" href="_my_persistent_data_8h.html#a6ed5b36c9cd209c52088cb9029de61b3aee11d292bc1a043b66b0904732f75eef">INTERMITTENT_KEEP_ALIVE</a>) {</div>
-<div class="line"><a id="l00810" name="l00810"></a><span class="lineno">  810</span>        <span class="comment">// Skip overdue-report check while occupied.</span></div>
-<div class="line"><a id="l00811" name="l00811"></a><span class="lineno">  811</span>      } <span class="keywordflow">else</span> {</div>
-<div class="line"><a id="l00812" name="l00812"></a><span class="lineno">  812</span>      uint16_t intervalSec = <a class="code hl_define" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a>.get_reportingInterval();</div>
-<div class="line"><a id="l00813" name="l00813"></a><span class="lineno">  813</span>      <span class="keywordflow">if</span> (intervalSec == 0) intervalSec = 3600;</div>
-<div class="line"><a id="l00814" name="l00814"></a><span class="lineno">  814</span> </div>
-<div class="line"><a id="l00815" name="l00815"></a><span class="lineno">  815</span>      time_t now = Time.now();</div>
-<div class="line"><a id="l00816" name="l00816"></a><span class="lineno">  816</span>      time_t lastReport = <a class="code hl_define" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a>.get_lastReport();</div>
-<div class="line"><a id="l00817" name="l00817"></a><span class="lineno">  817</span>      <span class="keywordflow">if</span> (lastReport &gt; 0 &amp;&amp; (now - lastReport) &gt;= intervalSec) {</div>
-<div class="line"><a id="l00818" name="l00818"></a><span class="lineno">  818</span>        <span class="keywordtype">int</span> overdue = (int)(now - lastReport - intervalSec);</div>
-<div class="line"><a id="l00819" name="l00819"></a><span class="lineno">  819</span>        Log.info(<span class="stringliteral">&quot;WAKE: PIR + report overdue (%d sec) - transitioning to REPORTING_STATE&quot;</span>, overdue);</div>
-<div class="line"><a id="l00820" name="l00820"></a><span class="lineno">  820</span>        <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a> = <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a927b7910140065b2cef01ac3557b91a6">REPORTING_STATE</a>;</div>
-<div class="line"><a id="l00821" name="l00821"></a><span class="lineno">  821</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00822" name="l00822"></a><span class="lineno">  822</span>      }</div>
-<div class="line"><a id="l00823" name="l00823"></a><span class="lineno">  823</span>      }</div>
-<div class="line"><a id="l00824" name="l00824"></a><span class="lineno">  824</span>    }</div>
-<div class="line"><a id="l00825" name="l00825"></a><span class="lineno">  825</span> </div>
-<div class="line"><a id="l00826" name="l00826"></a><span class="lineno">  826</span>    <span class="comment">// If PIR woke us in INTERMITTENT or DISCONNECTED mode and no report is needed,</span></div>
-<div class="line"><a id="l00827" name="l00827"></a><span class="lineno">  827</span>    <span class="comment">// return immediately to sleep. This check comes AFTER opportunistic reporting</span></div>
-<div class="line"><a id="l00828" name="l00828"></a><span class="lineno">  828</span>    <span class="comment">// so overdue reports are not missed.</span></div>
-<div class="line"><a id="l00829" name="l00829"></a><span class="lineno">  829</span>    <span class="keywordflow">if</span> (pirWake &amp;&amp; <a class="code hl_define" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a>.get_connectionMode() != <a class="code hl_enumvalue" href="_my_persistent_data_8h.html#a6ed5b36c9cd209c52088cb9029de61b3a7a691a2430ec26878897b5fbc9c22a4c">CONNECTED</a>) {</div>
-<div class="line"><a id="l00830" name="l00830"></a><span class="lineno">  830</span>      <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a> = <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24">SLEEPING_STATE</a>;</div>
-<div class="line"><a id="l00831" name="l00831"></a><span class="lineno">  831</span>      <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00832" name="l00832"></a><span class="lineno">  832</span>    }</div>
-<div class="line"><a id="l00833" name="l00833"></a><span class="lineno">  833</span> </div>
-<div class="line"><a id="l00834" name="l00834"></a><span class="lineno">  834</span>    Log.info(<span class="stringliteral">&quot;WAKE: No immediate action needed - transitioning to IDLE_STATE&quot;</span>);</div>
-<div class="line"><a id="l00835" name="l00835"></a><span class="lineno">  835</span>    <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a> = <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aeca4500f6f729608a014643f8c8f4003">IDLE_STATE</a>;</div>
-<div class="line"><a id="l00836" name="l00836"></a><span class="lineno">  836</span>  }</div>
-<div class="line"><a id="l00837" name="l00837"></a><span class="lineno">  837</span>}</div>
+<div class="line"><a id="l00804" name="l00804"></a><span class="lineno">  804</span>      Log.info(<span class="stringliteral">&quot;WAKE: Timer wake - reason=SCHEDULED_REPORT transitioning to REPORTING_STATE&quot;</span>);</div>
+<div class="line"><a id="l00805" name="l00805"></a><span class="lineno">  805</span>      <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a> = <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a927b7910140065b2cef01ac3557b91a6">REPORTING_STATE</a>;</div>
+<div class="line"><a id="l00806" name="l00806"></a><span class="lineno">  806</span>      <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00807" name="l00807"></a><span class="lineno">  807</span>    }</div>
+<div class="line"><a id="l00808" name="l00808"></a><span class="lineno">  808</span> </div>
+<div class="line"><a id="l00809" name="l00809"></a><span class="lineno">  809</span>    <span class="comment">// For PIR wakes, check if reporting is also due (opportunistic reporting)</span></div>
+<div class="line"><a id="l00810" name="l00810"></a><span class="lineno">  810</span>    <span class="keywordflow">if</span> (pirWake &amp;&amp; Time.isValid() &amp;&amp; <a class="code hl_function" href="_generalized-_core-_counter_8cpp.html#adaf14f9ee408635f2c952b99aaeda484">isWithinOpenHours</a>()) {</div>
+<div class="line"><a id="l00811" name="l00811"></a><span class="lineno">  811</span>      <span class="comment">// In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, do not opportunistically</span></div>
+<div class="line"><a id="l00812" name="l00812"></a><span class="lineno">  812</span>      <span class="comment">// report while occupied; PIR hits should only reset debounce.</span></div>
+<div class="line"><a id="l00813" name="l00813"></a><span class="lineno">  813</span>      <span class="keywordflow">if</span> (<a class="code hl_define" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a>.get_sensorMode() == <a class="code hl_enumvalue" href="_my_persistent_data_8h.html#abc47929dd59afff19be8147ebe8fa684a8b18dbf065aa2ac73e51fa136a4e673d">OCCUPANCY</a> &amp;&amp; <a class="code hl_define" href="_my_persistent_data_8h.html#a7ccda8a3a0f47702f9fa962899b0a3a1">current</a>.get_occupied() &amp;&amp;</div>
+<div class="line"><a id="l00814" name="l00814"></a><span class="lineno">  814</span>          <a class="code hl_define" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a>.get_connectionMode() == <a class="code hl_enumvalue" href="_my_persistent_data_8h.html#a6ed5b36c9cd209c52088cb9029de61b3aee11d292bc1a043b66b0904732f75eef">INTERMITTENT_KEEP_ALIVE</a>) {</div>
+<div class="line"><a id="l00815" name="l00815"></a><span class="lineno">  815</span>        <span class="comment">// Skip overdue-report check while occupied.</span></div>
+<div class="line"><a id="l00816" name="l00816"></a><span class="lineno">  816</span>      } <span class="keywordflow">else</span> {</div>
+<div class="line"><a id="l00817" name="l00817"></a><span class="lineno">  817</span>      uint16_t intervalSec = <a class="code hl_define" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a>.get_reportingInterval();</div>
+<div class="line"><a id="l00818" name="l00818"></a><span class="lineno">  818</span>      <span class="keywordflow">if</span> (intervalSec == 0) intervalSec = 3600;</div>
+<div class="line"><a id="l00819" name="l00819"></a><span class="lineno">  819</span> </div>
+<div class="line"><a id="l00820" name="l00820"></a><span class="lineno">  820</span>      time_t now = Time.now();</div>
+<div class="line"><a id="l00821" name="l00821"></a><span class="lineno">  821</span>      time_t lastReport = <a class="code hl_define" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a>.get_lastReport();</div>
+<div class="line"><a id="l00822" name="l00822"></a><span class="lineno">  822</span>      <span class="keywordflow">if</span> (lastReport &gt; 0 &amp;&amp; (now - lastReport) &gt;= intervalSec) {</div>
+<div class="line"><a id="l00823" name="l00823"></a><span class="lineno">  823</span>        <span class="keywordtype">int</span> overdue = (int)(now - lastReport - intervalSec);</div>
+<div class="line"><a id="l00824" name="l00824"></a><span class="lineno">  824</span>        Log.info(<span class="stringliteral">&quot;WAKE: PIR + report overdue (%d sec) - transitioning to REPORTING_STATE&quot;</span>, overdue);</div>
+<div class="line"><a id="l00825" name="l00825"></a><span class="lineno">  825</span>        <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a> = <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a927b7910140065b2cef01ac3557b91a6">REPORTING_STATE</a>;</div>
+<div class="line"><a id="l00826" name="l00826"></a><span class="lineno">  826</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00827" name="l00827"></a><span class="lineno">  827</span>      }</div>
+<div class="line"><a id="l00828" name="l00828"></a><span class="lineno">  828</span>      }</div>
+<div class="line"><a id="l00829" name="l00829"></a><span class="lineno">  829</span>    }</div>
+<div class="line"><a id="l00830" name="l00830"></a><span class="lineno">  830</span> </div>
+<div class="line"><a id="l00831" name="l00831"></a><span class="lineno">  831</span>    <span class="comment">// If PIR woke us in INTERMITTENT or DISCONNECTED mode and no report is needed,</span></div>
+<div class="line"><a id="l00832" name="l00832"></a><span class="lineno">  832</span>    <span class="comment">// return immediately to sleep. This check comes AFTER opportunistic reporting</span></div>
+<div class="line"><a id="l00833" name="l00833"></a><span class="lineno">  833</span>    <span class="comment">// so overdue reports are not missed.</span></div>
+<div class="line"><a id="l00834" name="l00834"></a><span class="lineno">  834</span>    <span class="keywordflow">if</span> (pirWake &amp;&amp; <a class="code hl_define" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a>.get_connectionMode() != <a class="code hl_enumvalue" href="_my_persistent_data_8h.html#a6ed5b36c9cd209c52088cb9029de61b3a7a691a2430ec26878897b5fbc9c22a4c">CONNECTED</a>) {</div>
+<div class="line"><a id="l00835" name="l00835"></a><span class="lineno">  835</span>      <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a> = <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24">SLEEPING_STATE</a>;</div>
+<div class="line"><a id="l00836" name="l00836"></a><span class="lineno">  836</span>      <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00837" name="l00837"></a><span class="lineno">  837</span>    }</div>
+<div class="line"><a id="l00838" name="l00838"></a><span class="lineno">  838</span> </div>
+<div class="line"><a id="l00839" name="l00839"></a><span class="lineno">  839</span>    Log.info(<span class="stringliteral">&quot;WAKE: No immediate action needed - transitioning to IDLE_STATE&quot;</span>);</div>
+<div class="line"><a id="l00840" name="l00840"></a><span class="lineno">  840</span>    <a class="code hl_variable" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a> = <a class="code hl_enumvalue" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aeca4500f6f729608a014643f8c8f4003">IDLE_STATE</a>;</div>
+<div class="line"><a id="l00841" name="l00841"></a><span class="lineno">  841</span>  }</div>
+<div class="line"><a id="l00842" name="l00842"></a><span class="lineno">  842</span>}</div>
 </div>
 <div class="ttc" id="a_build_profile_8h_html"><div class="ttname"><a href="_build_profile_8h.html">BuildProfile.h</a></div><div class="ttdoc">Build-profile guardrails for serial/debug waits.</div></div>
 <div class="ttc" id="a_build_profile_8h_html_a1c8895ff02f86bdd856ef0110a1a7a47"><div class="ttname"><a href="_build_profile_8h.html#a1c8895ff02f86bdd856ef0110a1a7a47">DEV_BUILD</a></div><div class="ttdeci">#define DEV_BUILD</div><div class="ttdoc">Set to 1 for developer builds.</div><div class="ttdef"><b>Definition</b> <a href="_build_profile_8h_source.html#l00027">BuildProfile.h:27</a></div></div>

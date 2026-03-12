@@ -1,6 +1,6 @@
 # Generalized-Core-Counter
 
-**Version:** 3.27 | **Latest:** Soak fixes - Thrashing and power
+**Version:** 3.28 | **Latest:** Bug fix - debounce timer reset
 
 A generalized IoT firmware core for outdoor sensor devices supporting multiple operating modes and sensor types.
 
