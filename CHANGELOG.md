@@ -303,3 +303,6 @@ This release fundamentally restructures device configuration to use four indepen
 ## 3.28 – 2026-03-13
 - Bug fix - debounce timer reset
 
+## 3.29 – 2026-03-13
+- Bug fix - Thrashguard on PIR events
+

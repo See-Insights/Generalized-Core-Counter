@@ -1,6 +1,6 @@
 # Generalized-Core-Counter
 
-**Version:** 3.28 | **Latest:** Bug fix - debounce timer reset
+**Version:** 3.29 | **Latest:** Bug fix - Thrashguard on PIR events
 
 A generalized IoT firmware core for outdoor sensor devices supporting multiple operating modes and sensor types.
 

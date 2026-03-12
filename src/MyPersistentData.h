@@ -64,6 +64,8 @@ enum SensorMode {
  * DISCONNECTED:             Device never auto-connects (test / bench mode).
  * INTERMITTENT_KEEP_ALIVE:  During open hours, maintain network standby for fast reconnects.
  *                           Used for occupancy sensors with frequent state changes.
+ *                           Automatically disabled below 65% battery (CONSERVING tier)
+ *                           to extend battery life. Re-enabled at 75% (HEALTHY tier).
  */
 enum ConnectionMode {
 	CONNECTED               = 0,  // Always connected, frequent reporting

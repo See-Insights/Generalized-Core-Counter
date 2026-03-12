@@ -219,5 +219,13 @@ Published from the device after each report:
 - When adding new alerts or error paths:
   - Add a code and description to the `getAlertSeverity` switch.
   - Decide where to raise it (`current.raiseAlert`) and where to clear it once healthy.
+  - Document in README.md alert list with appropriate severity tier.
+
+**Alert Code Reference:**
+- 14-16: Memory, connectivity, sleep system failures
+- 17: State machine thrash (ThrashGuard timeout protection)
+- 20-23: PMIC/charging faults (Boron only)
+- 30-32: Cloud connectivity issues
+- 40-43: Webhook, ledger, and queue management issues
 
 This guide is intentionally concise; extend it as new patterns emerge so future changes remain predictable and maintainable.

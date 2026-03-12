@@ -2,6 +2,7 @@
 #include "Particle.h"
 #include "sensors/SensorManager.h"
 #include "MyPersistentData.h"  // For sysStatus (serialConnected configuration)
+#include "ThrashGuard.h"        // For thrash diagnostics
 
 // Prototypes and System Mode calls
 // SYSTEM_THREAD is enabled by default in Device OS 6.2.0+
@@ -61,6 +62,11 @@ void Particle_Functions::setup() {
                                                         // these functions need
                                                         // to in first 30
                                                         // seconds
+  
+  // Diagnostic variables for ThrashGuard monitoring
+  Particle.variable("thrashTrips", thrashTripCount);
+  Particle.variable("thrashResets", thrashResetCount);
+  
   // Define the Particle variables and functions
 }
 

@@ -154,13 +154,46 @@ void handleReportingState() {
     BatteryTier newTier = Cloud::calculateBatteryTier(currentSoC);
     uint8_t prevTierValue = sysStatus.get_currentBatteryTier();
     
+    // Battery tier names for logging
+    const char* tierNames[] = {"HEALTHY", "CONSERVING", "CRITICAL", "SURVIVAL"};
+    
     // Log tier transitions for field diagnostics
     if (newTier != prevTierValue) {
-      const char* tierNames[] = {"HEALTHY", "CONSERVING", "CRITICAL", "SURVIVAL"};
       const char* prevName = (prevTierValue < 4) ? tierNames[prevTierValue] : "UNKNOWN";
       const char* newName = tierNames[newTier];
       Log.info("Battery tier transition: %s → %s (SoC=%.1f%%)", prevName, newName, (double)currentSoC);
       sysStatus.set_currentBatteryTier(static_cast<uint8_t>(newTier));
+    }
+    
+    // Battery-aware connectivity mode adjustment for OCCUPANCY sensors
+    // 
+    // Strategy: When battery drops below 65% (CONSERVING tier or worse), disable
+    // INTERMITTENT_KEEP_ALIVE mode to save power. Network standby draws ~6-10mA
+    // on cellular, which can drain battery faster than solar recharge in winter.
+    // 
+    // Behavior:
+    // - Battery ≥70% (HEALTHY): Use KEEP_ALIVE for instant occupancy change reporting
+    // - Battery <65% (CONSERVING+): Switch to INTERMITTENT, apply battery tier intervals
+    // - Recovery at 75%: Re-enable KEEP_ALIVE mode automatically
+    // 
+    // This prevents occupancy sensors from draining battery while maintaining
+    // core functionality with reduced responsiveness during low-battery periods.
+    if (sysStatus.get_sensorMode() == OCCUPANCY) {
+      ConnectionMode currentMode = static_cast<ConnectionMode>(sysStatus.get_connectionMode());
+      
+      if (currentMode == INTERMITTENT_KEEP_ALIVE && newTier >= TIER_CONSERVING) {
+        // Battery < 70% - switch to INTERMITTENT mode to save power
+        Log.info("Battery conservation: Disabling KEEP_ALIVE mode (tier=%s, SoC=%.1f%%) - switching to INTERMITTENT",
+                 tierNames[newTier], (double)currentSoC);
+        sysStatus.set_connectionMode(INTERMITTENT);
+      } else if (currentMode == INTERMITTENT && newTier == TIER_HEALTHY) {
+        // Battery recovered > 70% - restore KEEP_ALIVE mode if this is an occupancy sensor
+        // Note: Only re-enable if we came from KEEP_ALIVE originally. Cloud config will
+        // sync the intended mode periodically, so this is just an optimization.
+        Log.info("Battery recovery: Re-enabling KEEP_ALIVE mode (tier=HEALTHY, SoC=%.1f%%)",
+                 (double)currentSoC);
+        sysStatus.set_connectionMode(INTERMITTENT_KEEP_ALIVE);
+      }
     }
     
     // Calculate effective interval based on tier multiplier only

@@ -1,6 +1,26 @@
 #include "ThrashGuard.h"
 #include "state/StateMachine.h"
 #include "power/Connectivity.h"
+#include "MyPersistentData.h"
+
+/**
+ * @file ThrashGuard.cpp
+ * @brief State machine timeout protection and thrash detection
+ * 
+ * @details Monitors forward progress in each state and escalates corrective actions
+ * when the state machine appears stuck:
+ * 
+ * - Tier 1: Local backoff (10s delay, no state change)
+ * - Tier 2: Force disconnect + enter SLEEPING_STATE, raises alert 17
+ * - Tier 3: System.reset() after recent repeated trips, raises alert 17
+ * 
+ * Prevents infinite loops from:
+ * - Blocking operations without progress markers
+ * - Failed cloud/modem operations that don't timeout properly
+ * - Unexpected Device OS behavior during sleep/wake
+ * 
+ * Progress is tracked via markProgress() calls throughout the codebase.
+ */
 
 ThrashGuard thrashGuard;
 
@@ -38,7 +58,7 @@ void ThrashGuard::recordStateTransition(int oldState, int newState) {
 uint32_t ThrashGuard::timeoutForStateSec(int currentState) const {
   switch (currentState) {
   case SLEEPING_STATE:
-    return 30;
+    return 60;  // Increased from 30s to allow for cloud operations sync (30s) + sleep prep
   case CONNECTING_STATE:
     return 120;
   case REPORTING_STATE:
@@ -117,6 +137,7 @@ void ThrashGuard::loop(int currentState, uint32_t nowMs) {
 
   if (tier == 2) {
     logTrip(currentState, noprogSec, lastTag_, 2, "disconnect+sleep");
+    current.raiseAlert(17);  // Alert 17: Thrash detected (tier 2)
     Connectivity::requestFullDisconnectAndRadioOff();
     if (state != SLEEPING_STATE) {
       state = SLEEPING_STATE;
@@ -125,6 +146,7 @@ void ThrashGuard::loop(int currentState, uint32_t nowMs) {
   }
 
   logTrip(currentState, noprogSec, lastTag_, 3, "reset");
+  current.raiseAlert(17);  // Alert 17: Severe thrash detected (tier 3 - reset)
   thrashResetCount++;
   System.reset();
 }

@@ -140,6 +140,8 @@ void handleSleepingState() {
                    elapsedMs, CLOUD_SYNC_TIMEOUT_MS);
           lastStatusLogMs = millis();
         }
+        // Mark progress to prevent ThrashGuard timeout during legitimate cloud operations wait
+        thrashGuard.markProgress("CLOUD_OPS_WAIT");
         Particle.process(); // Keep connection alive
         return; // Stay in SLEEPING_STATE until complete or timeout
       }
@@ -295,6 +297,8 @@ void handleSleepingState() {
       }
       if (!ignoreDisconnectFailure) {
         // Help DeviceOS make progress on the disconnect.
+        // Mark progress to prevent ThrashGuard timeout during disconnect wait
+        thrashGuard.markProgress("DISCONNECT_WAIT");
         Particle.process();
         return;
       }
@@ -606,6 +610,9 @@ void handleSleepingState() {
   // Resume hardware watchdog immediately after wake
   ab1805.resumeWDT();
 
+  // Mark progress immediately after wake to reset ThrashGuard timer
+  thrashGuard.markProgress("WAKE_FROM_SLEEP");
+
 #ifdef DEBUG_SERIAL
   // Photon2 USB serial needs time to re-enumerate after sleep.
   // Must re-initialize before any Log.info() calls to avoid corrupted output.
@@ -619,6 +626,8 @@ void handleSleepingState() {
   unsigned long serialWaitStart = millis();
   while (!Serial.isConnected() && (millis() - serialWaitStart) < ConnectivityPolicy::DEBUG_SERIAL_WAIT_TIMEOUT_MS) {
     // Feed application watchdog during the wait to prevent reset
+    // Also mark progress for ThrashGuard to prevent timeout during legitimate serial wait
+    thrashGuard.markProgress("SERIAL_WAIT");
     Particle.process();
     delay(ConnectivityPolicy::DEBUG_SERIAL_WAIT_POLL_DELAY_MS);  // Blocking wait for serial connection
   }
@@ -740,6 +749,9 @@ void handleSleepingState() {
         Log.info("Count detected from PIR wake - Hourly: %d, Daily: %d",
                  current.get_hourlyCount(), current.get_dailyCount());
       } else if (sysStatus.get_sensorMode() == OCCUPANCY) {
+        // Occupancy mode: PIR wakes are expected behavior, not thrashing
+        thrashGuard.markProgress("PIR_WAKE_OCCUPANCY");
+        
         if (!current.get_occupied()) {
           current.set_occupied(true);
           current.set_occupancyStartTime(Time.now());
@@ -763,8 +775,13 @@ void handleSleepingState() {
           state = REPORTING_STATE;
           return;
         } else {
-          // Already occupied - motion detected, LED stays on
-          Log.info("Motion from PIR wake - space remains occupied");
+          // Already occupied - motion detected during debounce, restart timer
+          uint32_t debounceMs = sensorConfig.get_sensorSetting1();
+          if (debounceMs == 0) {
+            debounceMs = 60000; // default 60s
+          }
+          signalLED(true, debounceMs);  // Restart LED timer
+          Log.info("Motion from PIR wake - space remains occupied (timer reset to %lu sec)", debounceMs/1000);
         }
         current.set_lastOccupancyEvent(millis());
       }
