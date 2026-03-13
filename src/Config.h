@@ -15,17 +15,6 @@
 #include "BuildProfile.h"
 
 /**
- * @brief Debug serial configuration
- * 
- * Blocking USB-serial waits are controlled by build profile flags:
- * - DEV builds may opt-in with ALLOW_BLOCKING_SERIAL_WAITS=1
- * - FIELD builds never block (default)
- * 
- * Logging remains enabled regardless of these flags.
- */
-// #define DEBUG_SERIAL
-
-/**
  * @brief Sensor type ID mapping (for sysStatus.sensorType).
  *
  * These IDs are used across the fleet and must remain stable

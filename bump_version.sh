@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 
 # Simple helper to bump firmware version, release notes, Doxygen project number,
-# README version header, and append to the changelog.
+# README version header, PRODUCT_VERSION, and append to the changelog.
 #
 # Usage:
-#   ./bump_version.sh 3.02 "Fix PIR debounce timing"
+#   ./bump_version.sh 4.00 "New feature release"
 #
 # Notes:
 # - This script is tailored for macOS (uses BSD sed with -i '').
 # - Escapes values for safe use in sed replacement.
+# - Extracts integer part from version for PRODUCT_VERSION (e.g., "4.00" -> 4)
 
 set -euo pipefail
 
@@ -20,6 +21,9 @@ fi
 VERSION="$1"
 shift
 NOTES="$*"
+
+# Extract integer part for PRODUCT_VERSION (e.g., "4.00" -> "4", "4" -> "4")
+PRODUCT_VERSION_INT="${VERSION%%.*}"
 
 sed_escape_replacement() {
   # Escapes characters that are special in the sed replacement part.
@@ -37,12 +41,18 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
 VERSION_FILE="src/Version.cpp"
+MAIN_FILE="src/Generalized-Core-Counter.cpp"
 DOXYFILE="Doxyfile"
 CHANGELOG="CHANGELOG.md"
 README="README.md"
 
 if [ ! -f "$VERSION_FILE" ]; then
   echo "Error: $VERSION_FILE not found"
+  exit 1
+fi
+
+if [ ! -f "$MAIN_FILE" ]; then
+  echo "Error: $MAIN_FILE not found"
   exit 1
 fi
 
@@ -61,6 +71,9 @@ sed -i '' "s/^const char\\* FIRMWARE_VERSION.*/const char* FIRMWARE_VERSION = \"
 
 # Update firmware release notes in Version.cpp
 sed -i '' "s/^const char\\* FIRMWARE_RELEASE_NOTES.*/const char* FIRMWARE_RELEASE_NOTES = \"${NOTES_ESCAPED}\";/" "$VERSION_FILE"
+
+# Update PRODUCT_VERSION in main file (Generalized-Core-Counter.cpp)
+sed -i '' "s/^PRODUCT_VERSION(.*);/PRODUCT_VERSION(${PRODUCT_VERSION_INT});/" "$MAIN_FILE"
 
 # Update Doxygen project number
 sed -i '' "s/^PROJECT_NUMBER.*/PROJECT_NUMBER         = \"${VERSION_ESCAPED}\"/" "$DOXYFILE"
