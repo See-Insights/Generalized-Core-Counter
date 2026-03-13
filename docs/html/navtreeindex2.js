@@ -1,6 +1,5 @@
 var NAVTREEINDEX2 =
 {
-"classsys_status_data_1_1_sys_data.html#a4f202b9573570e16bf24003a86571c55":[22,0,13,0,17],
 "classsys_status_data_1_1_sys_data.html#a553a7a26ab8760a9d912476e1dfd837f":[22,0,13,0,11],
 "classsys_status_data_1_1_sys_data.html#a585c498d8e5c329844bee07dc696aa58":[22,0,13,0,13],
 "classsys_status_data_1_1_sys_data.html#a7c89f1779ae342efe40303f3f1fe1062":[22,0,13,0,34],
@@ -249,5 +248,6 @@ var NAVTREEINDEX2 =
 "struct_observability_1_1_wake_cycle_stats.html#a153cd884d191ed1510ab3793038534d3":[21,0,6,0,23],
 "struct_observability_1_1_wake_cycle_stats.html#a153cd884d191ed1510ab3793038534d3":[22,0,1,0,23],
 "struct_observability_1_1_wake_cycle_stats.html#a155af924e1b55eab6cd2cf864650ce5a":[21,0,6,0,14],
-"struct_observability_1_1_wake_cycle_stats.html#a155af924e1b55eab6cd2cf864650ce5a":[22,0,1,0,14]
+"struct_observability_1_1_wake_cycle_stats.html#a155af924e1b55eab6cd2cf864650ce5a":[22,0,1,0,14],
+"struct_observability_1_1_wake_cycle_stats.html#a20ff6a1af3902c292cdc9f83d928fd67":[21,0,6,0,18]
 };

@@ -20,7 +20,7 @@ var searchData=
   ['power_20management_17',['Battery-Aware Power Management',['../index.html#autotoc_md44',1,'']]],
   ['primary_18',['primary',['../struct_sensor_data.html#addc9a9116bf2fca7030c39282bb24395',1,'SensorData']]],
   ['probetmp112present_19',['probeTmp112Present',['../namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a452bb1633016be3c71fffc2fe5d5a0d7',1,'anonymous_namespace{SensorManager.cpp}']]],
-  ['product_5fversion_20',['PRODUCT_VERSION',['../_generalized-_core-_counter_8cpp.html#a0096c2cc976b98298ae0d988896cb51f',1,'Generalized-Core-Counter.cpp']]],
+  ['product_5fversion_20',['PRODUCT_VERSION',['../_generalized-_core-_counter_8cpp.html#aa8bd5ea21372cda3fc7d49e74a4b9727',1,'Generalized-Core-Counter.cpp']]],
   ['products_20example_21',['Multiple Products Example',['../index.html#autotoc_md28',1,'']]],
   ['projectconfig_22',['ProjectConfig',['../namespace_project_config.html',1,'']]],
   ['projectconfig_2eh_23',['ProjectConfig.h',['../_project_config_8h.html',1,'']]],

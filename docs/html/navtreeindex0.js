@@ -3,10 +3,9 @@ var NAVTREEINDEX0 =
 "_battery_backoff_8cpp.html":[23,0,0,0,0],
 "_battery_backoff_8cpp_source.html":[23,0,0,0,0],
 "_build_profile_8h.html":[23,0,0,6],
-"_build_profile_8h.html#a1c8895ff02f86bdd856ef0110a1a7a47":[23,0,0,6,2],
-"_build_profile_8h.html#a61e127df60d55ea4c8bd6b8ec1f88367":[23,0,0,6,1],
+"_build_profile_8h.html#a1c8895ff02f86bdd856ef0110a1a7a47":[23,0,0,6,1],
 "_build_profile_8h.html#a862e5c5913487ba4049590c35342976c":[23,0,0,6,0],
-"_build_profile_8h.html#ad4ad87bab679b526e350864dcf54b49b":[23,0,0,6,3],
+"_build_profile_8h.html#ad4ad87bab679b526e350864dcf54b49b":[23,0,0,6,2],
 "_build_profile_8h_source.html":[23,0,0,6],
 "_cloud_8cpp.html":[23,0,0,0,1],
 "_cloud_8cpp_source.html":[23,0,0,0,1],
@@ -26,7 +25,6 @@ var NAVTREEINDEX0 =
 "_device_status_publisher_8cpp.html#acf025b054301360475a0ec4542f74ff3":[23,0,0,0,5,0],
 "_device_status_publisher_8cpp_source.html":[23,0,0,0,5],
 "_generalized-_core-_counter_8cpp.html":[23,0,0,10],
-"_generalized-_core-_counter_8cpp.html#a0096c2cc976b98298ae0d988896cb51f":[23,0,0,10,5],
 "_generalized-_core-_counter_8cpp.html#a05393235987309ad44164c2676ba311d":[23,0,0,10,24],
 "_generalized-_core-_counter_8cpp.html#a0840b91aed028ae09ab1d7a4238569ec":[23,0,0,10,20],
 "_generalized-_core-_counter_8cpp.html#a1282f5e7e112ee067260b2fc2b5685fd":[23,0,0,10,14],
@@ -43,6 +41,7 @@ var NAVTREEINDEX0 =
 "_generalized-_core-_counter_8cpp.html#a8e11b98139fe014f3e8a660d91905438":[23,0,0,10,27],
 "_generalized-_core-_counter_8cpp.html#a98dbb1ba2c2de8358c8e27e2fa03859c":[23,0,0,10,21],
 "_generalized-_core-_counter_8cpp.html#a9ae784228f6b9b5ec7d14839274b3448":[23,0,0,10,23],
+"_generalized-_core-_counter_8cpp.html#aa8bd5ea21372cda3fc7d49e74a4b9727":[23,0,0,10,5],
 "_generalized-_core-_counter_8cpp.html#aae28e5f0c49a70c0b58808040acb0649":[23,0,0,10,16],
 "_generalized-_core-_counter_8cpp.html#ab71602050f3582f2f394acb7c5e97606":[23,0,0,10,15],
 "_generalized-_core-_counter_8cpp.html#abcd5d33fa869a1d746ac85a5f6ac720b":[23,0,0,10,26],
@@ -249,5 +248,6 @@ var NAVTREEINDEX0 =
 "class_cloud.html#af5b5031e09251a860c35e82e96bd1eef":[22,0,2,0],
 "class_i_sensor.html":[22,0,4],
 "class_i_sensor.html#a4a34b57999da9b9d6ab2522e83b743c8":[22,0,4,11],
-"class_i_sensor.html#a5a11e705590a9a16bef6c0dd154da2e7":[22,0,4,10]
+"class_i_sensor.html#a5a11e705590a9a16bef6c0dd154da2e7":[22,0,4,10],
+"class_i_sensor.html#a638047cc80e97814200be39478a9ee1d":[22,0,4,0]
 };

@@ -306,3 +306,6 @@ This release fundamentally restructures device configuration to use four indepen
 ## 3.29 – 2026-03-13
 - Bug fix - Thrashguard on PIR events
 
+## 4.00 – 2026-03-13
+- Adopt integer release numbering system
+

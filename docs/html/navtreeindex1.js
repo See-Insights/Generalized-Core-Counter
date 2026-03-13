@@ -1,6 +1,5 @@
 var NAVTREEINDEX1 =
 {
-"class_i_sensor.html#a638047cc80e97814200be39478a9ee1d":[22,0,4,0],
 "class_i_sensor.html#a657816643b95ea93192db51541b16661":[22,0,4,8],
 "class_i_sensor.html#a6eb640b82bf260898c32f74b053046d7":[22,0,4,9],
 "class_i_sensor.html#a6f7a8a36f2d4059adf21d6556a202e99":[22,0,4,12],
@@ -249,5 +248,6 @@ var NAVTREEINDEX1 =
 "classsys_status_data_1_1_sys_data.html#a35642ac84c4d8a5c1b88801fb21a6b79":[22,0,13,0,22],
 "classsys_status_data_1_1_sys_data.html#a39651ca58480ee88783a85f0967df627":[22,0,13,0,28],
 "classsys_status_data_1_1_sys_data.html#a4595625ff422e5883ae59676ada79e6e":[22,0,13,0,25],
-"classsys_status_data_1_1_sys_data.html#a4adcaff310ae44a6429c012f6d6205dd":[22,0,13,0,18]
+"classsys_status_data_1_1_sys_data.html#a4adcaff310ae44a6429c012f6d6205dd":[22,0,13,0,18],
+"classsys_status_data_1_1_sys_data.html#a4f202b9573570e16bf24003a86571c55":[22,0,13,0,17]
 };

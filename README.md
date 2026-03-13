@@ -1,6 +1,6 @@
 # Generalized-Core-Counter
 
-**Version:** 3.29 | **Latest:** Bug fix - Thrashguard on PIR events
+**Version:** 4.00 | **Latest:** Adopt integer release numbering system
 
 A generalized IoT firmware core for outdoor sensor devices supporting multiple operating modes and sensor types.
 

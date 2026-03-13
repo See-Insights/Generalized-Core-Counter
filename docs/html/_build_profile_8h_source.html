@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;3.29</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;4.00</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -95,7 +95,7 @@ $(function(){initNavTree('_build_profile_8h_source.html','',''); });
 <a href="_build_profile_8h.html">Go to the documentation of this file.</a><div class="fragment"><div class="line"><a id="l00001" name="l00001"></a><span class="lineno">    1</span><span class="preprocessor">#pragma once</span></div>
 <div class="line"><a id="l00002" name="l00002"></a><span class="lineno">    2</span></div>
 <div class="line"><a id="l00023" name="l00023"></a><span class="lineno">   23</span><span class="preprocessor">#ifndef DEV_BUILD</span><span class="preprocessor"></span></div>
-<div class="line"><a id="l00027" name="l00027"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a1c8895ff02f86bdd856ef0110a1a7a47">   27</a></span><span class="preprocessor">#define DEV_BUILD 1</span></div>
+<div class="line"><a id="l00027" name="l00027"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a1c8895ff02f86bdd856ef0110a1a7a47">   27</a></span><span class="preprocessor">#define DEV_BUILD 0</span></div>
 <div class="line"><a id="l00028" name="l00028"></a><span class="lineno">   28</span><span class="preprocessor">#endif</span></div>
 <div class="line"><a id="l00029" name="l00029"></a><span class="lineno">   29</span> </div>
 <div class="line"><a id="l00030" name="l00030"></a><span class="lineno">   30</span><span class="preprocessor">#ifndef FIELD_BUILD</span><span class="preprocessor"></span></div>
@@ -103,12 +103,12 @@ $(function(){initNavTree('_build_profile_8h_source.html','',''); });
 <div class="line"><a id="l00035" name="l00035"></a><span class="lineno">   35</span><span class="preprocessor">#endif</span></div>
 <div class="line"><a id="l00036" name="l00036"></a><span class="lineno">   36</span> </div>
 <div class="line"><a id="l00037" name="l00037"></a><span class="lineno">   37</span><span class="preprocessor">#ifndef ALLOW_BLOCKING_SERIAL_WAITS</span><span class="preprocessor"></span></div>
-<div class="line"><a id="l00041" name="l00041"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a862e5c5913487ba4049590c35342976c">   41</a></span><span class="preprocessor">#define ALLOW_BLOCKING_SERIAL_WAITS 1</span></div>
+<div class="line"><a id="l00041" name="l00041"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a862e5c5913487ba4049590c35342976c">   41</a></span><span class="preprocessor">#define ALLOW_BLOCKING_SERIAL_WAITS 0</span></div>
 <div class="line"><a id="l00042" name="l00042"></a><span class="lineno">   42</span><span class="preprocessor">#endif</span></div>
 <div class="line"><a id="l00043" name="l00043"></a><span class="lineno">   43</span> </div>
 <div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span><span class="comment">// Optional convenience: enable DEBUG_SERIAL in DEV builds unless overridden.</span></div>
 <div class="line"><a id="l00045" name="l00045"></a><span class="lineno">   45</span><span class="preprocessor">#if DEV_BUILD &amp;&amp; !defined(DEBUG_SERIAL)</span></div>
-<div class="line"><a id="l00046" name="l00046"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a61e127df60d55ea4c8bd6b8ec1f88367">   46</a></span><span class="preprocessor">#define DEBUG_SERIAL</span></div>
+<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span><span class="preprocessor">#define DEBUG_SERIAL</span></div>
 <div class="line"><a id="l00047" name="l00047"></a><span class="lineno">   47</span><span class="preprocessor">#endif</span></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
