@@ -24,7 +24,7 @@
 /**
  * @brief Set to 1 for developer builds.
  */
-#define DEV_BUILD 0
+#define DEV_BUILD 1
 #endif
 
 #ifndef FIELD_BUILD
@@ -38,7 +38,7 @@
 /**
  * @brief Allow explicit blocking waits for USB serial attachment.
  */
-#define ALLOW_BLOCKING_SERIAL_WAITS 0
+#define ALLOW_BLOCKING_SERIAL_WAITS 1
 #endif
 
 // Optional convenience: enable DEBUG_SERIAL in DEV builds unless overridden.

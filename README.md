@@ -1,6 +1,6 @@
 # Generalized-Core-Counter
 
-**Version:** 4.00 | **Latest:** Adopt integer release numbering system
+**Version:** 4.01 | **Latest:** allow long connect budgets to complete
 
 A generalized IoT firmware core for outdoor sensor devices supporting multiple operating modes and sensor types.
 

@@ -192,6 +192,8 @@ void handleIdleState() {
     }
   }
 
+  
+
   // ********** Power Management **********
   // In INTERMITTENT (1) or DISCONNECTED (2) modes, manage connection lifecycle.
   if (sysStatus.get_connectionMode() != CONNECTED) {

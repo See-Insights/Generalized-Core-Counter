@@ -545,11 +545,9 @@ void handleSleepingState() {
   }
 #endif
   
-  ab1805.stopWDT();
-  
   config.mode(SystemSleepMode::ULTRA_LOW_POWER)
-    .gpio(BUTTON_PIN, FALLING)    // Service button wake (active-low)
-    .gpio(intPin, RISING);        // PIR sensor wake (active HIGH on detect)
+    .gpio(BUTTON_PIN, FALLING)     // Service button wake (active-low)
+    .gpio(intPin, RISING);         // PIR sensor wake
     
   // Add network standby for occupancy mode to avoid reconnection delays
   // Note: Network standby is only supported/needed on cellular devices to prevent
@@ -565,6 +563,10 @@ void handleSleepingState() {
   
   config.duration((uint32_t)wakeInSeconds * 1000UL);  // Timer-based wake at reporting boundary
 
+  // Stop watchdog immediately before sleep (after config is fully built)
+  // to minimize time between I2C transaction and sleep entry
+  ab1805.stopWDT();
+
   thrashGuard.markProgress("SLEEP_ATTEMPT");
   SystemSleepResult result = System.sleep(config);
 
@@ -577,7 +579,7 @@ void handleSleepingState() {
     Log.error("ULTRA_LOW_POWER sleep failed err=%d (wakeIn=%d sec, button=%d pir=%d) - falling back to STOP", (int)result.error(), wakeInSeconds, (int)BUTTON_PIN, (int)intPin);
     current.raiseAlert(16);
 
-    // STOP generally supports a wider set of wake pins on some platforms.
+   // STOP generally supports a wider set of wake pins on some platforms.
     config = SystemSleepConfiguration();
     config.mode(SystemSleepMode::STOP)
       .gpio(BUTTON_PIN, FALLING)
@@ -593,9 +595,19 @@ void handleSleepingState() {
       result = System.sleep(config);
 
       if (result.error() != SYSTEM_ERROR_NONE) {
-        Log.error("All sleep attempts failed err=%d - delaying to avoid tight loop", (int)result.error());
+        // All sleep modes failed - this indicates a device state corruption
+        // that requires immediate reset (alert 16 already raised on first failure).
+        Log.error("All sleep attempts failed err=%d - immediate reset required", (int)result.error());
         ab1805.resumeWDT();
-        delay(1000);
+        
+        // Brief delay to allow log output to flush before reset
+        delay(2000);
+        
+        // Reset device to clear corrupted state
+        Log.info("Resetting device to clear sleep failure state");
+        System.reset();
+        
+        // Should never reach here, but set ERROR_STATE as fallback
         state = ERROR_STATE;
         return;
       }

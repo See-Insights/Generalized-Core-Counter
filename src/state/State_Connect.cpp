@@ -50,6 +50,8 @@ void handleConnectingState() {
   static bool connectRequested = false;
   static bool postConnectDone = false;
   static unsigned long budgetMs = ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS; // Connection timeout budget
+  static unsigned long lastConnectHeartbeatMs = 0;
+  constexpr unsigned long CONNECT_HEARTBEAT_MS = 30000UL;
 
   if (state != oldState) {
     publishStateTransition();
@@ -58,6 +60,7 @@ void handleConnectingState() {
     connectionStartTimeStamp = millis();
     connectRequested = false;
     postConnectDone = false;
+    lastConnectHeartbeatMs = 0;
 
     // ********** Connection Budget with Periodic Deep Attempts **********
     // Per Particle cellular docs: Must allow at least 5 minutes for IMSI cycling,
@@ -130,6 +133,17 @@ void handleConnectingState() {
 
     // Observability: mark connect request start timestamp (millis-based).
     Observability::cycleStats().markConnectRequested(connectionStartTimeStamp);
+  }
+
+  // Keep ThrashGuard informed during intentional long cellular connects.
+  // Heartbeat is emitted only while the connect attempt is active and still
+  // within the selected budget, so genuine over-budget stalls still timeout.
+  if (state == CONNECTING_STATE && connectRequested && !Particle.connected() && elapsedMs < budgetMs) {
+    const unsigned long nowMs = millis();
+    if (lastConnectHeartbeatMs == 0 || (nowMs - lastConnectHeartbeatMs) >= CONNECT_HEARTBEAT_MS) {
+      thrashGuard.markProgress("CONNECT_WAIT");
+      lastConnectHeartbeatMs = nowMs;
+    }
   }
 
   if (Particle.connected()) {

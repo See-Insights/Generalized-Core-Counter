@@ -309,3 +309,6 @@ This release fundamentally restructures device configuration to use four indepen
 ## 4.00 – 2026-03-13
 - Adopt integer release numbering system
 
+## 4.01 – 2026-03-15
+- allow long connect budgets to complete
+
