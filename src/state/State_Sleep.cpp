@@ -25,7 +25,6 @@
  */
 void handleSleepingState() {
   bool enteredState = (state != oldState);
-  bool ignoreDisconnectFailure = false;
   static bool operationsCompleteLogged = false;  // Track if we've logged completion message
 
   if (enteredState) {
@@ -263,50 +262,90 @@ void handleSleepingState() {
 
   // If disconnect was requested, wait (bounded) for it to take effect before sleeping.
   if (disconnectRequested && stillOn) {
-      if (disconnectRequestStartMs != 0 && (millis() - disconnectRequestStartMs) > disconnectBudgetMs) {
-        if (sysStatus.get_connectionMode() != CONNECTED) {
-          Log.warn("SLEEP: disconnect/modem-off exceeded budget (%lu ms) - continuing to sleep",
-                   (unsigned long)(millis() - disconnectRequestStartMs));
+    if (disconnectRequestStartMs != 0 && (millis() - disconnectRequestStartMs) > disconnectBudgetMs) {
+      Log.warn("SLEEP: disconnect/modem-off exceeded budget (%lu ms) - raising alert 15",
+               (unsigned long)(millis() - disconnectRequestStartMs));
+      current.raiseAlert(15);
+      state = ERROR_STATE;
+      disconnectRequested = false;
+      disconnectRequestStartMs = 0;
+      return;
+    }
 
-          // Best-effort: if cloud/radio teardown is stalling, force the radio off
-          // so we don't repeatedly wake with the Wi-Fi stack trying to reconnect.
-#if Wiring_WiFi
-          Connectivity::requestRadioPowerOff();
-#elif Wiring_Cellular
-          if (!useNetworkStandbyEffective) {
-            Connectivity::requestRadioPowerOff();
-          }
-#endif
-
-          ignoreDisconnectFailure = true;
-
-          // Observability: teardown ended due to budget exceed (best-effort path).
-          Observability::cycleStats().markTeardownEnd(millis());
-
-          disconnectRequested = false;
-          disconnectRequestStartMs = 0;
-        } else {
-          Log.warn("SLEEP: disconnect/modem-off exceeded budget (%lu ms) - raising alert 15",
-                   (unsigned long)(millis() - disconnectRequestStartMs));
-          current.raiseAlert(15);
-          state = ERROR_STATE;
-          disconnectRequested = false;
-          disconnectRequestStartMs = 0;
-          return;
-        }
-      }
-      if (!ignoreDisconnectFailure) {
-        // Help DeviceOS make progress on the disconnect.
-        // Mark progress to prevent ThrashGuard timeout during disconnect wait
-        thrashGuard.markProgress("DISCONNECT_WAIT");
-        Particle.process();
-        return;
-      }
+    // Help DeviceOS make progress on the disconnect.
+    // Throttle progress markers to avoid noisy per-loop updates.
+    static unsigned long lastDisconnectProgressMs = 0;
+    unsigned long nowMs = millis();
+    if ((nowMs - lastDisconnectProgressMs) > 1000UL) {
+      thrashGuard.markProgress("DISCONNECT_WAIT");
+      lastDisconnectProgressMs = nowMs;
+    }
+    Particle.process();
+    return;
   }
 
   // Observability: teardown completed (bounded wait finished and we are proceeding to sleep).
   if (disconnectRequested && !stillOn) {
     Observability::cycleStats().markTeardownEnd(millis());
+  }
+
+  // Enforce sleep preconditions before any final sleep call in this state.
+  // Non-standby cellular sleep requires both cloud disconnect and radio/modem off.
+  // Standby sleep requires cloud disconnect only.
+  auto sleepPreconditionsSatisfied = [&]() -> bool {
+#if Wiring_Cellular
+    if (!useNetworkStandbyEffective) {
+      return !Particle.connected() && !Connectivity::isRadioPoweredOn();
+    }
+#endif
+    return !Particle.connected();
+  };
+
+  if (!sleepPreconditionsSatisfied()) {
+    bool cloudConnected = Particle.connected();
+
+    // Request teardown exactly once, then wait with existing budget handling.
+    if (!disconnectRequested) {
+      if (useNetworkStandbyEffective) {
+        Log.warn("SLEEP: pre-sleep gate blocked (cloud=%d standby=1) - requesting cloud disconnect",
+                 (int)cloudConnected);
+        Connectivity::requestCloudDisconnectOnly();
+      } else if (cloudConnected) {
+        Log.warn("SLEEP: pre-sleep gate blocked (cloud=1 standby=0) - requesting cloud disconnect + modem off");
+        Connectivity::requestFullDisconnectAndRadioOff();
+      } else {
+        Log.warn("SLEEP: pre-sleep gate blocked (cloud=0 radioOn=1 standby=0) - requesting modem off");
+        Connectivity::requestRadioPowerOff();
+      }
+
+      disconnectRequested = true;
+      disconnectRequestStartMs = millis();
+      Observability::cycleStats().markTeardownStart((uint32_t)disconnectRequestStartMs, useNetworkStandbyEffective);
+      return;
+    }
+
+    if (disconnectRequestStartMs == 0) {
+      disconnectRequestStartMs = millis();
+    }
+
+    unsigned long elapsedMs = millis() - disconnectRequestStartMs;
+    if (elapsedMs > disconnectBudgetMs) {
+      Log.warn("SLEEP: pre-sleep teardown exceeded budget (%lu ms) - raising alert 15", elapsedMs);
+      current.raiseAlert(15);
+      state = ERROR_STATE;
+      disconnectRequested = false;
+      disconnectRequestStartMs = 0;
+      return;
+    }
+
+    static unsigned long lastGateProgressMs = 0;
+    unsigned long nowMs = millis();
+    if ((nowMs - lastGateProgressMs) > 1000UL) {
+      thrashGuard.markProgress("DISCONNECT_WAIT");
+      lastGateProgressMs = nowMs;
+    }
+    Particle.process();
+    return;
   }
 
   int nightSleepSec = -1;
