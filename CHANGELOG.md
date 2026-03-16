@@ -312,3 +312,6 @@ This release fundamentally restructures device configuration to use four indepen
 ## 4.01 – 2026-03-15
 - allow long connect budgets to complete
 
+## 4.02 – 2026-03-16
+- add IDLE modem-on ceiling safety net
+

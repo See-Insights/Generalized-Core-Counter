@@ -1,6 +1,6 @@
 # Generalized-Core-Counter
 
-**Version:** 4.01 | **Latest:** allow long connect budgets to complete
+**Version:** 4.02 | **Latest:** add IDLE modem-on ceiling safety net
 
 A generalized IoT firmware core for outdoor sensor devices supporting multiple operating modes and sensor types.
 

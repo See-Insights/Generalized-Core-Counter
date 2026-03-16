@@ -7,6 +7,7 @@
 #include "sensors/SensorManager.h"
 #include "device_pinout.h"
 #include "sensors/SensorDefinitions.h"
+#include "power/Connectivity.h"
 #include "ThrashGuard.h"
 
 // NOTE:
@@ -197,23 +198,6 @@ void handleIdleState() {
   // ********** Power Management **********
   // In INTERMITTENT (1) or DISCONNECTED (2) modes, manage connection lifecycle.
   if (sysStatus.get_connectionMode() != CONNECTED) {
-    // In LOW_POWER or DISCONNECTED modes, enforce maximum connected time.
-    // Use connectAttemptBudgetSec as the max connected duration.
-    if (Particle.connected() && connectedStartMs != 0) {
-      uint16_t budgetSec = sysStatus.get_connectAttemptBudgetSec();
-      if (budgetSec >= 30 && budgetSec <= 900) {
-        unsigned long connectedMs = millis() - connectedStartMs;
-        unsigned long budgetMs = (unsigned long)budgetSec * 1000UL;
-        if (connectedMs > budgetMs) {
-          Log.info("Connection timeout (%lu ms > %lu ms) - returning to sleep",
-                   (unsigned long)connectedMs, (unsigned long)budgetMs);
-          connectedStartMs = 0;
-          state = SLEEPING_STATE;
-          return;
-        }
-      }
-    }
-
     // In CONNECTED mode during open hours, never auto-sleep.
     if (Time.isValid() && sysStatus.get_connectionMode() == CONNECTED && isWithinOpenHours()) {
       return;
@@ -256,6 +240,71 @@ void handleIdleState() {
       }
       state = SLEEPING_STATE;
       return; // Go back to sleep when there's no work this hour
+    }
+  }
+
+  // ********** IDLE Connectivity Ceiling Safety Net **********
+  // ThrashGuard intentionally does not supervise IDLE_STATE, so enforce a
+  // conservative max awake ceiling when cloud/modem remains powered without
+  // meaningful work. This prevents modem-on battery drain wedges.
+  {
+    static unsigned long idleCeilingStartMs = 0;
+
+    const unsigned long nowMs = millis();
+    const bool cloudConnected = Particle.connected();
+    const bool radioOn = Connectivity::isRadioPoweredOn();
+    const bool connectivityPowered = cloudConnected || radioOn;
+    const bool updatesPending = System.updatesPending();
+
+    bool queueCanSleep = true;
+    if (cloudConnected) {
+      queueCanSleep = PublishQueuePosix::instance().getCanSleep();
+    }
+
+    const bool openHoursKeepAwakeValid = Time.isValid() && isWithinOpenHours();
+    const bool healthyConnectedAwakePath =
+      (sysStatus.get_connectionMode() == CONNECTED) &&
+      openHoursKeepAwakeValid &&
+      cloudConnected;
+
+    const bool noMeaningfulWorkRemains = !updatesPending && queueCanSleep;
+    const bool shouldApplyIdleCeiling =
+      connectivityPowered &&
+      noMeaningfulWorkRemains &&
+      !healthyConnectedAwakePath;
+
+    if (!shouldApplyIdleCeiling) {
+      idleCeilingStartMs = 0;
+    } else {
+      // Reuse existing connectAttemptBudgetSec behavior with conservative fallback.
+      uint16_t budgetSec = sysStatus.get_connectAttemptBudgetSec();
+      if (budgetSec < 30 || budgetSec > 900) {
+        budgetSec = 300;
+      }
+      const unsigned long budgetMs = (unsigned long)budgetSec * 1000UL;
+
+      // Use connectedStartMs when available; otherwise track this IDLE-powered
+      // dwell with a local timer so radio-on/cloud-off wedges are also bounded.
+      const unsigned long startMs = (connectedStartMs != 0) ? connectedStartMs : idleCeilingStartMs;
+      if (startMs == 0) {
+        idleCeilingStartMs = nowMs;
+      } else {
+        const unsigned long elapsedMs = nowMs - startMs;
+        if (elapsedMs > budgetMs) {
+          Log.warn("IDLE ceiling trip: mode=%d cloud=%d radioOn=%d elapsedMs=%lu connectedStartMs=%lu -> forcing teardown and sleep",
+                   (int)sysStatus.get_connectionMode(),
+                   (int)cloudConnected,
+                   (int)radioOn,
+                   elapsedMs,
+                   connectedStartMs);
+
+          Connectivity::requestFullDisconnectAndRadioOff();
+          connectedStartMs = 0;
+          idleCeilingStartMs = 0;
+          state = SLEEPING_STATE;
+          return;
+        }
+      }
     }
   }
 }
