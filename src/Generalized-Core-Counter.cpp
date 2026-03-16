@@ -119,6 +119,15 @@ SessionState session;
 // Track when we connected to enforce max connected time in LOW_POWER/DISCONNECTED modes
 unsigned long connectedStartMs = 0;
 
+// Boot-storm guard retained state. This protects against repeated resets that
+// occur before setup completes and therefore bypass ERROR_STATE protections.
+retained uint8_t bootStormCount = 0;
+retained bool bootInProgress = false;
+retained time_t bootStormWindowStart = 0;
+retained uint8_t bootStormLastResetReason = 0;
+retained uint32_t bootStormLastResetReasonData = 0;
+retained uint8_t bootStormTripCount = 0;
+
 // Webhook response supervision
 // Short-term monitoring is a simple 20s window that starts only when the
 // device is successfully cloud-connected (Particle.connected()). We arm the
@@ -128,6 +137,60 @@ unsigned long connectedStartMs = 0;
 const unsigned long resetWait = 30000;      // Error state dwell before reset
 
 void setup() {
+  const int reason = System.resetReason();
+  const uint32_t reasonData = System.resetReasonData();
+  bootStormLastResetReason = (uint8_t)reason;
+  bootStormLastResetReasonData = reasonData;
+
+  const bool previousBootFailedEarly = bootInProgress;
+  bool qualifiesForStormCount = false;
+  switch (reason) {
+#ifdef RESET_REASON_PANIC
+  case RESET_REASON_PANIC:
+#endif
+  case RESET_REASON_WATCHDOG:
+#ifdef RESET_REASON_UNKNOWN
+  case RESET_REASON_UNKNOWN:
+#endif
+#ifdef RESET_REASON_USER_APPLICATION
+  case RESET_REASON_USER_APPLICATION:
+#endif
+    qualifiesForStormCount = true;
+    break;
+  default:
+    break;
+  }
+
+  if (previousBootFailedEarly && qualifiesForStormCount) {
+    if (bootStormCount < 255) {
+      bootStormCount++;
+    }
+  }
+
+  if (Time.isValid()) {
+    const time_t now = Time.now();
+    if (bootStormWindowStart == 0) {
+      bootStormWindowStart = now;
+    } else if ((now - bootStormWindowStart) > 600) {
+      bootStormCount = (previousBootFailedEarly && qualifiesForStormCount) ? 1 : 0;
+      bootStormWindowStart = now;
+    }
+  }
+
+  if (bootStormCount >= 6) {
+    bootStormTripCount++;
+    Log.error("BOOT STORM: %u early resets detected (reason=%d)", bootStormCount, reason);
+    Connectivity::requestFullDisconnectAndRadioOff();
+    Particle.process();
+    SystemSleepConfiguration bootStormSleep;
+    bootStormSleep.mode(SystemSleepMode::ULTRA_LOW_POWER).duration(600000UL);
+    System.sleep(bootStormSleep);
+    Log.warn("BOOT STORM holdoff sleep returned unexpectedly - continuing boot");
+  }
+
+  // Mark this boot as in-progress immediately after storm check.
+  bootInProgress = true;
+
   // Wait for serial connection only in explicit DEV builds
 #if ALLOW_BLOCKING_SERIAL_WAITS
   waitFor(Serial.isConnected, 10000);
@@ -233,7 +296,7 @@ void setup() {
   // Track how often the device has been resetting so the error supervisor
   // can apply backoffs and avoid permanent reset loops. Only count resets
   // that are likely to be recoverable by firmware (pin/user/watchdog).
-  switch (System.resetReason()) {
+  switch (reason) {
   case RESET_REASON_PIN_RESET:
   case RESET_REASON_USER:
   case RESET_REASON_WATCHDOG:
@@ -375,11 +438,20 @@ void setup() {
 
   if (state == INITIALIZATION_STATE)
     state = IDLE_STATE; // Default to IDLE; CONNECTING only when explicitly requested
+
+  // setup reached stable completion; clear early-boot in-progress marker.
+  bootInProgress = false;
   Log.info("Startup complete");
   signalLED(false);  // Turn off startup indicator
 }
 
 void loop() {
+  // If we remain alive for a stability window, clear boot-storm counters.
+  if (bootStormCount > 0 && millis() > 300000UL) {
+    bootStormCount = 0;
+    bootStormWindowStart = 0;
+  }
+
   // Main state machine driving sensing, reporting, power management
   switch (state) {
   case IDLE_STATE:
