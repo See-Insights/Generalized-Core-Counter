@@ -321,3 +321,6 @@ This release fundamentally restructures device configuration to use four indepen
 ## 4.05 – 2026-03-18
 - Testing complete: boot storm and connectivity hardening
 
+## 5.00 – 2026-03-18
+- Hardware Soak Production Candidate
+

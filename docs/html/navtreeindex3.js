@@ -1,5 +1,12 @@
 var NAVTREEINDEX3 =
 {
+"struct_observability_1_1_wake_cycle_stats.html#a0ca38461ba43bb0eea8c264d0309eb52":[21,0,6,0,15],
+"struct_observability_1_1_wake_cycle_stats.html#a0ca38461ba43bb0eea8c264d0309eb52":[22,0,1,0,15],
+"struct_observability_1_1_wake_cycle_stats.html#a153cd884d191ed1510ab3793038534d3":[21,0,6,0,23],
+"struct_observability_1_1_wake_cycle_stats.html#a153cd884d191ed1510ab3793038534d3":[22,0,1,0,23],
+"struct_observability_1_1_wake_cycle_stats.html#a155af924e1b55eab6cd2cf864650ce5a":[21,0,6,0,14],
+"struct_observability_1_1_wake_cycle_stats.html#a155af924e1b55eab6cd2cf864650ce5a":[22,0,1,0,14],
+"struct_observability_1_1_wake_cycle_stats.html#a20ff6a1af3902c292cdc9f83d928fd67":[21,0,6,0,18],
 "struct_observability_1_1_wake_cycle_stats.html#a20ff6a1af3902c292cdc9f83d928fd67":[22,0,1,0,18],
 "struct_observability_1_1_wake_cycle_stats.html#a2455d3a9b38024954fc703703e1dba25":[21,0,6,0,12],
 "struct_observability_1_1_wake_cycle_stats.html#a2455d3a9b38024954fc703703e1dba25":[22,0,1,0,12],

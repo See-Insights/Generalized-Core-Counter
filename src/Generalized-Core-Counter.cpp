@@ -12,13 +12,6 @@
  * Repo: https://github.com/chipmc/Generalized-Core-Counter
  */
 
-// Version History (high level):
-// v1.x - Initial gesture sensor implementation and refinements
-// v2.x - Generalized sensor architecture with ISensor interface,
-//        counting vs occupancy modes, PIR support, improved error handling
-// v3.0 - Switched to Particle Ledger-based configuration with
-//        product defaults and per-device overrides
-
 // Include Particle Device OS APIs
 #include "Particle.h"
 
@@ -30,7 +23,7 @@
 
 // Firmware version recognized by Particle Product firmware management
 // Bump this integer whenever you cut a new production release.
-PRODUCT_VERSION(4);
+PRODUCT_VERSION(5);
 
 // Hardware abstraction and device-specific pinouts
 #include "device_pinout.h"           // Platform-specific pin definitions
@@ -136,6 +129,7 @@ retained bool bootStormAlertPending = false;
 
 // ********** Timing **********
 const unsigned long resetWait = 30000;      // Error state dwell before reset
+
 
 void setup() {
   const int reason = System.resetReason();
@@ -280,11 +274,21 @@ void setup() {
     Log.info("Serial logging enabled");
   }
 
-  // Initialize test mode overrides to disabled state
-  // Use -1.0f for battery (invalid SoC) and 0xFFFF for connection duration (max uint16_t)
-  // to indicate test mode is disabled. These can be set to valid values to enable test mode.
-  if (sysStatus.get_testBatteryOverride() < -1.0f || sysStatus.get_testBatteryOverride() > 100.0f) {
-    sysStatus.set_testBatteryOverride(-1.0f);  // Disabled
+  // Guard: detect and clear stale test-mode overrides left from bench testing.
+  // FIELD builds unconditionally clear active overrides; DEV builds retain them.
+  {
+    float testBatOvr = sysStatus.get_testBatteryOverride();
+    if (testBatOvr < -1.0f || testBatOvr > 100.0f) {
+      sysStatus.set_testBatteryOverride(-1.0f);  // Sanitize corrupt value
+    } else if (testBatOvr >= 0.0f) {
+      Log.warn("TEST OVERRIDE: testBatteryOverride=%.2f detected at boot", (double)testBatOvr);
+#if FIELD_BUILD
+      sysStatus.set_testBatteryOverride(-1.0f);
+      Log.warn("TEST OVERRIDE: cleared for FIELD build");
+#else
+      Log.warn("TEST OVERRIDE: retained (DEV build)");
+#endif
+    }
   }
   if (sysStatus.get_testConnectionDurationOverride() == 0) {
     sysStatus.set_testConnectionDurationOverride(0xFFFF);  // Disabled (max uint16_t)

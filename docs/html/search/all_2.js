@@ -11,7 +11,14 @@ var searchData=
   ['batterytier_8',['BatteryTier',['../_my_persistent_data_8h.html#a426866053adc87a6b48f04938146e0ff',1,'MyPersistentData.h']]],
   ['blue_5fled_9',['BLUE_LED',['../device__pinout_8cpp.html#aa4e58025e38ebad58b71cdfa59e76ebe',1,'BLUE_LED:&#160;device_pinout.cpp'],['../device__pinout_8h.html#aa4e58025e38ebad58b71cdfa59e76ebe',1,'BLUE_LED:&#160;device_pinout.cpp']]],
   ['board_20header_20pir_20sensor_20on_20carrier_10',['Carrier board header (PIR sensor on carrier)',['../device__pinout_8h.html#autotoc_md0',1,'']]],
-  ['boron_20only_11',['PMIC Monitoring &amp;amp; Remediation (Boron Only)',['../index.html#autotoc_md42',1,'']]],
-  ['buildprofile_2eh_12',['BuildProfile.h',['../_build_profile_8h.html',1,'']]],
-  ['button_5fpin_13',['BUTTON_PIN',['../device__pinout_8cpp.html#ae2f2771b68bc677751483fae6699726a',1,'BUTTON_PIN:&#160;device_pinout.cpp'],['../device__pinout_8h.html#ae2f2771b68bc677751483fae6699726a',1,'BUTTON_PIN:&#160;device_pinout.cpp']]]
+  ['bootinprogress_11',['bootInProgress',['../_generalized-_core-_counter_8cpp.html#a605e2a8fc2b1340964810872cfc48ebc',1,'Generalized-Core-Counter.cpp']]],
+  ['bootstormalertpending_12',['bootStormAlertPending',['../_generalized-_core-_counter_8cpp.html#aab460ebc929e6456962e8824df9fcf50',1,'Generalized-Core-Counter.cpp']]],
+  ['bootstormcount_13',['bootStormCount',['../_generalized-_core-_counter_8cpp.html#a24d9de3f59d41edb50dde2e6ec6fad9e',1,'Generalized-Core-Counter.cpp']]],
+  ['bootstormlastresetreason_14',['bootStormLastResetReason',['../_generalized-_core-_counter_8cpp.html#ac16a315a5eca7df5546ff98c90c5072e',1,'Generalized-Core-Counter.cpp']]],
+  ['bootstormlastresetreasondata_15',['bootStormLastResetReasonData',['../_generalized-_core-_counter_8cpp.html#a674fc2744d16fc35c39658acebfcbe25',1,'Generalized-Core-Counter.cpp']]],
+  ['bootstormtripcount_16',['bootStormTripCount',['../_generalized-_core-_counter_8cpp.html#a86638d99bd9bb52857597c7d38466738',1,'Generalized-Core-Counter.cpp']]],
+  ['bootstormwindowstart_17',['bootStormWindowStart',['../_generalized-_core-_counter_8cpp.html#af8a9485888db942f2d739396dae30e4a',1,'Generalized-Core-Counter.cpp']]],
+  ['boron_20only_18',['PMIC Monitoring &amp;amp; Remediation (Boron Only)',['../index.html#autotoc_md42',1,'']]],
+  ['buildprofile_2eh_19',['BuildProfile.h',['../_build_profile_8h.html',1,'']]],
+  ['button_5fpin_20',['BUTTON_PIN',['../device__pinout_8cpp.html#ae2f2771b68bc677751483fae6699726a',1,'BUTTON_PIN:&#160;device_pinout.cpp'],['../device__pinout_8h.html#ae2f2771b68bc677751483fae6699726a',1,'BUTTON_PIN:&#160;device_pinout.cpp']]]
 ];
