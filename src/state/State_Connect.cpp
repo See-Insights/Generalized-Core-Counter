@@ -51,7 +51,9 @@ void handleConnectingState() {
   static bool postConnectDone = false;
   static unsigned long budgetMs = ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS; // Connection timeout budget
   static unsigned long lastConnectHeartbeatMs = 0;
+  static unsigned long lastConnectStatusLogMs = 0;
   constexpr unsigned long CONNECT_HEARTBEAT_MS = 30000UL;
+  constexpr unsigned long CONNECT_STATUS_LOG_MS = 60000UL;
 
   if (state != oldState) {
     publishStateTransition();
@@ -61,6 +63,7 @@ void handleConnectingState() {
     connectRequested = false;
     postConnectDone = false;
     lastConnectHeartbeatMs = 0;
+    lastConnectStatusLogMs = 0;
 
     // ********** Connection Budget with Periodic Deep Attempts **********
     // Per Particle cellular docs: Must allow at least 5 minutes for IMSI cycling,
@@ -86,16 +89,6 @@ void handleConnectingState() {
     bool allowDeepAttempt = (attemptCounter >= ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD) ||
                 (currentSoC > ConnectivityPolicy::DEEP_ATTEMPT_SOC_THRESHOLD);
 
-    // Observability: record connect attempt type + budget + queue depth (cheap).
-    {
-      const uint16_t pending = (uint16_t)PublishQueuePosix::instance().getNumEvents();
-      Observability::cycleStats().markConnectAttempt(
-          allowDeepAttempt ? Observability::WakeCycleStats::ConnectAttemptType::DEEP
-                           : Observability::WakeCycleStats::ConnectAttemptType::NORMAL,
-          (uint32_t)budgetMs,
-          pending);
-    }
-    
     if (allowDeepAttempt) {
       // Every 4th attempt (counter 0-3, resets at 3) OR when battery >50%,
       // allow 11 minutes for full modem reset
@@ -108,6 +101,16 @@ void handleConnectingState() {
       }
     } else {
       Log.trace("Normal connection attempt #%d - 5 min budget", attemptCounter + 1);
+    }
+
+    // Observability: record connect attempt type + final effective budget.
+    {
+      const uint16_t pending = (uint16_t)PublishQueuePosix::instance().getNumEvents();
+      Observability::cycleStats().markConnectAttempt(
+          allowDeepAttempt ? Observability::WakeCycleStats::ConnectAttemptType::DEEP
+                           : Observability::WakeCycleStats::ConnectAttemptType::NORMAL,
+          (uint32_t)budgetMs,
+          pending);
     }
   }
 
@@ -143,6 +146,12 @@ void handleConnectingState() {
     if (lastConnectHeartbeatMs == 0 || (nowMs - lastConnectHeartbeatMs) >= CONNECT_HEARTBEAT_MS) {
       thrashGuard.markProgress("CONNECT_WAIT");
       lastConnectHeartbeatMs = nowMs;
+    }
+    if (lastConnectStatusLogMs == 0 || (nowMs - lastConnectStatusLogMs) >= CONNECT_STATUS_LOG_MS) {
+      Log.info("CONNECTING: waiting for cloud (%lu/%lu ms)",
+               (unsigned long)elapsedMs,
+               (unsigned long)budgetMs);
+      lastConnectStatusLogMs = nowMs;
     }
   }
 
@@ -201,10 +210,20 @@ void handleConnectingState() {
         }
       }
 
+      bool ledgerPublishOk = true;
       if (!lastEnteredFromReporting) {
         if (!Cloud::instance().publishDataToLedger()) {
           current.raiseAlert(42); // data ledger publish failure
+          ledgerPublishOk = false;
         }
+      }
+
+      // Boot-storm alert is intended as a one-shot incident marker.
+      // After one successful post-boot cloud service pass, clear it.
+      if (current.get_alertCode() == 17 && configOk && ledgerPublishOk) {
+        Log.info("Boot-storm recovery verified - clearing alert 17");
+        current.set_alertCode(0);
+        current.set_lastAlertTime(0);
       }
 
       size_t pending = PublishQueuePosix::instance().getNumEvents();

@@ -91,10 +91,16 @@ static int resolveErrorAction() {
     return 2;   // start with a soft reset
   }
 
-  case 17: // state machine thrash detected by ThrashGuard
+  case 17: // boot storm detected during setup/early boot
+    // Boot-storm logic has already enforced holdoff and surfaced the event.
+    // No additional recovery action needed here; just report via webhook.
+    Log.info("Alert 17 (boot storm) - holdoff logic already handled; no additional action");
+    return 0;
+
+  case 18: // state machine thrash detected by ThrashGuard
     // ThrashGuard has already taken corrective action (tier 2: force sleep, tier 3: reset).
     // No additional recovery action needed here; just report via webhook.
-    Log.info("Alert 17 (thrash) - ThrashGuard already handled; no additional action");
+    Log.info("Alert 18 (thrash) - ThrashGuard already handled; no additional action");
     return 0;
 
   default:

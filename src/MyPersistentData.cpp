@@ -683,7 +683,8 @@ static int getAlertSeverity(int8_t code) {
         case 14: // out-of-memory
         case 15: // modem / disconnect failure
         case 16: // repeated sleep failures (HIBERNATE / ULP / STOP)
-        case 17: // state machine thrash detected (ThrashGuard)
+        case 17: // boot storm detected during setup/early boot
+        case 18: // state machine thrash detected (ThrashGuard)
         case 20: // PMIC thermal shutdown (critical battery/charging fault)
         case 21: // PMIC charge timeout / stuck charging
             return 3; // critical

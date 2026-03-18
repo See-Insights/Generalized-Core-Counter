@@ -11,8 +11,8 @@
  * when the state machine appears stuck:
  * 
  * - Tier 1: Local backoff (10s delay, no state change)
- * - Tier 2: Force disconnect + enter SLEEPING_STATE, raises alert 17
- * - Tier 3: System.reset() after recent repeated trips, raises alert 17
+ * - Tier 2: Force disconnect + enter SLEEPING_STATE, raises alert 18
+ * - Tier 3: System.reset() after recent repeated trips, raises alert 18
  * 
  * Prevents infinite loops from:
  * - Blocking operations without progress markers
@@ -137,7 +137,7 @@ void ThrashGuard::loop(int currentState, uint32_t nowMs) {
 
   if (tier == 2) {
     logTrip(currentState, noprogSec, lastTag_, 2, "disconnect+sleep");
-    current.raiseAlert(17);  // Alert 17: Thrash detected (tier 2)
+    current.raiseAlert(18);  // Alert 18: Thrash detected (tier 2)
     Connectivity::requestFullDisconnectAndRadioOff();
     if (state != SLEEPING_STATE) {
       state = SLEEPING_STATE;
@@ -146,7 +146,7 @@ void ThrashGuard::loop(int currentState, uint32_t nowMs) {
   }
 
   logTrip(currentState, noprogSec, lastTag_, 3, "reset");
-  current.raiseAlert(17);  // Alert 17: Severe thrash detected (tier 3 - reset)
+  current.raiseAlert(18);  // Alert 18: Severe thrash detected (tier 3 - reset)
   thrashResetCount++;
   System.reset();
 }

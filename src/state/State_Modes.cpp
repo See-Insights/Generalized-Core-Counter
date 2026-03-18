@@ -75,9 +75,11 @@ void handleOccupancyMode() {
       // In INTERMITTENT_KEEP_ALIVE mode, report immediately on occupancy state changes
       // This allows dashboard to show real-time occupancy transitions
       if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
-        Log.info("Occupancy change detected - triggering immediate report");
         session.occupancyChangeTriggered = true;
-        state = REPORTING_STATE;
+        if (state == IDLE_STATE) {
+          Log.info("Occupancy change detected - triggering immediate report");
+          state = REPORTING_STATE;
+        }
       }
     } else {
       // Already occupied - reset LED timeout on new motion
@@ -134,14 +136,6 @@ void updateOccupancyState() {
 
   // Check if debounce timeout has expired
   if (timeSinceLastEvent > debounceMs) {
-    Log.info("[OCC DBG] debounceMs=%lu nowMs=%lu lastEventMs=%lu sinceMs=%lu start=%lu now=%lu totalSec=%lu",
-             (unsigned long)debounceMs,
-             (unsigned long)millis(),
-             (unsigned long)lastEvent,
-             (unsigned long)timeSinceLastEvent,
-             (unsigned long)current.get_occupancyStartTime(),
-             (unsigned long)Time.now(),
-             (unsigned long)current.get_totalOccupiedSeconds());
     // Calculate this occupancy session duration
     uint32_t sessionDuration = Time.now() - current.get_occupancyStartTime();
 
@@ -161,9 +155,11 @@ void updateOccupancyState() {
     // In INTERMITTENT_KEEP_ALIVE mode, report immediately on occupancy state changes
     // This allows dashboard to show real-time occupancy transitions
     if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
-      Log.info("Occupancy change detected - triggering immediate report");
       session.occupancyChangeTriggered = true;
-      state = REPORTING_STATE;
+      if (state == IDLE_STATE) {
+        Log.info("Occupancy change detected - triggering immediate report");
+        state = REPORTING_STATE;
+      }
     }
   }
 }

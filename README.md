@@ -1,6 +1,6 @@
 # Generalized-Core-Counter
 
-**Version:** 4.04 | **Latest:** Fix for reset storm in setup / early loop
+**Version:** 4.05 | **Latest:** Testing complete: boot storm and connectivity hardening
 
 A generalized IoT firmware core for outdoor sensor devices supporting multiple operating modes and sensor types.
 

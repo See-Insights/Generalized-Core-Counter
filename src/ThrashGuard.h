@@ -11,8 +11,8 @@
  * window, escalating corrective actions are taken:
  * 
  * Tier 1: Backoff only (transient issue)
- * Tier 2: Force sleep + disconnect (stuck in waiting state) + alert 17
- * Tier 3: System.reset() (repeated failures within 1 hour) + alert 17
+ * Tier 2: Force sleep + disconnect (stuck in waiting state) + alert 18
+ * Tier 3: System.reset() (repeated failures within 1 hour) + alert 18
  * 
  * State-specific timeouts (seconds):
  * - SLEEPING_STATE: 60s (cloud ops + disconnect wait)

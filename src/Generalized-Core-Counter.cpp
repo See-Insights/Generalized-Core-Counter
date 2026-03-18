@@ -127,6 +127,7 @@ retained time_t bootStormWindowStart = 0;
 retained uint8_t bootStormLastResetReason = 0;
 retained uint32_t bootStormLastResetReasonData = 0;
 retained uint8_t bootStormTripCount = 0;
+retained bool bootStormAlertPending = false;
 
 // Webhook response supervision
 // Short-term monitoring is a simple 20s window that starts only when the
@@ -143,6 +144,10 @@ void setup() {
   bootStormLastResetReasonData = reasonData;
 
   const bool previousBootFailedEarly = bootInProgress;
+  // Mark this boot as in-progress immediately so any early reset on this pass
+  // is detectable on the next boot.
+  bootInProgress = true;
+
   bool qualifiesForStormCount = false;
   switch (reason) {
 #ifdef RESET_REASON_PANIC
@@ -177,8 +182,9 @@ void setup() {
     }
   }
 
-  if (bootStormCount >= 6) {
+  if (bootStormCount >= 6 && previousBootFailedEarly && qualifiesForStormCount) {
     bootStormTripCount++;
+    bootStormAlertPending = true;
     Log.error("BOOT STORM: %u early resets detected (reason=%d)", bootStormCount, reason);
     Connectivity::requestFullDisconnectAndRadioOff();
     Particle.process();
@@ -187,9 +193,6 @@ void setup() {
     System.sleep(bootStormSleep);
     Log.warn("BOOT STORM holdoff sleep returned unexpectedly - continuing boot");
   }
-
-  // Mark this boot as in-progress immediately after storm check.
-  bootInProgress = true;
 
   // Wait for serial connection only in explicit DEV builds
 #if ALLOW_BLOCKING_SERIAL_WAITS
@@ -245,8 +248,6 @@ void setup() {
   // Fallback: rely on Particle.connect() in CONNECTING_STATE
 #endif
 
-  Particle_Functions::instance().setup(); // Initialize the Particle functions
-
   initializePinModes(); // Initialize the pin modes
 
   // Recovery path: if the user holds the service button during reset/wake,
@@ -261,6 +262,16 @@ void setup() {
   sysStatus.setup();    // Initialize persistent storage
   sensorConfig.setup(); // Initialize the sensor configuration
   current.setup();      // Initialize the current status data
+
+  // If a boot storm holdoff was triggered on this or the prior boot, surface
+  // it as an alert now that persistent current status storage is initialized.
+  if (bootStormAlertPending) {
+    // Force explicit boot-storm alert visibility in startup/report payloads.
+    current.set_alertCode(17);
+    current.set_lastAlertTime(Time.now());
+    bootStormAlertPending = false;
+    Log.warn("Boot storm holdoff detected - raising alert 17");
+  }
 
   // Configure serial logging based on serial flag
   // Note: Particle firmware on this platform doesn't support Log.level()

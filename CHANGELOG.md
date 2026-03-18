@@ -318,3 +318,6 @@ This release fundamentally restructures device configuration to use four indepen
 ## 4.04 – 2026-03-16
 - Fix for reset storm in setup / early loop
 
+## 4.05 – 2026-03-18
+- Testing complete: boot storm and connectivity hardening
+

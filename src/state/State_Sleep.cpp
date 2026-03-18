@@ -87,10 +87,22 @@ void handleSleepingState() {
   // (bounded) until both cloud and modem are actually off before sleeping.
   static bool disconnectRequested = false;
   static unsigned long disconnectRequestStartMs = 0;
+#if Wiring_WiFi
+  static bool wifiOffGuardActive = false;
+  static unsigned long wifiOffGuardStartMs = 0;
+  static unsigned long wifiOffGuardLastRetryMs = 0;
+  static uint8_t wifiOffGuardRetries = 0;
+#endif
 
   if (enteredState) {
     disconnectRequested = false;
     disconnectRequestStartMs = 0;
+#if Wiring_WiFi
+    wifiOffGuardActive = false;
+    wifiOffGuardStartMs = 0;
+    wifiOffGuardLastRetryMs = 0;
+    wifiOffGuardRetries = 0;
+#endif
   }
 
   // Safety: if disconnectRequested was latched but the timestamp got lost
@@ -579,7 +591,47 @@ void handleSleepingState() {
       Connectivity::requestCloudDisconnectOnly();
     }
     if (WiFi.isOn()) {
-      Connectivity::requestRadioPowerOff();
+      constexpr unsigned long WIFI_OFF_GUARD_MAX_MS = 2000UL;
+      constexpr unsigned long WIFI_OFF_GUARD_RETRY_MS = 400UL;
+      const unsigned long nowMs = millis();
+
+      if (!wifiOffGuardActive) {
+        wifiOffGuardActive = true;
+        wifiOffGuardStartMs = nowMs;
+        wifiOffGuardLastRetryMs = 0;
+        wifiOffGuardRetries = 0;
+        Log.info("SLEEP: WiFi still on - starting bounded radio-off guard");
+      }
+
+      if (wifiOffGuardLastRetryMs == 0 || (nowMs - wifiOffGuardLastRetryMs) >= WIFI_OFF_GUARD_RETRY_MS) {
+        Connectivity::requestRadioPowerOff();
+        wifiOffGuardLastRetryMs = nowMs;
+        if (wifiOffGuardRetries < 255) {
+          wifiOffGuardRetries++;
+        }
+      }
+
+      unsigned long guardElapsedMs = nowMs - wifiOffGuardStartMs;
+      if (guardElapsedMs <= WIFI_OFF_GUARD_MAX_MS) {
+        thrashGuard.markProgress("WIFI_OFF_GUARD");
+        Particle.process();
+        return;
+      }
+
+      Log.warn("SLEEP: WiFi radio remained on after %lu ms (%u retries) - proceeding to sleep",
+               guardElapsedMs,
+               wifiOffGuardRetries);
+      wifiOffGuardActive = false;
+      wifiOffGuardStartMs = 0;
+      wifiOffGuardLastRetryMs = 0;
+      wifiOffGuardRetries = 0;
+    } else if (wifiOffGuardActive) {
+      unsigned long guardElapsedMs = millis() - wifiOffGuardStartMs;
+      Log.info("SLEEP: WiFi radio powered off before sleep (%lu ms)", guardElapsedMs);
+      wifiOffGuardActive = false;
+      wifiOffGuardStartMs = 0;
+      wifiOffGuardLastRetryMs = 0;
+      wifiOffGuardRetries = 0;
     }
   }
 #endif
