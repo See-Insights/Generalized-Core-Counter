@@ -98,9 +98,9 @@ public:
      * 2. Convention-based ({mode}-webhook-v1)
      * 3. Legacy fallback (Ubidots-Counter-Hook-v1)
      * 
-     * @return String containing webhook event name
+    * @return Pointer to a stable webhook event name string
      */
-    String getWebhookName();
+    const char *getWebhookName() const;
 
     /**
      * @brief Service deferred cloud work; call from main loop.
@@ -120,22 +120,15 @@ private:
      * 
      * @return true if successful
      */
-    bool applyConfigurationFromLedger();
+    bool applyConfigurationFromLedger(const LedgerData &defaults, const LedgerData &device);
 
     /**
      * @brief Apply sensor configuration section
      * 
      * @return true if successful
      */
-    bool applySensorConfig();
+    bool applySensorConfig(const LedgerData &defaults, const LedgerData &device);
 
-    /**
-     * @brief Apply timing configuration section
-     * 
-     * @return true if successful
-     */
-    bool applyTimingConfig();
-    
     /**
      * @brief Callback when default-settings ledger syncs
      */
@@ -147,30 +140,32 @@ private:
     static void onDeviceSettingsSync(Ledger ledger);
     
     /**
-     * @brief Merge default and device settings into mergedConfig
-     */
-    void mergeConfiguration();
-
-    /**
      * @brief Apply messaging configuration section
      * 
      * @return true if successful
      */
-    bool applyMessagingConfig();
+    bool applyMessagingConfig(const LedgerData &defaults, const LedgerData &device);
 
     /**
      * @brief Apply modes configuration section
      * 
      * @return true if successful
      */
-    bool applyModesConfig();
+    bool applyModesConfig(const LedgerData &defaults, const LedgerData &device);
 
     /**
      * @brief Apply reporting configuration section (webhook settings)
      * 
      * @return true if successful
      */
-    bool applyReportingConfig();
+    bool applyReportingConfig(const LedgerData &defaults, const LedgerData &device);
+
+    /**
+     * @brief Apply timing configuration section
+     *
+     * @return true if successful
+     */
+    bool applyTimingConfig(const LedgerData &defaults, const LedgerData &device);
 
     /**
      * @brief Validate configuration value is within acceptable range
@@ -182,7 +177,7 @@ private:
      * @return true if valid
      */
     template<typename T>
-    bool validateRange(T value, T min, T max, const String& name);
+    bool validateRange(T value, T min, T max, const char* name);
 
     /**
      * @brief Check if device configuration differs from product defaults
@@ -214,8 +209,6 @@ private:
     /**
      * @brief Merged configuration data (defaults + device overrides)
      */
-    LedgerData mergedConfig;
-    
     /**
      * @brief Flag indicating if ledgers have synced from cloud
      */
@@ -282,11 +275,12 @@ public:
     static void testBatteryBackoffLogic();
 
 private:
+	static constexpr size_t STATUS_CACHE_SIZE = 512;
     
     /**
      * @brief Store last published device status to detect changes
      */
-    String lastPublishedStatus;
+    char lastPublishedStatus[STATUS_CACHE_SIZE];
 
     /**
      * @brief Tracks success of last applyConfigurationFromLedger() call

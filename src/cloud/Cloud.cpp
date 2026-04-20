@@ -22,7 +22,7 @@ Cloud &Cloud::instance() {
 }
 
 Cloud::Cloud() : ledgersSynced(false), lastApplySuccess(true) {
-    lastPublishedStatus = "";
+    lastPublishedStatus[0] = '\0';
     pendingStatusPublish = false;
     pendingConfigApply = false;
 }
@@ -32,25 +32,25 @@ Cloud::~Cloud() {
 
 bool Cloud::loadConfigurationFromCloud() {
     Log.info("Syncing configuration from cloud");
-    
-    // Trigger merge and apply configuration. mergeConfiguration() will update
-    // lastApplySuccess based on the result of applyConfigurationFromLedger().
-    mergeConfiguration();
+
+    LedgerData defaults = defaultSettingsLedger.get();
+    LedgerData device = deviceSettingsLedger.get();
+    lastApplySuccess = applyConfigurationFromLedger(defaults, device);
     return lastApplySuccess;
 }
 
-String Cloud::getWebhookName() {
+const char *Cloud::getWebhookName() const {
     // Priority 1: Cloud configuration (explicitly set)
-    String cloudWebhookName = sysStatus.get_webhookName();
-    if (cloudWebhookName.length() > 0) {
-        Log.info("Using cloud-configured webhook: %s", cloudWebhookName.c_str());
+    const char *cloudWebhookName = sysStatus.get_webhookNameCStr();
+    if (cloudWebhookName && cloudWebhookName[0] != '\0') {
+        Log.info("Using cloud-configured webhook: %s", cloudWebhookName);
         return cloudWebhookName;
     }
-    
+
     // Priority 2: Convention-based (mode-specific)
     uint8_t mode = sysStatus.get_sensorMode();
-    String conventionName;
-    
+    const char *conventionName = "unknown-webhook-v1";
+
     switch (mode) {
         case COUNTING:
             conventionName = "counting-webhook-v1";
@@ -62,11 +62,10 @@ String Cloud::getWebhookName() {
             conventionName = "measurement-webhook-v1";
             break;
         default:
-            conventionName = "unknown-webhook-v1";
             break;
     }
-    
-    Log.info("Using convention-based webhook: %s", conventionName.c_str());
+
+    Log.info("Using convention-based webhook: %s", conventionName);
     return conventionName;
 }
 
@@ -75,7 +74,9 @@ void Cloud::loop() {
     // Do at most one deferred operation per loop() pass.
     if (pendingConfigApply && Particle.connected()) {
         pendingConfigApply = false;
-        mergeConfiguration();
+        LedgerData defaults = defaultSettingsLedger.get();
+        LedgerData device = deviceSettingsLedger.get();
+        lastApplySuccess = applyConfigurationFromLedger(defaults, device);
         return;
     }
 

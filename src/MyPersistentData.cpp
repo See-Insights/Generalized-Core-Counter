@@ -181,6 +181,10 @@ String sysStatusData::get_timeZoneStr() const {
 	return result;
 }
 
+const char *sysStatusData::get_timeZoneStrCStr() const {
+    return sysData.timeZoneStr;
+}
+
 bool sysStatusData::set_timeZoneStr(const char *str) {
 	return setValueString(offsetof(SysData, timeZoneStr), sizeof(SysData::timeZoneStr), str);
 }
@@ -381,6 +385,11 @@ String sysStatusData::get_webhookName() const {
     getValueString(offsetof(SysData,webhookName), sizeof(SysData::webhookName), result);
     return result;
 }
+
+const char *sysStatusData::get_webhookNameCStr() const {
+    return sysData.webhookName;
+}
+
 bool sysStatusData::set_webhookName(const char *str) {
     return setValueString(offsetof(SysData,webhookName), sizeof(SysData::webhookName), str);
 }
@@ -694,10 +703,12 @@ static int getAlertSeverity(int8_t code) {
         case 31: // failed to connect to cloud
         case 32: // connect taking too long
         case 40: // repeated webhook failures
-        case 41: // configuration/ledger apply failure
+        case 41: // configuration/ledger apply failure (CONNECT phase)
         case 42: // data ledger publish failure
         case 43: // publish queue not drained before forced sleep
             return 2; // major
+        case 44: // ledger sync timeout before sleep (SLEEP phase - cosmetic, config already applied)
+            return 1; // minor - less severe than 41 because config is already working
         default:
             return 1; // minor / warning
     }

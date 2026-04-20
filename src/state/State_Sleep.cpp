@@ -167,8 +167,11 @@ void handleSleepingState() {
         Log.warn("SLEEP: Publish queue not empty - raising alert 43");
         current.raiseAlert(43); // Queue drainage failure (highest priority)
       } else if (!ledgersSynced) {
-        Log.warn("SLEEP: Ledger sync incomplete - raising alert 41");
-        current.raiseAlert(41); // Configuration sync failure
+        // Enhanced diagnostics for Alert 44 troubleshooting
+        Log.warn("SLEEP: Ledger sync incomplete - raising alert 44");
+        Log.warn("Alert 44 context: timeout after %lu ms (budget=%lu ms)",
+                 elapsedMs, CLOUD_SYNC_TIMEOUT_MS);
+        current.raiseAlert(44); // Ledger sync timeout before sleep (minor - config already applied)
       } else if (!updatesChecked) {
         Log.warn("SLEEP: OTA updates pending - raising alert 42");
         current.raiseAlert(42); // OTA updates pending

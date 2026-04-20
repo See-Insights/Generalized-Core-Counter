@@ -23,7 +23,7 @@
 
 // Firmware version recognized by Particle Product firmware management
 // Bump this integer whenever you cut a new production release.
-PRODUCT_VERSION(5);
+PRODUCT_VERSION(6);
 
 // Hardware abstraction and device-specific pinouts
 #include "device_pinout.h"           // Platform-specific pin definitions
@@ -308,6 +308,29 @@ void setup() {
     current.set_lastAlertTime(0);
   }
 
+  // Clear sticky OOM alert after a reset-driven recovery attempt so field
+  // reports can distinguish a one-off OOM from repeated reset/OOM cycles.
+  bool clearOomAlertOnBoot = false;
+  switch (reason) {
+  case RESET_REASON_PIN_RESET:
+  case RESET_REASON_USER:
+  case RESET_REASON_WATCHDOG:
+    clearOomAlertOnBoot = true;
+    break;
+#ifdef RESET_REASON_USER_APPLICATION
+  case RESET_REASON_USER_APPLICATION:
+    clearOomAlertOnBoot = true;
+    break;
+#endif
+  default:
+    break;
+  }
+  if (current.get_alertCode() == 14 && clearOomAlertOnBoot) {
+    Log.info("Clearing alert 14 on boot after reset-driven recovery");
+    current.set_alertCode(0);
+    current.set_lastAlertTime(0);
+  }
+
   // Track how often the device has been resetting so the error supervisor
   // can apply backoffs and avoid permanent reset loops. Only count resets
   // that are likely to be recoverable by firmware (pin/user/watchdog).
@@ -315,6 +338,9 @@ void setup() {
   case RESET_REASON_PIN_RESET:
   case RESET_REASON_USER:
   case RESET_REASON_WATCHDOG:
+#ifdef RESET_REASON_USER_APPLICATION
+  case RESET_REASON_USER_APPLICATION:
+#endif
     sysStatus.set_resetCount(sysStatus.get_resetCount() + 1);
     break;
   case RESET_REASON_UPDATE:
@@ -385,12 +411,12 @@ void setup() {
   // ===== TIME AND TIMEZONE CONFIGURATION =====
   // Setup local time from persisted timezone string (POSIX TZ format).
   // This must be configured before we can make any open/close hour decisions.
-  String tz = sysStatus.get_timeZoneStr();
-  if (tz.length() == 0) {
+  const char *tz = sysStatus.get_timeZoneStrCStr();
+  if (!tz || tz[0] == '\0') {
     tz = "SGT-8"; // Fallback default
-    sysStatus.set_timeZoneStr(tz.c_str());
+    sysStatus.set_timeZoneStr(tz);
   }
-  LocalTime::instance().withConfig(LocalTimePosixTimezone(tz.c_str()));
+  LocalTime::instance().withConfig(LocalTimePosixTimezone(tz));
 
   // Validate time and configure local time converter
   if (!Time.isValid()) {
@@ -401,7 +427,7 @@ void setup() {
     
     // Now that time is valid, configure local time converter for timezone-aware operations
     conv.withCurrentTime().convert();
-    Log.info("Timezone: %s, Local time: %s", tz.c_str(), conv.format(TIME_FORMAT_DEFAULT).c_str());
+    Log.info("Timezone: %s, Local time: %s", tz, conv.format(TIME_FORMAT_DEFAULT).c_str());
     Log.info("Open hours %02u:00-%02u:00, currently: %s",
              sysStatus.get_openTime(), sysStatus.get_closeTime(),
              isWithinOpenHours() ? "OPEN" : "CLOSED");
@@ -528,7 +554,9 @@ void loop() {
 
   // If an out-of-memory event occurred, go to error state
   if (outOfMemory >= 0) {
-    Log.info("Resetting due to low memory");
+    Log.error("Out-of-memory event detected (param=%d freeHeap=%lu) - resetting",
+              outOfMemory,
+              (unsigned long)System.freeMemory());
     // Out-of-memory is treated as a critical alert; only overwrite any
     // existing alert if this is more severe.
     current.raiseAlert(14);
@@ -744,10 +772,10 @@ void publishData() {
   }
 
   // Get webhook name from cloud configuration (with fallback to convention)
-  String webhookName = Cloud::instance().getWebhookName();
-  
+  const char *webhookName = Cloud::instance().getWebhookName();
+
   PublishQueuePosix::instance().publish(webhookName, data, PRIVATE);
-  Log.info("Publishing to webhook '%s': %s", webhookName.c_str(), data);
+  Log.info("Publishing to webhook '%s': %s", webhookName, data);
 
   // Arm short-term webhook supervision.
   // If we're already connected, start the 20s window immediately.
@@ -777,20 +805,22 @@ void publishData() {
  * before the radio is brought up.
  */
 void publishStartupStatus() {
-  char status[192];
+  char status[224];
 
   int resetReason = System.resetReason();
   uint32_t resetReasonData = System.resetReasonData();
   int8_t alertCode = current.get_alertCode();
   time_t lastAlert = current.get_lastAlertTime();
+  unsigned long freeHeap = System.freeMemory();
 
   snprintf(status, sizeof(status),
-           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld}",
+           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu}",
            FIRMWARE_VERSION,
            resetReason,
            (unsigned long)resetReasonData,
            (int)alertCode,
-           (long)lastAlert);
+           (long)lastAlert,
+           freeHeap);
 
   PublishQueuePosix::instance().publish("status", status, PRIVATE);
   Log.info("Startup status: %s", status);

@@ -713,11 +713,12 @@ The firmware implements a comprehensive alert system that monitors device health
 - `31`: Failed to connect to cloud
 - `32`: Connect taking too long
 - `40`: Repeated webhook failures (>6 hours without response)
-- `41`: Configuration/ledger apply failure
+- `41`: Configuration apply failure (during CONNECT phase - device may have stale config)
 - `42`: Data ledger publish failure
 - `43`: Publish queue not drained before forced sleep
 
 **Minor (Tier 1)** - Informational warnings
+- `44`: Ledger sync timeout before sleep (cosmetic - config already applied successfully)
 
 ### PMIC Monitoring & Remediation (Boron Only)
 
@@ -754,6 +755,38 @@ For Boron devices with BQ24195 PMIC, the firmware actively monitors charging hea
 - Configuration validation with range checking
 - Graceful degradation for remote deployments
 - Alerts automatically clear when underlying condition resolves
+
+### Alert 41/44 Diagnostic Details
+
+To aid field troubleshooting of configuration and ledger sync issues, the firmware provides enhanced diagnostics:
+
+**Alert 41 - Configuration Apply Failure (CONNECT phase):**
+- Logs ledger sync status at time of failure
+- Reports connection duration
+- Identifies which config section failed: sensor, timing, messaging, modes, or reporting
+- Example log output:
+  ```
+  Configuration apply failed: sensor=OK timing=OK messaging=FAIL modes=OK reporting=OK
+  Alert 41 context: ledgersSynced=true connectDuration=8234 ms
+  ```
+
+**Alert 44 - Ledger Sync Timeout (SLEEP phase):**
+- Logs timeout duration vs budget
+- Shows which cloud operations completed: queue, ledgers, updates, webhook
+- Example log output:
+  ```
+  SLEEP: Waiting for cloud operations - queue:Y ledgers:N updates:Y webhook:Y (8451/30000 ms)
+  Alert 44 context: timeout after 30124 ms (budget=30000 ms)
+  ```
+
+**Platform-Specific Tuning:**
+- WiFi devices: 5-second ledger sync timeout
+- Cellular devices: 10-second ledger sync timeout (reduces false alerts on slower networks)
+
+**Ledger Sync Logging:**
+- Info-level logging shows sync timestamps for `default-settings` and `device-settings` ledgers
+- Tracks elapsed time since connection for sync window progress
+- Distinguishes partial sync (one ledger synced) from complete failure
 
 ## Battery-Aware Power Management
 

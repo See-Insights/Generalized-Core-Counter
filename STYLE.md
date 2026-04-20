@@ -161,6 +161,7 @@ Published from the device after each report:
 - Use `current.raiseAlert(code)` to record problems. Severity is determined centrally in `MyPersistentData.cpp`:
   - Critical (3): OOM (14), modem/disconnect failure (15).
   - Major (2): connect timeouts (30–32), webhook failures (40), config/ledger failures (41–43).
+  - Minor (1): ledger sync timeout before sleep (44) - config already working.
   - Minor (1): everything else.
 - `raiseAlert` only upgrades the stored code if the new alert is **more severe** than the existing one.
 - `resolveErrorAction()` in `Generalized-Core-Counter.cpp` maps the active alert + reset count to recovery behavior:

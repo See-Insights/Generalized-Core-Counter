@@ -34,7 +34,7 @@ bool Cloud::writeDeviceStatusToCloud() {
 
     // Timing
     writerBase.name("timing").beginObject();
-    writerBase.name("timezone").value(sysStatus.get_timeZoneStr());
+    writerBase.name("timezone").value(sysStatus.get_timeZoneStrCStr());
     writerBase.name("reportingIntervalSec").value(sysStatus.get_reportingInterval());
     writerBase.name("openHour").value(sysStatus.get_openTime());
     writerBase.name("closeHour").value(sysStatus.get_closeTime());
@@ -58,8 +58,7 @@ bool Cloud::writeDeviceStatusToCloud() {
     bufferBase[writerBase.dataSize()] = '\0';
 
     // Only publish if the configuration actually changed
-    String baseStatus = String(bufferBase);
-    if (lastPublishedStatus == baseStatus) {
+    if (strcmp(lastPublishedStatus, bufferBase) == 0) {
         Log.info("Device status unchanged; skipping device-status ledger update");
         return true; // Not an error; nothing to do
     }
@@ -88,7 +87,7 @@ bool Cloud::writeDeviceStatusToCloud() {
     writer.endObject();
 
     writer.name("timing").beginObject();
-    writer.name("timezone").value(sysStatus.get_timeZoneStr());
+    writer.name("timezone").value(sysStatus.get_timeZoneStrCStr());
     writer.name("reportingIntervalSec").value(sysStatus.get_reportingInterval());
     writer.name("openHour").value(sysStatus.get_openTime());
     writer.name("closeHour").value(sysStatus.get_closeTime());
@@ -136,8 +135,9 @@ bool Cloud::writeDeviceStatusToCloud() {
     if (result == SYSTEM_ERROR_NONE) {
         // Preserve base-status change detection so per-cycle fields don't
         // force additional device-status publishes.
-        lastPublishedStatus = baseStatus;
-        Log.info("Device status published to cloud");
+        strncpy(lastPublishedStatus, bufferBase, sizeof(lastPublishedStatus) - 1);
+        lastPublishedStatus[sizeof(lastPublishedStatus) - 1] = '\0';
+        Log.info("Device status published to cloud (freeHeap=%lu)", (unsigned long)System.freeMemory());
         return true;
     } else {
         Log.warn("Failed to publish device status: %d", result);
@@ -150,6 +150,7 @@ bool Cloud::publishDataToLedger() {
     
     char buffer[512];
     JSONBufferWriter writer(buffer, sizeof(buffer));
+    const unsigned long freeHeap = System.freeMemory();
     
     writer.beginObject();
     writer.name("timestamp").value((int)Time.now());
@@ -180,6 +181,7 @@ bool Cloud::publishDataToLedger() {
     
     writer.name("battery").value(current.get_stateOfCharge(), 1);
     writer.name("temp").value(current.get_internalTempC(), 1);
+    writer.name("freeHeap").value((int)freeHeap);
     writer.endObject();
     
     if (!writer.buffer()) {
@@ -197,18 +199,22 @@ bool Cloud::publishDataToLedger() {
         // can correlate what was actually written to device-data.
         int mode = sysStatus.get_sensorMode();
         if (mode == COUNTING || mode == MEASUREMENT) {
-            Log.info("Sensor data published to cloud - mode=%s hourly=%d daily=%d alert=%d",
+            Log.info("Sensor data published to cloud - mode=%s hourly=%d daily=%d alert=%d freeHeap=%lu",
                      (mode == COUNTING ? "counting" : "measurement"),
                      (int)current.get_hourlyCount(),
                      (int)current.get_dailyCount(),
-                     (int)current.get_alertCode());
+                     (int)current.get_alertCode(),
+                     freeHeap);
         } else if (mode == OCCUPANCY) {
-            Log.info("Sensor data published to cloud - mode=occupancy occupied=%d totalMin=%lu alert=%d",
+            Log.info("Sensor data published to cloud - mode=occupancy occupied=%d totalMin=%lu alert=%d freeHeap=%lu",
                      (int)current.get_occupied(),
                      (unsigned long)(current.get_totalOccupiedSeconds() / 60UL),
-                     (int)current.get_alertCode());
+                     (int)current.get_alertCode(),
+                     freeHeap);
         } else {
-            Log.info("Sensor data published to cloud - mode=unknown alert=%d", (int)current.get_alertCode());
+            Log.info("Sensor data published to cloud - mode=unknown alert=%d freeHeap=%lu",
+                     (int)current.get_alertCode(),
+                     freeHeap);
         }
         return true;
     } else {

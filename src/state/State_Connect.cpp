@@ -129,7 +129,8 @@ void handleConnectingState() {
     Log.info("Starting connection attempt - Signal: S=%2.0f%% Q=%2.0f%%",
              (double)strengthPct, (double)qualityPct);
 #endif
-    Log.info("Requesting Particle cloud connection");
+  Log.info("Requesting Particle cloud connection (freeHeap=%lu)",
+       (unsigned long)System.freeMemory());
     Particle.connect();
     connectRequested = true;
     thrashGuard.markProgress("CONNECT_START");
@@ -189,6 +190,7 @@ void handleConnectingState() {
         Log.info("Connection successful - clearing alert 31");
         current.set_alertCode(0);
       }
+      Log.info("Cloud connected (freeHeap=%lu)", (unsigned long)System.freeMemory());
       measure.getSignalStrength();
       measure.batteryState();
       Log.info("Enclosure temperature at connect: %4.2f C", (double)current.get_internalTempC());
@@ -199,8 +201,17 @@ void handleConnectingState() {
       }
 
       bool configOk = Cloud::instance().loadConfigurationFromCloud();
+      Log.info("Configuration load complete success=%d freeHeap=%lu",
+               configOk,
+               (unsigned long)System.freeMemory());
       if (!configOk) {
+        // Enhanced diagnostics for Alert 41 troubleshooting
+        bool ledgersSynced = Cloud::instance().areLedgersSynced();
+        unsigned long connectDuration = millis() - connectedStartMs;
         Log.warn("Configuration apply failed (will raise alert 41)");
+        Log.warn("Alert 41 context: ledgersSynced=%s connectDuration=%lu ms",
+                 ledgersSynced ? "true" : "false",
+                 connectDuration);
         current.raiseAlert(41);
       } else {
         thrashGuard.markProgress("LEDGER_SYNC_OK");
@@ -253,8 +264,10 @@ void handleConnectingState() {
   }
 
   if (elapsedMs > budgetMs) {
-    Log.warn("Connection attempt exceeded budget (%lu ms > %lu ms) - raising alert 31",
-             (unsigned long)elapsedMs, (unsigned long)budgetMs);
+    Log.warn("Connection attempt exceeded budget (%lu ms > %lu ms freeHeap=%lu) - raising alert 31",
+             (unsigned long)elapsedMs,
+             (unsigned long)budgetMs,
+             (unsigned long)System.freeMemory());
 
     // Observability: connect attempt timed out.
     Observability::cycleStats().markConnectTimeout((uint32_t)elapsedMs);

@@ -1,4 +1,5 @@
 #include "cloud/Cloud.h"
+#include "power/ConnectivityPolicy.h"
 
 void Cloud::setup() {
     Log.info("Setting up Cloud configuration management");
@@ -44,7 +45,7 @@ bool Cloud::areLedgersSynced() const {
     time_t defaultSync = defaultSettingsLedger.lastSynced();
     time_t deviceSync = deviceSettingsLedger.lastSynced();
     
-    // Log sync timestamps for debugging
+    // Trace-level logging to avoid spam in main loop (called every iteration)
     Log.trace("Ledger sync check: default-settings=%lu device-settings=%lu", 
               (unsigned long)defaultSync, (unsigned long)deviceSync);
     
@@ -57,25 +58,30 @@ bool Cloud::areLedgersSynced() const {
         if (wasDisconnected) {
             firstConnectedTime = millis();
             wasDisconnected = false;
-            Log.info("Connected - starting 5s ledger sync window");
+            Log.info("Connected - starting %lu ms ledger sync window", 
+                     ConnectivityPolicy::LEDGER_SYNC_TIMEOUT_MS);
         }
         
-        // Give ledgers 5 seconds to sync after connection
-        if (millis() - firstConnectedTime > 5000) {
+        // Give ledgers time to sync after connection (platform-specific timeout)
+        unsigned long elapsedSinceConnect = millis() - firstConnectedTime;
+        if (elapsedSinceConnect > ConnectivityPolicy::LEDGER_SYNC_TIMEOUT_MS) {
             // If either ledger has synced, both must sync
             if (defaultSync > 0 || deviceSync > 0) {
                 bool bothSynced = (defaultSync > 0 && deviceSync > 0);
                 if (!bothSynced) {
-                    Log.warn("Partial ledger sync: default=%lu device=%lu", 
+                    Log.warn("Partial ledger sync after %lu ms: default=%lu device=%lu", 
+                             elapsedSinceConnect,
                              (unsigned long)defaultSync, (unsigned long)deviceSync);
                 }
                 return bothSynced;
             }
-            // If neither has synced after 5s, assume they're empty and that's okay
-            Log.info("No ledger data after 5s - assuming empty ledgers (OK)");
+            // If neither has synced after timeout, assume they're empty and that's okay
+            Log.info("No ledger data after %lu ms - assuming empty ledgers (OK)", elapsedSinceConnect);
             return true;
         }
-        // Still within the 5-second sync window
+        // Still within the sync window
+        Log.trace("Ledger sync pending: %lu ms elapsed (waiting for %lu ms)", 
+                  elapsedSinceConnect, ConnectivityPolicy::LEDGER_SYNC_TIMEOUT_MS);
         return false;
     } else {
         // Disconnected - reset for next connection

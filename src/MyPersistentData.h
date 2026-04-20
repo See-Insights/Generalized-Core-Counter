@@ -273,6 +273,7 @@ public:
 	void set_resetCount(uint8_t value);
 
 	String get_timeZoneStr() const;
+	const char *get_timeZoneStrCStr() const;
 	bool set_timeZoneStr(const char *str);
 
 	uint8_t get_openTime() const;
@@ -362,6 +363,7 @@ public:
     void set_testScenarioIndex(uint8_t value);
 
 	String get_webhookName() const;
+	const char *get_webhookNameCStr() const;
 	bool set_webhookName(const char *str);
 	bool get_webhookEnabled() const;
 	void set_webhookEnabled(bool value);

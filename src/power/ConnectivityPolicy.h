@@ -111,6 +111,24 @@ constexpr unsigned long FIRMWARE_UPDATE_MAX_MS = 5UL * 60UL * 1000UL;
 constexpr unsigned long CLOUD_OPS_GATE_TIMEOUT_MS = 30000UL;
 constexpr unsigned long CLOUD_OPS_STATUS_LOG_INTERVAL_MS = 5000UL;
 
+// ===== Ledger Sync Timeout =====
+// Purpose:
+// - Define how long to wait for Particle Ledger sync after cloud connection
+//   before considering ledgers synced (or failing config load with Alert 41).
+//
+// Rationale / tradeoffs:
+// - WiFi: Ledgers typically sync within 2-3 seconds
+// - Cellular: May take 7-10 seconds due to higher latency and packet loss
+// - Too short: False Alert 41 triggers on cellular even when ledgers work
+// - Too long: Delays config application and wastes connection time
+//
+// Platform-specific tuning:
+#if Wiring_Cellular
+constexpr unsigned long LEDGER_SYNC_TIMEOUT_MS = 10000UL;  // 10s for cellular
+#else
+constexpr unsigned long LEDGER_SYNC_TIMEOUT_MS = 5000UL;   // 5s for WiFi
+#endif
+
 // ===== Teardown/disconnect budgets =====
 // Purpose:
 // - Bound how long we will wait for cloud disconnect and modem power-off to take

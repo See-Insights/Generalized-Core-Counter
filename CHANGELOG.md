@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- **Alert code 44**: New minor alert for ledger sync timeout before sleep (tier 1). Distinguishes cosmetic sync timeout (config already applied) from functional config apply failure (alert 41).
+- **Platform-specific ledger sync timeout**: Cellular devices (Boron) now have 10-second ledger sync timeout vs 5 seconds for WiFi, reducing false alert triggers on slower networks.
+- **Enhanced Alert 41 diagnostics**: Added detailed logging for configuration apply failures including ledger sync status, connection duration, and which config section failed (sensor/timing/messaging/modes/reporting).
+
+### Changed
+
+- **Alert 41 scope refined**: Now specifically indicates configuration apply failure during CONNECT phase (tier 2 - major). Previously also covered pre-sleep ledger sync timeouts which are now alert 44.
+
 ### Fixed
 
 - (none)
