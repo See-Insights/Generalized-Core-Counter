@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;5.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;7.00</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -701,93 +701,116 @@ Common Customizations</h2>
 <div class="line"> </div>
 <div class="line">1. **Create sensor class** implementing `ISensor` interface:</div>
 </div><!-- fragment --><p> cpp class MyNewSensor : public <a class="el" href="class_i_sensor.html" title="Abstract interface for all sensors.">ISensor</a> { public: static MyNewSensor* instance(); bool <a class="el" href="_generalized-_core-_counter_8cpp.html#a4fc01d736fe50cf5b977f755b675f11d">setup()</a> override; bool <a class="el" href="_generalized-_core-_counter_8cpp.html#afe461d27b9c48d5921c00d521181f12f">loop()</a> override; <a class="el" href="struct_sensor_data.html" title="Generic sensor data structure.">SensorData</a> getSensorData() override; const char* getSensorType() const override; }; </p><div class="fragment"><div class="line">2. **Add to SensorFactory.h**:</div>
-</div><!-- fragment --><p> cpp case MYNEWSENSOR: return MyNewSensor::instance(); ```</p>
-<ol type="1">
-<li><b>Update <a class="el" href="_config_8h.html" title="Global compile-time configuration options and enums.">Config.h</a></b> with new sensor type enum</li>
-<li><b>No changes needed</b> to core state machine or data handling!</li>
-</ol>
+</div><!-- fragment --><p> cpp case MYNEWSENSOR: return MyNewSensor::instance(); </p><div class="fragment"><div class="line">3. **Update Config.h** with new sensor type enum</div>
+<div class="line"> </div>
+<div class="line">4. **No changes needed** to core state machine or data handling!</div>
+<div class="line"> </div>
+<div class="line">## Memory Constraints</div>
+<div class="line"> </div>
+<div class="line">- No `String` allocations in hot path (loop)</div>
+<div class="line">- Static buffers for frequently-used data (deviceID)</div>
+<div class="line">- Stack allocation for JSON (512 bytes acceptable)</div>
+<div class="line">- Persistent storage auto-managed by StorageHelperRK</div>
+<div class="line"> </div>
+<div class="line">## Offline Data Retention &amp; Firmware Updates</div>
+<div class="line"> </div>
+<div class="line">- **Persistent publish queue**: All cloud publishes go through PublishQueuePosixRK, which buffers events in RAM and on the `/usr` flash filesystem.</div>
+<div class="line">- **30+ days of hourly data**: The firmware configures a file-backed queue size of 800 events, allowing at least 30 days of hourly reports to be retained during extended network outages before the oldest events are discarded.</div>
+<div class="line">- **Guaranteed retry on reconnect**: Buffered events are sent on subsequent connections with `WITH_ACK` enabled; events are only removed from the queue after successful delivery.</div>
+<div class="line">- **Sleep-aware queue handling**: The state machine checks that the publish queue is in a sleep-safe state before entering long low-power sleeps, avoiding data loss due to mid-flight publishes.</div>
+<div class="line">- **Bounded firmware-update mode**: The FIRMWARE_UPDATE state is time-limited (5 minutes by default). If no updates are applied within this window, the device exits update mode and returns toward its normal connect/report/sleep cycle to protect battery life.</div>
+<div class="line"> </div>
+<div class="line">## Error Handling &amp; Alert System</div>
+<div class="line"> </div>
+<div class="line">The firmware implements a comprehensive alert system that monitors device health and reports issues through webhooks:</div>
+<div class="line"> </div>
+<div class="line">### Alert Severity Levels</div>
+<div class="line"> </div>
+<div class="line">**Critical (Tier 3)** - Requires immediate attention:</div>
+<div class="line">- `14`: Out of memory</div>
+<div class="line">- `15`: Modem/disconnect failure</div>
+<div class="line">- `16`: Repeated sleep failures (HIBERNATE/ULP)</div>
+<div class="line">- `17`: **State machine thrash detected** (ThrashGuard timeout)</div>
+<div class="line">- `20`: **PMIC thermal shutdown** (charging stopped due to temperature)</div>
+<div class="line">- `21`: **PMIC charge timeout** (stuck charging - safety timer expired)</div>
+<div class="line"> </div>
+<div class="line">**Major (Tier 2)** - Should be addressed soon:</div>
+<div class="line">- `22`: **PMIC input fault** (VBUS overvoltage)</div>
+<div class="line">- `23`: **PMIC battery fault** (general charging issue)</div>
+<div class="line">- `30`: Connectivity timeout with radio up</div>
+<div class="line">- `31`: Failed to connect to cloud</div>
+<div class="line">- `32`: Connect taking too long</div>
+<div class="line">- `40`: Repeated webhook failures (&gt;6 hours without response)</div>
+<div class="line">- `41`: Configuration apply failure (during CONNECT phase - device may have stale config)</div>
+<div class="line">- `42`: Data ledger publish failure</div>
+<div class="line">- `43`: Publish queue not drained before forced sleep</div>
+<div class="line"> </div>
+<div class="line">**Minor (Tier 1)** - Informational warnings</div>
+<div class="line">- `44`: Ledger sync timeout before sleep (cosmetic - config already applied successfully)</div>
+<div class="line"> </div>
+<div class="line">### PMIC Monitoring &amp; Remediation (Boron Only)</div>
+<div class="line"> </div>
+<div class="line">For Boron devices with BQ24195 PMIC, the firmware actively monitors charging health:</div>
+<div class="line"> </div>
+<div class="line">**Detection:**</div>
+<div class="line">- Reads PMIC fault registers every battery check cycle</div>
+<div class="line">- Monitors for thermal shutdown, charge timeout, input faults</div>
+<div class="line">- Tracks stuck charging states (&gt;6 hours at same SoC)</div>
+<div class="line">- Logs detailed PMIC status (charge state, VBUS, thermal regulation)</div>
+<div class="line"> </div>
+<div class="line">**Smart Remediation with Anti-Thrashing:**</div>
+<div class="line">- **Level 0** (Initial): Monitor only, log diagnostics</div>
+<div class="line">- **Level 1** (2+ consecutive faults): Soft reset - cycle charging off/on</div>
+<div class="line">- **Level 2** (3+ consecutive faults): Power cycle with watchdog supervision</div>
+<div class="line">- **Cooldown**: 1 hour minimum between remediation attempts</div>
+<div class="line">- **Auto-Clear**: Resets counters when charging returns to healthy state</div>
+<div class="line"> </div>
+<div class="line">**Escalation Example:**</div>
+<div class="line">1. First fault detected → Alert raised, monitor only (wait for cooldown)</div>
+<div class="line">2. Second fault after cooldown → Level 1: Cycle charging (disable 500ms, re-enable)</div>
+<div class="line">3. Third fault after cooldown → Level 2: Power cycle with watchdog reset</div>
+<div class="line">4. Charging recovers → Clear alert, reset remediation level</div>
+<div class="line"> </div>
+<div class="line">**Benefits:**</div>
+<div class="line">- Automatic recovery from common &quot;1Hz amber LED&quot; charging faults</div>
+<div class="line">- Prevents thrashing (repeated fix attempts)</div>
+<div class="line">- Detailed diagnostic logs for root cause analysis</div>
+<div class="line">- Alert webhooks notify monitoring systems before manual intervention needed</div>
+<div class="line"> </div>
+<div class="line">### Error Recovery Strategy</div>
+<div class="line"> </div>
+<div class="line">- Sensor failures → Connect and report (no reset loops)</div>
+<div class="line">- Configuration validation with range checking</div>
+<div class="line">- Graceful degradation for remote deployments</div>
+<div class="line">- Alerts automatically clear when underlying condition resolves</div>
+<div class="line"> </div>
+<div class="line">### Alert 41/44 Diagnostic Details</div>
+<div class="line"> </div>
+<div class="line">To aid field troubleshooting of configuration and ledger sync issues, the firmware provides enhanced diagnostics:</div>
+<div class="line"> </div>
+<div class="line">**Alert 41 - Configuration Apply Failure (CONNECT phase):**</div>
+<div class="line">- Logs ledger sync status at time of failure</div>
+<div class="line">- Reports connection duration</div>
+<div class="line">- Identifies which config section failed: sensor, timing, messaging, modes, or reporting</div>
+<div class="line">- Example log output:</div>
+</div><!-- fragment --><p> Configuration apply failed: sensor=OK timing=OK messaging=FAIL modes=OK reporting=OK Alert 41 context: ledgersSynced=true connectDuration=8234 ms </p><div class="fragment"><div class="line">**Alert 44 - Ledger Sync Timeout (SLEEP phase):**</div>
+<div class="line">- Logs timeout duration vs budget</div>
+<div class="line">- Shows which cloud operations completed: queue, ledgers, updates, webhook</div>
+<div class="line">- Example log output:</div>
+</div><!-- fragment --><p> SLEEP: Waiting for cloud operations - queue:Y ledgers:N updates:Y webhook:Y (8451/30000 ms) Alert 44 context: timeout after 30124 ms (budget=30000 ms) ```</p>
+<p><b>Platform-Specific Tuning:</b></p><ul>
+<li>WiFi devices: 5-second ledger sync timeout</li>
+<li>Cellular devices: 10-second ledger sync timeout (reduces false alerts on slower networks)</li>
+</ul>
+<p><b>Ledger Sync Logging:</b></p><ul>
+<li>Info-level logging shows sync timestamps for <span class="tt">default-settings</span> and <span class="tt">device-settings</span> ledgers</li>
+<li>Tracks elapsed time since connection for sync window progress</li>
+<li>Distinguishes partial sync (one ledger synced) from complete failure</li>
+</ul>
 <h1 class="doxsection"><a class="anchor" id="autotoc_md38"></a>
-Memory Constraints</h1>
-<ul>
-<li>No <span class="tt">String</span> allocations in hot path (loop)</li>
-<li>Static buffers for frequently-used data (deviceID)</li>
-<li>Stack allocation for JSON (512 bytes acceptable)</li>
-<li>Persistent storage auto-managed by StorageHelperRK</li>
-</ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md39"></a>
-Offline Data Retention &amp; Firmware Updates</h1>
-<ul>
-<li><b>Persistent publish queue</b>: All cloud publishes go through PublishQueuePosixRK, which buffers events in RAM and on the <span class="tt">/usr</span> flash filesystem.</li>
-<li><b>30+ days of hourly data</b>: The firmware configures a file-backed queue size of 800 events, allowing at least 30 days of hourly reports to be retained during extended network outages before the oldest events are discarded.</li>
-<li><b>Guaranteed retry on reconnect</b>: Buffered events are sent on subsequent connections with <span class="tt">WITH_ACK</span> enabled; events are only removed from the queue after successful delivery.</li>
-<li><b>Sleep-aware queue handling</b>: The state machine checks that the publish queue is in a sleep-safe state before entering long low-power sleeps, avoiding data loss due to mid-flight publishes.</li>
-<li><b>Bounded firmware-update mode</b>: The FIRMWARE_UPDATE state is time-limited (5 minutes by default). If no updates are applied within this window, the device exits update mode and returns toward its normal connect/report/sleep cycle to protect battery life.</li>
-</ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md40"></a>
-Error Handling &amp; Alert System</h1>
-<p>The firmware implements a comprehensive alert system that monitors device health and reports issues through webhooks:</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md41"></a>
-Alert Severity Levels</h2>
-<p><b>Critical (Tier 3)</b> - Requires immediate attention:</p><ul>
-<li><span class="tt">14</span>: Out of memory</li>
-<li><span class="tt">15</span>: Modem/disconnect failure</li>
-<li><span class="tt">16</span>: Repeated sleep failures (HIBERNATE/ULP)</li>
-<li><span class="tt">17</span>: <b><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8">State</a> machine thrash detected</b> (<a class="el" href="class_thrash_guard.html">ThrashGuard</a> timeout)</li>
-<li><span class="tt">20</span>: <b>PMIC thermal shutdown</b> (charging stopped due to temperature)</li>
-<li><span class="tt">21</span>: <b>PMIC charge timeout</b> (stuck charging - safety timer expired)</li>
-</ul>
-<p><b>Major (Tier 2)</b> - Should be addressed soon:</p><ul>
-<li><span class="tt">22</span>: <b>PMIC input fault</b> (VBUS overvoltage)</li>
-<li><span class="tt">23</span>: <b>PMIC battery fault</b> (general charging issue)</li>
-<li><span class="tt">30</span>: <a class="el" href="namespace_connectivity.html">Connectivity</a> timeout with radio up</li>
-<li><span class="tt">31</span>: Failed to connect to cloud</li>
-<li><span class="tt">32</span>: Connect taking too long</li>
-<li><span class="tt">40</span>: Repeated webhook failures (&gt;6 hours without response)</li>
-<li><span class="tt">41</span>: Configuration/ledger apply failure</li>
-<li><span class="tt">42</span>: Data ledger publish failure</li>
-<li><span class="tt">43</span>: Publish queue not drained before forced sleep</li>
-</ul>
-<p><b>Minor (Tier 1)</b> - Informational warnings</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md42"></a>
-PMIC Monitoring &amp; Remediation (Boron Only)</h2>
-<p>For Boron devices with BQ24195 PMIC, the firmware actively monitors charging health:</p>
-<p><b>Detection:</b></p><ul>
-<li>Reads PMIC fault registers every battery check cycle</li>
-<li>Monitors for thermal shutdown, charge timeout, input faults</li>
-<li>Tracks stuck charging states (&gt;6 hours at same SoC)</li>
-<li>Logs detailed PMIC status (charge state, VBUS, thermal regulation)</li>
-</ul>
-<p><b>Smart Remediation with Anti-Thrashing:</b></p><ul>
-<li><b>Level 0</b> (Initial): Monitor only, log diagnostics</li>
-<li><b>Level 1</b> (2+ consecutive faults): Soft reset - cycle charging off/on</li>
-<li><b>Level 2</b> (3+ consecutive faults): Power cycle with watchdog supervision</li>
-<li><b>Cooldown</b>: 1 hour minimum between remediation attempts</li>
-<li><b>Auto-Clear</b>: Resets counters when charging returns to healthy state</li>
-</ul>
-<p><b>Escalation Example:</b></p><ol type="1">
-<li>First fault detected → Alert raised, monitor only (wait for cooldown)</li>
-<li>Second fault after cooldown → Level 1: Cycle charging (disable 500ms, re-enable)</li>
-<li>Third fault after cooldown → Level 2: Power cycle with watchdog reset</li>
-<li>Charging recovers → Clear alert, reset remediation level</li>
-</ol>
-<p><b>Benefits:</b></p><ul>
-<li>Automatic recovery from common "1Hz amber LED" charging faults</li>
-<li>Prevents thrashing (repeated fix attempts)</li>
-<li>Detailed diagnostic logs for root cause analysis</li>
-<li>Alert webhooks notify monitoring systems before manual intervention needed</li>
-</ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md43"></a>
-Error Recovery Strategy</h2>
-<ul>
-<li>Sensor failures → Connect and report (no reset loops)</li>
-<li>Configuration validation with range checking</li>
-<li>Graceful degradation for remote deployments</li>
-<li>Alerts automatically clear when underlying condition resolves</li>
-</ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md44"></a>
 Battery-Aware Power Management</h1>
 <p>The firmware implements multi-tier battery conservation:</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md45"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md39"></a>
 Connection Interval Backoff (All Modes)</h2>
 <p><b>4-Tier System:</b></p><ul>
 <li><b>HEALTHY</b> (&gt;70% SoC): Normal intervals (1x multiplier)</li>
@@ -796,7 +819,7 @@ Connection Interval Backoff (All Modes)</h2>
 <li><b>SURVIVAL</b> (&lt;30% SoC): 12x interval (e.g., hourly → every 12hrs)</li>
 </ul>
 <p><b>Hysteresis:</b> Requires 5% higher SoC to move to better tier, preventing rapid tier thrashing.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md46"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md40"></a>
 Occupancy Mode Battery Protection</h2>
 <p>For occupancy sensors using <span class="tt"><a class="el" href="_my_persistent_data_8h.html#a6ed5b36c9cd209c52088cb9029de61b3aee11d292bc1a043b66b0904732f75eef">INTERMITTENT_KEEP_ALIVE</a></span> mode:</p>
 <p><b>Above 70% (HEALTHY):</b></p><ul>
@@ -820,7 +843,7 @@ Occupancy Mode Battery Protection</h2>
 <li>Automatic recovery when recharged</li>
 <li>User-transparent power management</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md47"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md41"></a>
 Dependencies</h1>
 <ul>
 <li>AB1805_RK: RTC and watchdog</li>
@@ -830,7 +853,7 @@ Dependencies</h1>
 <li>BackgroundPublishRK: Non-blocking publishes</li>
 <li>SequentialFileRK: File operations</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md48"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md42"></a>
 Contributing</h1>
 <p>When adding features:</p><ol type="1">
 <li><b>Maintain simplicity</b>: Keep core logic clean</li>
@@ -838,12 +861,12 @@ Contributing</h1>
 <li><b>Extend, don't modify</b>: Use factory pattern for new types</li>
 <li><b>Test remotely</b>: Ensure devices don't brick in field</li>
 </ol>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md49"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md43"></a>
 License</h1>
 <p>This project is licensed under the MIT License.</p>
 <p>You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of this software, subject to the conditions of the MIT License.</p>
 <p>See the top-level <span class="tt">LICENSE</span> file in this repository for the complete license text.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md50"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md44"></a>
 Support</h1>
 <p>For issues or questions, contact [Your Contact Info] </p>
 </div></div><!-- PageDoc -->

@@ -16,7 +16,7 @@ var searchData=
   ['internaltempc_13',['internalTempC',['../classcurrent_status_data_1_1_current_data.html#ae8065326e30dfc67cc31dcb5411b6ecf',1,'currentStatusData::CurrentData']]],
   ['internaltempstr_14',['internalTempStr',['../_sensor_manager_8h.html#a18a7f2fb416732c2c8e8c4ab0668b7fc',1,'SensorManager.h']]],
   ['interrupt_15',['INTERRUPT',['../_my_persistent_data_8h.html#afa73726fb0afdae0ad2eb26889e5d25cad5f5c57f205afd4f9df70a8c4e194b45',1,'MyPersistentData.h']]],
-  ['interval_20backoff_20all_20modes_16',['Connection Interval Backoff (All Modes)',['../index.html#autotoc_md45',1,'']]],
+  ['interval_20backoff_20all_20modes_16',['Connection Interval Backoff (All Modes)',['../index.html#autotoc_md39',1,'']]],
   ['intpin_17',['intPin',['../device__pinout_8cpp.html#af10028b3e028ba5dd0a7aade08e7f9f2',1,'intPin:&#160;device_pinout.cpp'],['../device__pinout_8h.html#af10028b3e028ba5dd0a7aade08e7f9f2',1,'intPin:&#160;device_pinout.cpp']]],
   ['is_5fcharging_18',['is_charging',['../struct_observability_1_1_wake_cycle_stats.html#a82cd9eed09d7ab26ccb1973721768364',1,'Observability::WakeCycleStats']]],
   ['isdst_19',['isDst',['../struct_local_time_cache_1_1_local_time_snapshot.html#af171a4fbc662f58f7e06e51f97f67ce7',1,'LocalTimeCache::LocalTimeSnapshot']]],

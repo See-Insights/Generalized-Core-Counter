@@ -215,10 +215,6 @@ void handleConnectingState() {
         current.raiseAlert(41);
       } else {
         thrashGuard.markProgress("LEDGER_SYNC_OK");
-        if (current.get_alertCode() == 41) {
-          Log.info("Configuration apply succeeded - clearing stale alert 41");
-          current.set_alertCode(0);
-        }
       }
 
       bool ledgerPublishOk = true;

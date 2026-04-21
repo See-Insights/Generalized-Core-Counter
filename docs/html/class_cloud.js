@@ -4,7 +4,7 @@ var class_cloud =
     [ "~Cloud", "class_cloud.html#ac3b4ccc03e48584cacf48d803c2c9737", null ],
     [ "Cloud", "class_cloud.html#a29bcce74614bcaf5f6eaf64ddd14d321", null ],
     [ "areLedgersSynced", "class_cloud.html#abd1e7289193949f93905243f7fb848cf", null ],
-    [ "getWebhookName", "class_cloud.html#a13e784dbb848d1b5ffe5e6977d274a17", null ],
+    [ "getWebhookName", "class_cloud.html#ad4f5a131e2d2e3c2349d03e892ff40ab", null ],
     [ "loadConfigurationFromCloud", "class_cloud.html#a82b4714d5ad360e54ad9bece976b3860", null ],
     [ "loop", "class_cloud.html#ab6354f2706aa556f0fb0ee8a625c722c", null ],
     [ "operator=", "class_cloud.html#a89d68dd84add935e621be4b7b380192a", null ],

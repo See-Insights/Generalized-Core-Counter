@@ -68,21 +68,14 @@ var NAVTREE =
       [ "Creating Device-Specific Settings", "index.html#autotoc_md36", null ],
       [ "Common Customizations", "index.html#autotoc_md37", null ]
     ] ],
-    [ "Memory Constraints", "index.html#autotoc_md38", null ],
-    [ "Offline Data Retention &amp; Firmware Updates", "index.html#autotoc_md39", null ],
-    [ "Error Handling &amp; Alert System", "index.html#autotoc_md40", [
-      [ "Alert Severity Levels", "index.html#autotoc_md41", null ],
-      [ "PMIC Monitoring &amp; Remediation (Boron Only)", "index.html#autotoc_md42", null ],
-      [ "Error Recovery Strategy", "index.html#autotoc_md43", null ]
+    [ "Battery-Aware Power Management", "index.html#autotoc_md38", [
+      [ "Connection Interval Backoff (All Modes)", "index.html#autotoc_md39", null ],
+      [ "Occupancy Mode Battery Protection", "index.html#autotoc_md40", null ]
     ] ],
-    [ "Battery-Aware Power Management", "index.html#autotoc_md44", [
-      [ "Connection Interval Backoff (All Modes)", "index.html#autotoc_md45", null ],
-      [ "Occupancy Mode Battery Protection", "index.html#autotoc_md46", null ]
-    ] ],
-    [ "Dependencies", "index.html#autotoc_md47", null ],
-    [ "Contributing", "index.html#autotoc_md48", null ],
-    [ "License", "index.html#autotoc_md49", null ],
-    [ "Support", "index.html#autotoc_md50", null ],
+    [ "Dependencies", "index.html#autotoc_md41", null ],
+    [ "Contributing", "index.html#autotoc_md42", null ],
+    [ "License", "index.html#autotoc_md43", null ],
+    [ "Support", "index.html#autotoc_md44", null ],
     [ "Namespaces", "namespaces.html", [
       [ "Namespace List", "namespaces.html", "namespaces_dup" ],
       [ "Namespace Members", "namespacemembers.html", [
@@ -119,9 +112,9 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "_battery_backoff_8cpp.html",
-"class_cloud.html#abd1e7289193949f93905243f7fb848cf",
-"classsys_status_data_1_1_sys_data.html#a294ecc86e44f7cb180ea78debdf7914a",
-"struct_observability_1_1_wake_cycle_stats.html#a0ca38461ba43bb0eea8c264d0309eb52"
+"class_cloud.html#ac3b4ccc03e48584cacf48d803c2c9737",
+"classsys_status_data_1_1_sys_data.html#a16316871cb17f0e9643e7a8a4efab0b0",
+"struct_observability_1_1_wake_cycle_stats.html#a06cab85b425af73192f92487cb60d163"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronization';

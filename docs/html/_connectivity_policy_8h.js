@@ -20,6 +20,7 @@ var _connectivity_policy_8h =
     [ "ConnectivityPolicy::DISCONNECT_MODEM_DEFAULT_SEC", "namespace_connectivity_policy.html#a705397f035907905d74eb58006a987c2", null ],
     [ "ConnectivityPolicy::DISCONNECT_STANDBY_MAX_MS", "namespace_connectivity_policy.html#a27680d5a2fe0f28206eed36f939f763d", null ],
     [ "ConnectivityPolicy::FIRMWARE_UPDATE_MAX_MS", "namespace_connectivity_policy.html#aca78df6b9ce0caf57f4672e8c0b15f72", null ],
+    [ "ConnectivityPolicy::LEDGER_SYNC_TIMEOUT_MS", "namespace_connectivity_policy.html#a514e3eeaa0000e932f68cba30657176e", null ],
     [ "ConnectivityPolicy::WEBHOOK_LONGTERM_ALERT40_SEC", "namespace_connectivity_policy.html#a2bf83afe32c0f44b32a6cb4d48e6a402", null ],
     [ "ConnectivityPolicy::WEBHOOK_LONGTERM_CONNECTED_RECENTLY_SEC", "namespace_connectivity_policy.html#aec173e6da0225c588ff07235628b1b16", null ],
     [ "ConnectivityPolicy::WEBHOOK_LONGTERM_ESCALATE_TO_ERROR_SEC", "namespace_connectivity_policy.html#a8c2c9ae6d7ba0414db36943cd01d78a4", null ],

@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;5.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;7.00</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -143,12 +143,14 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a3185b307cbdcd7544b2617601e252b13" id="r_a3185b307cbdcd7544b2617601e252b13"><td class="memItemLeft">uint16_t&#160;</td><td class="memItemRight"><a class="el" href="#a3185b307cbdcd7544b2617601e252b13">get_testConnectionDurationOverride</a> () const</td></tr>
 <tr class="memitem:ab2776defbc8ac19e2e8849a940523004" id="r_ab2776defbc8ac19e2e8849a940523004"><td class="memItemLeft">uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#ab2776defbc8ac19e2e8849a940523004">get_testScenarioIndex</a> () const</td></tr>
 <tr class="memitem:a969253996a1807f900ab9bfb57f78509" id="r_a969253996a1807f900ab9bfb57f78509"><td class="memItemLeft">String&#160;</td><td class="memItemRight"><a class="el" href="#a969253996a1807f900ab9bfb57f78509">get_timeZoneStr</a> () const</td></tr>
+<tr class="memitem:a22eff58f2f9acf90ee7613a0753c83a3" id="r_a22eff58f2f9acf90ee7613a0753c83a3"><td class="memItemLeft">const char *&#160;</td><td class="memItemRight"><a class="el" href="#a22eff58f2f9acf90ee7613a0753c83a3">get_timeZoneStrCStr</a> () const</td></tr>
 <tr class="memitem:ac836de4d7ff45ed0a26367799fc90a13" id="r_ac836de4d7ff45ed0a26367799fc90a13"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ac836de4d7ff45ed0a26367799fc90a13">get_updatesPending</a> () const</td></tr>
 <tr class="memitem:ad05f8282db2457a9b9e9c21318be71e7" id="r_ad05f8282db2457a9b9e9c21318be71e7"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ad05f8282db2457a9b9e9c21318be71e7">get_verboseMode</a> () const</td></tr>
 <tr class="memitem:a53b5ce2e1b8569169daca8b3f56aef9e" id="r_a53b5ce2e1b8569169daca8b3f56aef9e"><td class="memItemLeft">time_t&#160;</td><td class="memItemRight"><a class="el" href="#a53b5ce2e1b8569169daca8b3f56aef9e">get_verboseModeStartTime</a> () const</td></tr>
 <tr class="memitem:acff7c7e690c0803fa0ca1baedde720f0" id="r_acff7c7e690c0803fa0ca1baedde720f0"><td class="memItemLeft">uint16_t&#160;</td><td class="memItemRight"><a class="el" href="#acff7c7e690c0803fa0ca1baedde720f0">get_verboseTimeoutMin</a> () const</td></tr>
 <tr class="memitem:a9927d8c116ea51a5f1fdb2b60fa5ed45" id="r_a9927d8c116ea51a5f1fdb2b60fa5ed45"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a9927d8c116ea51a5f1fdb2b60fa5ed45">get_webhookEnabled</a> () const</td></tr>
 <tr class="memitem:a777653df70f312f6d2ddb68c2f418fa7" id="r_a777653df70f312f6d2ddb68c2f418fa7"><td class="memItemLeft">String&#160;</td><td class="memItemRight"><a class="el" href="#a777653df70f312f6d2ddb68c2f418fa7">get_webhookName</a> () const</td></tr>
+<tr class="memitem:a1f08e528810c06a29bc07e40e93a4416" id="r_a1f08e528810c06a29bc07e40e93a4416"><td class="memItemLeft">const char *&#160;</td><td class="memItemRight"><a class="el" href="#a1f08e528810c06a29bc07e40e93a4416">get_webhookNameCStr</a> () const</td></tr>
 <tr class="memitem:a1fe640a4097cfcf90bd86330fdc5d4c7" id="r_a1fe640a4097cfcf90bd86330fdc5d4c7"><td class="memItemLeft">uint32_t&#160;</td><td class="memItemRight"><a class="el" href="#a1fe640a4097cfcf90bd86330fdc5d4c7">get_webhookTimeoutMs</a> () const</td></tr>
 <tr class="memitem:a9e2e292756ad6498d273b180f2144608" id="r_a9e2e292756ad6498d273b180f2144608"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a9e2e292756ad6498d273b180f2144608">initialize</a> ()</td></tr>
 <tr class="memdesc:a9e2e292756ad6498d273b180f2144608"><td class="mdescLeft">&#160;</td><td class="mdescRight">Will reinitialize data if it is found not to be valid.  <br /></td></tr>
@@ -260,7 +262,7 @@ Static Protected Attributes</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00056">56</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_my_persistent_data_8cpp_source.html#l00044">persistentDataPathSystem</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00403">SYS_DATA_MAGIC</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00404">SYS_DATA_VERSION</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00231">sysData</a>.</p>
+<p class="reference">References <a class="el" href="_my_persistent_data_8cpp_source.html#l00044">persistentDataPathSystem</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00405">SYS_DATA_MAGIC</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00406">SYS_DATA_VERSION</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00231">sysData</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="_my_persistent_data_8cpp_source.html#l00049">instance()</a>, <a class="el" href="#a0fcf28bd66fbd70cd1ca4bea8e379ca6">operator=()</a>, and <a class="el" href="#a516621dcd2ca88fc3b46860e78ee037f">sysStatusData()</a>.</p>
 
@@ -374,7 +376,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00195">195</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00199">199</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -393,7 +395,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00330">330</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00334">334</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -412,7 +414,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00323">323</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00327">327</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -431,7 +433,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00351">351</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00355">355</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -450,7 +452,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00288">288</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00292">292</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -469,7 +471,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00344">344</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00348">348</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -488,7 +490,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00251">251</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00255">255</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -507,7 +509,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00209">209</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00213">213</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -526,7 +528,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00216">216</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00220">220</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -545,7 +547,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00265">265</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00269">269</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -564,7 +566,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00223">223</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00227">227</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -583,7 +585,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00202">202</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00206">206</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -602,7 +604,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00272">272</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00276">276</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -659,7 +661,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00337">337</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00341">341</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -678,7 +680,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00188">188</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00192">192</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -697,7 +699,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00244">244</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00248">248</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -716,7 +718,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00295">295</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00299">299</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -754,7 +756,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00302">302</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00306">306</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -773,7 +775,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00281">281</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00285">285</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -792,7 +794,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00230">230</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00234">234</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -811,7 +813,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00258">258</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00262">262</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -887,7 +889,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00358">358</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00362">362</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -906,7 +908,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00365">365</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00369">369</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -925,7 +927,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00372">372</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00376">376</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -950,6 +952,27 @@ Static Protected Attributes</h2></td></tr>
 
 </div>
 </div>
+<a id="a22eff58f2f9acf90ee7613a0753c83a3" name="a22eff58f2f9acf90ee7613a0753c83a3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a22eff58f2f9acf90ee7613a0753c83a3">&#9670;&#160;</a></span>get_timeZoneStrCStr()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const char * sysStatusData::get_timeZoneStrCStr </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00184">184</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00231">sysData</a>.</p>
+
+</div>
+</div>
 <a id="ac836de4d7ff45ed0a26367799fc90a13" name="ac836de4d7ff45ed0a26367799fc90a13"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ac836de4d7ff45ed0a26367799fc90a13">&#9670;&#160;</a></span>get_updatesPending()</h2>
 
@@ -965,7 +988,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00237">237</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00241">241</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1003,7 +1026,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00316">316</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00320">320</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1022,7 +1045,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00309">309</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00313">313</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1041,7 +1064,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00388">388</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00397">397</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1060,9 +1083,30 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00379">379</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00383">383</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00225">sysStatusData::SysData::webhookName</a>.</p>
+
+</div>
+</div>
+<a id="a1f08e528810c06a29bc07e40e93a4416" name="a1f08e528810c06a29bc07e40e93a4416"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1f08e528810c06a29bc07e40e93a4416">&#9670;&#160;</a></span>get_webhookNameCStr()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const char * sysStatusData::get_webhookNameCStr </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00389">389</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00231">sysData</a>.</p>
 
 </div>
 </div>
@@ -1081,7 +1125,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00395">395</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00404">404</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1105,7 +1149,7 @@ Static Protected Attributes</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00103">103</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00071">CONNECTED</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00054">COUNTING</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00099">INTERRUPT</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00875">publishDiagnosticSafe()</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00086">SCHEDULED</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
+<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00071">CONNECTED</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00054">COUNTING</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00099">INTERRUPT</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00951">publishDiagnosticSafe()</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00086">SCHEDULED</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
 </div>
 </div>
@@ -1137,7 +1181,7 @@ Static Protected Attributes</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00049">49</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00400">_instance</a>, and <a class="el" href="_my_persistent_data_8cpp_source.html#l00056">sysStatusData()</a>.</p>
+<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00402">_instance</a>, and <a class="el" href="_my_persistent_data_8cpp_source.html#l00056">sysStatusData()</a>.</p>
 
 </div>
 </div>
@@ -1243,7 +1287,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00198">198</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00202">202</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1262,7 +1306,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00333">333</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00337">337</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1281,7 +1325,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00326">326</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00330">330</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1300,7 +1344,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00354">354</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00358">358</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1319,7 +1363,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00291">291</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00295">295</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1338,7 +1382,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00347">347</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00351">351</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1357,7 +1401,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00254">254</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00258">258</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1376,7 +1420,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00212">212</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00216">216</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1395,7 +1439,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00219">219</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00223">223</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1414,7 +1458,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00268">268</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00272">272</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1433,7 +1477,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00226">226</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00230">230</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1452,7 +1496,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00205">205</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00209">209</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1471,7 +1515,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00275">275</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00279">279</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1528,7 +1572,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00340">340</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00344">344</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1547,7 +1591,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00191">191</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00195">195</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1566,7 +1610,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00247">247</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00251">251</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1585,7 +1629,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00298">298</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00302">302</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1623,7 +1667,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00305">305</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00309">309</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1642,7 +1686,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00284">284</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00288">288</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1661,7 +1705,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00233">233</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00237">237</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1680,7 +1724,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00261">261</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00265">265</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1737,7 +1781,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00361">361</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00365">365</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1756,7 +1800,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00368">368</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00372">372</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1775,7 +1819,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00375">375</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00379">379</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1794,7 +1838,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00184">184</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00188">188</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00189">sysStatusData::SysData::timeZoneStr</a>.</p>
 
@@ -1815,7 +1859,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00240">240</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00244">244</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1853,7 +1897,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00319">319</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00323">323</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1872,7 +1916,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00312">312</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00316">316</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1891,7 +1935,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00391">391</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00400">400</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -1910,7 +1954,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00384">384</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00393">393</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00225">sysStatusData::SysData::webhookName</a>.</p>
 
@@ -1931,7 +1975,7 @@ Static Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00398">398</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8cpp_source.html#l00407">407</a> of file <a class="el" href="_my_persistent_data_8cpp_source.html">MyPersistentData.cpp</a>.</p>
 
 </div>
 </div>
@@ -2006,7 +2050,7 @@ Static Protected Attributes</h2></td></tr>
 <p>Singleton instance of this class. </p>
 <p>The object pointer to this class is stored here. It's NULL at system boot. </p>
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8h_source.html#l00400">400</a> of file <a class="el" href="_my_persistent_data_8h_source.html">MyPersistentData.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8h_source.html#l00402">402</a> of file <a class="el" href="_my_persistent_data_8h_source.html">MyPersistentData.h</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="_my_persistent_data_8cpp_source.html#l00049">instance()</a>.</p>
 
@@ -2032,7 +2076,7 @@ Static Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8h_source.html#l00403">403</a> of file <a class="el" href="_my_persistent_data_8h_source.html">MyPersistentData.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8h_source.html#l00405">405</a> of file <a class="el" href="_my_persistent_data_8h_source.html">MyPersistentData.h</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="_my_persistent_data_8cpp_source.html#l00056">sysStatusData()</a>.</p>
 
@@ -2058,7 +2102,7 @@ Static Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8h_source.html#l00404">404</a> of file <a class="el" href="_my_persistent_data_8h_source.html">MyPersistentData.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8h_source.html#l00406">406</a> of file <a class="el" href="_my_persistent_data_8h_source.html">MyPersistentData.h</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="_my_persistent_data_8cpp_source.html#l00056">sysStatusData()</a>.</p>
 
@@ -2078,7 +2122,7 @@ Static Protected Attributes</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_my_persistent_data_8h_source.html#l00231">231</a> of file <a class="el" href="_my_persistent_data_8h_source.html">MyPersistentData.h</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_my_persistent_data_8cpp_source.html#l00056">sysStatusData()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_my_persistent_data_8cpp_source.html#l00184">get_timeZoneStrCStr()</a>, <a class="el" href="_my_persistent_data_8cpp_source.html#l00389">get_webhookNameCStr()</a>, and <a class="el" href="_my_persistent_data_8cpp_source.html#l00056">sysStatusData()</a>.</p>
 
 </div>
 </div>

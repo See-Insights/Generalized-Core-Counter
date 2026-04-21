@@ -6,17 +6,38 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- (none)
+
+### Changed
+
+- (none)
+
+### Fixed
+
+- (none)
+
+## 7.00 – 2026-04-21
+
+### Added
+
+- **Production-safe alert auto-clear allowlist**: Auto-clear after successful queued report now applies only to transient operational alerts `15`, `31`, `41`, `43`, and `44`.
+- **Device-status heap checkpoint**: Added `freeHeap` logging after device-status ledger publish so the remaining `LedgerData::fromJSON()` path is visible during soak diagnostics.
 - **Alert code 44**: New minor alert for ledger sync timeout before sleep (tier 1). Distinguishes cosmetic sync timeout (config already applied) from functional config apply failure (alert 41).
 - **Platform-specific ledger sync timeout**: Cellular devices (Boron) now have 10-second ledger sync timeout vs 5 seconds for WiFi, reducing false alert triggers on slower networks.
 - **Enhanced Alert 41 diagnostics**: Added detailed logging for configuration apply failures including ledger sync status, connection duration, and which config section failed (sensor/timing/messaging/modes/reporting).
 
 ### Changed
 
+- **Cloud config apply path hardened for heap stability**: Removed merged ledger object materialization and now apply settings inline from defaults plus device overrides.
+- **Hot-path string usage eliminated**: Replaced transient `String` use in webhook name, timezone, device-status diffing, and range-validation logging with `const char*` or fixed buffers.
+- **Alert lifecycle semantics tightened**: Stale alert `41` is no longer cleared immediately on config success; transient alert clearing is now explicit and allowlist-based.
 - **Alert 41 scope refined**: Now specifically indicates configuration apply failure during CONNECT phase (tier 2 - major). Previously also covered pre-sleep ledger sync timeouts which are now alert 44.
+- **Documentation sync for release v7**: Updated firmware metadata, Particle product version, Doxygen project number, and alert 44 supervisor comments to match current behavior.
 
 ### Fixed
 
-- (none)
+- **Alert 44 persistence during soak**: Pre-sleep ledger sync timeout alerts are now reported and then auto-cleared only under the new transient-alert allowlist model.
+- **Misleading sensor merge diagnostic**: Removed the pre-read sensor merge log that could emit sentinel values like `setting1=-1` before the actual config read.
 
 ## 3.27 – 2026-03-12
 
@@ -211,63 +232,48 @@ This release fundamentally restructures device configuration to use four indepen
       "connecttime": <seconds>,
       "timestamp": <epoch_milliseconds>
     }
+
+      - (none)
+
+      ### Changed
+
+      - (none)
+
+      ### Fixed
+
+      - (none)
+
+      ## 7.00 – 2026-04-21
+
+      ### Added
+
+      - **Production-safe alert auto-clear allowlist**: Auto-clear after successful queued report now applies only to transient operational alerts `15`, `31`, `41`, `43`, and `44`.
+      - **Device-status heap checkpoint**: Added `freeHeap` logging after device-status ledger publish so the remaining `LedgerData::fromJSON()` path is visible during soak diagnostics.
+      - **Alert code 44**: New minor alert for ledger sync timeout before sleep (tier 1). Distinguishes cosmetic sync timeout (config already applied) from functional config apply failure (alert 41).
+      - **Platform-specific ledger sync timeout**: Cellular devices (Boron) now have 10-second ledger sync timeout vs 5 seconds for WiFi, reducing false alert triggers on slower networks.
+      - **Enhanced Alert 41 diagnostics**: Added detailed logging for configuration apply failures including ledger sync status, connection duration, and which config section failed (sensor/timing/messaging/modes/reporting).
+
+      ### Changed
+
+      - **Cloud config apply path hardened for heap stability**: Removed merged ledger object materialization and now apply settings inline from defaults plus device overrides.
+      - **Hot-path string usage eliminated**: Replaced transient `String` use in webhook name, timezone, device-status diffing, and range-validation logging with `const char*` or fixed buffers.
+      - **Alert lifecycle semantics tightened**: Stale alert `41` is no longer cleared immediately on config success; transient alert clearing is now explicit and allowlist-based.
+      - **Alert 41 scope refined**: Now specifically indicates configuration apply failure during CONNECT phase (tier 2 - major). Previously also covered pre-sleep ledger sync timeouts which are now alert 44.
+      - **Documentation sync for release v7**: Updated firmware metadata, Particle product version, Doxygen project number, and alert 44 supervisor comments to match current behavior.
+
+      ### Fixed
+
+      - **Alert 44 persistence during soak**: Pre-sleep ledger sync timeout alerts are now reported and then auto-cleared only under the new transient-alert allowlist model.
+      - **Misleading sensor merge diagnostic**: Removed the pre-read sensor merge log that could emit sentinel values like `setting1=-1` before the actual config read.
     ```
-  - Dashboard receives real-time occupancy state and cumulative daily occupied time
-  - Battery nested in object structure per occupancy sensor requirements
+      ## 3.27 – 2026-03-12
 
-### Changed
-- **Operating Mode Validation**: Updated Cloud.cpp to accept operating mode values 0-3 (was 0-2)
-- **Sleep Configuration**: ULTRA_LOW_POWER sleep now conditionally uses network standby based on operating mode and open hours
-- **Mode Handler**: State_Modes.cpp occupancy handler now transitions to REPORTING_STATE on occupancy changes when in DISCONNECTED_KEEP_ALIVE mode
-- **Startup Logging**: Operating mode display now includes DISCONNECTED_KEEP_ALIVE label
+      ### Fixed
 
-### Technical Details
-- Solar-powered tennis court sensors get better light/signal than remote visitation counters
-- Network standby power consumption (~14mA) acceptable for solar installations
-- Prevents 30-60 second reconnection delays on each occupancy change
-- Compatible with existing battery tier system (HEALTHY/CONSERVING/CRITICAL/SURVIVAL)
-- Counting mode webhook format unchanged for backward compatibility
-
-## 3.01 – 2025-12-23
-- Add centralized firmware versioning, release notes, and include firmware metadata in device-status ledgers.
-
-## 3.02 – 2025-12-23
-- Fix PIR debounce timing
-
-## 3.02 – 2025-12-23
-- Fix PIR debounce timing
-
-## 3.03 – 2025-12-23
-- Updated workflow
-
-## 3.04 – 2025-12-23
-- Fixed issue with local time string
-
-## 3.05 – 2025-12-24
-- MVP for a PIR person counter
-
-## 3.06 – 2025-12-26
-- Fixing cleanups and logging
-
-## 3.07 – 2025-12-27
-- Now publishes to Ubidots and Ledger
-
-## 3.08 – 2025-12-29
-- MVP on Sleeping - Testing intervals
-
-## 3.09 – 2025-12-30
-- MVP starting to optimize
-
-## 3.10 – 2025-12-31
-- Firmware ready to start testing on Boron
-
-## 3.10 – 2025-12-31
-- Changes from Claude Sonnet 4.5 Code review - ready to test
-
-## 3.11 – 2025-12-31
-- Increased PublishQueue depth to 30 days
-
-## 3.11 – 2026-01-13
+      - **ThrashGuard timeout protection**: Fixed ThrashGuard timeout conflicts in SLEEPING_STATE that caused spurious resets (RESET_REASON_USER/140).
+        - Increased SLEEPING_STATE timeout from 30s to 60s to accommodate cloud operations sync (30s) + disconnect wait.
+        - Added progress markers for serial reconnection (`SERIAL_WAIT`), cloud operations (`CLOUD_OPS_WAIT`), and disconnect wait (`DISCONNECT_WAIT`).
+        - Added `WAKE_FROM_SLEEP` progress marker immediately after resuming from sleep.
 - Updated connection with phases to unblock connections
 
 ## 3.12 – 2026-01-13

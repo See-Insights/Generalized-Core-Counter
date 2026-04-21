@@ -5,7 +5,7 @@ var _generalized__core__counter_8cpp =
     [ "isWithinOpenHours", "_generalized-_core-_counter_8cpp.html#adaf14f9ee408635f2c952b99aaeda484", null ],
     [ "loop", "_generalized-_core-_counter_8cpp.html#afe461d27b9c48d5921c00d521181f12f", null ],
     [ "outOfMemoryHandler", "_generalized-_core-_counter_8cpp.html#a1711b4262f6d65d417a01d7081daa4e8", null ],
-    [ "PRODUCT_VERSION", "_generalized-_core-_counter_8cpp.html#a35c1b8b4875fa56a1f1f667f76ca11db", null ],
+    [ "PRODUCT_VERSION", "_generalized-_core-_counter_8cpp.html#a8e73e5fce5c5f4500e4e85fc8dd78bb1", null ],
     [ "publishData", "_generalized-_core-_counter_8cpp.html#a6e8d6c80794e3a266d4ef6b976e9c27c", null ],
     [ "publishDiagnosticSafe", "_generalized-_core-_counter_8cpp.html#a5b6d4035a9304bc53863ee513f708b0d", null ],
     [ "publishStartupStatus", "_generalized-_core-_counter_8cpp.html#a3b52d4e2736530265377e967979feaf9", null ],

@@ -44,7 +44,7 @@ static int resolveErrorAction() {
 
   case 15: // modem or disconnect failure
   case 31: // failed to connect to cloud
-  case 44: // prolonged offline (>3 hours during open hours)
+  case 44: // ledger sync timeout before sleep
     if (resets >= 4) {
       Log.info("Connectivity alert %d with reset count=%u; suppressing further resets", alert, resets);
       return 0;

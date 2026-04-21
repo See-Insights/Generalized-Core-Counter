@@ -23,7 +23,7 @@
 
 // Firmware version recognized by Particle Product firmware management
 // Bump this integer whenever you cut a new production release.
-PRODUCT_VERSION(6);
+PRODUCT_VERSION(7);
 
 // Hardware abstraction and device-specific pinouts
 #include "device_pinout.h"           // Platform-specific pin definitions
@@ -31,6 +31,16 @@ PRODUCT_VERSION(6);
 #include "LocalTimeRK.h"             // Timezone conversion (UTC to local)
 #include "time/LocalTimeCache.h"          // Cached LocalTimeRK conversions
 
+/**
+ * @brief Returns true for alerts that are safe to auto-clear after a queued report.
+ *
+ * @details These alerts represent transient operational failures that are
+ *          re-evaluated frequently enough to be raised again if the underlying
+ *          condition persists on later cycles.
+ *
+ * @param alertCode The current alert code.
+ * @return true if the alert may be auto-cleared after successful queueing.
+ */
 // Persistent data and configuration
 #include "MyPersistentData.h"        // FRAM-backed sysStatus, current, sensorConfig
 
@@ -691,6 +701,29 @@ int secondsUntilNextOpen() {
  * - dailyoccupancy is reported in whole minutes (derived from total seconds).
  * - device-data uses totalOccupiedSec but it is also in minutes for consistency.
  */
+/**
+ * @brief Returns true for transient alerts that may auto-clear after reporting.
+ *
+ * @details These alerts represent operational failures that are re-evaluated
+ *          frequently enough to be raised again on later cycles if the
+ *          underlying condition persists.
+ *
+ * @param alertCode Current alert code carried in the report payload.
+ * @return true if the alert should auto-clear after successful queueing.
+ */
+static bool isAutoClearAfterReportAlert(int alertCode) {
+  switch (alertCode) {
+  case 15:
+  case 31:
+  case 41:
+  case 43:
+  case 44:
+    return true;
+  default:
+    return false;
+  }
+}
+
 void publishData() {
   // Legacy Ubidots context strings describing battery state
   static const char *batteryContext[7] = {
@@ -716,6 +749,7 @@ void publishData() {
   }
 
   uint8_t sensorMode = sysStatus.get_sensorMode();
+  const int8_t reportedAlertCode = current.get_alertCode();
 
   // Ensure battery value is always a finite number for webhook ingestion.
   // Ubidots rejects NaN/Inf with a 400 response.
@@ -738,7 +772,7 @@ void publishData() {
              stateOfCharge,
              batteryContext[battState],
              current.get_internalTempC(),
-             current.get_alertCode(),
+             reportedAlertCode,
              sysStatus.get_resetCount(),
              sysStatus.get_lastConnectionDuration(),
              timeStampValue);
@@ -747,7 +781,7 @@ void publishData() {
     Log.info("Report payload: occupancy=%d totalMinutes=%lu alert=%d",
              current.get_occupied() ? 1 : 0,
              totalOccupiedMinutes,
-             (int)current.get_alertCode());
+             (int)reportedAlertCode);
   } else {
     const unsigned long timeStampValue = endOfPrevHourStampSec;
 
@@ -760,7 +794,7 @@ void publishData() {
              batteryContext[battState],
              current.get_internalTempC(),
              sysStatus.get_resetCount(),
-             current.get_alertCode(),
+             reportedAlertCode,
              sysStatus.get_lastConnectionDuration(),
              timeStampValue);
 
@@ -768,14 +802,26 @@ void publishData() {
     Log.info("Report payload: hourly=%d daily=%d alert=%d",
              (int)current.get_hourlyCount(),
              (int)current.get_dailyCount(),
-             (int)current.get_alertCode());
+             (int)reportedAlertCode);
   }
 
   // Get webhook name from cloud configuration (with fallback to convention)
   const char *webhookName = Cloud::instance().getWebhookName();
 
-  PublishQueuePosix::instance().publish(webhookName, data, PRIVATE);
+  bool queued = PublishQueuePosix::instance().publish(webhookName, data, PRIVATE);
   Log.info("Publishing to webhook '%s': %s", webhookName, data);
+
+  // General alert lifecycle rule: once an alert has been included in a report
+  // and that report is accepted by the publish queue, clear it locally.
+  // If the underlying condition persists, it will be raised again.
+  if (queued &&
+      reportedAlertCode > 0 &&
+      isAutoClearAfterReportAlert(reportedAlertCode) &&
+      current.get_alertCode() == reportedAlertCode) {
+    Log.info("Clearing alert %d after queueing report payload", (int)reportedAlertCode);
+    current.set_alertCode(0);
+    current.set_lastAlertTime(0);
+  }
 
   // Arm short-term webhook supervision.
   // If we're already connected, start the 20s window immediately.

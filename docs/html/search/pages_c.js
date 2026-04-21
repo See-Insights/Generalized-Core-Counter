@@ -5,8 +5,7 @@ var searchData=
   ['payload_2',['Payload',['../index.html#autotoc_md21',1,'Counting Mode Payload'],['../index.html#autotoc_md22',1,'Occupancy Mode Payload']]],
   ['persistent_20storage_3',['Persistent Storage',['../index.html#autotoc_md12',1,'']]],
   ['pir_20sensor_20on_20carrier_4',['Carrier board header (PIR sensor on carrier)',['../device__pinout_8h.html#autotoc_md0',1,'']]],
-  ['pmic_20monitoring_20remediation_20boron_20only_5',['PMIC Monitoring &amp;amp; Remediation (Boron Only)',['../index.html#autotoc_md42',1,'']]],
-  ['power_20management_6',['Battery-Aware Power Management',['../index.html#autotoc_md44',1,'']]],
-  ['products_20example_7',['Multiple Products Example',['../index.html#autotoc_md28',1,'']]],
-  ['protection_8',['Occupancy Mode Battery Protection',['../index.html#autotoc_md46',1,'']]]
+  ['power_20management_5',['Battery-Aware Power Management',['../index.html#autotoc_md38',1,'']]],
+  ['products_20example_6',['Multiple Products Example',['../index.html#autotoc_md28',1,'']]],
+  ['protection_7',['Occupancy Mode Battery Protection',['../index.html#autotoc_md40',1,'']]]
 ];

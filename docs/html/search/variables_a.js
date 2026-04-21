@@ -12,11 +12,12 @@ var searchData=
   ['lastthrashreason_9',['lastThrashReason',['../_thrash_guard_8cpp.html#a248d05cd249c3781ae19ac85e8c9ebd8',1,'lastThrashReason:&#160;ThrashGuard.cpp'],['../_thrash_guard_8h.html#a248d05cd249c3781ae19ac85e8c9ebd8',1,'lastThrashReason:&#160;ThrashGuard.cpp']]],
   ['lasttimesync_10',['lastTimeSync',['../classsys_status_data_1_1_sys_data.html#afafd4b77d084a2e9f2e425bd7dc6868d',1,'sysStatusData::SysData']]],
   ['leddefaulton_11',['ledDefaultOn',['../struct_sensor_definition.html#a605061cb2e0f2517a393c6452b45c733',1,'SensorDefinition']]],
-  ['ledofftime_12',['ledOffTime',['../device__pinout_8cpp.html#a5da8aad32460f76191dfdc104f686d86',1,'device_pinout.cpp']]],
-  ['ledpower_13',['ledPower',['../device__pinout_8cpp.html#acd13ce86cf516466e21e068ed7306716',1,'ledPower:&#160;device_pinout.cpp'],['../device__pinout_8h.html#acd13ce86cf516466e21e068ed7306716',1,'ledPower:&#160;device_pinout.cpp']]],
-  ['localhour_14',['localHour',['../struct_local_time_cache_1_1_local_time_snapshot.html#a01e4cfe14a6e3cf4710365d32952e795',1,'LocalTimeCache::LocalTimeSnapshot']]],
-  ['localsecondsofday_15',['localSecondsOfDay',['../struct_local_time_cache_1_1_local_time_snapshot.html#aad6546edd2c360e5dea2c03b162b5703',1,'LocalTimeCache::LocalTimeSnapshot']]],
-  ['localymd_16',['localYmd',['../struct_local_time_cache_1_1_local_time_snapshot.html#a87264f17fb07874b4cebd8c3f9f99759',1,'LocalTimeCache::LocalTimeSnapshot']]],
-  ['lowbatterymode_17',['lowBatteryMode',['../classsys_status_data_1_1_sys_data.html#a585c498d8e5c329844bee07dc696aa58',1,'sysStatusData::SysData']]],
-  ['lowpowermode_18',['lowPowerMode',['../classsys_status_data_1_1_sys_data.html#aebaa91e1d0c5b5a892a4d5d93e8914f3',1,'sysStatusData::SysData']]]
+  ['ledger_5fsync_5ftimeout_5fms_12',['LEDGER_SYNC_TIMEOUT_MS',['../namespace_connectivity_policy.html#a514e3eeaa0000e932f68cba30657176e',1,'ConnectivityPolicy']]],
+  ['ledofftime_13',['ledOffTime',['../device__pinout_8cpp.html#a5da8aad32460f76191dfdc104f686d86',1,'device_pinout.cpp']]],
+  ['ledpower_14',['ledPower',['../device__pinout_8cpp.html#acd13ce86cf516466e21e068ed7306716',1,'ledPower:&#160;device_pinout.cpp'],['../device__pinout_8h.html#acd13ce86cf516466e21e068ed7306716',1,'ledPower:&#160;device_pinout.cpp']]],
+  ['localhour_15',['localHour',['../struct_local_time_cache_1_1_local_time_snapshot.html#a01e4cfe14a6e3cf4710365d32952e795',1,'LocalTimeCache::LocalTimeSnapshot']]],
+  ['localsecondsofday_16',['localSecondsOfDay',['../struct_local_time_cache_1_1_local_time_snapshot.html#aad6546edd2c360e5dea2c03b162b5703',1,'LocalTimeCache::LocalTimeSnapshot']]],
+  ['localymd_17',['localYmd',['../struct_local_time_cache_1_1_local_time_snapshot.html#a87264f17fb07874b4cebd8c3f9f99759',1,'LocalTimeCache::LocalTimeSnapshot']]],
+  ['lowbatterymode_18',['lowBatteryMode',['../classsys_status_data_1_1_sys_data.html#a585c498d8e5c329844bee07dc696aa58',1,'sysStatusData::SysData']]],
+  ['lowpowermode_19',['lowPowerMode',['../classsys_status_data_1_1_sys_data.html#aebaa91e1d0c5b5a892a4d5d93e8914f3',1,'sysStatusData::SysData']]]
 ];

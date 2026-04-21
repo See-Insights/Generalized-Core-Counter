@@ -1,5 +1,12 @@
 var namespaces_dup =
 [
+    [ "anonymous_namespace{ConfigApply.cpp}", "namespaceanonymous__namespace_02_config_apply_8cpp_03.html", [
+      [ "getMergedBoolValue", "namespaceanonymous__namespace_02_config_apply_8cpp_03.html#a6f0db844a94f45001e94584d82046943", null ],
+      [ "getMergedIntValue", "namespaceanonymous__namespace_02_config_apply_8cpp_03.html#a2dc8b88b0461af698f01773e88407246", null ],
+      [ "getMergedStringValue", "namespaceanonymous__namespace_02_config_apply_8cpp_03.html#ac88f90d08274fa514ff7df25100e6ed8", null ],
+      [ "getNestedMap", "namespaceanonymous__namespace_02_config_apply_8cpp_03.html#a31374c69c16e9d6aaf8721073ec520e5", null ],
+      [ "getTopLevelMap", "namespaceanonymous__namespace_02_config_apply_8cpp_03.html#a60abad9cbfe54e2c48afe42c7dc501ce", null ]
+    ] ],
     [ "anonymous_namespace{LocalTimeCache.cpp}", "namespaceanonymous__namespace_02_local_time_cache_8cpp_03.html", null ],
     [ "anonymous_namespace{SensorManager.cpp}", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html", [
       [ "probeTmp112Present", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a452bb1633016be3c71fffc2fe5d5a0d7", null ]
@@ -38,6 +45,7 @@ var namespaces_dup =
       [ "DISCONNECT_MODEM_DEFAULT_SEC", "namespace_connectivity_policy.html#a705397f035907905d74eb58006a987c2", null ],
       [ "DISCONNECT_STANDBY_MAX_MS", "namespace_connectivity_policy.html#a27680d5a2fe0f28206eed36f939f763d", null ],
       [ "FIRMWARE_UPDATE_MAX_MS", "namespace_connectivity_policy.html#aca78df6b9ce0caf57f4672e8c0b15f72", null ],
+      [ "LEDGER_SYNC_TIMEOUT_MS", "namespace_connectivity_policy.html#a514e3eeaa0000e932f68cba30657176e", null ],
       [ "WEBHOOK_LONGTERM_ALERT40_SEC", "namespace_connectivity_policy.html#a2bf83afe32c0f44b32a6cb4d48e6a402", null ],
       [ "WEBHOOK_LONGTERM_CONNECTED_RECENTLY_SEC", "namespace_connectivity_policy.html#aec173e6da0225c588ff07235628b1b16", null ],
       [ "WEBHOOK_LONGTERM_ESCALATE_TO_ERROR_SEC", "namespace_connectivity_policy.html#a8c2c9ae6d7ba0414db36943cd01d78a4", null ],
