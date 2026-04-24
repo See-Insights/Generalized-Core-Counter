@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;8.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;9.00</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -95,31 +95,42 @@ $(function(){initNavTree('_state___common_8h_source.html','',''); });
 <a href="_state___common_8h.html">Go to the documentation of this file.</a><div class="fragment"><div class="line"><a id="l00001" name="l00001"></a><span class="lineno">    1</span><span class="preprocessor">#pragma once</span></div>
 <div class="line"><a id="l00002" name="l00002"></a><span class="lineno">    2</span> </div>
 <div class="line"><a id="l00003" name="l00003"></a><span class="lineno">    3</span><span class="preprocessor">#include &quot;Particle.h&quot;</span></div>
-<div class="line"><a id="l00004" name="l00004"></a><span class="lineno">    4</span><span class="preprocessor">#include &quot;<a class="code" href="_state_handlers_8h.html">state/StateHandlers.h</a>&quot;</span></div>
-<div class="line"><a id="l00005" name="l00005"></a><span class="lineno">    5</span><span class="preprocessor">#include &quot;<a class="code" href="_state_machine_8h.html">state/StateMachine.h</a>&quot;</span></div>
-<div class="line"><a id="l00006" name="l00006"></a><span class="lineno">    6</span> </div>
-<div class="line"><a id="l00007" name="l00007"></a><span class="lineno">    7</span><span class="comment">// NOTE:</span></div>
-<div class="line"><a id="l00008" name="l00008"></a><span class="lineno">    8</span><span class="comment">// This file was split from StateHandlers.cpp as a mechanical refactor.</span></div>
-<div class="line"><a id="l00009" name="l00009"></a><span class="lineno">    9</span><span class="comment">// No behavioral changes were made.</span></div>
-<div class="line"><a id="l00010" name="l00010"></a><span class="lineno">   10</span> </div>
-<div class="line"><a id="l00011" name="l00011"></a><span class="lineno">   11</span><span class="comment">// Forward declarations for helper functions shared across states</span></div>
-<div class="line"><a id="l00012" name="l00012"></a><span class="lineno">   12</span><span class="comment">// These are implemented in logic-specific files but exposed here.</span></div>
-<div class="line"><a id="l00013" name="l00013"></a><span class="lineno">   13</span> </div>
-<div class="line"><a id="l00014" name="l00014"></a><span class="lineno">   14</span><span class="comment">// Implemented in State_Idle.cpp</span></div>
-<div class="line"><a id="l00015" name="l00015"></a><span class="lineno">   15</span><span class="keywordtype">void</span> <a class="code hl_function" href="_state___common_8h.html#a26af5a78d8cca160ca913b5e91a224d6">ensureSensorEnabled</a>(<span class="keyword">const</span> <span class="keywordtype">char</span>* context);</div>
-<div class="line"><a id="l00016" name="l00016"></a><span class="lineno">   16</span> </div>
-<div class="line"><a id="l00017" name="l00017"></a><span class="lineno">   17</span><span class="comment">// Defined in Generalized-Core-Counter.cpp</span></div>
-<div class="line"><a id="l00018" name="l00018"></a><span class="lineno">   18</span><span class="keyword">extern</span> <span class="keywordtype">bool</span> <a class="code hl_function" href="_state___common_8h.html#a5b6d4035a9304bc53863ee513f708b0d">publishDiagnosticSafe</a>(<span class="keyword">const</span> <span class="keywordtype">char</span>* eventName, <span class="keyword">const</span> <span class="keywordtype">char</span>* data, PublishFlags flags);</div>
-<div class="line"><a id="l00019" name="l00019"></a><span class="lineno">   19</span> </div>
-<div class="line"><a id="l00020" name="l00020"></a><span class="lineno">   20</span><span class="comment">// Defined in Generalized-Core-Counter.cpp</span></div>
-<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span><span class="keywordtype">void</span> <a class="code hl_function" href="_state___common_8h.html#a496510658b21d252547ca67ae1035445">dailyCleanup</a>();</div>
-<div class="line"><a id="l00022" name="l00022"></a><span class="lineno">   22</span> </div>
-<div class="line"><a id="l00023" name="l00023"></a><span class="lineno">   23</span><span class="comment">// Defined in Generalized-Core-Counter.cpp</span></div>
-<div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span><span class="keywordtype">void</span> <a class="code hl_function" href="_state___common_8h.html#a6e8d6c80794e3a266d4ef6b976e9c27c">publishData</a>();</div>
+<div class="line"><a id="l00004" name="l00004"></a><span class="lineno">    4</span><span class="preprocessor">#include &quot;<a class="code" href="_my_persistent_data_8h.html">MyPersistentData.h</a>&quot;</span></div>
+<div class="line"><a id="l00005" name="l00005"></a><span class="lineno">    5</span><span class="preprocessor">#include &quot;<a class="code" href="_state_handlers_8h.html">state/StateHandlers.h</a>&quot;</span></div>
+<div class="line"><a id="l00006" name="l00006"></a><span class="lineno">    6</span><span class="preprocessor">#include &quot;<a class="code" href="_state_machine_8h.html">state/StateMachine.h</a>&quot;</span></div>
+<div class="line"><a id="l00007" name="l00007"></a><span class="lineno">    7</span> </div>
+<div class="line"><a id="l00008" name="l00008"></a><span class="lineno">    8</span><span class="comment">// NOTE:</span></div>
+<div class="line"><a id="l00009" name="l00009"></a><span class="lineno">    9</span><span class="comment">// This file was split from StateHandlers.cpp as a mechanical refactor.</span></div>
+<div class="line"><a id="l00010" name="l00010"></a><span class="lineno">   10</span><span class="comment">// No behavioral changes were made.</span></div>
+<div class="line"><a id="l00011" name="l00011"></a><span class="lineno">   11</span> </div>
+<div class="line"><a id="l00012" name="l00012"></a><span class="lineno">   12</span><span class="comment">// Forward declarations for helper functions shared across states</span></div>
+<div class="line"><a id="l00013" name="l00013"></a><span class="lineno">   13</span><span class="comment">// These are implemented in logic-specific files but exposed here.</span></div>
+<div class="line"><a id="l00014" name="l00014"></a><span class="lineno">   14</span> </div>
+<div class="line"><a id="l00015" name="l00015"></a><span class="lineno">   15</span><span class="comment">// Implemented in State_Idle.cpp</span></div>
+<div class="line"><a id="l00016" name="l00016"></a><span class="lineno">   16</span><span class="keywordtype">void</span> <a class="code hl_function" href="_state___common_8h.html#a26af5a78d8cca160ca913b5e91a224d6">ensureSensorEnabled</a>(<span class="keyword">const</span> <span class="keywordtype">char</span>* context);</div>
+<div class="line"><a id="l00017" name="l00017"></a><span class="lineno">   17</span> </div>
+<div class="line"><a id="l00018" name="l00018"></a><span class="lineno">   18</span><span class="comment">// Defined in Generalized-Core-Counter.cpp</span></div>
+<div class="line"><a id="l00019" name="l00019"></a><span class="lineno">   19</span><span class="keyword">extern</span> <span class="keywordtype">bool</span> <a class="code hl_function" href="_state___common_8h.html#a5b6d4035a9304bc53863ee513f708b0d">publishDiagnosticSafe</a>(<span class="keyword">const</span> <span class="keywordtype">char</span>* eventName, <span class="keyword">const</span> <span class="keywordtype">char</span>* data, PublishFlags flags);</div>
+<div class="line"><a id="l00020" name="l00020"></a><span class="lineno">   20</span> </div>
+<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span><span class="comment">// Defined in Generalized-Core-Counter.cpp</span></div>
+<div class="line"><a id="l00022" name="l00022"></a><span class="lineno">   22</span><span class="keywordtype">void</span> <a class="code hl_function" href="_state___common_8h.html#a496510658b21d252547ca67ae1035445">dailyCleanup</a>();</div>
+<div class="line"><a id="l00023" name="l00023"></a><span class="lineno">   23</span> </div>
+<div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span><span class="comment">// Defined in Generalized-Core-Counter.cpp</span></div>
+<div class="line"><a id="l00025" name="l00025"></a><span class="lineno">   25</span><span class="keywordtype">void</span> <a class="code hl_function" href="_state___common_8h.html#a6e8d6c80794e3a266d4ef6b976e9c27c">publishData</a>();</div>
+<div class="line"><a id="l00026" name="l00026"></a><span class="lineno">   26</span> </div>
+<div class="line"><a id="l00027" name="l00027"></a><span class="lineno">   27</span><span class="comment">// Defined in Generalized-Core-Counter.cpp</span></div>
+<div class="line"><a id="l00028" name="l00028"></a><span class="lineno">   28</span><a class="code hl_enumeration" href="_my_persistent_data_8h.html#a426866053adc87a6b48f04938146e0ff">BatteryTier</a> <a class="code hl_function" href="_state___common_8h.html#a41a544e4d6539b3b90c9cdbd3420de83">applyBatteryAwareConnectionModePolicy</a>(<span class="keywordtype">float</span> currentSoC);</div>
+<div class="line"><a id="l00029" name="l00029"></a><span class="lineno">   29</span> </div>
+<div class="line"><a id="l00030" name="l00030"></a><span class="lineno">   30</span><span class="comment">// Defined in Generalized-Core-Counter.cpp</span></div>
+<div class="line"><a id="l00031" name="l00031"></a><span class="lineno">   31</span><span class="keywordtype">void</span> <a class="code hl_function" href="_state___common_8h.html#ae8d84ddf273ffd2dad8fa8fa39191914">setAppBreadcrumb</a>(uint8_t code);</div>
+<div class="ttc" id="a_my_persistent_data_8h_html"><div class="ttname"><a href="_my_persistent_data_8h.html">MyPersistentData.h</a></div><div class="ttdoc">Persistent Data Storage Structures - EEPROM/Retained Memory Management.</div></div>
+<div class="ttc" id="a_my_persistent_data_8h_html_a426866053adc87a6b48f04938146e0ff"><div class="ttname"><a href="_my_persistent_data_8h.html#a426866053adc87a6b48f04938146e0ff">BatteryTier</a></div><div class="ttdeci">BatteryTier</div><div class="ttdoc">Battery tier defines progressive power conservation levels.</div><div class="ttdef"><b>Definition</b> <a href="_my_persistent_data_8h_source.html#l00111">MyPersistentData.h:111</a></div></div>
 <div class="ttc" id="a_state___common_8h_html_a26af5a78d8cca160ca913b5e91a224d6"><div class="ttname"><a href="_state___common_8h.html#a26af5a78d8cca160ca913b5e91a224d6">ensureSensorEnabled</a></div><div class="ttdeci">void ensureSensorEnabled(const char *context)</div><div class="ttdef"><b>Definition</b> <a href="_state___idle_8cpp_source.html#l00017">State_Idle.cpp:17</a></div></div>
-<div class="ttc" id="a_state___common_8h_html_a496510658b21d252547ca67ae1035445"><div class="ttname"><a href="_state___common_8h.html#a496510658b21d252547ca67ae1035445">dailyCleanup</a></div><div class="ttdeci">void dailyCleanup()</div><div class="ttdoc">Cleanup function that is run at the beginning of the day.</div><div class="ttdef"><b>Definition</b> <a href="_generalized-_core-_counter_8cpp_source.html#l01019">Generalized-Core-Counter.cpp:1019</a></div></div>
-<div class="ttc" id="a_state___common_8h_html_a5b6d4035a9304bc53863ee513f708b0d"><div class="ttname"><a href="_state___common_8h.html#a5b6d4035a9304bc53863ee513f708b0d">publishDiagnosticSafe</a></div><div class="ttdeci">bool publishDiagnosticSafe(const char *eventName, const char *data, PublishFlags flags)</div><div class="ttdoc">Safely publish diagnostic message through queue with depth guard.</div><div class="ttdef"><b>Definition</b> <a href="_generalized-_core-_counter_8cpp_source.html#l00951">Generalized-Core-Counter.cpp:951</a></div></div>
-<div class="ttc" id="a_state___common_8h_html_a6e8d6c80794e3a266d4ef6b976e9c27c"><div class="ttname"><a href="_state___common_8h.html#a6e8d6c80794e3a266d4ef6b976e9c27c">publishData</a></div><div class="ttdeci">void publishData()</div><div class="ttdef"><b>Definition</b> <a href="_generalized-_core-_counter_8cpp_source.html#l00727">Generalized-Core-Counter.cpp:727</a></div></div>
+<div class="ttc" id="a_state___common_8h_html_a41a544e4d6539b3b90c9cdbd3420de83"><div class="ttname"><a href="_state___common_8h.html#a41a544e4d6539b3b90c9cdbd3420de83">applyBatteryAwareConnectionModePolicy</a></div><div class="ttdeci">BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC)</div><div class="ttdef"><b>Definition</b> <a href="_generalized-_core-_counter_8cpp_source.html#l00704">Generalized-Core-Counter.cpp:704</a></div></div>
+<div class="ttc" id="a_state___common_8h_html_a496510658b21d252547ca67ae1035445"><div class="ttname"><a href="_state___common_8h.html#a496510658b21d252547ca67ae1035445">dailyCleanup</a></div><div class="ttdeci">void dailyCleanup()</div><div class="ttdoc">Cleanup function that is run at the beginning of the day.</div><div class="ttdef"><b>Definition</b> <a href="_generalized-_core-_counter_8cpp_source.html#l01156">Generalized-Core-Counter.cpp:1156</a></div></div>
+<div class="ttc" id="a_state___common_8h_html_a5b6d4035a9304bc53863ee513f708b0d"><div class="ttname"><a href="_state___common_8h.html#a5b6d4035a9304bc53863ee513f708b0d">publishDiagnosticSafe</a></div><div class="ttdeci">bool publishDiagnosticSafe(const char *eventName, const char *data, PublishFlags flags)</div><div class="ttdoc">Safely publish diagnostic message through queue with depth guard.</div><div class="ttdef"><b>Definition</b> <a href="_generalized-_core-_counter_8cpp_source.html#l01088">Generalized-Core-Counter.cpp:1088</a></div></div>
+<div class="ttc" id="a_state___common_8h_html_a6e8d6c80794e3a266d4ef6b976e9c27c"><div class="ttname"><a href="_state___common_8h.html#a6e8d6c80794e3a266d4ef6b976e9c27c">publishData</a></div><div class="ttdeci">void publishData()</div><div class="ttdef"><b>Definition</b> <a href="_generalized-_core-_counter_8cpp_source.html#l00862">Generalized-Core-Counter.cpp:862</a></div></div>
+<div class="ttc" id="a_state___common_8h_html_ae8d84ddf273ffd2dad8fa8fa39191914"><div class="ttname"><a href="_state___common_8h.html#ae8d84ddf273ffd2dad8fa8fa39191914">setAppBreadcrumb</a></div><div class="ttdeci">void setAppBreadcrumb(uint8_t code)</div><div class="ttdef"><b>Definition</b> <a href="_generalized-_core-_counter_8cpp_source.html#l00180">Generalized-Core-Counter.cpp:180</a></div></div>
 <div class="ttc" id="a_state_handlers_8h_html"><div class="ttname"><a href="_state_handlers_8h.html">StateHandlers.h</a></div></div>
 <div class="ttc" id="a_state_machine_8h_html"><div class="ttname"><a href="_state_machine_8h.html">StateMachine.h</a></div></div>
 </div><!-- fragment --></div><!-- contents -->

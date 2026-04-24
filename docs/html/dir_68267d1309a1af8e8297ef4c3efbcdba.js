@@ -14,6 +14,7 @@ var dir_68267d1309a1af8e8297ef4c3efbcdba =
     [ "MyPersistentData.cpp", "_my_persistent_data_8cpp.html", "_my_persistent_data_8cpp" ],
     [ "MyPersistentData.h", "_my_persistent_data_8h.html", "_my_persistent_data_8h" ],
     [ "ProjectConfig.h", "_project_config_8h.html", null ],
+    [ "Settings.h", "_settings_8h.html", null ],
     [ "ThrashGuard.cpp", "_thrash_guard_8cpp.html", "_thrash_guard_8cpp" ],
     [ "ThrashGuard.h", "_thrash_guard_8h.html", "_thrash_guard_8h" ],
     [ "Version.cpp", "_version_8cpp.html", "_version_8cpp" ],

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Particle.h"
+#include "MyPersistentData.h"
 #include "state/StateHandlers.h"
 #include "state/StateMachine.h"
 
@@ -22,3 +23,9 @@ void dailyCleanup();
 
 // Defined in Generalized-Core-Counter.cpp
 void publishData();
+
+// Defined in Generalized-Core-Counter.cpp
+BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC);
+
+// Defined in Generalized-Core-Counter.cpp
+void setAppBreadcrumb(uint8_t code);

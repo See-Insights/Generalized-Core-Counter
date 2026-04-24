@@ -1,6 +1,6 @@
 # Generalized-Core-Counter
 
-**Version:** 5.00 | **Latest:** Hardware Soak Production Candidate
+**Version:** 9.00 | **Latest:** Alert 44 empty-device-ledger fix and wake/connect hardening
 
 A generalized IoT firmware core for outdoor sensor devices supporting multiple operating modes and sensor types.
 
@@ -765,19 +765,19 @@ To aid field troubleshooting of configuration and ledger sync issues, the firmwa
 - Reports connection duration
 - Identifies which config section failed: sensor, timing, messaging, modes, or reporting
 - Example log output:
-  ```
-  Configuration apply failed: sensor=OK timing=OK messaging=FAIL modes=OK reporting=OK
-  Alert 41 context: ledgersSynced=true connectDuration=8234 ms
-  ```
+```
+Configuration apply failed: sensor=OK timing=OK messaging=FAIL modes=OK reporting=OK
+Alert 41 context: ledgersSynced=true connectDuration=8234 ms
+```
 
 **Alert 44 - Ledger Sync Timeout (SLEEP phase):**
 - Logs timeout duration vs budget
 - Shows which cloud operations completed: queue, ledgers, updates, webhook
 - Example log output:
-  ```
-  SLEEP: Waiting for cloud operations - queue:Y ledgers:N updates:Y webhook:Y (8451/30000 ms)
-  Alert 44 context: timeout after 30124 ms (budget=30000 ms)
-  ```
+```
+SLEEP: Waiting for cloud operations - queue:Y ledgers:N updates:Y webhook:Y (8451/30000 ms)
+Alert 44 context: timeout after 30124 ms (budget=30000 ms)
+```
 
 **Platform-Specific Tuning:**
 - WiFi devices: 5-second ledger sync timeout

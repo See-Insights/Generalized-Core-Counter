@@ -40,6 +40,7 @@ struct SessionState {
   bool awaitingWebhookResponse = false;
   bool webhookExpectedOnConnect = false;   // We queued a webhook publish and should start a response window on next cloud connect
   unsigned long webhookAwaitStartMs = 0;  // millis() when the short-term webhook response window started
+  bool serviceRequestTriggered = false;   // User/service button requested immediate report/connect
   bool occupancyChangeTriggered = false;  // Report triggered by occupancy state change
   bool returnToSleepAfterReport = false;  // Should return to SLEEPING_STATE after connection
 };

@@ -7,9 +7,29 @@ var namespaces_dup =
       [ "getNestedMap", "namespaceanonymous__namespace_02_config_apply_8cpp_03.html#a31374c69c16e9d6aaf8721073ec520e5", null ],
       [ "getTopLevelMap", "namespaceanonymous__namespace_02_config_apply_8cpp_03.html#a60abad9cbfe54e2c48afe42c7dc501ce", null ]
     ] ],
+    [ "anonymous_namespace{Generalized-Core-Counter.cpp}", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html", [
+      [ "AppBreadcrumb", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4b", [
+        [ "BREADCRUMB_NONE", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baf2c3f5cb0c665f8493135acd37fd8a47", null ],
+        [ "BREADCRUMB_SETUP_START", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba1e8d87c53bbad61f629b8e6e5eb19831", null ],
+        [ "BREADCRUMB_SETUP_COMPLETE", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baea20a283f6df04c47a957e3beb916e9e", null ],
+        [ "BREADCRUMB_SLEEP_ENTRY", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba41c80e373c2e70f78120ccfe6f2ce6e1", null ],
+        [ "BREADCRUMB_WAKE", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba2edd74c1da6390538c15b226ddb79459", null ],
+        [ "BREADCRUMB_REPORTING", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba33dd0d4d32b37a6c112bbf29509fe843", null ],
+        [ "BREADCRUMB_CONNECT_REQUESTED", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baa3bab554e3e3a8d82a72b835225229f1", null ],
+        [ "BREADCRUMB_CLOUD_CONNECTED", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba1a124c01a209149458f63420e9d07f8e", null ],
+        [ "BREADCRUMB_APP_WATCHDOG_RESET", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba4437fa49e9455b2ca7a6ad393dd2ad00", null ]
+      ] ],
+      [ "appBreadcrumbName", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a555d15a7ec243d93b6d9be9c1b6f1fa8", null ]
+    ] ],
+    [ "anonymous_namespace{LedgerClient.cpp}", "namespaceanonymous__namespace_02_ledger_client_8cpp_03.html", [
+      [ "ledgerHasConfigContent", "namespaceanonymous__namespace_02_ledger_client_8cpp_03.html#adb973634933ef1036e1092ad24f20248", null ]
+    ] ],
     [ "anonymous_namespace{LocalTimeCache.cpp}", "namespaceanonymous__namespace_02_local_time_cache_8cpp_03.html", null ],
     [ "anonymous_namespace{SensorManager.cpp}", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html", [
       [ "probeTmp112Present", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a452bb1633016be3c71fffc2fe5d5a0d7", null ]
+    ] ],
+    [ "anonymous_namespace{State_Sleep.cpp}", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html", [
+      [ "computeCloudSyncTimeoutMs", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a13e9915406af72c4d32f922a088d826d", null ]
     ] ],
     [ "anonymous_namespace{ThrashGuard.cpp}", "namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html", [
       [ "BACKOFF_MS", "namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a7051561c04cc971e71f1db9dbc2a9b8f", null ],

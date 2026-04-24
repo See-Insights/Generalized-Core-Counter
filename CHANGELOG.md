@@ -16,7 +16,29 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
-## 8.00 – 2026-04-23
+## 9.00 - 2026-04-24
+
+### Added
+
+- **Retained app breadcrumbs for reset attribution**: Added retained startup breadcrumbs around sleep, reporting, connect-request, cloud-connected, and watchdog-reset milestones so connect-stage reboots can be attributed from the next boot log and startup status payload.
+- **Centralized settings catalog documentation**: Added `Settings.h` as the single documentation entry point for build-profile flags, hardware override macros, and legacy project-level settings.
+
+### Changed
+
+- **Release metadata updated for v9 rollout**: Bumped Particle product version, firmware version string, README version header, and Doxygen project number to `9.00`.
+- **Wake/connect service path hardened**: User-button wakes now route through `REPORTING_STATE`, explicit service requests bypass interval alignment without reusing occupancy semantics, and sleep now uses a queue-aware cloud-ops timeout budget.
+- **Field-safe build defaults restored**: The repo now defaults to `DEV_BUILD=0` with blocking serial waits disabled, while still allowing developers to opt back into local debug behavior with build flags.
+- **Carrier and settings documentation expanded**: Device pinout, project config, and settings comments were updated so generated API docs better explain build flags, pin roles, and fallback behavior.
+
+### Fixed
+
+- **Alert 44 on default-only devices**: `Cloud::areLedgersSynced()` now treats a synced `default-settings` ledger plus an empty `device-settings` ledger as valid, preventing false ledger-timeout alerts on new devices or fleets that only use product defaults.
+- **Alert 44 reporting semantics**: Startup status now serves as the one-time report for a pending alert 44 and clears it immediately afterward so the alert does not linger into later service paths.
+- **Boot-to-sleep battery telemetry gap**: Boot paths now refresh battery and PMIC telemetry before falling back to sleep, so short open-hours wake cycles still log current battery state.
+- **PMIC status decoding**: Boron PMIC logging now reports correct VBUS, power-good, thermal, and VSYS-min state instead of mislabeling system-status bits.
+- **Queue-drain self-churn and standby gating**: Verbose webhook diagnostics no longer feed the publish queue while it is draining, and network standby is only used after a successful cloud session in the current wake cycle.
+
+## 8.00 - 2026-04-23
 
 ### Added
 
@@ -32,7 +54,7 @@ All notable changes to this project will be documented in this file.
 - **Alert 44 false positives after reconnect**: `Cloud::areLedgersSynced()` now returns true immediately when both ledgers are already synced instead of forcing the full connection window.
 - **Stale ledger sync window reuse across cycles**: The helper now resets its timing window on each newly observed cloud connection, preventing one cycle's sync state from leaking into later sleep gates.
 
-## 7.00 – 2026-04-21
+## 7.00 - 2026-04-21
 
 ### Added
 

@@ -1,6 +1,12 @@
 var searchData=
 [
-  ['connected_0',['CONNECTED',['../_my_persistent_data_8h.html#a6ed5b36c9cd209c52088cb9029de61b3a7a691a2430ec26878897b5fbc9c22a4c',1,'MyPersistentData.h']]],
-  ['connecting_5fstate_1',['CONNECTING_STATE',['../_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a549bd89b38411c3eb84cead55c7df867',1,'StateMachine.h']]],
-  ['counting_2',['COUNTING',['../_my_persistent_data_8h.html#abc47929dd59afff19be8147ebe8fa684aceae44f0ce8284b8a154151dfcb28ab1',1,'MyPersistentData.h']]]
+  ['breadcrumb_5fapp_5fwatchdog_5freset_0',['BREADCRUMB_APP_WATCHDOG_RESET',['../namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba4437fa49e9455b2ca7a6ad393dd2ad00',1,'anonymous_namespace{Generalized-Core-Counter.cpp}']]],
+  ['breadcrumb_5fcloud_5fconnected_1',['BREADCRUMB_CLOUD_CONNECTED',['../namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba1a124c01a209149458f63420e9d07f8e',1,'anonymous_namespace{Generalized-Core-Counter.cpp}']]],
+  ['breadcrumb_5fconnect_5frequested_2',['BREADCRUMB_CONNECT_REQUESTED',['../namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baa3bab554e3e3a8d82a72b835225229f1',1,'anonymous_namespace{Generalized-Core-Counter.cpp}']]],
+  ['breadcrumb_5fnone_3',['BREADCRUMB_NONE',['../namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baf2c3f5cb0c665f8493135acd37fd8a47',1,'anonymous_namespace{Generalized-Core-Counter.cpp}']]],
+  ['breadcrumb_5freporting_4',['BREADCRUMB_REPORTING',['../namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba33dd0d4d32b37a6c112bbf29509fe843',1,'anonymous_namespace{Generalized-Core-Counter.cpp}']]],
+  ['breadcrumb_5fsetup_5fcomplete_5',['BREADCRUMB_SETUP_COMPLETE',['../namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baea20a283f6df04c47a957e3beb916e9e',1,'anonymous_namespace{Generalized-Core-Counter.cpp}']]],
+  ['breadcrumb_5fsetup_5fstart_6',['BREADCRUMB_SETUP_START',['../namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba1e8d87c53bbad61f629b8e6e5eb19831',1,'anonymous_namespace{Generalized-Core-Counter.cpp}']]],
+  ['breadcrumb_5fsleep_5fentry_7',['BREADCRUMB_SLEEP_ENTRY',['../namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba41c80e373c2e70f78120ccfe6f2ce6e1',1,'anonymous_namespace{Generalized-Core-Counter.cpp}']]],
+  ['breadcrumb_5fwake_8',['BREADCRUMB_WAKE',['../namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba2edd74c1da6390538c15b226ddb79459',1,'anonymous_namespace{Generalized-Core-Counter.cpp}']]]
 ];

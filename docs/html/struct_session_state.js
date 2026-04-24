@@ -6,6 +6,7 @@ var struct_session_state =
     [ "hibernateDisabledForSession", "struct_session_state.html#ac03474741cb2abc800e6fcfedcba9939", null ],
     [ "occupancyChangeTriggered", "struct_session_state.html#ab0391031ffb3a039c6db4e17f06ae93c", null ],
     [ "returnToSleepAfterReport", "struct_session_state.html#a3d3c38bdf541bbd8b95c9859a7afeb3a", null ],
+    [ "serviceRequestTriggered", "struct_session_state.html#a27334f9e6eb109ab31509aab4b7c3438", null ],
     [ "suppressAlert40ThisSession", "struct_session_state.html#a4e21bac5c687402420d7fefc3cf4d119", null ],
     [ "webhookAwaitStartMs", "struct_session_state.html#aafdada6c72b108a7b369426eef84666c", null ],
     [ "webhookExpectedOnConnect", "struct_session_state.html#a9b23a9744750720b7ffca9823ca9cdf3", null ]

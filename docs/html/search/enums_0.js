@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['batterytier_0',['BatteryTier',['../_my_persistent_data_8h.html#a426866053adc87a6b48f04938146e0ff',1,'MyPersistentData.h']]]
+  ['appbreadcrumb_0',['AppBreadcrumb',['../namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4b',1,'anonymous_namespace{Generalized-Core-Counter.cpp}']]]
 ];

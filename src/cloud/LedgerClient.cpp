@@ -2,6 +2,18 @@
 #include "BuildProfile.h"
 #include "power/ConnectivityPolicy.h"
 
+namespace {
+
+bool ledgerHasConfigContent(const LedgerData &ledger) {
+    return ledger.has("sensor") ||
+           ledger.has("timing") ||
+           ledger.has("messaging") ||
+           ledger.has("modes") ||
+           ledger.has("reporting");
+}
+
+} // namespace
+
 #if defined(ALERT44_DIAG_ENABLED)
 static void logLedgerSyncDiag(bool connected,
                               unsigned long nowMs,
@@ -127,6 +139,51 @@ bool Cloud::areLedgersSynced() const {
         // Give ledgers time to sync after connection (platform-specific timeout)
         unsigned long elapsedSinceConnect = nowMs - firstConnectedTime;
         if (elapsedSinceConnect > ConnectivityPolicy::LEDGER_SYNC_TIMEOUT_MS) {
+            LedgerData defaultData = defaultSettingsLedger.get();
+            LedgerData deviceData = deviceSettingsLedger.get();
+            bool defaultHasConfig = ledgerHasConfigContent(defaultData);
+            bool deviceHasConfig = ledgerHasConfigContent(deviceData);
+
+            if (defaultSynced && !deviceSynced && !deviceHasConfig) {
+                Log.info("default-settings synced and device-settings is empty after %lu ms - assuming no device overrides",
+                         elapsedSinceConnect);
+#if defined(ALERT44_DIAG_ENABLED)
+                logLedgerSyncDiag(true,
+                                  nowMs,
+                                  firstConnectedTime,
+                                  elapsedSinceConnect,
+                                  ConnectivityPolicy::LEDGER_SYNC_TIMEOUT_MS,
+                                  defaultSync,
+                                  deviceSync,
+                                  defaultSynced,
+                                  deviceSynced,
+                                  wasDisconnected,
+                                  true,
+                                  "DEFAULT_SYNCED_DEVICE_EMPTY");
+#endif
+                return true;
+            }
+
+            if (!defaultSynced && deviceSynced && !defaultHasConfig) {
+                Log.info("device-settings synced and default-settings is empty after %lu ms - assuming no product defaults",
+                         elapsedSinceConnect);
+#if defined(ALERT44_DIAG_ENABLED)
+                logLedgerSyncDiag(true,
+                                  nowMs,
+                                  firstConnectedTime,
+                                  elapsedSinceConnect,
+                                  ConnectivityPolicy::LEDGER_SYNC_TIMEOUT_MS,
+                                  defaultSync,
+                                  deviceSync,
+                                  defaultSynced,
+                                  deviceSynced,
+                                  wasDisconnected,
+                                  true,
+                                  "DEVICE_SYNCED_DEFAULT_EMPTY");
+#endif
+                return true;
+            }
+
             // If either ledger has synced, both must sync
             if (defaultSynced || deviceSynced) {
                 bool bothSynced = (defaultSynced && deviceSynced);

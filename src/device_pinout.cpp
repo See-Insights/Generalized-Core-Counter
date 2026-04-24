@@ -1,3 +1,19 @@
+/**
+ * @file device_pinout.cpp
+ * @author Chip McClelland
+ * @email chip@seeinsights.com
+ * @brief Platform-specific pin mappings and pin-helper implementations.
+ *
+ * @details
+ * This file translates logical carrier-board signals into the correct pin names
+ * for each supported Particle platform so the rest of the firmware can stay
+ * platform-agnostic. It also owns the small LED helper routines used throughout
+ * the state machine.
+ *
+ * @copyright Copyright (c) 2026 Chip McClelland
+ * @license MIT License
+ */
+
 // Particle Functions
 #include "Particle.h"
 #include "device_pinout.h"
@@ -27,6 +43,9 @@ const pin_t BUTTON_PIN        = D4;
 const pin_t BLUE_LED          = D7;
 const pin_t WAKEUP_PIN        = WKP;  // D10 on Photon2 (was D8 on Argon/Boron)
 
+// These carrier functions are intentionally kept stable across platforms so
+// higher-level state code never has to care which module is underneath.
+
 // Convenience aliases for carrier functions
 // (No additional aliases; use the base names directly in application code.)
 
@@ -52,22 +71,28 @@ const pin_t ledPower      = MISO; // D11 on Boron
 
 #else
 // Fallback: assume SPI pins follow the common SCK/MOSI/MISO aliases.
+// This keeps new boards usable during bring-up even before they get an
+// explicit PLATFORM_ID branch.
 const pin_t intPin        = SCK;
 const pin_t disableModule = MOSI;
 const pin_t ledPower      = MISO;
 #endif
 
 bool initializePinModes() {
-    Log.info("Initalizing the pinModes");
-    // Define as inputs or outputs
+    Log.info("Initializing the pin modes");
+    // Keep carrier inputs passive here; any pull-ups/drive assumptions are
+    // owned by the carrier hardware and the AB1805 wiring.
     pinMode(BUTTON_PIN, INPUT);    // User button on the carrier board - external pull-up on carrier
     pinMode(WAKEUP_PIN, INPUT_PULLUP);    // AB1805 FOUT/nIRQ (open-drain, active-LOW, needs pull-up)
     pinMode(BLUE_LED, OUTPUT);     // On-module status LED
-     return true;
+    return true;
 }
 
 
 bool initializePowerCfg() {
+    // This stub remains as the single power-policy hook for future carrier or
+    // solar charging changes. Leaving it in place avoids scattering that setup
+    // later across startup code.
     /*
     Log.info("Initializing Power Config");
     const int maxCurrentFromPanel = 900;            // Not currently used (100,150,500,900,1200,2000 - will pick closest) (550mA for 3.5W Panel, 340 for 2W panel)
@@ -98,6 +123,8 @@ void signalLED(bool state, uint32_t durationMs) {
     digitalWrite(BLUE_LED, state ? HIGH : LOW);
     
     if (state && durationMs > 0) {
+        // Record the deadline in retained RTC time so sleep/wake cycles do not
+        // extend the requested on-time.
         if (Time.isValid()) {
             ledOffTime = Time.now() + (durationMs / 1000);
         } else {
@@ -111,6 +138,8 @@ void signalLED(bool state, uint32_t durationMs) {
 }
 
 void signalLEDUpdate() {
+    // Only the main loop should clear timeout-driven LED state so the timeout
+    // behavior stays deterministic and easy to reason about.
     if (ledOffTime > 0 && Time.isValid() && Time.now() >= ledOffTime) {
         digitalWrite(BLUE_LED, LOW);
         ledOffTime = 0;

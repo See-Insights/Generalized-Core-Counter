@@ -362,8 +362,10 @@ bool Cloud::applyModesConfig(const LedgerData &defaults, const LedgerData &devic
     // Connection mode: 0=CONNECTED, 1=INTERMITTENT, 2=DISCONNECTED, 3=INTERMITTENT_KEEP_ALIVE
     if (getMergedIntValue(defaultModes, deviceModes, "connectionMode", connectionMode)) {
         if (validateRange(connectionMode, 0, 3, "connectionMode")) {
-            if (sysStatus.get_connectionMode() != static_cast<ConnectionMode>(connectionMode)) {
+            if (sysStatus.get_connectionMode() != static_cast<ConnectionMode>(connectionMode) ||
+                sysStatus.get_lowBatteryMode()) {
                 sysStatus.set_connectionMode(static_cast<ConnectionMode>(connectionMode));
+                sysStatus.set_lowBatteryMode(false);
                 const char *modeStr = connectionMode == CONNECTED ? "CONNECTED" :
                                      connectionMode == INTERMITTENT ? "INTERMITTENT" :
                                      connectionMode == DISCONNECTED ? "DISCONNECTED" : "INTERMITTENT_KEEP_ALIVE";

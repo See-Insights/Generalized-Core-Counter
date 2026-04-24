@@ -441,17 +441,21 @@ bool SensorManager::batteryState() {
   
   // Read REG08 (System Status Register) for additional diagnostics
   byte systemStatus = pmic.getSystemStatus();
+  uint8_t vbusStatus = (systemStatus >> 6) & 0x03;
   uint8_t chargeStatus = (systemStatus >> 4) & 0x03;
-  bool vbusGood = (systemStatus & 0x80) != 0;
-  uint8_t thermalStatus = systemStatus & 0x03;
-  
+  bool powerGood = (systemStatus & 0x04) != 0;
+  bool thermalRegulation = (systemStatus & 0x02) != 0;
+  bool inVsysMin = (systemStatus & 0x01) != 0;
+
+  const char* vbusStatusStr[] = {"Unknown", "USB Host", "Adapter", "OTG"};
   const char* chargeStatusStr[] = {"Not Charging", "Pre-charge", "Fast Charging", "Charge Done"};
-  const char* thermalStr[] = {"Normal", "Warm", "Hot", "Cold"};
-  
-  Log.info("PMIC Status: charge=%s, VBUS=%s, thermal=%s, faultReg=0x%02x",
+
+  Log.info("PMIC Status: vbus=%s, powerGood=%s, charge=%s, thermal=%s, vsysMin=%s, faultReg=0x%02x",
+           vbusStatusStr[vbusStatus],
+           powerGood ? "Yes" : "No",
            chargeStatusStr[chargeStatus],
-           vbusGood ? "Good" : "Fault",
-           thermalStr[thermalStatus],
+           thermalRegulation ? "Regulating" : "Normal",
+           inVsysMin ? "Yes" : "No",
            faultReg);
   
   // Detect stuck charging state (charging for >6 hours at same SoC)

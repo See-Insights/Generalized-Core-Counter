@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;8.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;9.00</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -93,6 +93,7 @@ $(function(){initNavTree('_state___common_8h.html','',''); });
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><code>#include &quot;Particle.h&quot;</code><br />
+<code>#include &quot;<a class="el" href="_my_persistent_data_8h_source.html">MyPersistentData.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="_state_handlers_8h_source.html">state/StateHandlers.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="_state_machine_8h_source.html">state/StateMachine.h</a>&quot;</code><br />
 </div>
@@ -100,14 +101,39 @@ $(function(){initNavTree('_state___common_8h.html','',''); });
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
+<tr class="memitem:a41a544e4d6539b3b90c9cdbd3420de83" id="r_a41a544e4d6539b3b90c9cdbd3420de83"><td class="memItemLeft"><a class="el" href="_my_persistent_data_8h.html#a426866053adc87a6b48f04938146e0ff">BatteryTier</a>&#160;</td><td class="memItemRight"><a class="el" href="#a41a544e4d6539b3b90c9cdbd3420de83">applyBatteryAwareConnectionModePolicy</a> (float currentSoC)</td></tr>
 <tr class="memitem:a496510658b21d252547ca67ae1035445" id="r_a496510658b21d252547ca67ae1035445"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a496510658b21d252547ca67ae1035445">dailyCleanup</a> ()</td></tr>
 <tr class="memdesc:a496510658b21d252547ca67ae1035445"><td class="mdescLeft">&#160;</td><td class="mdescRight">Cleanup function that is run at the beginning of the day.  <br /></td></tr>
 <tr class="memitem:a26af5a78d8cca160ca913b5e91a224d6" id="r_a26af5a78d8cca160ca913b5e91a224d6"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a26af5a78d8cca160ca913b5e91a224d6">ensureSensorEnabled</a> (const char *context)</td></tr>
 <tr class="memitem:a6e8d6c80794e3a266d4ef6b976e9c27c" id="r_a6e8d6c80794e3a266d4ef6b976e9c27c"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a6e8d6c80794e3a266d4ef6b976e9c27c">publishData</a> ()</td></tr>
 <tr class="memitem:a5b6d4035a9304bc53863ee513f708b0d" id="r_a5b6d4035a9304bc53863ee513f708b0d"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a5b6d4035a9304bc53863ee513f708b0d">publishDiagnosticSafe</a> (const char *eventName, const char *data, PublishFlags flags)</td></tr>
 <tr class="memdesc:a5b6d4035a9304bc53863ee513f708b0d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Safely publish diagnostic message through queue with depth guard.  <br /></td></tr>
+<tr class="memitem:ae8d84ddf273ffd2dad8fa8fa39191914" id="r_ae8d84ddf273ffd2dad8fa8fa39191914"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#ae8d84ddf273ffd2dad8fa8fa39191914">setAppBreadcrumb</a> (uint8_t code)</td></tr>
 </table>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
+<a id="a41a544e4d6539b3b90c9cdbd3420de83" name="a41a544e4d6539b3b90c9cdbd3420de83"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a41a544e4d6539b3b90c9cdbd3420de83">&#9670;&#160;</a></span>applyBatteryAwareConnectionModePolicy()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="_my_persistent_data_8h.html#a426866053adc87a6b48f04938146e0ff">BatteryTier</a> applyBatteryAwareConnectionModePolicy </td>
+          <td>(</td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>currentSoC</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00704">704</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_battery_backoff_8cpp_source.html#l00006">Cloud::calculateBatteryTier()</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00072">INTERMITTENT</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00074">INTERMITTENT_KEEP_ALIVE</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00055">OCCUPANCY</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00113">TIER_CONSERVING</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00112">TIER_HEALTHY</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___report_8cpp_source.html#l00018">handleReportingState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00052">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00194">setup()</a>.</p>
+
+</div>
+</div>
 <a id="a496510658b21d252547ca67ae1035445" name="a496510658b21d252547ca67ae1035445"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a496510658b21d252547ca67ae1035445">&#9670;&#160;</a></span>dailyCleanup()</h2>
 
@@ -126,7 +152,7 @@ Functions</h2></td></tr>
 <p>Cleanup function that is run at the beginning of the day. </p>
 <p>May or may not be in connected state. Syncs time with remote service and sets low power mode. Called from Reporting <a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8">State</a> ONLY. Cleans house at the beginning of a new day. </p>
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01019">1019</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01156">1156</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
 </div>
 </div>
@@ -149,7 +175,7 @@ Functions</h2></td></tr>
 
 <p class="reference">References <a class="el" href="_sensor_manager_8cpp_source.html#l00056">SensorManager::initializeFromConfig()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00022">SensorManager::instance()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00139">SensorManager::onExitSleep()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___idle_8cpp_source.html#l00031">handleIdleState()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00026">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___idle_8cpp_source.html#l00031">handleIdleState()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00052">handleSleepingState()</a>.</p>
 
 </div>
 </div>
@@ -168,7 +194,7 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00727">727</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00862">862</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
 </div>
 </div>
@@ -216,9 +242,32 @@ Functions</h2></td></tr>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>true if message was queued or published, false if queue was too full. </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00951">951</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01088">1088</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01019">dailyCleanup()</a>, <a class="el" href="_state___connect_8cpp_source.html#l00047">handleConnectingState()</a>, <a class="el" href="_my_persistent_data_8cpp_source.html#l00103">sysStatusData::initialize()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00895">UbidotsHandler()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01156">dailyCleanup()</a>, <a class="el" href="_state___connect_8cpp_source.html#l00047">handleConnectingState()</a>, <a class="el" href="_my_persistent_data_8cpp_source.html#l00103">sysStatusData::initialize()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01032">UbidotsHandler()</a>.</p>
+
+</div>
+</div>
+<a id="ae8d84ddf273ffd2dad8fa8fa39191914" name="ae8d84ddf273ffd2dad8fa8fa39191914"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae8d84ddf273ffd2dad8fa8fa39191914">&#9670;&#160;</a></span>setAppBreadcrumb()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void setAppBreadcrumb </td>
+          <td>(</td>
+          <td class="paramtype">uint8_t</td>          <td class="paramname"><span class="paramname"><em>code</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00180">180</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00175">appBreadcrumb</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00176">appBreadcrumbMs</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00047">handleConnectingState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00052">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00194">setup()</a>.</p>
 
 </div>
 </div>

@@ -18,12 +18,13 @@
 // Global configuration (includes DEBUG_SERIAL define)
 #include "Config.h"
 #include "power/Connectivity.h"
+#include "power/ConnectivityPolicy.h"
 #include "observability/WakeCycleStats.h"
 #include "ThrashGuard.h"
 
 // Firmware version recognized by Particle Product firmware management
 // Bump this integer whenever you cut a new production release.
-PRODUCT_VERSION(8);
+PRODUCT_VERSION(9);
 
 // Hardware abstraction and device-specific pinouts
 #include "device_pinout.h"           // Platform-specific pin definitions
@@ -95,6 +96,7 @@ void dailyCleanup();          // Reset daily counters and housekeeping
 void UbidotsHandler(const char *event, const char *data); // Webhook response handler
 void publishStartupStatus();  // One-time status summary at boot
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE); // Safe diagnostic publish with queue guard
+BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC);
 
 // Instantiate needed libraries / APIs
 SystemSleepConfiguration config; // Sleep 2.0 configuration
@@ -122,6 +124,45 @@ SessionState session;
 // Track when we connected to enforce max connected time in LOW_POWER/DISCONNECTED modes
 unsigned long connectedStartMs = 0;
 
+namespace {
+
+enum AppBreadcrumb : uint8_t {
+  BREADCRUMB_NONE = 0,
+  BREADCRUMB_SETUP_START = 1,
+  BREADCRUMB_SETUP_COMPLETE = 2,
+  BREADCRUMB_SLEEP_ENTRY = 3,
+  BREADCRUMB_WAKE = 4,
+  BREADCRUMB_REPORTING = 5,
+  BREADCRUMB_CONNECT_REQUESTED = 6,
+  BREADCRUMB_CLOUD_CONNECTED = 7,
+  BREADCRUMB_APP_WATCHDOG_RESET = 8,
+};
+
+const char *appBreadcrumbName(uint8_t code) {
+  switch (code) {
+  case BREADCRUMB_SETUP_START:
+    return "SETUP_START";
+  case BREADCRUMB_SETUP_COMPLETE:
+    return "SETUP_COMPLETE";
+  case BREADCRUMB_SLEEP_ENTRY:
+    return "SLEEP_ENTRY";
+  case BREADCRUMB_WAKE:
+    return "WAKE";
+  case BREADCRUMB_REPORTING:
+    return "REPORTING";
+  case BREADCRUMB_CONNECT_REQUESTED:
+    return "CONNECT_REQUESTED";
+  case BREADCRUMB_CLOUD_CONNECTED:
+    return "CLOUD_CONNECTED";
+  case BREADCRUMB_APP_WATCHDOG_RESET:
+    return "APP_WATCHDOG_RESET";
+  default:
+    return "NONE";
+  }
+}
+
+} // namespace
+
 // Boot-storm guard retained state. This protects against repeated resets that
 // occur before setup completes and therefore bypass ERROR_STATE protections.
 retained uint8_t bootStormCount = 0;
@@ -131,6 +172,15 @@ retained uint8_t bootStormLastResetReason = 0;
 retained uint32_t bootStormLastResetReasonData = 0;
 retained uint8_t bootStormTripCount = 0;
 retained bool bootStormAlertPending = false;
+retained uint8_t appBreadcrumb = BREADCRUMB_NONE;
+retained uint32_t appBreadcrumbMs = 0;
+uint8_t startupPreviousBreadcrumb = BREADCRUMB_NONE;
+uint32_t startupPreviousBreadcrumbMs = 0;
+
+void setAppBreadcrumb(uint8_t code) {
+  appBreadcrumb = code;
+  appBreadcrumbMs = millis();
+}
 
 // Webhook response supervision
 // Short-term monitoring is a simple 20s window that starts only when the
@@ -144,6 +194,11 @@ const unsigned long resetWait = 30000;      // Error state dwell before reset
 void setup() {
   const int reason = System.resetReason();
   const uint32_t reasonData = System.resetReasonData();
+  const uint8_t previousBreadcrumb = appBreadcrumb;
+  const uint32_t previousBreadcrumbMs = appBreadcrumbMs;
+  startupPreviousBreadcrumb = previousBreadcrumb;
+  startupPreviousBreadcrumbMs = previousBreadcrumbMs;
+  setAppBreadcrumb(BREADCRUMB_SETUP_START);
   bootStormLastResetReason = (uint8_t)reason;
   bootStormLastResetReasonData = reasonData;
 
@@ -154,6 +209,7 @@ void setup() {
 
   bool qualifiesForStormCount = false;
   switch (reason) {
+  case RESET_REASON_NONE:
 #ifdef RESET_REASON_PANIC
   case RESET_REASON_PANIC:
 #endif
@@ -168,6 +224,12 @@ void setup() {
     break;
   default:
     break;
+  }
+
+  if (previousBootFailedEarly && qualifiesForStormCount) {
+    Log.warn("Previous boot reset early before setup completed (reason=%d data=%lu)",
+             reason,
+             (unsigned long)reasonData);
   }
 
   if (previousBootFailedEarly && qualifiesForStormCount) {
@@ -206,6 +268,10 @@ void setup() {
 
   Log.info("===== Firmware Version %s =====", FIRMWARE_VERSION);
   Log.info("===== Release Notes: %s =====", FIRMWARE_RELEASE_NOTES);
+  Log.info("Previous app breadcrumb: %s (%u) at %lu ms",
+           appBreadcrumbName(previousBreadcrumb),
+           (unsigned)previousBreadcrumb,
+           (unsigned long)previousBreadcrumbMs);
 
   // Observability: start a new wake cycle on cold boot.
   Observability::cycleStats().resetOnWake(millis());
@@ -243,10 +309,8 @@ void setup() {
   // by calling Particle.connect() from CONNECTING_STATE.
 #if Wiring_WiFi
   Log.info("Platform connectivity: WiFi (radio off until CONNECTING_STATE)");
-  Connectivity::requestRadioPowerOff();
 #elif Wiring_Cellular
   Log.info("Platform connectivity: Cellular (radio off until CONNECTING_STATE)");
-  Connectivity::requestRadioPowerOff();
 #else
   Log.info("Platform connectivity: default (Particle.connect only)");
   // Fallback: rely on Particle.connect() in CONNECTING_STATE
@@ -279,8 +343,23 @@ void setup() {
 
   // Configure serial logging based on serial flag
   // Note: Particle firmware on this platform doesn't support Log.level()
-  if (sysStatus.get_serialConnected()) {
+  if (sysStatus.get_serialConnected() || (ALLOW_BLOCKING_SERIAL_WAITS != 0)) {
     Serial.begin(9600);
+
+    // Honor the persisted serialConnected flag with a bounded wait so
+    // USB serial can attach before a low-power device drops back to sleep.
+    // In developer builds, the build profile can force this wait even when
+    // cloud config has not enabled serial logging yet.
+    const unsigned long serialWaitStart = millis();
+    while (!Serial.isConnected() && (millis() - serialWaitStart) < ConnectivityPolicy::DEBUG_SERIAL_WAIT_TIMEOUT_MS) {
+      Particle.process();
+      delay(ConnectivityPolicy::DEBUG_SERIAL_WAIT_POLL_DELAY_MS);
+    }
+
+    if (Serial.isConnected()) {
+      delay(ConnectivityPolicy::DEBUG_SERIAL_POST_CONNECT_DELAY_MS);
+    }
+
     Log.info("Serial logging enabled");
   }
 
@@ -418,6 +497,16 @@ void setup() {
   // soon after the first successful connection.
   publishStartupStatus();
 
+  // Alert 44 is raised late in the previous wake cycle, after the normal
+  // report path has already run. Treat the startup status snapshot as its
+  // one-time report, then clear it so it does not linger into later
+  // direct-connect service paths before the next scheduled report.
+  if (current.get_alertCode() == 44) {
+    Log.info("Clearing alert 44 after startup status snapshot");
+    current.set_alertCode(0);
+    current.set_lastAlertTime(0);
+  }
+
   // ===== TIME AND TIMEZONE CONFIGURATION =====
   // Setup local time from persisted timezone string (POSIX TZ format).
   // This must be configured before we can make any open/close hour decisions.
@@ -451,6 +540,14 @@ void setup() {
         session.suppressAlert40ThisSession = true;
       }
     }
+  }
+
+  // Refresh battery and PMIC telemetry before the first post-boot state
+  // decision so boot->sleep cycles still emit a battery sample. If a prior
+  // low-battery downgrade is active, re-evaluate it immediately on boot.
+  measure.batteryState();
+  if (sysStatus.get_lowBatteryMode()) {
+    applyBatteryAwareConnectionModePolicy(current.get_stateOfCharge());
   }
 
   Log.info("Sensor ready at startup: %s", SensorManager::instance().isSensorReady() ? "true" : "false");
@@ -492,6 +589,7 @@ void setup() {
 
   // setup reached stable completion; clear early-boot in-progress marker.
   bootInProgress = false;
+  setAppBreadcrumb(BREADCRUMB_SETUP_COMPLETE);
   Log.info("Startup complete");
   signalLED(false);  // Turn off startup indicator
 }
@@ -577,7 +675,7 @@ void loop() {
   if (userSwitchDetected) {
     Log.info("User switch pressed - triggering immediate report and connection");
     userSwitchDetected = false;
-    session.occupancyChangeTriggered = true;  // Bypass boundary alignment for immediate connection
+    session.serviceRequestTriggered = true;
     state = REPORTING_STATE;
   }
 
@@ -599,7 +697,44 @@ void loop() {
 
 // ApplicationWatchdog expects a plain function pointer.
 static void appWatchdogHandler() {
+  setAppBreadcrumb(BREADCRUMB_APP_WATCHDOG_RESET);
   System.reset();
+}
+
+BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC) {
+  BatteryTier newTier = Cloud::calculateBatteryTier(currentSoC);
+  uint8_t prevTierValue = sysStatus.get_currentBatteryTier();
+  const char* tierNames[] = {"HEALTHY", "CONSERVING", "CRITICAL", "SURVIVAL"};
+
+  if (newTier != prevTierValue) {
+    const char* prevName = (prevTierValue < 4) ? tierNames[prevTierValue] : "UNKNOWN";
+    const char* newName = tierNames[newTier];
+    Log.info("Battery tier transition: %s -> %s (SoC=%.1f%%)", prevName, newName, (double)currentSoC);
+    sysStatus.set_currentBatteryTier(static_cast<uint8_t>(newTier));
+  }
+
+  if (sysStatus.get_sensorMode() == OCCUPANCY) {
+    ConnectionMode currentMode = static_cast<ConnectionMode>(sysStatus.get_connectionMode());
+    bool lowBatteryDowngradeActive = sysStatus.get_lowBatteryMode();
+
+    if (currentMode == INTERMITTENT_KEEP_ALIVE && newTier >= TIER_CONSERVING) {
+      Log.info("Battery conservation: Disabling KEEP_ALIVE mode (tier=%s, SoC=%.1f%%) - switching to INTERMITTENT",
+               tierNames[newTier], (double)currentSoC);
+      sysStatus.set_connectionMode(INTERMITTENT);
+      sysStatus.set_lowBatteryMode(true);
+    } else if (currentMode == INTERMITTENT && lowBatteryDowngradeActive && newTier == TIER_HEALTHY) {
+      Log.info("Battery recovery: Restoring KEEP_ALIVE mode (tier=HEALTHY, SoC=%.1f%%)",
+               (double)currentSoC);
+      sysStatus.set_connectionMode(INTERMITTENT_KEEP_ALIVE);
+      sysStatus.set_lowBatteryMode(false);
+    } else if (currentMode != INTERMITTENT && lowBatteryDowngradeActive) {
+      sysStatus.set_lowBatteryMode(false);
+    }
+  } else if (sysStatus.get_lowBatteryMode()) {
+    sysStatus.set_lowBatteryMode(false);
+  }
+
+  return newTier;
 }
 
 static bool isWithinOpenHoursForHour(uint8_t hour, uint8_t openHour, uint8_t closeHour) {
@@ -851,7 +986,7 @@ void publishData() {
  * before the radio is brought up.
  */
 void publishStartupStatus() {
-  char status[224];
+  char status[320];
 
   int resetReason = System.resetReason();
   uint32_t resetReasonData = System.resetReasonData();
@@ -860,13 +995,15 @@ void publishStartupStatus() {
   unsigned long freeHeap = System.freeMemory();
 
   snprintf(status, sizeof(status),
-           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu}",
+           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu}",
            FIRMWARE_VERSION,
            resetReason,
            (unsigned long)resetReasonData,
            (int)alertCode,
            (long)lastAlert,
-           freeHeap);
+           freeHeap,
+           (unsigned)startupPreviousBreadcrumb,
+           (unsigned long)startupPreviousBreadcrumbMs);
 
   PublishQueuePosix::instance().publish("status", status, PRIVATE);
   Log.info("Startup status: %s", status);
@@ -928,7 +1065,7 @@ void UbidotsHandler(const char *event, const char *data) {
       snprintf(responseString, sizeof(responseString), "Response Received");
     }
   }
-  if (sysStatus.get_verboseMode() && Particle.connected()) {
+  if (sysStatus.get_verboseMode() && Particle.connected() && PublishQueuePosix::instance().getCanSleep()) {
     publishDiagnosticSafe("Ubidots Hook", responseString, PRIVATE);
   }
   Log.info("%s", responseString);

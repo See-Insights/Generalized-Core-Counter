@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;8.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;9.00</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -93,14 +93,14 @@ $(function(){initNavTree('_config_8h.html','',''); });
 </div><!--header-->
 <div class="contents">
 
-<p>Global compile-time configuration options and enums.  
+<p>Backward-compatible wrapper for shared project settings.  
 <a href="#details">More...</a></p>
-<div class="textblock"><code>#include &quot;<a class="el" href="_build_profile_8h_source.html">BuildProfile.h</a>&quot;</code><br />
+<div class="textblock"><code>#include &quot;<a class="el" href="_settings_8h_source.html">Settings.h</a>&quot;</code><br />
 </div>
 <p><a href="_config_8h_source.html">Go to the source code of this file.</a></p>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
-<div class="textblock"><p>Global compile-time configuration options and enums. </p>
-<p>This header is reserved for project-wide configuration values and enumerations (such as sensor type selection) that are shared across modules. Some configuration is currently defined in other headers and implementation files; this file provides a single place for Doxygen to anchor high-level configuration documentation. </p>
+<div class="textblock"><p>Backward-compatible wrapper for shared project settings. </p>
+<p>New code should include <a class="el" href="_settings_8h.html" title="Central catalog of shared build, hardware-override, and project settings.">Settings.h</a> directly when it needs shared build or project settings. This wrapper remains so existing includes do not need to change all at once. </p>
 
 <p class="definition">Definition in file <a class="el" href="_config_8h_source.html">Config.h</a>.</p>
 </div></div><!-- contents -->

@@ -15,6 +15,32 @@
 #include "observability/WakeCycleStats.h"
 #include "ThrashGuard.h"
 
+namespace {
+
+unsigned long computeCloudSyncTimeoutMs(uint16_t queueDepth) {
+  const unsigned long baseTimeoutMs = ConnectivityPolicy::CLOUD_OPS_GATE_TIMEOUT_MS;
+  if (queueDepth == 0) {
+    return baseTimeoutMs;
+  }
+
+  const unsigned long publishStartupMs = 2000UL;
+  const unsigned long perEventDrainMs = 1000UL;
+  const unsigned long queueDrainCushionMs = 5000UL;
+  const unsigned long maxTimeoutMs = 120000UL;
+
+  unsigned long queueAwareTimeoutMs =
+      publishStartupMs + ((unsigned long)queueDepth * perEventDrainMs) + queueDrainCushionMs;
+  if (queueAwareTimeoutMs < baseTimeoutMs) {
+    queueAwareTimeoutMs = baseTimeoutMs;
+  }
+  if (queueAwareTimeoutMs > maxTimeoutMs) {
+    queueAwareTimeoutMs = maxTimeoutMs;
+  }
+  return queueAwareTimeoutMs;
+}
+
+} // namespace
+
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
 // No behavioral changes were made.
@@ -28,6 +54,7 @@ void handleSleepingState() {
   static bool operationsCompleteLogged = false;  // Track if we've logged completion message
 
   if (enteredState) {
+    setAppBreadcrumb(3);
     publishStateTransition();
     operationsCompleteLogged = false;  // Reset flag on state entry
     // One-time diagnostic on entry so logs clearly show the device's view of park hours.
@@ -46,8 +73,12 @@ void handleSleepingState() {
   // Determine if we will use *effective* network standby for the upcoming sleep.
   // Only cellular platforms actually apply standby; on WiFi, treat as disabled
   // so disconnect logic doesn't wait for a radio state that won't change.
+  // Standby is only useful after a successful cloud session in the current
+  // wake cycle; if connect never succeeded, preserving the modem state buys
+  // nothing and can carry a bad NCP state into the next wake.
   bool useNetworkStandbyEffective = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) &&
-                                   isWithinOpenHours();
+                                   isWithinOpenHours() &&
+                                   Observability::cycleStats().connect_result == Observability::WakeCycleStats::ConnectResult::SUCCESS;
 #if HAL_PLATFORM_CELLULAR
   useNetworkStandbyEffective = useNetworkStandbyEffective && !Cellular.isOff();
 #else
@@ -78,7 +109,8 @@ void handleSleepingState() {
   // NOTE: This code is non-blocking at application level (Particle.process() called)
   // but blocks state transition until prerequisites complete or timeout.
   static unsigned long cloudSyncStartMs = 0;
-  const unsigned long CLOUD_SYNC_TIMEOUT_MS = ConnectivityPolicy::CLOUD_OPS_GATE_TIMEOUT_MS;
+  static unsigned long cloudSyncBudgetMs = 0;
+  static uint16_t cloudSyncMaxQueueDepth = 0;
 
   // ********** Non-blocking disconnect + modem power-down **********
   // Device OS already manages the asynchronous cloud session teardown once
@@ -97,6 +129,8 @@ void handleSleepingState() {
   if (enteredState) {
     disconnectRequested = false;
     disconnectRequestStartMs = 0;
+    cloudSyncBudgetMs = 0;
+    cloudSyncMaxQueueDepth = 0;
 #if Wiring_WiFi
     wifiOffGuardActive = false;
     wifiOffGuardStartMs = 0;
@@ -125,6 +159,13 @@ void handleSleepingState() {
     bool updatesChecked = !System.updatesPending();
     bool webhookConfirmed = !session.awaitingWebhookResponse;
     uint16_t queueDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
+    if (queueDepth > cloudSyncMaxQueueDepth) {
+      cloudSyncMaxQueueDepth = queueDepth;
+    }
+    unsigned long queueAwareBudgetMs = computeCloudSyncTimeoutMs(cloudSyncMaxQueueDepth);
+    if (queueAwareBudgetMs > cloudSyncBudgetMs) {
+      cloudSyncBudgetMs = queueAwareBudgetMs;
+    }
 
     {
       static uint16_t lastQueueDepth = 0xFFFF;
@@ -139,16 +180,17 @@ void handleSleepingState() {
     if (!allComplete) {
       unsigned long elapsedMs = millis() - cloudSyncStartMs;
 
-      if (elapsedMs < CLOUD_SYNC_TIMEOUT_MS) {
+      if (elapsedMs < cloudSyncBudgetMs) {
         // Still within budget - log status every 5 seconds
         static unsigned long lastStatusLogMs = 0;
         if ((millis() - lastStatusLogMs) > ConnectivityPolicy::CLOUD_OPS_STATUS_LOG_INTERVAL_MS) {
-          Log.info("SLEEP: Waiting for cloud operations - queue:%s ledgers:%s updates:%s webhook:%s (%lu/%lu ms)",
+          Log.info("SLEEP: Waiting for cloud operations - queue:%s(%u) ledgers:%s updates:%s webhook:%s (%lu/%lu ms)",
                    queueEmpty ? "Y" : "N",
+                   (unsigned)queueDepth,
                    ledgersSynced ? "Y" : "N",
                    updatesChecked ? "Y" : "N",
                    webhookConfirmed ? "Y" : "N",
-                   elapsedMs, CLOUD_SYNC_TIMEOUT_MS);
+                   elapsedMs, cloudSyncBudgetMs);
           lastStatusLogMs = millis();
         }
         // Mark progress to prevent ThrashGuard timeout during legitimate cloud operations wait
@@ -158,9 +200,13 @@ void handleSleepingState() {
       }
 
       // Budget exceeded - log incomplete operations and raise ONE alert (priority order)
-      Log.warn("SLEEP: Cloud sync timeout after %lu ms", elapsedMs);
-      Log.warn("SLEEP: State at timeout - queue=%d ledgers=%d updates=%d webhook=%d",
-               queueEmpty, ledgersSynced, updatesChecked, webhookConfirmed);
+      Log.warn("SLEEP: Cloud sync timeout after %lu ms (budget=%lu ms, queueDepth=%u maxQueueDepth=%u)",
+           elapsedMs,
+           cloudSyncBudgetMs,
+           (unsigned)queueDepth,
+           (unsigned)cloudSyncMaxQueueDepth);
+      Log.warn("SLEEP: State at timeout - queueEmpty=%d queueDepth=%u ledgers=%d updates=%d webhook=%d",
+           queueEmpty, (unsigned)queueDepth, ledgersSynced, updatesChecked, webhookConfirmed);
 
       // Only raise one alert - check in priority order (queue > ledger > updates > webhook)
       if (!queueEmpty) {
@@ -170,7 +216,7 @@ void handleSleepingState() {
         // Enhanced diagnostics for Alert 44 troubleshooting
         Log.warn("SLEEP: Ledger sync incomplete - raising alert 44");
         Log.warn("Alert 44 context: timeout after %lu ms (budget=%lu ms)",
-                 elapsedMs, CLOUD_SYNC_TIMEOUT_MS);
+                 elapsedMs, cloudSyncBudgetMs);
         current.raiseAlert(44); // Ledger sync timeout before sleep (minor - config already applied)
       } else if (!updatesChecked) {
         Log.warn("SLEEP: OTA updates pending - raising alert 42");
@@ -182,9 +228,13 @@ void handleSleepingState() {
 
       // Proceed with disconnect despite incomplete operations
       cloudSyncStartMs = 0;
+      cloudSyncBudgetMs = 0;
+      cloudSyncMaxQueueDepth = 0;
     } else {
       // All operations complete - reset timer and proceed
       cloudSyncStartMs = 0;
+      cloudSyncBudgetMs = 0;
+      cloudSyncMaxQueueDepth = 0;
     }
 
     if (!operationsCompleteLogged) {
@@ -202,6 +252,8 @@ void handleSleepingState() {
   } else {
     // Not connected - reset timer
     cloudSyncStartMs = 0;
+    cloudSyncBudgetMs = 0;
+    cloudSyncMaxQueueDepth = 0;
   }
 
   // If we're going to sleep with cellular network standby, do NOT wait for radio-off.
@@ -718,34 +770,28 @@ void handleSleepingState() {
 
   // Mark progress immediately after wake to reset ThrashGuard timer
   thrashGuard.markProgress("WAKE_FROM_SLEEP");
+  setAppBreadcrumb(4);
 
-#ifdef DEBUG_SERIAL
-  // Photon2 USB serial needs time to re-enumerate after sleep.
-  // Must re-initialize before any Log.info() calls to avoid corrupted output.
-  Serial.begin();  // Re-initialize serial port
+  if (sysStatus.get_serialConnected() || (ALLOW_BLOCKING_SERIAL_WAITS != 0)) {
+    // Re-initialize USB serial after wake and give the host a bounded chance
+    // to re-enumerate before we continue through another short wake cycle.
+    Serial.begin(9600);
+    delay(ConnectivityPolicy::DEBUG_SERIAL_REENUM_DELAY_MS);
 
-#if ALLOW_BLOCKING_SERIAL_WAITS
-  delay(ConnectivityPolicy::DEBUG_SERIAL_REENUM_DELAY_MS);     // Give USB time to re-enumerate
+    unsigned long serialWaitStart = millis();
+    while (!Serial.isConnected() && (millis() - serialWaitStart) < ConnectivityPolicy::DEBUG_SERIAL_WAIT_TIMEOUT_MS) {
+      thrashGuard.markProgress("SERIAL_WAIT");
+      Particle.process();
+      delay(ConnectivityPolicy::DEBUG_SERIAL_WAIT_POLL_DELAY_MS);
+    }
 
-  // Use blocking wait for serial connection - waitFor() is non-blocking
-  // and the device would go back to sleep before connection established
-  unsigned long serialWaitStart = millis();
-  while (!Serial.isConnected() && (millis() - serialWaitStart) < ConnectivityPolicy::DEBUG_SERIAL_WAIT_TIMEOUT_MS) {
-    // Feed application watchdog during the wait to prevent reset
-    // Also mark progress for ThrashGuard to prevent timeout during legitimate serial wait
-    thrashGuard.markProgress("SERIAL_WAIT");
-    Particle.process();
-    delay(ConnectivityPolicy::DEBUG_SERIAL_WAIT_POLL_DELAY_MS);  // Blocking wait for serial connection
+    if (Serial.isConnected()) {
+      delay(ConnectivityPolicy::DEBUG_SERIAL_POST_CONNECT_DELAY_MS);
+      Log.info("Serial reconnected after %lu ms", (millis() - serialWaitStart));
+    } else {
+      Log.warn("Serial did not reconnect within 30s - continuing without serial");
+    }
   }
-
-  if (Serial.isConnected()) {
-    delay(ConnectivityPolicy::DEBUG_SERIAL_POST_CONNECT_DELAY_MS);  // Extra settling time after connection
-    Log.info("Serial reconnected after %lu ms", (millis() - serialWaitStart));
-  } else {
-    Log.warn("Serial did not reconnect within 30s - continuing without serial");
-  }
-#endif // ALLOW_BLOCKING_SERIAL_WAITS
-#endif // DEBUG_SERIAL
 
   // Re-attach user button interrupt after sleep (sleep may have detached it)
   attachInterrupt(BUTTON_PIN, userSwitchISR, FALLING);
@@ -781,10 +827,11 @@ void handleSleepingState() {
   }
 
   if (buttonWake) {
-    // User button wake: go directly to CONNECTING_STATE.
+    // User button wake: queue a fresh service report, then force immediate connect.
     SensorManager::instance().onExitSleep();
-    Log.info("WAKE: Button pressed - reason=SERVICE_REQUEST transitioning to CONNECTING_STATE");
-    state = CONNECTING_STATE;
+    session.serviceRequestTriggered = true;
+    Log.info("WAKE: Button pressed - reason=SERVICE_REQUEST transitioning to REPORTING_STATE");
+    state = REPORTING_STATE;
     return;
   } else {
     // In this state the device was awoken for hourly reporting or PIR
@@ -834,11 +881,17 @@ void handleSleepingState() {
       Log.info("Space now UNOCCUPIED (LED timeout on wake) - Session: %lu sec, Total today: %lu sec",
                sessionDuration, totalOccupied);
       
-      // Report immediately on occupancy state changes
-      Log.info("Occupancy change detected (occupied->unoccupied) - triggering immediate report");
-      session.occupancyChangeTriggered = true;
-      state = REPORTING_STATE;
-      return;
+      // Match the rest of the occupancy state machine: only KEEP_ALIVE mode
+      // forces an immediate report/connect on occupancy transitions.
+      if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
+        Log.info("Occupancy change detected (occupied->unoccupied) - triggering immediate report");
+        session.occupancyChangeTriggered = true;
+        state = REPORTING_STATE;
+        return;
+      }
+
+      Log.info("Occupancy change detected (occupied->unoccupied) - no immediate report (connectionMode=%d)",
+               (int)sysStatus.get_connectionMode());
     }
 
     // Process PIR wake events (after checking LED timeout above)
@@ -857,6 +910,14 @@ void handleSleepingState() {
       } else if (sysStatus.get_sensorMode() == OCCUPANCY) {
         // Occupancy mode: PIR wakes are expected behavior, not thrashing
         thrashGuard.markProgress("PIR_WAKE_OCCUPANCY");
+
+        // If KEEP_ALIVE was temporarily disabled for low battery, refresh the
+        // battery policy on wake so recovered power can restore the intended
+        // occupancy behavior before we decide whether to report or sleep again.
+        if (sysStatus.get_lowBatteryMode()) {
+          measure.batteryState();
+          applyBatteryAwareConnectionModePolicy(current.get_stateOfCharge());
+        }
         
         if (!current.get_occupied()) {
           current.set_occupied(true);
@@ -875,11 +936,19 @@ void handleSleepingState() {
           Log.info("Space now OCCUPIED from PIR wake at %s",
                    Time.timeStr().c_str());
           
-          // Report immediately on occupancy state changes
-          Log.info("Occupancy change detected (unoccupied->occupied) - triggering immediate report");
-          session.occupancyChangeTriggered = true;
-          state = REPORTING_STATE;
-          return;
+          // Match the rest of the occupancy state machine: only KEEP_ALIVE mode
+          // forces an immediate report/connect on occupancy transitions.
+          if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
+            Log.info("Occupancy change detected (unoccupied->occupied) - triggering immediate report");
+            session.occupancyChangeTriggered = true;
+            setAppBreadcrumb(5);
+            setAppBreadcrumb(5);
+            state = REPORTING_STATE;
+            return;
+          }
+
+          Log.info("Occupancy change detected (unoccupied->occupied) - no immediate report (connectionMode=%d)",
+                   (int)sysStatus.get_connectionMode());
         } else {
           // Already occupied - motion detected during debounce, restart timer
           uint32_t debounceMs = sensorConfig.get_sensorSetting1();

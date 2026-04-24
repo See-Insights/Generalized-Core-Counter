@@ -131,6 +131,7 @@ void handleConnectingState() {
 #endif
   Log.info("Requesting Particle cloud connection (freeHeap=%lu)",
        (unsigned long)System.freeMemory());
+    setAppBreadcrumb(6);
     Particle.connect();
     connectRequested = true;
     thrashGuard.markProgress("CONNECT_START");
@@ -159,6 +160,7 @@ void handleConnectingState() {
   if (Particle.connected()) {
     if (!postConnectDone) {
       thrashGuard.markProgress("CLOUD_CONNECTED");
+      setAppBreadcrumb(7);
       connectedStartMs = millis();
       sysStatus.set_lastConnection(Time.now());
 

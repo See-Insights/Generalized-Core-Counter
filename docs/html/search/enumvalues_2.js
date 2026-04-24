@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['deep_0',['DEEP',['../struct_observability_1_1_wake_cycle_stats.html#a54f787bfc1fab38f76cbd367716e8c12ac7489a84585b023358dc07a421411f45',1,'Observability::WakeCycleStats']]],
-  ['disconnected_1',['DISCONNECTED',['../_my_persistent_data_8h.html#a6ed5b36c9cd209c52088cb9029de61b3acdaad1112073e3e2ea032424c38c34e1',1,'MyPersistentData.h']]],
-  ['distance_2',['DISTANCE',['../_sensor_factory_8h.html#a87ca7b4499ea761999a872674eba32afab06c2037eb7a58030a42212c8244d477',1,'SensorFactory.h']]]
+  ['connected_0',['CONNECTED',['../_my_persistent_data_8h.html#a6ed5b36c9cd209c52088cb9029de61b3a7a691a2430ec26878897b5fbc9c22a4c',1,'MyPersistentData.h']]],
+  ['connecting_5fstate_1',['CONNECTING_STATE',['../_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a549bd89b38411c3eb84cead55c7df867',1,'StateMachine.h']]],
+  ['counting_2',['COUNTING',['../_my_persistent_data_8h.html#abc47929dd59afff19be8147ebe8fa684aceae44f0ce8284b8a154151dfcb28ab1',1,'MyPersistentData.h']]]
 ];

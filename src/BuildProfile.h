@@ -16,9 +16,9 @@
  * - DEV (non-blocking): -DDEV_BUILD=1
  * - DEV (blocking waits enabled): -DDEV_BUILD=1 -DALLOW_BLOCKING_SERIAL_WAITS=1
  *
- * Current repo defaults are set for development with blocking waits enabled.
- * Switch to field-safe behavior by setting DEV_BUILD=0 (and optionally
- * ALLOW_BLOCKING_SERIAL_WAITS=0) at build time.
+ * Current repo defaults are set for field-safe behavior.
+ * Switch to developer behavior by setting DEV_BUILD=1 (and optionally
+ * ALLOW_BLOCKING_SERIAL_WAITS=1) at build time.
  */
 #ifndef DEV_BUILD
 /**
