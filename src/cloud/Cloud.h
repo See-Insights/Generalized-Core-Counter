@@ -216,8 +216,14 @@ private:
 
 public:
     /**
-     * @brief Check if ledgers have synced from cloud
-     * @return true if all ledgers have completed initial sync
+    * @brief Check whether the input ledgers are ready for the current sleep gate.
+    *
+    * Returns true immediately once both cloud-input ledgers have synced.
+    * If neither ledger has synced after the connection window expires, the
+    * helper treats them as intentionally empty and also returns true.
+    * Partial sync after the timeout is treated as a real failure and returns false.
+    *
+    * @return true if the current connection has satisfied ledger readiness rules
      */
     bool areLedgersSynced() const;
 

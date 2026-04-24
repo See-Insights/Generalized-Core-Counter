@@ -124,14 +124,14 @@ void handleSleepingState() {
     bool ledgersSynced = Cloud::instance().areLedgersSynced();
     bool updatesChecked = !System.updatesPending();
     bool webhookConfirmed = !session.awaitingWebhookResponse;
+    uint16_t queueDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
 
     {
       static uint16_t lastQueueDepth = 0xFFFF;
-      uint16_t depth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
-      if (lastQueueDepth != 0xFFFF && depth < lastQueueDepth) {
+      if (lastQueueDepth != 0xFFFF && queueDepth < lastQueueDepth) {
         thrashGuard.markProgress("QUEUE_DRAIN");
       }
-      lastQueueDepth = depth;
+      lastQueueDepth = queueDepth;
     }
 
     bool allComplete = queueEmpty && ledgersSynced && updatesChecked && webhookConfirmed;

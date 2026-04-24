@@ -23,7 +23,7 @@
 
 // Firmware version recognized by Particle Product firmware management
 // Bump this integer whenever you cut a new production release.
-PRODUCT_VERSION(7);
+PRODUCT_VERSION(8);
 
 // Hardware abstraction and device-specific pinouts
 #include "device_pinout.h"           // Platform-specific pin definitions

@@ -1,5 +1,6 @@
 var NAVTREEINDEX1 =
 {
+"class_cloud.html#abd1e7289193949f93905243f7fb848cf":[19,0,2,3],
 "class_cloud.html#ac3b4ccc03e48584cacf48d803c2c9737":[19,0,2,1],
 "class_cloud.html#ad4f5a131e2d2e3c2349d03e892ff40ab":[19,0,2,4],
 "class_cloud.html#af5b5031e09251a860c35e82e96bd1eef":[19,0,2,0],
@@ -248,6 +249,5 @@ var NAVTREEINDEX1 =
 "classsys_status_data_1_1_sys_data.html#a00dd45aa7796876b69f20b29ec4c54a6":[19,0,13,0,8],
 "classsys_status_data_1_1_sys_data.html#a02d2a15146a6aa1fd512809eff624ca5":[19,0,13,0,4],
 "classsys_status_data_1_1_sys_data.html#a0bbf6577468e7f05f9101582d2ac0c61":[19,0,13,0,15],
-"classsys_status_data_1_1_sys_data.html#a0e444ace1641199039b9dbdf2ea2ab19":[19,0,13,0,36],
-"classsys_status_data_1_1_sys_data.html#a124d1947b9d0a93e46b95f4bfc98527a":[19,0,13,0,0]
+"classsys_status_data_1_1_sys_data.html#a0e444ace1641199039b9dbdf2ea2ab19":[19,0,13,0,36]
 };

@@ -16,6 +16,22 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## 8.00 – 2026-04-23
+
+### Added
+
+- **Targeted soak diagnostics for the ledger sync helper**: Retained a throttled `LEDGER_SYNC_DIAG` trace in `Cloud::areLedgersSynced()` so remote soak devices can confirm connection-window resets and immediate success when both ledgers are already synced.
+
+### Changed
+
+- **Release metadata updated for v8 soak rollout**: Bumped Particle product version, firmware version string, and Doxygen project number to `8.00`.
+- **Ledger sync diagnostics narrowed**: Removed the broader sleep-gate Alert 44 diagnostic spam and kept only the helper-level logging needed to validate the semantic fix during fleet soak.
+
+### Fixed
+
+- **Alert 44 false positives after reconnect**: `Cloud::areLedgersSynced()` now returns true immediately when both ledgers are already synced instead of forcing the full connection window.
+- **Stale ledger sync window reuse across cycles**: The helper now resets its timing window on each newly observed cloud connection, preventing one cycle's sync state from leaking into later sleep gates.
+
 ## 7.00 – 2026-04-21
 
 ### Added

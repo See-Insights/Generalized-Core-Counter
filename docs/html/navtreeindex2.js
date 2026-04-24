@@ -1,5 +1,6 @@
 var NAVTREEINDEX2 =
 {
+"classsys_status_data_1_1_sys_data.html#a124d1947b9d0a93e46b95f4bfc98527a":[19,0,13,0,0],
 "classsys_status_data_1_1_sys_data.html#a16316871cb17f0e9643e7a8a4efab0b0":[19,0,13,0,32],
 "classsys_status_data_1_1_sys_data.html#a1d988ae2845765cdaa981f5ea8655269":[19,0,13,0,6],
 "classsys_status_data_1_1_sys_data.html#a294ecc86e44f7cb180ea78debdf7914a":[19,0,13,0,35],
@@ -248,6 +249,5 @@ var NAVTREEINDEX2 =
 "struct_observability_1_1_wake_cycle_stats.html":[18,0,7,0],
 "struct_observability_1_1_wake_cycle_stats.html":[19,0,1,0],
 "struct_observability_1_1_wake_cycle_stats.html#a01919984ad1f9ed240ef2dcebb566593":[18,0,7,0,27],
-"struct_observability_1_1_wake_cycle_stats.html#a01919984ad1f9ed240ef2dcebb566593":[19,0,1,0,27],
-"struct_observability_1_1_wake_cycle_stats.html#a06cab85b425af73192f92487cb60d163":[18,0,7,0,11]
+"struct_observability_1_1_wake_cycle_stats.html#a01919984ad1f9ed240ef2dcebb566593":[19,0,1,0,27]
 };

@@ -112,8 +112,8 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "_battery_backoff_8cpp.html",
-"class_cloud.html#ac3b4ccc03e48584cacf48d803c2c9737",
-"classsys_status_data_1_1_sys_data.html#a16316871cb17f0e9643e7a8a4efab0b0",
+"class_cloud.html#abd1e7289193949f93905243f7fb848cf",
+"classsys_status_data_1_1_sys_data.html#a124d1947b9d0a93e46b95f4bfc98527a",
 "struct_observability_1_1_wake_cycle_stats.html#a06cab85b425af73192f92487cb60d163"
 ];
 

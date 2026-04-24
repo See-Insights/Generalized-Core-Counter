@@ -41,6 +41,13 @@
 #define ALLOW_BLOCKING_SERIAL_WAITS 0
 #endif
 
+#ifndef ALERT44_DIAG_ENABLED
+/**
+ * @brief Enable temporary ledger-sync helper diagnostics for Alert 44 soak validation.
+ */
+#define ALERT44_DIAG_ENABLED 1
+#endif
+
 // Optional convenience: enable DEBUG_SERIAL in DEV builds unless overridden.
 #if DEV_BUILD && !defined(DEBUG_SERIAL)
 #define DEBUG_SERIAL

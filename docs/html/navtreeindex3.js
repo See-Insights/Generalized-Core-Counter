@@ -1,5 +1,6 @@
 var NAVTREEINDEX3 =
 {
+"struct_observability_1_1_wake_cycle_stats.html#a06cab85b425af73192f92487cb60d163":[18,0,7,0,11],
 "struct_observability_1_1_wake_cycle_stats.html#a06cab85b425af73192f92487cb60d163":[19,0,1,0,11],
 "struct_observability_1_1_wake_cycle_stats.html#a07867322eacd08453e641f274641a853":[18,0,7,0,31],
 "struct_observability_1_1_wake_cycle_stats.html#a07867322eacd08453e641f274641a853":[19,0,1,0,31],

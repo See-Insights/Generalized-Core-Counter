@@ -3,9 +3,10 @@ var NAVTREEINDEX0 =
 "_battery_backoff_8cpp.html":[20,0,0,0,0],
 "_battery_backoff_8cpp_source.html":[20,0,0,0,0],
 "_build_profile_8h.html":[20,0,0,6],
-"_build_profile_8h.html#a1c8895ff02f86bdd856ef0110a1a7a47":[20,0,0,6,1],
-"_build_profile_8h.html#a862e5c5913487ba4049590c35342976c":[20,0,0,6,0],
-"_build_profile_8h.html#ad4ad87bab679b526e350864dcf54b49b":[20,0,0,6,2],
+"_build_profile_8h.html#a1c8895ff02f86bdd856ef0110a1a7a47":[20,0,0,6,2],
+"_build_profile_8h.html#a514aaf0b3362e1c52cab3da5f36439dc":[20,0,0,6,0],
+"_build_profile_8h.html#a862e5c5913487ba4049590c35342976c":[20,0,0,6,1],
+"_build_profile_8h.html#ad4ad87bab679b526e350864dcf54b49b":[20,0,0,6,3],
 "_build_profile_8h_source.html":[20,0,0,6],
 "_cloud_8cpp.html":[20,0,0,0,1],
 "_cloud_8cpp_source.html":[20,0,0,0,1],
@@ -43,7 +44,6 @@ var NAVTREEINDEX0 =
 "_generalized-_core-_counter_8cpp.html#a86638d99bd9bb52857597c7d38466738":[20,0,0,10,20],
 "_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79":[20,0,0,10,32],
 "_generalized-_core-_counter_8cpp.html#a8e11b98139fe014f3e8a660d91905438":[20,0,0,10,34],
-"_generalized-_core-_counter_8cpp.html#a8e73e5fce5c5f4500e4e85fc8dd78bb1":[20,0,0,10,5],
 "_generalized-_core-_counter_8cpp.html#a98dbb1ba2c2de8358c8e27e2fa03859c":[20,0,0,10,28],
 "_generalized-_core-_counter_8cpp.html#a9ae784228f6b9b5ec7d14839274b3448":[20,0,0,10,30],
 "_generalized-_core-_counter_8cpp.html#aab460ebc929e6456962e8824df9fcf50":[20,0,0,10,16],
@@ -52,6 +52,7 @@ var NAVTREEINDEX0 =
 "_generalized-_core-_counter_8cpp.html#abcd5d33fa869a1d746ac85a5f6ac720b":[20,0,0,10,33],
 "_generalized-_core-_counter_8cpp.html#ac16a315a5eca7df5546ff98c90c5072e":[20,0,0,10,18],
 "_generalized-_core-_counter_8cpp.html#ac76c3827d7e201a452741421f4737990":[20,0,0,10,0],
+"_generalized-_core-_counter_8cpp.html#ac869b8acb82cc5251120ca2f63e05749":[20,0,0,10,5],
 "_generalized-_core-_counter_8cpp.html#acbe01778898ecb2b953cc096aeb6539a":[20,0,0,10,24],
 "_generalized-_core-_counter_8cpp.html#acf025b054301360475a0ec4542f74ff3":[20,0,0,10,26],
 "_generalized-_core-_counter_8cpp.html#ad46915a4f3e89ba9e29e19720677db47":[20,0,0,10,13],
@@ -248,6 +249,5 @@ var NAVTREEINDEX0 =
 "class_cloud.html#a82b4714d5ad360e54ad9bece976b3860":[19,0,2,5],
 "class_cloud.html#a832b2fee272f68202c5877a0b2fee7c0":[19,0,2,8],
 "class_cloud.html#a89d68dd84add935e621be4b7b380192a":[19,0,2,7],
-"class_cloud.html#ab6354f2706aa556f0fb0ee8a625c722c":[19,0,2,6],
-"class_cloud.html#abd1e7289193949f93905243f7fb848cf":[19,0,2,3]
+"class_cloud.html#ab6354f2706aa556f0fb0ee8a625c722c":[19,0,2,6]
 };
