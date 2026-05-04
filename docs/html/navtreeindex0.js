@@ -48,7 +48,6 @@ var NAVTREEINDEX0 =
 "_generalized-_core-_counter_8cpp.html#a86638d99bd9bb52857597c7d38466738":[20,0,0,10,26],
 "_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79":[20,0,0,10,40],
 "_generalized-_core-_counter_8cpp.html#a8e11b98139fe014f3e8a660d91905438":[20,0,0,10,42],
-"_generalized-_core-_counter_8cpp.html#a8e25b3a8bd65c4120b1df0b941ffb167":[20,0,0,10,8],
 "_generalized-_core-_counter_8cpp.html#a98dbb1ba2c2de8358c8e27e2fa03859c":[20,0,0,10,34],
 "_generalized-_core-_counter_8cpp.html#a9ae784228f6b9b5ec7d14839274b3448":[20,0,0,10,36],
 "_generalized-_core-_counter_8cpp.html#aab460ebc929e6456962e8824df9fcf50":[20,0,0,10,22],
@@ -61,6 +60,7 @@ var NAVTREEINDEX0 =
 "_generalized-_core-_counter_8cpp.html#acbe01778898ecb2b953cc096aeb6539a":[20,0,0,10,30],
 "_generalized-_core-_counter_8cpp.html#acf025b054301360475a0ec4542f74ff3":[20,0,0,10,32],
 "_generalized-_core-_counter_8cpp.html#ad46915a4f3e89ba9e29e19720677db47":[20,0,0,10,17],
+"_generalized-_core-_counter_8cpp.html#ad500242a86166c1fe064fd0500bda870":[20,0,0,10,8],
 "_generalized-_core-_counter_8cpp.html#ada98fd6c3ac770e6a604ce883e8b7966":[20,0,0,10,14],
 "_generalized-_core-_counter_8cpp.html#adaf14f9ee408635f2c952b99aaeda484":[20,0,0,10,5],
 "_generalized-_core-_counter_8cpp.html#ae8d84ddf273ffd2dad8fa8fa39191914":[20,0,0,10,15],
@@ -144,7 +144,8 @@ var NAVTREEINDEX0 =
 "_sensor_factory_8h.html#a87ca7b4499ea761999a872674eba32afae6046d71f178a038b81660974fa28a91":[20,0,0,3,5,1,6],
 "_sensor_factory_8h_source.html":[20,0,0,3,5],
 "_sensor_manager_8cpp.html":[20,0,0,3,6],
-"_sensor_manager_8cpp.html#aef74f36dc982b031c818fa1eaed04c92":[20,0,0,3,6,1],
+"_sensor_manager_8cpp.html#a8858da7e857adf69b17865a3ab3d322f":[20,0,0,3,6,4],
+"_sensor_manager_8cpp.html#aef74f36dc982b031c818fa1eaed04c92":[20,0,0,3,6,3],
 "_sensor_manager_8cpp_source.html":[20,0,0,3,6],
 "_sensor_manager_8h.html":[20,0,0,3,7],
 "_sensor_manager_8h.html#a18a7f2fb416732c2c8e8c4ab0668b7fc":[20,0,0,3,7,2],
@@ -248,6 +249,5 @@ var NAVTREEINDEX0 =
 "_version_8h.html#acf025b054301360475a0ec4542f74ff3":[20,0,0,18,1],
 "_version_8h_source.html":[20,0,0,18],
 "_wake_cycle_stats_8cpp.html":[20,0,0,1,0],
-"_wake_cycle_stats_8cpp_source.html":[20,0,0,1,0],
-"_wake_cycle_stats_8h.html":[20,0,0,1,1]
+"_wake_cycle_stats_8cpp_source.html":[20,0,0,1,0]
 };

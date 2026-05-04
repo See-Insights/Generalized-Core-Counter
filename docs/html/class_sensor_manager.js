@@ -10,6 +10,7 @@ var class_sensor_manager =
     [ "isItSafeToCharge", "class_sensor_manager.html#ad7031fd4e8dbe8bb106ebf4406d608ca", null ],
     [ "isSensorReady", "class_sensor_manager.html#a70dabc59358476483196904dab2612b3", null ],
     [ "loop", "class_sensor_manager.html#ade20e76385cc4f2dd3313088a0804fdd", null ],
+    [ "noteWakeFromLowPowerSleep", "class_sensor_manager.html#ac51dedb8c2fcb06c5f5839b3e9e84ea9", null ],
     [ "onEnterSleep", "class_sensor_manager.html#acd053548a4cb1ac2623de8f27514b5c6", null ],
     [ "onExitSleep", "class_sensor_manager.html#a3d605277298d063851c91b1238784c17", null ],
     [ "operator=", "class_sensor_manager.html#a27577f963c22e4249ea73d0961d7cba3", null ],
@@ -17,6 +18,8 @@ var class_sensor_manager =
     [ "setSensor", "class_sensor_manager.html#aaf00c40722d05d7fb5be18f47f18e94a", null ],
     [ "setup", "class_sensor_manager.html#a24c47251bd3eb4e8962ce41783fa426e", null ],
     [ "tmp36TemperatureC", "class_sensor_manager.html#a049e5cf771c954f3b4d0702f2ac1c412", null ],
+    [ "_batteryStabilizationPending", "class_sensor_manager.html#af5fb59cde27c9232777c2f9542dc7ef1", null ],
+    [ "_firstBatterySampleTaken", "class_sensor_manager.html#aec34633aca7cdbfe123488d5c539da10", null ],
     [ "_lastPollTime", "class_sensor_manager.html#a6da110325ebad4ad76647add5f4b5746", null ],
     [ "_sensor", "class_sensor_manager.html#a8d0a0f57f79ac88a77e6f7263a520391", null ]
 ];

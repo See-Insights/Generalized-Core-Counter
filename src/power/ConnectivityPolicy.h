@@ -155,6 +155,16 @@ constexpr uint16_t DISCONNECT_CLOUD_DEFAULT_SEC = 15;
 constexpr uint16_t DISCONNECT_MODEM_DEFAULT_SEC = 30;
 constexpr unsigned long DISCONNECT_STANDBY_MAX_MS = 5000UL;
 
+// ===== Battery / fuel-gauge wake stabilization =====
+// Purpose:
+// - Allow the Boron fuel gauge a brief bounded settling period after waking
+//   from low-power sleep before we trust SoC/state for reporting or policy.
+// - Keep the blocking window small and deterministic so we do not materially
+//   extend awake time.
+constexpr unsigned long BATTERY_WAKE_QUICKSTART_DELAY_MS = 500UL;
+constexpr unsigned long BATTERY_WAKE_RETRY_DELAY_MS = 200UL;
+constexpr uint8_t BATTERY_WAKE_MAX_RETRIES = 2;
+
 // ===== Report/connectivity supervision thresholds =====
 // Purpose:
 // - Long-term health monitoring for webhook delivery/response (alerting and
@@ -181,6 +191,23 @@ constexpr long WEBHOOK_LONGTERM_ESCALATION_COOLDOWN_SEC = 3L * 3600L;
 // Safety notes:
 // - Typically safe to tune; keep small relative to shortest effective interval.
 constexpr time_t CONNECT_ALIGNMENT_TOLERANCE_SEC = 30;
+
+// ===== Nightly heap guard =====
+// Purpose:
+// - Provide a conservative overnight remediation path for devices that are about
+//   to use long ULTRA_LOW_POWER fallback sleep instead of HIBERNATE.
+// - If free heap has drifted low by the end of the day, a reset before the long
+//   overnight sleep gives the next day a clean start without interrupting open
+//   hours operation.
+//
+// Rationale / tradeoffs:
+// - The warning threshold is observability only.
+// - The reset threshold should remain well above true out-of-memory conditions
+//   so this guard acts preventively, not reactively.
+// - This guard is intentionally limited to overnight fallback sleep; devices
+//   that successfully enter HIBERNATE already get a cold boot on wake.
+constexpr unsigned long NIGHTLY_HEAP_WARN_THRESHOLD_BYTES = 50UL * 1024UL;
+constexpr unsigned long NIGHTLY_HEAP_RESET_THRESHOLD_BYTES = 45UL * 1024UL;
 
 // ===== Debug serial (post-sleep USB re-enumeration) =====
 // Used only under DEBUG_SERIAL in State_Sleep.

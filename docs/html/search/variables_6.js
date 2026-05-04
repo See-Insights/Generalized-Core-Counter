@@ -8,5 +8,6 @@ var searchData=
   ['firstconnectionobserved_5',['firstConnectionObserved',['../struct_session_state.html#a0088f8de1f1a228221012131953327cc',1,'SessionState']]],
   ['firstconnectionqueuedrainedlogged_6',['firstConnectionQueueDrainedLogged',['../struct_session_state.html#ab8e72d0a538b87295dfdf147c7a58e90',1,'SessionState']]],
   ['flag1_7',['flag1',['../struct_sensor_data.html#af22e63ef6b8e15b87afaa6be98f44798',1,'SensorData']]],
-  ['flag2_8',['flag2',['../struct_sensor_data.html#a8bb132601fb67dcf16f1cc1144ba9461',1,'SensorData']]]
+  ['flag2_8',['flag2',['../struct_sensor_data.html#a8bb132601fb67dcf16f1cc1144ba9461',1,'SensorData']]],
+  ['fuelgauge_9',['fuelGauge',['../_sensor_manager_8cpp.html#a8858da7e857adf69b17865a3ab3d322f',1,'SensorManager.cpp']]]
 ];

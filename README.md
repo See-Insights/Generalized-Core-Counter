@@ -1,6 +1,6 @@
 # Generalized-Core-Counter
 
-**Version:** 9.00 | **Latest:** Alert 44 empty-device-ledger fix and wake/connect hardening
+**Version:** 10.00 | **Latest:** Battery wake stabilization and nightly heap guard hardening
 
 A generalized IoT firmware core for outdoor sensor devices supporting multiple operating modes and sensor types.
 

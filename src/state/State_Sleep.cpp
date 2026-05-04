@@ -491,7 +491,8 @@ void handleSleepingState() {
   }
 
   int wakeInSeconds;
-  if (!isWithinOpenHours() && nightSleepSec > 0) {
+  const bool overnightFallbackSleep = (!isWithinOpenHours() && nightSleepSec > 0);
+  if (overnightFallbackSleep) {
     wakeInSeconds = nightSleepSec;
     Log.info("Outside opening hours - using ULTRA_LOW_POWER fallback sleep for %d seconds", wakeInSeconds);
   } else {
@@ -543,6 +544,28 @@ void handleSleepingState() {
     } else {
       // Unoccupied - use scheduled wake time
       Log.info("OCCUPANCY: Sleeping for scheduled wake: %d sec (unoccupied)", wakeInSeconds);
+    }
+  }
+
+  // If HIBERNATE is unavailable and we are about to take a long overnight
+  // ULTRA_LOW_POWER fallback sleep, optionally reset first when heap has
+  // drifted low. This gives the next day a clean start without affecting
+  // open-hours behavior.
+  if (overnightFallbackSleep) {
+    const unsigned long freeHeap = (unsigned long)System.freeMemory();
+
+    if (freeHeap <= ConnectivityPolicy::NIGHTLY_HEAP_RESET_THRESHOLD_BYTES) {
+      Log.warn("Nightly heap guard: freeHeap=%lu <= %lu before overnight ULTRA_LOW_POWER fallback - resetting for clean next-day start",
+               freeHeap,
+               ConnectivityPolicy::NIGHTLY_HEAP_RESET_THRESHOLD_BYTES);
+      System.reset();
+      return;
+    }
+
+    if (freeHeap <= ConnectivityPolicy::NIGHTLY_HEAP_WARN_THRESHOLD_BYTES) {
+      Log.warn("Nightly heap guard: freeHeap=%lu <= %lu before overnight ULTRA_LOW_POWER fallback - monitoring only",
+               freeHeap,
+               ConnectivityPolicy::NIGHTLY_HEAP_WARN_THRESHOLD_BYTES);
     }
   }
 
@@ -811,6 +834,10 @@ void handleSleepingState() {
 
   // Observability: start of a new wake cycle (ULP return path).
   Observability::cycleStats().resetOnWake(millis());
+
+  // Battery must be sampled before any later report/connect logic turns on the
+  // modem, so mark the first post-wake sample for fuel-gauge stabilization now.
+  measure.noteWakeFromLowPowerSleep();
   
   // LED will be turned on with proper timeout by PIR wake processing below
   // Don't turn it on here without timeout as it causes false LED timeout detection
@@ -829,6 +856,7 @@ void handleSleepingState() {
   if (buttonWake) {
     // User button wake: queue a fresh service report, then force immediate connect.
     SensorManager::instance().onExitSleep();
+    measure.batteryState();
     session.serviceRequestTriggered = true;
     Log.info("WAKE: Button pressed - reason=SERVICE_REQUEST transitioning to REPORTING_STATE");
     state = REPORTING_STATE;
@@ -848,6 +876,9 @@ void handleSleepingState() {
         SensorManager::instance().initializeFromConfig();
       }
       Log.info("Wake: sensorReady=%s", SensorManager::instance().isSensorReady() ? "true" : "false");
+
+      // Refresh battery state immediately after wake while the radio is still off.
+      measure.batteryState();
 
       // In CONNECTED operating mode, the device should reconnect at the
       // start of open hours so it can resume normal connected behavior.

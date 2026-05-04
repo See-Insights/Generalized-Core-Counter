@@ -16,6 +16,22 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## 10.00 - 2026-04-30
+
+### Added
+
+- **Nightly heap guard policy**: Added conservative overnight warning and reset thresholds for devices that must fall back to long `ULTRA_LOW_POWER` sleep instead of `HIBERNATE`, giving the next day a clean start when free heap drifts low.
+
+### Changed
+
+- **Release metadata updated for v10 rollout**: Bumped Particle product version, firmware version string, README version header, and Doxygen project number to `10.00`.
+- **Battery telemetry now stabilizes before wake-time reporting**: Low-power wake paths now mark the first post-wake battery sample for bounded fuel-gauge stabilization before any later report/connect path can bring up the modem.
+
+### Fixed
+
+- **Post-sleep Boron battery misreads**: The first battery sample after low-power wake now issues `fuelGauge.quickStart()`, waits briefly, retries suspicious `0%`, `100%`, or `Unknown` readings, and falls back to voltage-estimated SoC when necessary.
+- **Wake-time battery policy using distorted readings**: Battery SoC/state are now refreshed immediately after wake while the radio is still off, preventing modem current draw from skewing the measurement used for reporting and low-battery policy decisions.
+
 ## 9.00 - 2026-04-24
 
 ### Added

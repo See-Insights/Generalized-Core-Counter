@@ -16,5 +16,6 @@ var searchData=
   ['flag1_13',['flag1',['../struct_sensor_data.html#af22e63ef6b8e15b87afaa6be98f44798',1,'SensorData']]],
   ['flag2_14',['flag2',['../struct_sensor_data.html#a8bb132601fb67dcf16f1cc1144ba9461',1,'SensorData']]],
   ['flash_20firmware_15',['Flash Firmware',['../index.html#autotoc_md33',1,'']]],
-  ['flow_16',['Configuration Management Flow',['../index.html#autotoc_md18',1,'']]]
+  ['flow_16',['Configuration Management Flow',['../index.html#autotoc_md18',1,'']]],
+  ['fuelgauge_17',['fuelGauge',['../_sensor_manager_8cpp.html#a8858da7e857adf69b17865a3ab3d322f',1,'SensorManager.cpp']]]
 ];

@@ -1,5 +1,17 @@
 var NAVTREEINDEX3 =
 {
+"namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a452bb1633016be3c71fffc2fe5d5a0d7":[18,0,4,2],
+"namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a5e3e975006a3ea6d5ce637eef262bc84":[18,0,4,1],
+"namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#ab5a3fd276944117f8d63d688914a47d4":[18,0,4,0],
+"namespaceanonymous__namespace_02_state___sleep_8cpp_03.html":[18,0,5],
+"namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a13e9915406af72c4d32f922a088d826d":[18,0,5,0],
+"namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html":[18,0,6],
+"namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a520e89c249eda26c28608a22b7e620dc":[18,0,6,1],
+"namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a7051561c04cc971e71f1db9dbc2a9b8f":[18,0,6,0],
+"namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#af396c832c1943dc159954049a9503303":[18,0,6,3],
+"namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afbb332fff9abe10374e0a8920493b9d2":[18,0,6,4],
+"namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afc75631d91905ff375e5056c5ddffafb":[18,0,6,2],
+"namespacemembers.html":[18,1,0],
 "namespacemembers_enum.html":[18,1,3],
 "namespacemembers_eval.html":[18,1,4],
 "namespacemembers_func.html":[18,1,1],

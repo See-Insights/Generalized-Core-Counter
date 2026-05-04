@@ -24,7 +24,7 @@
 
 // Firmware version recognized by Particle Product firmware management
 // Bump this integer whenever you cut a new production release.
-PRODUCT_VERSION(9);
+PRODUCT_VERSION(10);
 
 // Hardware abstraction and device-specific pinouts
 #include "device_pinout.h"           // Platform-specific pin definitions
@@ -545,6 +545,9 @@ void setup() {
   // Refresh battery and PMIC telemetry before the first post-boot state
   // decision so boot->sleep cycles still emit a battery sample. If a prior
   // low-battery downgrade is active, re-evaluate it immediately on boot.
+  if (System.resetReason() == RESET_REASON_POWER_MANAGEMENT) {
+    measure.noteWakeFromLowPowerSleep();
+  }
   measure.batteryState();
   if (sysStatus.get_lowBatteryMode()) {
     applyBatteryAwareConnectionModePolicy(current.get_stateOfCharge());

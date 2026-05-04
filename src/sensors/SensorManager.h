@@ -86,6 +86,11 @@ public:
      */
     void onExitSleep();
 
+    /**
+     * @brief Mark that the next battery sample occurs immediately after low-power wake.
+     */
+    void noteWakeFromLowPowerSleep();
+
     /** @name Utility functions
      *  Helpers for temperature, battery, radio signal, and delays.
      */
@@ -140,6 +145,12 @@ protected:
 
     /** @brief Timestamp of the last sensor poll (millis). */
     unsigned long _lastPollTime;
+
+    /** @brief One-shot flag to stabilize battery measurement after low-power wake. */
+    bool _batteryStabilizationPending;
+
+    /** @brief Track whether the first post-boot battery sample has already run. */
+    bool _firstBatterySampleTaken;
 };
 
 #endif /* SENSORMANAGER_H */

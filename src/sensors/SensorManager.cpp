@@ -7,16 +7,34 @@ const char *batteryContext[7] = {"Unknown",    "Not Charging", "Charging",
 // Particle Functions
 #include "sensors/SensorManager.h"
 #include "MyPersistentData.h"  // Access sysStatus/sensorConfig
+#include "power/ConnectivityPolicy.h"
 #include "sensors/SensorFactory.h"
 #include "device_pinout.h"     // TMP36_SENSE_PIN for enclosure temperature
 
 // Device-specific includes and definitions
 // Use Particle feature detection for automatic platform identification
 
-// FuelGauge fuelGauge;                                // Needed to address
-// issue with updates in low battery state
+FuelGauge fuelGauge;
 
 SensorManager *SensorManager::_instance;
+
+namespace {
+
+bool batterySampleLooksSuspicious(uint8_t battState, float soc) {
+  return !(soc == soc) || soc <= 0.0f || soc >= 100.0f || battState == 0;
+}
+
+float estimateSocFromVoltage(float voltage) {
+  float soc = (voltage - 3.0f) * (100.0f / (4.2f - 3.0f));
+  if (soc < 0.0f) {
+    soc = 0.0f;
+  } else if (soc > 100.0f) {
+    soc = 100.0f;
+  }
+  return soc;
+}
+
+} // namespace
 
 // [static]
 SensorManager &SensorManager::instance() {
@@ -25,7 +43,11 @@ SensorManager &SensorManager::instance() {
   }
   return *_instance;
 }
-SensorManager::SensorManager() : _sensor(nullptr), _lastPollTime(0) {}
+SensorManager::SensorManager()
+    : _sensor(nullptr),
+      _lastPollTime(0),
+      _batteryStabilizationPending(false),
+      _firstBatterySampleTaken(false) {}
 
 SensorManager::~SensorManager() {}
 
@@ -148,6 +170,10 @@ void SensorManager::onExitSleep() {
   }
 }
 
+void SensorManager::noteWakeFromLowPowerSleep() {
+  _batteryStabilizationPending = true;
+}
+
 float SensorManager::tmp36TemperatureC(int adcValue) {
   // Analog inputs have values from 0-4095, or
   // 12-bit precision. 0 = 0V, 4095 = 3.3V, 0.0008 volts (0.8 mV) per unit
@@ -235,9 +261,77 @@ bool SensorManager::batteryState() {
   // Boron (cellular) and Argon (Wi-Fi) Gen 3 devices:
   // Use built-in System battery APIs backed by the fuel gauge
   // (and a BQ24195 PMIC on Boron only).
-  uint8_t battState = System.batteryState();
-  float soc = System.batteryCharge();
-  int powerSource = System.powerSource();
+  bool quickStartUsed = false;
+  bool fallbackUsed = false;
+  uint8_t retryCount = 0;
+  bool shouldStabilize = _batteryStabilizationPending;
+  if (!_firstBatterySampleTaken && System.resetReason() == RESET_REASON_POWER_MANAGEMENT) {
+    shouldStabilize = true;
+  }
+
+  auto readBatterySample = [&](uint8_t &battState, float &soc, int &powerSource) {
+    battState = System.batteryState();
+    soc = System.batteryCharge();
+    powerSource = System.powerSource();
+  };
+
+  uint8_t battState = 0;
+  float soc = 0.0f;
+  int powerSource = 0;
+
+  if (shouldStabilize) {
+    fuelGauge.quickStart();
+    quickStartUsed = true;
+    delay(ConnectivityPolicy::BATTERY_WAKE_QUICKSTART_DELAY_MS);
+  }
+
+  readBatterySample(battState, soc, powerSource);
+
+  if (shouldStabilize) {
+    Log.info("Battery stabilization: initial SoC=%.2f%% state=%s (%d) powerSource=%d quickStart=%s",
+             (double)soc,
+             batteryContext[(battState <= 6) ? battState : 0],
+             battState,
+             powerSource,
+             quickStartUsed ? "true" : "false");
+  }
+
+  while (batterySampleLooksSuspicious(battState, soc) &&
+         retryCount < ConnectivityPolicy::BATTERY_WAKE_MAX_RETRIES) {
+    retryCount++;
+    Log.warn("Battery stabilization: suspicious sample SoC=%.2f%% state=%s (%d) - retry %u/%u",
+             (double)soc,
+             batteryContext[(battState <= 6) ? battState : 0],
+             battState,
+             (unsigned)retryCount,
+             (unsigned)ConnectivityPolicy::BATTERY_WAKE_MAX_RETRIES);
+    delay(ConnectivityPolicy::BATTERY_WAKE_RETRY_DELAY_MS);
+    readBatterySample(battState, soc, powerSource);
+  }
+
+  if (batterySampleLooksSuspicious(battState, soc)) {
+    float vcell = fuelGauge.getVCell();
+    if (vcell > 2.5f && vcell < 5.0f) {
+      soc = estimateSocFromVoltage(vcell);
+      fallbackUsed = true;
+      Log.warn("Battery stabilization: falling back to voltage-estimated SoC=%.2f%% from VCell=%.3fV",
+               (double)soc,
+               (double)vcell);
+    }
+  }
+
+  _batteryStabilizationPending = false;
+  _firstBatterySampleTaken = true;
+
+  if (shouldStabilize) {
+    Log.info("Battery stabilization: final SoC=%.2f%% state=%s (%d) powerSource=%d retries=%u fallback=%s",
+             (double)soc,
+             batteryContext[(battState <= 6) ? battState : 0],
+             battState,
+             powerSource,
+             (unsigned)retryCount,
+             fallbackUsed ? "true" : "false");
+  }
   
   // Log battery diagnostics to help identify charging state issues
   Log.info("Battery: state=%s (%d), SoC=%.2f%%, powerSource=%d", 

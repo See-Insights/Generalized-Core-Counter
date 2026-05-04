@@ -26,6 +26,8 @@ var namespaces_dup =
     ] ],
     [ "anonymous_namespace{LocalTimeCache.cpp}", "namespaceanonymous__namespace_02_local_time_cache_8cpp_03.html", null ],
     [ "anonymous_namespace{SensorManager.cpp}", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html", [
+      [ "batterySampleLooksSuspicious", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#ab5a3fd276944117f8d63d688914a47d4", null ],
+      [ "estimateSocFromVoltage", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a5e3e975006a3ea6d5ce637eef262bc84", null ],
       [ "probeTmp112Present", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a452bb1633016be3c71fffc2fe5d5a0d7", null ]
     ] ],
     [ "anonymous_namespace{State_Sleep.cpp}", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html", [
@@ -45,6 +47,9 @@ var namespaces_dup =
       [ "requestRadioPowerOff", "namespace_connectivity.html#a2a57cc42c82eb80256258e783f248508", null ]
     ] ],
     [ "ConnectivityPolicy", "namespace_connectivity_policy.html", [
+      [ "BATTERY_WAKE_MAX_RETRIES", "namespace_connectivity_policy.html#aab6a8ffd368bd5a38fa7027aa9132dc4", null ],
+      [ "BATTERY_WAKE_QUICKSTART_DELAY_MS", "namespace_connectivity_policy.html#accb711c2bdb603b993647a684f509e61", null ],
+      [ "BATTERY_WAKE_RETRY_DELAY_MS", "namespace_connectivity_policy.html#a41c8f007142126ba744f363302a5e8f3", null ],
       [ "CLOUD_OPS_GATE_TIMEOUT_MS", "namespace_connectivity_policy.html#a7040aac1badbcf609009c686cb58fee0", null ],
       [ "CLOUD_OPS_STATUS_LOG_INTERVAL_MS", "namespace_connectivity_policy.html#ae79b12c5f7f85ae9ca5a607ef4cdd075", null ],
       [ "CONNECT_ALIGNMENT_TOLERANCE_SEC", "namespace_connectivity_policy.html#aff43402fa9d45e067666caf3f2347686", null ],
@@ -66,6 +71,8 @@ var namespaces_dup =
       [ "DISCONNECT_STANDBY_MAX_MS", "namespace_connectivity_policy.html#a27680d5a2fe0f28206eed36f939f763d", null ],
       [ "FIRMWARE_UPDATE_MAX_MS", "namespace_connectivity_policy.html#aca78df6b9ce0caf57f4672e8c0b15f72", null ],
       [ "LEDGER_SYNC_TIMEOUT_MS", "namespace_connectivity_policy.html#a514e3eeaa0000e932f68cba30657176e", null ],
+      [ "NIGHTLY_HEAP_RESET_THRESHOLD_BYTES", "namespace_connectivity_policy.html#ae00914c08bf3eaaa5d8e412d63d07078", null ],
+      [ "NIGHTLY_HEAP_WARN_THRESHOLD_BYTES", "namespace_connectivity_policy.html#a264374785dc6d61fd971454e4c9a0e7e", null ],
       [ "WEBHOOK_LONGTERM_ALERT40_SEC", "namespace_connectivity_policy.html#a2bf83afe32c0f44b32a6cb4d48e6a402", null ],
       [ "WEBHOOK_LONGTERM_CONNECTED_RECENTLY_SEC", "namespace_connectivity_policy.html#aec173e6da0225c588ff07235628b1b16", null ],
       [ "WEBHOOK_LONGTERM_ESCALATE_TO_ERROR_SEC", "namespace_connectivity_policy.html#a8c2c9ae6d7ba0414db36943cd01d78a4", null ],
