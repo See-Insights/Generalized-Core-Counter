@@ -33,6 +33,7 @@
  */
 
 #include "MyPersistentData.h"
+#include "BuildProfile.h"
 
 // Forward declaration for safe diagnostic publishing (defined in Generalized-Core-Counter.cpp)
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE);
@@ -95,8 +96,15 @@ bool sysStatusData::validate(size_t dataSize) {
             Log.info("data not valid last connection duration =%d", sysStatus.get_lastConnectionDuration());
             valid = false;
         }
+
+        if (sysStatus.get_connectivityRecoveryStage() > 3) {
+            Log.info("data not valid connectivity recovery stage =%d", sysStatus.get_connectivityRecoveryStage());
+            valid = false;
+        }
     }
-    Log.info("sysStatus data is %s",(valid) ? "valid": "not valid");
+    if (!valid) {
+        Log.warn("sysStatus data is not valid");
+    }
     return valid;
 }
 
@@ -107,10 +115,10 @@ void sysStatusData::initialize() {
     Log.info(message);
     if (Particle.connected()) publishDiagnosticSafe("Mode", message, PRIVATE);
     Log.info("Loading system defaults");
-    sysStatus.set_structuresVersion(1);
+    sysStatus.set_structuresVersion(2);
     sysStatus.set_verboseMode(false);
     sysStatus.set_lowBatteryMode(false);
-    sysStatus.set_solarPowerMode(true);
+    sysStatus.set_solarPowerMode(FIELD_BUILD ? true : false);
     sysStatus.set_lowPowerMode(false);          // Legacy flag - kept for storage compatibility
     sysStatus.set_timeZoneStr("SGT-8");        // Default to Singapore Time (POSIX TZ string for UTC+8, no DST)
     sysStatus.set_sensorType(1);                // PIR sensor
@@ -120,14 +128,18 @@ void sysStatusData::initialize() {
     sysStatus.set_lastDailyCleanup(0);                                     // No cleanup has run yet
     
     // ********** Operating Mode Defaults **********
-    sysStatus.set_countingMode(COUNTING);                                  // Default to counting mode
-    sysStatus.set_operatingMode(CONNECTED);                                // Default to connected mode
-    sysStatus.set_occupancyDebounceMs(0);                                  // Default 0 ms; only used in OCCUPANCY mode
-    sysStatus.set_connectedReportingIntervalSec(300);                      // Default 5 minutes when connected
-    sysStatus.set_lowPowerReportingIntervalSec(3600);                      // Default 1 hour when in low power
+    sysStatus.set_sensorMode(COUNTING);                                    // Default to counting mode
+    sysStatus.set_connectionMode(CONNECTED);                               // Default to connected mode
+    sysStatus.set_reportingMode(SCHEDULED);                                // Default to scheduled reporting
+    sysStatus.set_samplingMode(INTERRUPT);                                 // Default to interrupt-driven
+    sysStatus.set_verboseTimeoutMin(60);                                   // Default 60 min verbose timeout
+    sysStatus.set_verboseModeStartTime(0);                                 // Verbose mode not active
     sysStatus.set_connectAttemptBudgetSec(300);                            // Default 300s (5 minutes) max connect attempt per wake
     sysStatus.set_cloudDisconnectBudgetSec(15);                            // Default 15s max wait for cloud disconnect
     sysStatus.set_modemOffBudgetSec(30);                                   // Default 30s max wait for modem power-down
+    sysStatus.set_connectivityRecoveryStage(0);
+    sysStatus.set_lastConnectivityRecoveryAction(0);
+    sysStatus.set_connectivityRecoveryCount(0);
 }
 
 uint8_t sysStatusData::get_structuresVersion() const {
@@ -178,6 +190,10 @@ String sysStatusData::get_timeZoneStr() const {
 	String result;
 	getValueString(offsetof(SysData, timeZoneStr), sizeof(SysData::timeZoneStr), result);
 	return result;
+}
+
+const char *sysStatusData::get_timeZoneStrCStr() const {
+    return sysData.timeZoneStr;
 }
 
 bool sysStatusData::set_timeZoneStr(const char *str) {
@@ -277,39 +293,46 @@ void sysStatusData::set_lastTimeSync(time_t value) {
 
 // ********** Operating Mode Configuration Get/Set Functions **********
 
-uint8_t sysStatusData::get_countingMode() const {
-    return getValue<uint8_t>(offsetof(SysData,countingMode));
+uint8_t sysStatusData::get_sensorMode() const {
+    return getValue<uint8_t>(offsetof(SysData,sensorMode));
 }
-void sysStatusData::set_countingMode(uint8_t value) {
-    setValue<uint8_t>(offsetof(SysData,countingMode), value);
-}
-
-uint8_t sysStatusData::get_operatingMode() const {
-    return getValue<uint8_t>(offsetof(SysData,operatingMode));
-}
-void sysStatusData::set_operatingMode(uint8_t value) {
-    setValue<uint8_t>(offsetof(SysData,operatingMode), value);
+void sysStatusData::set_sensorMode(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,sensorMode), value);
 }
 
-uint32_t sysStatusData::get_occupancyDebounceMs() const {
-    return getValue<uint32_t>(offsetof(SysData,occupancyDebounceMs));
+uint8_t sysStatusData::get_connectionMode() const {
+    return getValue<uint8_t>(offsetof(SysData,connectionMode));
 }
-void sysStatusData::set_occupancyDebounceMs(uint32_t value) {
-    setValue<uint32_t>(offsetof(SysData,occupancyDebounceMs), value);
-}
-
-uint16_t sysStatusData::get_connectedReportingIntervalSec() const {
-    return getValue<uint16_t>(offsetof(SysData,connectedReportingIntervalSec));
-}
-void sysStatusData::set_connectedReportingIntervalSec(uint16_t value) {
-    setValue<uint16_t>(offsetof(SysData,connectedReportingIntervalSec), value);
+void sysStatusData::set_connectionMode(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,connectionMode), value);
 }
 
-uint16_t sysStatusData::get_lowPowerReportingIntervalSec() const {
-    return getValue<uint16_t>(offsetof(SysData,lowPowerReportingIntervalSec));
+uint8_t sysStatusData::get_reportingMode() const {
+    return getValue<uint8_t>(offsetof(SysData,reportingMode));
 }
-void sysStatusData::set_lowPowerReportingIntervalSec(uint16_t value) {
-    setValue<uint16_t>(offsetof(SysData,lowPowerReportingIntervalSec), value);
+void sysStatusData::set_reportingMode(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,reportingMode), value);
+}
+
+uint8_t sysStatusData::get_samplingMode() const {
+    return getValue<uint8_t>(offsetof(SysData,samplingMode));
+}
+void sysStatusData::set_samplingMode(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,samplingMode), value);
+}
+
+uint16_t sysStatusData::get_verboseTimeoutMin() const {
+    return getValue<uint16_t>(offsetof(SysData,verboseTimeoutMin));
+}
+void sysStatusData::set_verboseTimeoutMin(uint16_t value) {
+    setValue<uint16_t>(offsetof(SysData,verboseTimeoutMin), value);
+}
+
+time_t sysStatusData::get_verboseModeStartTime() const {
+    return getValue<time_t>(offsetof(SysData,verboseModeStartTime));
+}
+void sysStatusData::set_verboseModeStartTime(time_t value) {
+    setValue<time_t>(offsetof(SysData,verboseModeStartTime), value);
 }
 
 uint16_t sysStatusData::get_connectAttemptBudgetSec() const {
@@ -331,6 +354,76 @@ uint16_t sysStatusData::get_modemOffBudgetSec() const {
 }
 void sysStatusData::set_modemOffBudgetSec(uint16_t value) {
     setValue<uint16_t>(offsetof(SysData,modemOffBudgetSec), value);
+}
+
+uint8_t sysStatusData::get_currentBatteryTier() const {
+    return getValue<uint8_t>(offsetof(SysData,currentBatteryTier));
+}
+void sysStatusData::set_currentBatteryTier(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,currentBatteryTier), value);
+}
+
+uint8_t sysStatusData::get_connectionAttemptCounter() const {
+    return getValue<uint8_t>(offsetof(SysData,connectionAttemptCounter));
+}
+void sysStatusData::set_connectionAttemptCounter(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,connectionAttemptCounter), value);
+}
+
+uint16_t sysStatusData::get_testConnectionDurationOverride() const {
+    return getValue<uint16_t>(offsetof(SysData,testConnectionDurationOverride));
+}
+void sysStatusData::set_testConnectionDurationOverride(uint16_t value) {
+    setValue<uint16_t>(offsetof(SysData,testConnectionDurationOverride), value);
+}
+
+String sysStatusData::get_webhookName() const {
+    String result;
+    getValueString(offsetof(SysData,webhookName), sizeof(SysData::webhookName), result);
+    return result;
+}
+
+const char *sysStatusData::get_webhookNameCStr() const {
+    return sysData.webhookName;
+}
+
+bool sysStatusData::set_webhookName(const char *str) {
+    return setValueString(offsetof(SysData,webhookName), sizeof(SysData::webhookName), str);
+}
+
+bool sysStatusData::get_webhookEnabled() const {
+    return getValue<bool>(offsetof(SysData,webhookEnabled));
+}
+void sysStatusData::set_webhookEnabled(bool value) {
+    setValue<bool>(offsetof(SysData,webhookEnabled), value);
+}
+
+uint32_t sysStatusData::get_webhookTimeoutMs() const {
+    return getValue<uint32_t>(offsetof(SysData,webhookTimeoutMs));
+}
+void sysStatusData::set_webhookTimeoutMs(uint32_t value) {
+    setValue<uint32_t>(offsetof(SysData,webhookTimeoutMs), value);
+}
+
+uint8_t sysStatusData::get_connectivityRecoveryStage() const {
+    return getValue<uint8_t>(offsetof(SysData,connectivityRecoveryStage));
+}
+void sysStatusData::set_connectivityRecoveryStage(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,connectivityRecoveryStage), value);
+}
+
+time_t sysStatusData::get_lastConnectivityRecoveryAction() const {
+    return getValue<time_t>(offsetof(SysData,lastConnectivityRecoveryAction));
+}
+void sysStatusData::set_lastConnectivityRecoveryAction(time_t value) {
+    setValue<time_t>(offsetof(SysData,lastConnectivityRecoveryAction), value);
+}
+
+uint8_t sysStatusData::get_connectivityRecoveryCount() const {
+    return getValue<uint8_t>(offsetof(SysData,connectivityRecoveryCount));
+}
+void sysStatusData::set_connectivityRecoveryCount(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,connectivityRecoveryCount), value);
 }
 
 // End of sysStatusData class
@@ -370,14 +463,9 @@ void sensorConfigData::loop() {
 
 bool sensorConfigData::validate(size_t dataSize) {
     bool valid = PersistentDataFile::validate(dataSize);
-    if (valid) {
-        if (sensorConfig.get_threshold1() > 100 || sensorConfig.get_threshold2() > 100) {
-            Log.info("Sensor config: thresholds not valid (threshold1=%d, threshold2=%d)", 
-                     sensorConfig.get_threshold1(), sensorConfig.get_threshold2());
-            valid = false;
-        }
+    if (!valid) {
+        Log.warn("Sensor config is not valid");
     }
-    Log.info("Sensor config is %s", (valid) ? "valid" : "not valid");
     return valid;
 }
 
@@ -390,27 +478,46 @@ void sensorConfigData::initialize() {
     updateHash();
 }
 
-uint16_t sensorConfigData::get_threshold1() const {
-    return getValue<uint16_t>(offsetof(SensorData, threshold1));
+uint8_t sensorConfigData::get_sensorType() const {
+    return getValue<uint8_t>(offsetof(SensorData, type));
 }
 
-void sensorConfigData::set_threshold1(uint16_t value) {
-    setValue<uint16_t>(offsetof(SensorData, threshold1), value);
+void sensorConfigData::set_sensorType(uint8_t value) {
+    setValue<uint8_t>(offsetof(SensorData, type), value);
 }
 
-uint16_t sensorConfigData::get_threshold2() const {
-    return getValue<uint16_t>(offsetof(SensorData, threshold2));
+uint32_t sensorConfigData::get_sensorSetting1() const {
+    uint32_t value = getValue<uint32_t>(offsetof(SensorData, setting1));
+    Log.trace("sensorConfig.get_sensorSetting1() => %lu", (unsigned long)value);
+    return value;
 }
 
-void sensorConfigData::set_threshold2(uint16_t value) {
-    setValue<uint16_t>(offsetof(SensorData, threshold2), value);
-}
-uint16_t sensorConfigData::get_pollingRate() const {
-    return getValue<uint16_t>(offsetof(SensorData, pollingRate));
+void sensorConfigData::set_sensorSetting1(uint32_t value) {
+    setValue<uint32_t>(offsetof(SensorData, setting1), value);
 }
 
-void sensorConfigData::set_pollingRate(uint16_t value) {
-    setValue<uint16_t>(offsetof(SensorData, pollingRate), value);
+uint32_t sensorConfigData::get_sensorSetting2() const {
+    return getValue<uint32_t>(offsetof(SensorData, setting2));
+}
+
+void sensorConfigData::set_sensorSetting2(uint32_t value) {
+    setValue<uint32_t>(offsetof(SensorData, setting2), value);
+}
+
+uint32_t sensorConfigData::get_sensorSetting3() const {
+    return getValue<uint32_t>(offsetof(SensorData, setting3));
+}
+
+void sensorConfigData::set_sensorSetting3(uint32_t value) {
+    setValue<uint32_t>(offsetof(SensorData, setting3), value);
+}
+
+uint32_t sensorConfigData::get_sensorSetting4() const {
+    return getValue<uint32_t>(offsetof(SensorData, setting4));
+}
+
+void sensorConfigData::set_sensorSetting4(uint32_t value) {
+    setValue<uint32_t>(offsetof(SensorData, setting4), value);
 }  // End of sensorConfigData class
 
 
@@ -474,8 +581,40 @@ bool currentStatusData::validate(size_t dataSize) {
             current.set_dailyCount(0);
             valid = false;
         }
+
+        // Occupancy-mode sanity checks (prevents bogus 100+ year totals)
+        // totalOccupiedSeconds is "today" and should never exceed 24 hours.
+        uint32_t totalOccupied = current.get_totalOccupiedSeconds();
+        if (totalOccupied > 24UL * 3600UL) {
+            Log.warn("Current: totalOccupiedSeconds invalid (%lu sec) - resetting", (unsigned long)totalOccupied);
+            current.set_totalOccupiedSeconds(0);
+        }
+
+        // If occupied is true, occupancyStartTime must be non-zero and plausible.
+        if (current.get_occupied()) {
+            time_t start = current.get_occupancyStartTime();
+            if (start == 0) {
+                Log.warn("Current: occupied=true but occupancyStartTime=0 - forcing unoccupied");
+                current.set_occupied(false);
+                current.set_lastOccupancyEvent(0);
+            } else if (Time.isValid()) {
+                time_t now = Time.now();
+                // If start is in the future by more than a few seconds, clamp.
+                if (start > now + 5) {
+                    Log.warn("Current: occupancyStartTime in future (%lu > %lu) - clamping", (unsigned long)start, (unsigned long)now);
+                    current.set_occupancyStartTime(now);
+                }
+            }
+
+            // lastOccupancyEvent drives debounce logic; if missing, seed to now to avoid immediate expiry.
+            if (current.get_lastOccupancyEvent() == 0) {
+                current.set_lastOccupancyEvent(millis());
+            }
+        }
     }
-    Log.info("Current data is %s", (valid) ? "valid" : "not valid");
+    if (!valid) {
+        Log.warn("Current data is not valid");
+    }
     return valid;
 }
 
@@ -574,7 +713,9 @@ static int getAlertSeverity(int8_t code) {
     switch (code) {
         case 14: // out-of-memory
         case 15: // modem / disconnect failure
-        case 16: // repeated sleep failures (HIBERNATE / ULP)
+        case 16: // repeated sleep failures (HIBERNATE / ULP / STOP)
+        case 17: // boot storm detected during setup/early boot
+        case 18: // state machine thrash detected (ThrashGuard)
         case 20: // PMIC thermal shutdown (critical battery/charging fault)
         case 21: // PMIC charge timeout / stuck charging
             return 3; // critical
@@ -584,10 +725,12 @@ static int getAlertSeverity(int8_t code) {
         case 31: // failed to connect to cloud
         case 32: // connect taking too long
         case 40: // repeated webhook failures
-        case 41: // configuration/ledger apply failure
+        case 41: // configuration/ledger apply failure (CONNECT phase)
         case 42: // data ledger publish failure
         case 43: // publish queue not drained before forced sleep
             return 2; // major
+        case 44: // ledger sync timeout before sleep (SLEEP phase - cosmetic, config already applied)
+            return 1; // minor - less severe than 41 because config is already working
         default:
             return 1; // minor / warning
     }

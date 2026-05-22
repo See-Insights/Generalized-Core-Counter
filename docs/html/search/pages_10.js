@@ -1,6 +1,4 @@
 var searchData=
 [
-  ['tasks_0',['How-To: Common Configuration Tasks',['../index.html#autotoc_md25',1,'']]],
-  ['the_20firmware_1',['Extending the Firmware',['../index.html#autotoc_md29',1,'']]],
-  ['to_3a_20common_20configuration_20tasks_2',['How-To: Common Configuration Tasks',['../index.html#autotoc_md25',1,'']]]
+  ['up_0',['Post-Soak Follow-Up',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md25',1,'']]]
 ];

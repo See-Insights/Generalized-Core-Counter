@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['current_0',['current',['../_my_persistent_data_8h.html#a7ccda8a3a0f47702f9fa962899b0a3a1',1,'MyPersistentData.h']]]
+  ['allow_5fblocking_5fserial_5fwaits_0',['ALLOW_BLOCKING_SERIAL_WAITS',['../_build_profile_8h.html#a862e5c5913487ba4049590c35342976c',1,'BuildProfile.h']]]
 ];

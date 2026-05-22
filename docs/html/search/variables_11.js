@@ -1,10 +1,16 @@
 var searchData=
 [
-  ['threshold1_0',['threshold1',['../classsensor_config_data_1_1_sensor_data.html#a69cf73ec56b4d2a9c5308137c7130e40',1,'sensorConfigData::SensorData']]],
-  ['threshold2_1',['threshold2',['../classsensor_config_data_1_1_sensor_data.html#a5284d5ef711df8590edb7972c6f0841b',1,'sensorConfigData::SensorData']]],
-  ['timestamp_2',['timestamp',['../struct_sensor_data.html#a9d8f49a4ee41d10300a511c533c954db',1,'SensorData']]],
-  ['timezonestr_3',['timeZoneStr',['../classsys_status_data_1_1_sys_data.html#aed0d32647da7c17e449cabda33e200c0',1,'sysStatusData::SysData']]],
-  ['tmp36_5fsense_5fpin_4',['TMP36_SENSE_PIN',['../device__pinout_8cpp.html#abe0da77b4714252385701ee7c36ddfa5',1,'TMP36_SENSE_PIN:&#160;device_pinout.cpp'],['../device__pinout_8h.html#abe0da77b4714252385701ee7c36ddfa5',1,'TMP36_SENSE_PIN:&#160;device_pinout.cpp']]],
-  ['totaloccupiedseconds_5',['totalOccupiedSeconds',['../classcurrent_status_data_1_1_current_data.html#aa0e5a3b1fe72a2fcc64c4048fb83df3a',1,'currentStatusData::CurrentData']]],
-  ['type_6',['type',['../struct_sensor_definition.html#aeeac185140f5cca31b010b3033eff544',1,'SensorDefinition']]]
+  ['radio_5fon_5fbefore_5fsleep_0',['radio_on_before_sleep',['../struct_observability_1_1_wake_cycle_stats.html#ab7896103414826bd3d8cf98cdb87a3d2',1,'Observability::WakeCycleStats']]],
+  ['radioison_1',['radioIsOn',['../struct_power_inputs.html#aa1ddb723ab00f8556884c26794636431',1,'PowerInputs']]],
+  ['reading_2',['reading',['../struct_power_report.html#aafcb5d8185378bf013088d073744e4e5',1,'PowerReport']]],
+  ['reason_5fnoprogress_3',['REASON_NOPROGRESS',['../namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a520e89c249eda26c28608a22b7e620dc',1,'anonymous_namespace{ThrashGuard.cpp}']]],
+  ['recoverypowerdownsuggested_4',['recoveryPowerdownSuggested',['../struct_power_policy.html#ad42b255e1f8c2facae3a0dd3945f3161',1,'PowerPolicy']]],
+  ['reducedretrysuggested_5',['reducedRetrySuggested',['../struct_power_policy.html#abed8239a1d530da59c18db91e291ee8d',1,'PowerPolicy']]],
+  ['reportinginterval_6',['reportingInterval',['../classsys_status_data_1_1_sys_data.html#a4f202b9573570e16bf24003a86571c55',1,'sysStatusData::SysData']]],
+  ['reportingmode_7',['reportingMode',['../classsys_status_data_1_1_sys_data.html#a4adcaff310ae44a6429c012f6d6205dd',1,'sysStatusData::SysData']]],
+  ['reservedbyte0_8',['reservedByte0',['../classsys_status_data_1_1_sys_data.html#ac87aa71619750726f5efec465f9cd350',1,'sysStatusData::SysData']]],
+  ['reservedfloat0_9',['reservedFloat0',['../classsys_status_data_1_1_sys_data.html#a993a64e0e41111539be990890da73e0e',1,'sysStatusData::SysData']]],
+  ['resetcount_10',['resetCount',['../classsys_status_data_1_1_sys_data.html#a8905aae58be262d2bf83628081500c50',1,'sysStatusData::SysData']]],
+  ['resetwait_11',['resetWait',['../_generalized-_core-_counter_8cpp.html#a51c21d3aa0797826d2cfcf9de5c1082d',1,'resetWait:&#160;Generalized-Core-Counter.cpp'],['../_state_machine_8h.html#a51c21d3aa0797826d2cfcf9de5c1082d',1,'resetWait:&#160;Generalized-Core-Counter.cpp']]],
+  ['returntosleepafterreport_12',['returnToSleepAfterReport',['../struct_session_state.html#a3d3c38bdf541bbd8b95c9859a7afeb3a',1,'SessionState']]]
 ];

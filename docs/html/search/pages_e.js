@@ -1,7 +1,9 @@
 var searchData=
 [
-  ['recovery_20strategy_0',['Error Recovery Strategy',['../index.html#autotoc_md36',1,'']]],
-  ['remediation_20boron_20only_1',['PMIC Monitoring &amp;amp; Remediation (Boron Only)',['../index.html#autotoc_md35',1,'']]],
-  ['reporting_2',['Data Reporting',['../index.html#autotoc_md18',1,'']]],
-  ['retention_20firmware_20updates_3',['Offline Data Retention &amp;amp; Firmware Updates',['../index.html#autotoc_md32',1,'']]]
+  ['recovery_20architecture_0',['Recovery Architecture',['../index.html#autotoc_md6',1,'']]],
+  ['release_20focus_1',['Release Focus',['../index.html#autotoc_md2',1,'']]],
+  ['release_20notes_3a_20v11_200_200_2',['Release Notes: v11.0.0',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html',1,'']]],
+  ['release_20status_3',['Current Release Status',['../index.html#autotoc_md17',1,'']]],
+  ['repository_20layout_4',['Repository Layout',['../index.html#autotoc_md14',1,'']]],
+  ['rollback_20guidance_5',['Rollback Guidance',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md24',1,'']]]
 ];

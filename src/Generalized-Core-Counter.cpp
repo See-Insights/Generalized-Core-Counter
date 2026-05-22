@@ -12,40 +12,57 @@
  * Repo: https://github.com/chipmc/Generalized-Core-Counter
  */
 
-// Version History (high level):
-// v1.x - Initial gesture sensor implementation and refinements
-// v2.x - Generalized sensor architecture with ISensor interface,
-//        counting vs occupancy modes, PIR support, improved error handling
-// v3.0 - Switched to Particle Ledger-based configuration with
-//        product defaults and per-device overrides
-
 // Include Particle Device OS APIs
 #include "Particle.h"
 
 // Global configuration (includes DEBUG_SERIAL define)
 #include "Config.h"
+#include "state/State_Common.h"
+#include "power/Connectivity.h"
+#include "power/ConnectivityPolicy.h"
+#include "power/PowerManager.h"
+#include "power/PowerPlatform.h"
+#include "observability/WakeCycleStats.h"
+#include "ThrashGuard.h"
 
 // Firmware version recognized by Particle Product firmware management
 // Bump this integer whenever you cut a new production release.
-PRODUCT_VERSION(3);
-#include "AB1805_RK.h"
-#include "Cloud.h"
-#include "LocalTimeRK.h"
-#include "MyPersistentData.h"
-#include "Particle_Functions.h"
-#include "PublishQueuePosixRK.h"
-#include "SensorManager.h"
-#include "device_pinout.h"
-#include "ISensor.h"
-#include "SensorFactory.h"
-#include "SensorDefinitions.h"
-#include "Version.h"
-#include "StateMachine.h"
-#include "StateHandlers.h"
-#include "ProjectConfig.h"
+PRODUCT_VERSION(11);
 
-// Forward declarations in case Version.h is not picked up correctly
-// by the build system in this translation unit.
+// Hardware abstraction and device-specific pinouts
+#include "device_pinout.h"           // Platform-specific pin definitions
+#include "AB1805_RK.h"               // RTC and hardware watchdog
+#include "LocalTimeRK.h"             // Timezone conversion (UTC to local)
+#include "time/LocalTimeCache.h"          // Cached LocalTimeRK conversions
+
+// Persistent data and configuration
+#include "MyPersistentData.h"        // FRAM-backed sysStatus, current, sensorConfig
+
+// Cloud connectivity and data publishing
+#include "cloud/Cloud.h"                   // Particle Ledger integration (config + data)
+#include "PublishQueuePosixRK.h"     // File-backed persistent event queue
+#include "cloud/Particle_Functions.h"      // Particle.function() and Particle.variable() registration
+
+// Sensor abstraction layer
+#include "sensors/SensorManager.h"           // Singleton managing active sensor instance
+#include "sensors/SensorFactory.h"           // Factory for creating sensor instances by type
+#include "sensors/SensorDefinitions.h"       // SensorType enum and counting mode constants
+
+// State machine implementation
+#include "state/StateMachine.h"            // State enum and global state variables
+#include "state/StateHandlers.h"           // Handler functions for each state
+
+// Application metadata
+#include "Version.h"                 // FIRMWARE_VERSION and FIRMWARE_RELEASE_NOTES
+#include "ProjectConfig.h"           // Webhook event name and project constants
+
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+#warning "CONNECTIVITY_FAILSAFE_TEST_MODE=1 (bench timings enabled)"
+#else
+#warning "CONNECTIVITY_FAILSAFE_TEST_MODE=0 (production timings enabled)"
+#endif
+
+// Forward declarations for firmware metadata referenced from this translation unit.
 extern const char* FIRMWARE_VERSION;
 extern const char* FIRMWARE_RELEASE_NOTES;
 
@@ -66,6 +83,14 @@ extern const char* FIRMWARE_RELEASE_NOTES;
  * - Connectivity: compile-time macros (Wiring_WiFi / Wiring_Cellular)
  *   select WiFi vs. cellular for radio control; Particle.connect() is
  *   used to bring up the cloud session on both.
+ *
+ * File navigation
+ * ---------------
+ * 1) Includes, globals, retained state, and small formatting helpers
+ * 2) setup()/loop() and top-level lifecycle wiring
+ * 3) policy helpers for battery tier, open hours, and report publishing
+ * 4) startup status, webhook supervision, diagnostics, and state logging
+ * 5) connectivity failsafe, ISRs, and daily maintenance
  */
 
 // Forward declarations
@@ -73,23 +98,23 @@ static void appWatchdogHandler(); // Application watchdog handler
 void publishData();           // Publish the data to the cloud
 void userSwitchISR();         // Interrupt for the user switch
 void sensorISR();             // Interrupt for legacy tire-counting sensor
-void countSignalTimerISR();   // Timer ISR to turn off BLUE LED
 void dailyCleanup();          // Reset daily counters and housekeeping
 void UbidotsHandler(const char *event, const char *data); // Webhook response handler
 void publishStartupStatus();  // One-time status summary at boot
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE); // Safe diagnostic publish with queue guard
+BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC);
+void clearConnectivityFailsafeRecovery(const char *reason);
+void connectivityFailsafeSupervisor();
+void logConnectivityFailsafeBootDiagnostics();
 
-// One-shot software timer to keep BLUE_LED on long enough
-// to be visible for each count or PIR-triggered wake event.
-Timer countSignalTimer(1000, countSignalTimerISR, true);
+// ===== Global runtime objects =====
 
-// Sleep configuration
 SystemSleepConfiguration config; // Sleep 2.0 configuration
 void outOfMemoryHandler(system_event_t event, int param);
 LocalTimeConvert conv; // For converting UTC time to local time
 AB1805 ab1805(Wire);   // AB1805 RTC / Watchdog
 
-// System Health Variables
+// System health flag set from the out-of-memory callback.
 int outOfMemory = -1; // Set by outOfMemoryHandler when heap is exhausted
 
 // ********** State Machine **********
@@ -102,35 +127,457 @@ State oldState = INITIALIZATION_STATE;
 // ********** Global Flags **********
 volatile bool userSwitchDetected = false;
 volatile bool sensorDetect = false; // Flag for sensor interrupt
-bool dataInFlight =
-    false; // Flag for whether we are waiting for a response from the webhook
 
-// Track first-connection queue behaviour for observability
-bool firstConnectionObserved = false;
-bool firstConnectionQueueDrainedLogged = false;
-
-bool hibernateDisabledForSession = false;
+// Session state - consolidated flags for connection/webhook/hibernate tracking
+SessionState session;
 
 // Track when we connected to enforce max connected time in LOW_POWER/DISCONNECTED modes
 unsigned long connectedStartMs = 0;
 
-// Suppress alert 40 (webhook timeout) after waking from overnight closed-hours hibernate
-bool suppressAlert40ThisSession = false;
+namespace {
 
-// ********** Timing **********
-const int wakeBoundary = 1 * 3600;          // Reporting boundary (1 hour)
+enum AppBreadcrumb : uint8_t {
+  BREADCRUMB_NONE = 0,
+  BREADCRUMB_SETUP_START = 1,
+  BREADCRUMB_SETUP_COMPLETE = 2,
+  BREADCRUMB_SLEEP_ENTRY = 3,
+  BREADCRUMB_WAKE = 4,
+  BREADCRUMB_REPORTING = 5,
+  BREADCRUMB_CONNECT_REQUESTED = 6,
+  BREADCRUMB_CLOUD_CONNECTED = 7,
+  BREADCRUMB_APP_WATCHDOG_RESET = 8,
+  BREADCRUMB_CONNECTIVITY_FAILSAFE = 9,
+  BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD = 10,
+};
+
+const char *appBreadcrumbName(uint8_t code) {
+  switch (code) {
+  case BREADCRUMB_SETUP_START:
+    return "SETUP";
+  case BREADCRUMB_SETUP_COMPLETE:
+    return "READY";
+  case BREADCRUMB_SLEEP_ENTRY:
+    return "SLEEP";
+  case BREADCRUMB_WAKE:
+    return "WAKE";
+  case BREADCRUMB_REPORTING:
+    return "REPORT";
+  case BREADCRUMB_CONNECT_REQUESTED:
+    return "CONN";
+  case BREADCRUMB_CLOUD_CONNECTED:
+    return "CLOUD";
+  case BREADCRUMB_APP_WATCHDOG_RESET:
+    return "WDT";
+  case BREADCRUMB_CONNECTIVITY_FAILSAFE:
+    return "CONN_FAILSAFE";
+  case BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD:
+    return "CONN_FAILSAFE_HARD";
+  default:
+    return "NONE";
+  }
+}
+
+const char *stateShortName(State value) {
+  switch (value) {
+  case INITIALIZATION_STATE:
+    return "Init";
+  case ERROR_STATE:
+    return "Error";
+  case IDLE_STATE:
+    return "Idle";
+  case SLEEPING_STATE:
+    return "Sleep";
+  case CONNECTING_STATE:
+    return "Connect";
+  case REPORTING_STATE:
+    return "Report";
+  case FIRMWARE_UPDATE_STATE:
+    return "FW";
+  default:
+    return "?";
+  }
+}
+
+const char *batteryTierShortName(BatteryTier tier) {
+  switch (tier) {
+  case TIER_HEALTHY:
+    return "H";
+  case TIER_CONSERVING:
+    return "C";
+  case TIER_CRITICAL:
+    return "CR";
+  case TIER_SURVIVAL:
+    return "S";
+  default:
+    return "?";
+  }
+}
+
+BatteryTier currentBatteryTierForFailsafe() {
+  const uint8_t tierValue = sysStatus.get_currentBatteryTier();
+  if (tierValue <= TIER_SURVIVAL) {
+    return static_cast<BatteryTier>(tierValue);
+  }
+  return Cloud::calculateBatteryTier(current.get_stateOfCharge());
+}
+
+bool connectivityFailsafeHasExternalPower() {
+  const PowerPlatform::PowerSourceSnapshot snapshot = PowerPlatform::readPowerSource();
+  if (snapshot.status == PowerAvailability::NotAvailable) {
+    return false;
+  }
+
+  switch (snapshot.source) {
+  case 1:
+  case 2:
+  case 3:
+  case 4:
+    return true;
+  default:
+    return false;
+  }
+}
+
+uint32_t connectivityFailsafeJitterSec(uint8_t stage) {
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+  (void)stage;
+  return 0;
+#else
+  if (ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC <= 0) {
+    return 0;
+  }
+
+  String deviceId = System.deviceID();
+  uint32_t hash = 5381u;
+  for (size_t index = 0; index < deviceId.length(); ++index) {
+    hash = ((hash << 5) + hash) ^ (uint8_t)deviceId.charAt(index);
+  }
+  hash ^= (uint32_t)stage * 2654435761u;
+  return hash % (uint32_t)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC;
+#endif
+}
+
+void persistConnectivityFailsafeState(uint8_t stage, time_t actionTime, bool incrementCount) {
+  sysStatus.set_connectivityRecoveryStage(stage);
+  sysStatus.set_lastConnectivityRecoveryAction(actionTime);
+  if (incrementCount) {
+    uint8_t count = sysStatus.get_connectivityRecoveryCount();
+    if (count < 0xFF) {
+      sysStatus.set_connectivityRecoveryCount(count + 1);
+    }
+  }
+  sysStatus.flush(true);
+}
+
+const char *failsafeDeferReasonNameLocal(FailsafeDeferReason reason) {
+  switch (reason) {
+  case FAILSAFE_DEFER_INVALID_TIME:
+    return "invalid-time";
+  case FAILSAFE_DEFER_NO_LAST_CONNECTION:
+    return "no-last-connection";
+  case FAILSAFE_DEFER_DISCONNECTED_MODE:
+    return "disconnected-mode";
+  case FAILSAFE_DEFER_UPDATE_PENDING:
+    return "update-pending";
+  case FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED:
+    return "low-battery-hard-stage-suppressed";
+  case FAILSAFE_DEFER_CLOSED_HOURS_LONG_SLEEP:
+    return "closed-hours-long-sleep";
+  default:
+    return "none";
+  }
+}
+
+bool claimFailsafeDeferLogLocal(FailsafeDeferReason reason) {
+  if (reason == FAILSAFE_DEFER_NONE) {
+    return false;
+  }
+
+  const uint8_t shift = (uint8_t)reason - 1;
+  const uint32_t bit = (shift < 32) ? (1UL << shift) : 0UL;
+  if (bit == 0UL) {
+    return false;
+  }
+  if (session.failsafeDeferLogMask & bit) {
+    return false;
+  }
+  session.failsafeDeferLogMask |= bit;
+  return true;
+}
+
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+long connectivityFailsafeAgeSecOrNegative(time_t timestamp) {
+  if (!Time.isValid() || timestamp == 0) {
+    return -1L;
+  }
+
+  const time_t now = Time.now();
+  if (now <= timestamp) {
+    return -1L;
+  }
+  return (long)(now - timestamp);
+}
+
+void formatFailsafeAgeField(char *buffer, size_t bufferSize, time_t timestamp) {
+  const long ageSec = connectivityFailsafeAgeSecOrNegative(timestamp);
+  if (timestamp == 0) {
+    snprintf(buffer, bufferSize, "0");
+  } else if (ageSec >= 0) {
+    snprintf(buffer, bufferSize, "%lds", ageSec);
+  } else {
+    snprintf(buffer, bufferSize, "%ld", (long)timestamp);
+  }
+}
+
+void formatFailsafeConnectionAgeField(char *buffer, size_t bufferSize, time_t lastConnection) {
+  const long ageSec = connectivityFailsafeAgeSecOrNegative(lastConnection);
+  if (ageSec >= 0) {
+    snprintf(buffer, bufferSize, "%lds", ageSec);
+  } else {
+    snprintf(buffer, bufferSize, "na");
+  }
+}
+
+int plannedClosedHoursSleepSec() {
+  if (!Time.isValid() || isWithinOpenHours()) {
+    return -1;
+  }
+
+  int nightSleepSec = secondsUntilNextOpen();
+  if (nightSleepSec <= 0) {
+    nightSleepSec = 3600;
+  }
+
+  const int maxSleepSec = 546 * 60;
+  if (nightSleepSec > maxSleepSec) {
+    nightSleepSec = maxSleepSec;
+  }
+  return nightSleepSec;
+}
+
+FailsafeDeferReason currentFailsafeEligibilityReason() {
+  if (sysStatus.get_connectionMode() == DISCONNECTED) {
+    return FAILSAFE_DEFER_DISCONNECTED_MODE;
+  }
+
+  if (state == FIRMWARE_UPDATE_STATE || System.updatesPending()) {
+    return FAILSAFE_DEFER_UPDATE_PENDING;
+  }
+
+  if (!Time.isValid()) {
+    return FAILSAFE_DEFER_INVALID_TIME;
+  }
+
+  const time_t lastConnection = sysStatus.get_lastConnection();
+  if (lastConnection == 0) {
+    return FAILSAFE_DEFER_NO_LAST_CONNECTION;
+  }
+
+  const time_t now = Time.now();
+  if (now > lastConnection) {
+    const time_t connectionAgeSec = now - lastConnection;
+    uint8_t currentStage = sysStatus.get_connectivityRecoveryStage();
+    if (currentStage > 3) {
+      currentStage = 0;
+    }
+
+    if (connectionAgeSec >= ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC && currentStage < 3) {
+      time_t lastAction = sysStatus.get_lastConnectivityRecoveryAction();
+      if (lastAction > now) {
+        lastAction = 0;
+      }
+
+      const uint8_t nextStage = currentStage + 1;
+      time_t requiredDelay = ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC;
+      if (nextStage >= 2) {
+        requiredDelay += (time_t)connectivityFailsafeJitterSec(nextStage);
+      }
+
+      const bool cooldownComplete =
+          (currentStage == 0 || lastAction == 0 || (now - lastAction) >= requiredDelay);
+
+      if (cooldownComplete) {
+        const BatteryTier tier = currentBatteryTierForFailsafe();
+        const bool externalPowerPresent = connectivityFailsafeHasExternalPower();
+        const bool lowBatteryHardActionBlocked =
+            nextStage >= 2 && !externalPowerPresent &&
+            (sysStatus.get_lowBatteryMode() || tier == TIER_SURVIVAL);
+
+        if (lowBatteryHardActionBlocked) {
+          return FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED;
+        }
+      }
+    }
+  }
+
+  return FAILSAFE_DEFER_NONE;
+}
+
+void logConnectivityFailsafeBootTestContextLocal() {
+  const int closedSleepSec = plannedClosedHoursSleepSec();
+  if (closedSleepSec >
+      (int)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC) {
+    Log.info("FailsafeTest: closed-hours sleep cap active planned=%ds cap=%lds",
+             closedSleepSec,
+             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC);
+  }
+}
+
+void logConnectivityFailsafeBootDiagnosticsLocal() {
+  char lastActionField[24];
+  char connectionAgeField[24];
+  formatFailsafeAgeField(lastActionField, sizeof(lastActionField),
+                         sysStatus.get_lastConnectivityRecoveryAction());
+  formatFailsafeConnectionAgeField(connectionAgeField, sizeof(connectionAgeField),
+                                   sysStatus.get_lastConnection());
+
+  const FailsafeDeferReason reason = currentFailsafeEligibilityReason();
+  if (reason == FAILSAFE_DEFER_NONE) {
+    Log.info("FailsafeBoot: test=1 stale=%lds cd=%lds jit=%lds stage=%u cnt=%u lastAct=%s connAge=%s eligible=1",
+             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC,
+             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC,
+             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC,
+             (unsigned)sysStatus.get_connectivityRecoveryStage(),
+             (unsigned)sysStatus.get_connectivityRecoveryCount(),
+             lastActionField,
+             connectionAgeField);
+  } else {
+    Log.info("FailsafeBoot: test=1 stale=%lds cd=%lds jit=%lds stage=%u cnt=%u lastAct=%s connAge=%s eligible=0 reason=%s",
+             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC,
+             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC,
+             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC,
+             (unsigned)sysStatus.get_connectivityRecoveryStage(),
+             (unsigned)sysStatus.get_connectivityRecoveryCount(),
+             lastActionField,
+             connectionAgeField,
+             failsafeDeferReasonNameLocal(reason));
+  }
+}
+#endif
+
+} // namespace
+
+const char *failsafeDeferReasonName(FailsafeDeferReason reason) {
+  return failsafeDeferReasonNameLocal(reason);
+}
+
+bool claimFailsafeDeferLog(FailsafeDeferReason reason) {
+  return claimFailsafeDeferLogLocal(reason);
+}
+
+void logConnectivityFailsafeBootDiagnostics() {
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+  logConnectivityFailsafeBootDiagnosticsLocal();
+  logConnectivityFailsafeBootTestContextLocal();
+#endif
+}
+
+// ===== Retained boot and breadcrumb state =====
+
+// Boot-storm guard retained state protects against repeated resets that occur
+// before setup completes and therefore bypass ERROR_STATE protections.
+retained uint8_t bootStormCount = 0;
+retained bool bootInProgress = false;
+retained time_t bootStormWindowStart = 0;
+retained uint8_t bootStormLastResetReason = 0;
+retained uint32_t bootStormLastResetReasonData = 0;
+retained uint8_t bootStormTripCount = 0;
+retained bool bootStormAlertPending = false;
+retained uint8_t appBreadcrumb = BREADCRUMB_NONE;
+retained uint32_t appBreadcrumbMs = 0;
+uint8_t startupPreviousBreadcrumb = BREADCRUMB_NONE;
+uint32_t startupPreviousBreadcrumbMs = 0;
+
+void setAppBreadcrumb(uint8_t code) {
+  appBreadcrumb = code;
+  appBreadcrumbMs = millis();
+}
+
+// Short-term webhook monitoring starts only after a successful cloud
+// connection. The expectation is armed when a webhook publish is queued.
+
+// ===== Application lifecycle =====
+
 const unsigned long resetWait = 30000;      // Error state dwell before reset
-const unsigned long maxConnectAttemptMs = 5UL * 60UL * 1000UL; // Max time to spend trying to connect per wake
+
 
 void setup() {
-  // Wait for serial connection when DEBUG_SERIAL is enabled
-#ifdef DEBUG_SERIAL
+  const int reason = System.resetReason();
+  const uint32_t reasonData = System.resetReasonData();
+  const uint8_t previousBreadcrumb = appBreadcrumb;
+  const uint32_t previousBreadcrumbMs = appBreadcrumbMs;
+  startupPreviousBreadcrumb = previousBreadcrumb;
+  startupPreviousBreadcrumbMs = previousBreadcrumbMs;
+  setAppBreadcrumb(BREADCRUMB_SETUP_START);
+  bootStormLastResetReason = (uint8_t)reason;
+  bootStormLastResetReasonData = reasonData;
+
+  const bool previousBootFailedEarly = bootInProgress;
+  // Mark this boot as in-progress immediately so any early reset on this pass
+  // is detectable on the next boot.
+  bootInProgress = true;
+
+  bool qualifiesForStormCount = false;
+  switch (reason) {
+  case RESET_REASON_NONE:
+#ifdef RESET_REASON_PANIC
+  case RESET_REASON_PANIC:
+#endif
+  case RESET_REASON_WATCHDOG:
+#ifdef RESET_REASON_UNKNOWN
+  case RESET_REASON_UNKNOWN:
+#endif
+#ifdef RESET_REASON_USER_APPLICATION
+  case RESET_REASON_USER_APPLICATION:
+#endif
+    qualifiesForStormCount = true;
+    break;
+  default:
+    break;
+  }
+
+  if (previousBootFailedEarly && qualifiesForStormCount) {
+    Log.warn("Previous boot reset early before setup completed (reason=%d data=%lu)",
+             reason,
+             (unsigned long)reasonData);
+  }
+
+  if (previousBootFailedEarly && qualifiesForStormCount) {
+    if (bootStormCount < 255) {
+      bootStormCount++;
+    }
+  }
+
+  if (Time.isValid()) {
+    const time_t now = Time.now();
+    if (bootStormWindowStart == 0) {
+      bootStormWindowStart = now;
+    } else if ((now - bootStormWindowStart) > 600) {
+      bootStormCount = (previousBootFailedEarly && qualifiesForStormCount) ? 1 : 0;
+      bootStormWindowStart = now;
+    }
+  }
+
+  if (bootStormCount >= 6 && previousBootFailedEarly && qualifiesForStormCount) {
+    bootStormTripCount++;
+    bootStormAlertPending = true;
+    Log.error("BOOT STORM: %u early resets detected (reason=%d)", bootStormCount, reason);
+    Connectivity::requestFullDisconnectAndRadioOff();
+    Particle.process();
+    SystemSleepConfiguration bootStormSleep;
+    bootStormSleep.mode(SystemSleepMode::ULTRA_LOW_POWER).duration(600000UL);
+    System.sleep(bootStormSleep);
+    Log.warn("BOOT STORM holdoff sleep returned unexpectedly - continuing boot");
+  }
+
+  // Wait for serial connection only in explicit DEV builds
+#if ALLOW_BLOCKING_SERIAL_WAITS
   waitFor(Serial.isConnected, 10000);
   delay(1000);
 #endif
 
-  Log.info("===== Firmware Version %s =====", FIRMWARE_VERSION);
-  Log.info("===== Release Notes: %s =====", FIRMWARE_RELEASE_NOTES);
+  // Observability: start a new wake cycle on cold boot.
+  Observability::cycleStats().resetOnWake(millis());
   
   System.on(out_of_memory,
             outOfMemoryHandler); // Enabling an out of memory handler is a good
@@ -142,40 +589,81 @@ void setup() {
   // stalls that exceed our non-blocking design intent. The AB1805 hardware
   // watchdog (124s) provides ultimate backstop if this software watchdog fails.
   static ApplicationWatchdog appWatchdog(60000, appWatchdogHandler, 1536);
-  Log.info("Application watchdog enabled: 60s timeout");
 
   // Subscribe to the Ubidots integration response event so we can track
   // successful webhook deliveries and update lastHookResponse.
+  // This subscription is non-blocking; we'll receive responses when connected.
   {
     char responseTopic[125];
     String deviceID = System.deviceID();
     deviceID.toCharArray(responseTopic, sizeof(responseTopic));
     Particle.subscribe(responseTopic, UbidotsHandler);
+
+    // Also subscribe to the default Particle webhook response prefix so this
+    // works with whatever webhook name is configured in the ledger.
+    // If the integration uses the default response topic, responses will be
+    // published to: hook-response/<eventName>.
+    Particle.subscribe("hook-response/", UbidotsHandler);
   }
 
-  // Configure network stack but keep radio OFF at startup.
-  // In SEMI_AUTOMATIC mode we explicitly control when the radio is turned on
-  // by calling Particle.connect() from CONNECTING_STATE.
-#if Wiring_WiFi
-  Log.info("Platform connectivity: WiFi (radio off until CONNECTING_STATE)");
-  WiFi.disconnect();
-  WiFi.off();
-#elif Wiring_Cellular
-  Log.info("Platform connectivity: Cellular (radio off until CONNECTING_STATE)");
-  Cellular.disconnect();
-  Cellular.off();
-#else
-  Log.info("Platform connectivity: default (Particle.connect only)");
-  // Fallback: rely on Particle.connect() in CONNECTING_STATE
+  // Configure startup with the radio left off. CONNECTING_STATE owns
+  // Particle.connect() and all subsequent network bring-up.
+#if !Wiring_WiFi && !Wiring_Cellular
+  // Platforms without explicit Wiring_* radio macros still connect through CONNECTING_STATE.
 #endif
 
-  Particle_Functions::instance().setup(); // Initialize the Particle functions
-
   initializePinModes(); // Initialize the pin modes
+
+  // Recovery path: if the user holds the service button during reset/wake,
+  // force a cloud connection regardless of opening-hours logic.
+  // This allows ledger changes (e.g., opening hours) to be pulled down to
+  // recover a device that would otherwise immediately sleep.
+  if (digitalRead(BUTTON_PIN) == LOW) { // Active-low user button
+    Log.info("Boot override: user button held - forcing CONNECTING_STATE");
+    state = CONNECTING_STATE;
+  }
 
   sysStatus.setup();    // Initialize persistent storage
   sensorConfig.setup(); // Initialize the sensor configuration
   current.setup();      // Initialize the current status data
+  PowerManager::instance().setup();
+
+  // If a boot storm holdoff was triggered on this or the prior boot, surface
+  // it as an alert now that persistent current status storage is initialized.
+  if (bootStormAlertPending) {
+    // Force explicit boot-storm alert visibility in startup/report payloads.
+    current.set_alertCode(17);
+    current.set_lastAlertTime(Time.now());
+    bootStormAlertPending = false;
+    Log.warn("Boot storm holdoff detected - raising alert 17");
+  }
+
+  // Configure serial logging based on serial flag
+  // Note: Particle firmware on this platform doesn't support Log.level()
+  if (sysStatus.get_serialConnected() || (ALLOW_BLOCKING_SERIAL_WAITS != 0)) {
+    Serial.begin(9600);
+
+    // Honor the persisted serialConnected flag with a bounded wait so
+    // USB serial can attach before a low-power device drops back to sleep.
+    // In developer builds, the build profile can force this wait even when
+    // cloud config has not enabled serial logging yet.
+    const unsigned long serialWaitStart = millis();
+    while (!Serial.isConnected() && (millis() - serialWaitStart) < ConnectivityPolicy::DEBUG_SERIAL_WAIT_TIMEOUT_MS) {
+      Particle.process();
+      delay(ConnectivityPolicy::DEBUG_SERIAL_WAIT_POLL_DELAY_MS);
+    }
+
+    if (Serial.isConnected()) {
+      delay(ConnectivityPolicy::DEBUG_SERIAL_POST_CONNECT_DELAY_MS);
+    }
+  }
+
+  if (sysStatus.get_testConnectionDurationOverride() == 0) {
+    sysStatus.set_testConnectionDurationOverride(0xFFFF);  // Disabled (max uint16_t)
+  }
+  
+  // Uncomment the following line to run unit tests on boot
+  // Cloud::testBatteryBackoffLogic();
 
   // Testing: clear sticky sleep-failure alert to avoid reset/deep-power loops.
   if (current.get_alertCode() == 16) {
@@ -184,13 +672,39 @@ void setup() {
     current.set_lastAlertTime(0);
   }
 
-  // Track how often the device has been resetting so the error supervisor
-  // can apply backoffs and avoid permanent reset loops. Only count resets
-  // that are likely to be recoverable by firmware (pin/user/watchdog).
-  switch (System.resetReason()) {
+  // Clear sticky OOM alert after a reset-driven recovery attempt so field
+  // reports can distinguish a one-off OOM from repeated reset/OOM cycles.
+  bool clearOomAlertOnBoot = false;
+  switch (reason) {
   case RESET_REASON_PIN_RESET:
   case RESET_REASON_USER:
   case RESET_REASON_WATCHDOG:
+    clearOomAlertOnBoot = true;
+    break;
+#ifdef RESET_REASON_USER_APPLICATION
+  case RESET_REASON_USER_APPLICATION:
+    clearOomAlertOnBoot = true;
+    break;
+#endif
+  default:
+    break;
+  }
+  if (current.get_alertCode() == 14 && clearOomAlertOnBoot) {
+    Log.info("Clearing alert 14 on boot after reset-driven recovery");
+    current.set_alertCode(0);
+    current.set_lastAlertTime(0);
+  }
+
+  // Track how often the device has been resetting so the error supervisor
+  // can apply backoffs and avoid permanent reset loops. Only count resets
+  // that are likely to be recoverable by firmware (pin/user/watchdog).
+  switch (reason) {
+  case RESET_REASON_PIN_RESET:
+  case RESET_REASON_USER:
+  case RESET_REASON_WATCHDOG:
+#ifdef RESET_REASON_USER_APPLICATION
+  case RESET_REASON_USER_APPLICATION:
+#endif
     sysStatus.set_resetCount(sysStatus.get_resetCount() + 1);
     break;
   case RESET_REASON_UPDATE:
@@ -201,20 +715,15 @@ void setup() {
     state = CONNECTING_STATE;
     break;
   case RESET_REASON_POWER_MANAGEMENT:
-    // Waking from sleep. If current local hour matches opening hour (e.g., 07:00),
-    // we likely just woke from overnight closed-hours hibernate.
-    // Suppress alert 40 this session since 8+ hours without webhook responses
-    // during closed hours is expected, not an error.
-    // Error escalation/hard resets during other hours (08:00-22:00) will still
-    // correctly trigger alert 40 if there's a real connectivity issue.
-    // Note: Local time calculation happens after timezone setup, so we check this
-    // later in setup() rather than here where timezone isn't configured yet.
+    // Waking from sleep. Alert 40 suppression for overnight hibernate
+    // is handled later in setup() after timezone configuration is complete.
     break;
   default:
     break;
   }
 
   // Ensure sensor-board LED power default matches configured sensor type
+  // TODO: Consider moving this sensor-specific logic to device_pinout.cpp or SensorManager
   pinMode(ledPower, OUTPUT);
   SensorType configuredType = static_cast<SensorType>(sysStatus.get_sensorType());
   const SensorDefinition* sensorDef = SensorDefinitions::getDefinition(configuredType);
@@ -232,7 +741,8 @@ void setup() {
       .withFileQueueSize(800)
       .setup(); // Initialize the publish queue
 
-  // Initialize AB1805 RTC and watchdog
+  // ===== TIME, RTC, AND WATCHDOG CONFIGURATION =====
+  // Initialize AB1805 RTC and hardware watchdog, then restore system time if needed
   const bool timeValidBeforeRtc = Time.isValid();
   ab1805.withFOUT(WKP).setup();                // Initialize AB1805 RTC - WKP is D10 on Photon2
   ab1805.setWDT(AB1805::WATCHDOG_MAX_SECONDS); // Enable watchdog
@@ -242,10 +752,12 @@ void setup() {
   const bool timeValidAfterRtc = Time.isValid();
   if (!timeValidBeforeRtc && timeValidAfterRtc) {
     if (rtcReadOk) {
-      Log.info("RTC restored system time: %s (rtc=%s)",
-               Time.timeStr().c_str(),
-               Time.format(rtcTime, TIME_FORMAT_DEFAULT).c_str());
-    } else {
+      if (sysStatus.get_verboseMode()) {
+        Log.info("RTC restored system time: %s (rtc=%s)",
+                 Time.timeStr().c_str(),
+                 Time.format(rtcTime, TIME_FORMAT_DEFAULT).c_str());
+      }
+    } else if (sysStatus.get_verboseMode()) {
       Log.info("RTC restored system time: %s (rtc read failed)",
                Time.timeStr().c_str());
     }
@@ -262,29 +774,32 @@ void setup() {
   // soon after the first successful connection.
   publishStartupStatus();
 
+  // Alert 44 is raised late in the previous wake cycle, after the normal
+  // report path has already run. Treat the startup status snapshot as its
+  // one-time report, then clear it so it does not linger into later
+  // direct-connect service paths before the next scheduled report.
+  if (current.get_alertCode() == 44) {
+    Log.info("Clearing alert 44 after startup status snapshot");
+    current.set_alertCode(0);
+    current.set_lastAlertTime(0);
+  }
+
   // ===== TIME AND TIMEZONE CONFIGURATION =====
   // Setup local time from persisted timezone string (POSIX TZ format).
   // This must be configured before we can make any open/close hour decisions.
-  String tz = sysStatus.get_timeZoneStr();
-  if (tz.length() == 0) {
+  const char *tz = sysStatus.get_timeZoneStrCStr();
+  if (!tz || tz[0] == '\0') {
     tz = "SGT-8"; // Fallback default
-    sysStatus.set_timeZoneStr(tz.c_str());
+    sysStatus.set_timeZoneStr(tz);
   }
-  LocalTime::instance().withConfig(LocalTimePosixTimezone(tz.c_str()));
+  LocalTime::instance().withConfig(LocalTimePosixTimezone(tz));
 
   // Validate time and configure local time converter
   if (!Time.isValid()) {
-    Log.info("Time is invalid - %s so connecting", Time.timeStr().c_str());
     state = CONNECTING_STATE;
   } else {
-    Log.info("Time is valid - %s", Time.timeStr().c_str());
-    
     // Now that time is valid, configure local time converter for timezone-aware operations
     conv.withCurrentTime().convert();
-    Log.info("Timezone: %s, Local time: %s", tz.c_str(), conv.format(TIME_FORMAT_DEFAULT).c_str());
-    Log.info("Open hours %02u:00-%02u:00, currently: %s",
-             sysStatus.get_openTime(), sysStatus.get_closeTime(),
-             isWithinOpenHours() ? "OPEN" : "CLOSED");
 
     // Check if waking from overnight hibernate - suppress alert 40 since
     // 8+ hours without webhook during closed hours is expected, not an error.
@@ -292,30 +807,33 @@ void setup() {
       uint8_t localHour = (uint8_t)(conv.getLocalTimeHMS().toSeconds() / 3600);
       if (localHour == sysStatus.get_openTime()) {
         Log.info("Wake from overnight hibernate at opening hour - suppressing alert 40");
-        suppressAlert40ThisSession = true;
+        session.suppressAlert40ThisSession = true;
       }
-    }
-
-    // In CONNECTED operating mode, always connect on boot to reload
-    // configuration from ledger and prevent stuck-in-IDLE power drain.
-    if (sysStatus.get_operatingMode() == CONNECTED) {
-      Log.info("CONNECTED mode - connecting on boot to reload config");
-      state = CONNECTING_STATE;
     }
   }
 
-  Log.info("Sensor ready at startup: %s", SensorManager::instance().isSensorReady() ? "true" : "false");
+  Log.info("Boot: v=%s reset=%d heap=%lu prev=%s open=%d FailsafeTest=%d",
+           FIRMWARE_VERSION,
+           reason,
+           (unsigned long)System.freeMemory(),
+           appBreadcrumbName(startupPreviousBreadcrumb),
+           Time.isValid() ? (isWithinOpenHours() ? 1 : 0) : -1,
+           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0);
+
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+  Log.info("Failsafe: test=%d stale=%lds cooldown=%lds jitter=%lds",
+           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
+           (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC,
+           (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC,
+           (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC);
+  logConnectivityFailsafeBootDiagnostics();
+#endif
 
   // ===== SENSOR ABSTRACTION LAYER =====
   // Initialize the sensor based on configuration using *local* time. This
   // runs after timezone configuration so open/close checks are correct.
-  Log.info("Initial operatingMode: %d (%s)", sysStatus.get_operatingMode(),
-           sysStatus.get_operatingMode() == 0 ? "CONNECTED" :
-           sysStatus.get_operatingMode() == 1 ? "LOW_POWER" : "DISCONNECTED");
-
   if (!SensorManager::instance().isSensorReady()) {
     if (isWithinOpenHours()) {
-      Log.info("Initializing sensor after timezone setup");
       SensorManager::instance().initializeFromConfig();
 
       if (!SensorManager::instance().isSensorReady()) {
@@ -323,13 +841,22 @@ void setup() {
         state = CONNECTING_STATE;
       }
     } else {
-      Log.info("Outside opening hours at startup; sensor will remain powered down");
       // Ensure carrier sensor power rails are actually turned off even if
       // we skipped sensor initialization while closed.
-      Log.info("Startup CLOSED: forcing sensor power down before sleep");
       SensorManager::instance().onEnterSleep();
-      Log.info("Sensor ready after startup power-down: %s", SensorManager::instance().isSensorReady() ? "true" : "false");
     }
+  }
+
+  // Defer the first startup battery sample until setup tail so RTC/time,
+  // cloud/ledger setup, timezone config, connection-mode logging, and sensor
+  // initialization have completed while the radio is still off.
+  if (System.resetReason() == RESET_REASON_POWER_MANAGEMENT) {
+    measure.noteWakeFromLowPowerSleep();
+  }
+  measure.batteryState(BatterySampleContext::Setup);
+  PowerManager::instance().refreshInputProfile();
+  if (sysStatus.get_lowBatteryMode()) {
+    applyBatteryAwareConnectionModePolicy(current.get_stateOfCharge());
   }
   // ===================================
 
@@ -339,11 +866,22 @@ void setup() {
 
   if (state == INITIALIZATION_STATE)
     state = IDLE_STATE; // Default to IDLE; CONNECTING only when explicitly requested
-  Log.info("Startup complete");
-  digitalWrite(BLUE_LED, LOW); // Signal the end of startup
+
+  // setup reached stable completion; clear early-boot in-progress marker.
+  bootInProgress = false;
+  setAppBreadcrumb(BREADCRUMB_SETUP_COMPLETE);
+  signalLED(false);  // Turn off startup indicator
 }
 
 void loop() {
+  // If we remain alive for a stability window, clear boot-storm counters.
+  if (bootStormCount > 0 && millis() > 300000UL) {
+    bootStormCount = 0;
+    bootStormWindowStart = 0;
+  }
+
+  connectivityFailsafeSupervisor();
+
   // Main state machine driving sensing, reporting, power management
   switch (state) {
   case IDLE_STATE:
@@ -371,6 +909,8 @@ void loop() {
     break;
   }
 
+  thrashGuard.loop(state, millis());
+
   ab1805.loop(); // Keeps the RTC synchronized with the device clock
 
   // Housekeeping for each transit of the main loop
@@ -384,31 +924,51 @@ void loop() {
   // Service outgoing publish queue
   PublishQueuePosix::instance().loop();
 
+  // Check for short-term webhook response timeout.
+  // Requirement: 20 seconds starting only after a successful cloud connect.
+  if (Particle.connected() && session.awaitingWebhookResponse && session.webhookAwaitStartMs != 0) {
+    unsigned long timeoutMs = sysStatus.get_webhookTimeoutMs();
+    if (timeoutMs < 5000UL || timeoutMs > 120000UL) {
+      timeoutMs = 20000UL;
+    }
+
+    const unsigned long elapsedMs = millis() - session.webhookAwaitStartMs;
+    if (elapsedMs > timeoutMs) {
+      Log.warn("Webhook response timeout after %lu ms - raising alert 40", elapsedMs);
+      session.awaitingWebhookResponse = false;
+      session.webhookAwaitStartMs = 0;
+      current.raiseAlert(40);
+    }
+  }
+
   // If an out-of-memory event occurred, go to error state
   if (outOfMemory >= 0) {
-    Log.info("Resetting due to low memory");
+    Log.error("Out-of-memory event detected (param=%d freeHeap=%lu) - resetting",
+              outOfMemory,
+              (unsigned long)System.freeMemory());
     // Out-of-memory is treated as a critical alert; only overwrite any
     // existing alert if this is more severe.
     current.raiseAlert(14);
     state = ERROR_STATE;
   }
 
-  // If the user switch is pressed, force a connection to drain queue.
+  // If the user switch is pressed, force an immediate report and connection
   if (userSwitchDetected) {
-    Log.info("User switch pressed - connecting to drain queue");
+    Log.info("User switch pressed - triggering immediate report and connection");
     userSwitchDetected = false;
-    state = CONNECTING_STATE;
+    session.serviceRequestTriggered = true;
+    state = REPORTING_STATE;
   }
 
   // ********** Centralized sensor event handling **********
   // Service sensor interrupts regardless of current state. This ensures
   // counts are captured even during long-running operations like cellular
   // connection attempts (which can take minutes) or firmware updates.
-  // SCHEDULED mode is time-based (handled in IDLE only), not interrupt-driven.
-  uint8_t countingMode = sysStatus.get_countingMode();
-  if (countingMode == COUNTING) {
+  // MEASUREMENT mode is time-based (handled in IDLE only), not interrupt-driven.
+  uint8_t sensorMode = sysStatus.get_sensorMode();
+  if (sensorMode == COUNTING) {
     handleCountingMode();  // Count each sensor event
-  } else if (countingMode == OCCUPANCY) {
+  } else if (sensorMode == OCCUPANCY) {
     handleOccupancyMode(); // Track occupied/unoccupied state
   }
 
@@ -418,26 +978,57 @@ void loop() {
 
 // ApplicationWatchdog expects a plain function pointer.
 static void appWatchdogHandler() {
+  setAppBreadcrumb(BREADCRUMB_APP_WATCHDOG_RESET);
   System.reset();
 }
 
-// Helper to determine whether current *local* time is within park open hours.
-// Local time is derived from LocalTimeRK using the configured timezone.
-// If time is not yet valid, we treat it as "open" so the device can start
-// sensing while it acquires time and configuration.
-bool isWithinOpenHours() {
-  if (!Time.isValid()) {
-    return true;
+// ===== Policy and publishing helpers =====
+
+BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC) {
+  BatteryTier newTier = Cloud::calculateBatteryTier(currentSoC);
+  uint8_t prevTierValue = sysStatus.get_currentBatteryTier();
+  const char* tierNames[] = {"HEALTHY", "CONSERVING", "CRITICAL", "SURVIVAL"};
+
+  if (newTier != prevTierValue) {
+    const char* prevName = (prevTierValue < 4) ? tierNames[prevTierValue] : "UNKNOWN";
+    const char* newName = tierNames[newTier];
+    Log.info("Battery tier transition: %s -> %s (SoC=%.1f%%)", prevName, newName, (double)currentSoC);
+    sysStatus.set_currentBatteryTier(static_cast<uint8_t>(newTier));
   }
 
-  uint8_t openHour = sysStatus.get_openTime();
-  uint8_t closeHour = sysStatus.get_closeTime();
-  // Use LocalTimeRK to convert UTC to local hour based on the
-  // configured timezone (see setup()).
-  LocalTimeConvert tempConv;
-  tempConv.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
-  uint8_t hour = (uint8_t)(tempConv.getLocalTimeHMS().toSeconds() / 3600);
+  if (sysStatus.get_sensorMode() == OCCUPANCY) {
+    ConnectionMode currentMode = static_cast<ConnectionMode>(sysStatus.get_connectionMode());
+    bool lowBatteryDowngradeActive = sysStatus.get_lowBatteryMode();
 
+    if (currentMode == INTERMITTENT_KEEP_ALIVE && newTier >= TIER_CONSERVING) {
+      Log.info("Battery conservation: Disabling KEEP_ALIVE mode (tier=%s, SoC=%.1f%%) - switching to INTERMITTENT",
+               tierNames[newTier], (double)currentSoC);
+      sysStatus.set_connectionMode(INTERMITTENT);
+      sysStatus.set_lowBatteryMode(true);
+    } else if (currentMode == INTERMITTENT && lowBatteryDowngradeActive && newTier == TIER_HEALTHY) {
+      Log.info("Battery recovery: clearing lowBatteryMode (tier=HEALTHY, SoC=%.1f%%)",
+               (double)currentSoC);
+      Log.info("Battery recovery: restoring INTERMITTENT_KEEP_ALIVE (tier=HEALTHY, SoC=%.1f%%)",
+               (double)currentSoC);
+      sysStatus.set_connectionMode(INTERMITTENT_KEEP_ALIVE);
+      sysStatus.set_lowBatteryMode(false);
+    } else if (currentMode != INTERMITTENT && lowBatteryDowngradeActive) {
+      Log.info("Battery recovery: clearing lowBatteryMode (tier=%s, SoC=%.1f%%)",
+               tierNames[newTier],
+               (double)currentSoC);
+      sysStatus.set_lowBatteryMode(false);
+    }
+  } else if (sysStatus.get_lowBatteryMode()) {
+    Log.info("Battery recovery: clearing lowBatteryMode (tier=%s, SoC=%.1f%%)",
+             tierNames[newTier],
+             (double)currentSoC);
+    sysStatus.set_lowBatteryMode(false);
+  }
+
+  return newTier;
+}
+
+static bool isWithinOpenHoursForHour(uint8_t hour, uint8_t openHour, uint8_t closeHour) {
   if (openHour < closeHour) {
     // Simple daytime window, e.g. 6 -> 22
     return (hour >= openHour) && (hour < closeHour);
@@ -450,25 +1041,15 @@ bool isWithinOpenHours() {
   }
 }
 
-// Helper to compute seconds until next park opening time (local time)
-int secondsUntilNextOpen() {
-  if (!Time.isValid()) {
-    // Fallback: 1 hour if time is not yet valid
-    return 3600;
-  }
-
-  uint8_t openHour = sysStatus.get_openTime();
-  uint8_t closeHour = sysStatus.get_closeTime();
-
-  LocalTimeConvert tempConv;
-  tempConv.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
-  uint32_t secondsOfDay = tempConv.getLocalTimeHMS().toSeconds();
-
+static int secondsUntilNextOpenForSeconds(uint32_t secondsOfDay,
+                                          uint8_t openHour,
+                                          uint8_t closeHour,
+                                          bool openNow) {
   uint32_t openSec = (uint8_t)openHour * 3600;
   uint32_t closeSec = (uint8_t)closeHour * 3600;
 
   // Normalize: if we're currently within opening hours, next open is tomorrow
-  if (isWithinOpenHours()) {
+  if (openNow) {
     return (int)((24 * 3600UL - secondsOfDay) + openSec);
   }
 
@@ -487,7 +1068,7 @@ int secondsUntilNextOpen() {
       // During the closed gap today
       return (int)(openSec - secondsOfDay);
     } else {
-      // Otherwise next open is later today or tomorrow, but isWithinOpenHours()
+      // Otherwise next open is later today or tomorrow, but openNow
       // was already false so this path will generally be rare; fall back to 1 hour
       return 3600;
     }
@@ -497,28 +1078,90 @@ int secondsUntilNextOpen() {
   }
 }
 
+
+// Helper to determine whether current *local* time is within park open hours.
+// Local time is derived from LocalTimeRK using the configured timezone.
+// If time is not yet valid, we treat it as "open" so the device can start
+// sensing while it acquires time and configuration.
+bool isWithinOpenHours() {
+  if (!Time.isValid()) {
+    return true;
+  }
+
+  uint8_t openHour = sysStatus.get_openTime();
+  uint8_t closeHour = sysStatus.get_closeTime();
+  const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
+  const uint8_t hour = snapshot.localHour;
+  const bool openNow = isWithinOpenHoursForHour(hour, openHour, closeHour);
+
+  return openNow;
+}
+
+// Helper to compute seconds until next park opening time (local time)
+int secondsUntilNextOpen() {
+  if (!Time.isValid()) {
+    // Fallback: 1 hour if time is not yet valid
+    return 3600;
+  }
+
+  uint8_t openHour = sysStatus.get_openTime();
+  uint8_t closeHour = sysStatus.get_closeTime();
+  const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
+  const bool openNow = isWithinOpenHoursForHour(snapshot.localHour, openHour, closeHour);
+  const int secondsUntil = secondsUntilNextOpenForSeconds(
+      snapshot.localSecondsOfDay, openHour, closeHour, openNow);
+
+  return secondsUntil;
+}
+
 /**
- * @brief Publish sensor data to Ubidots webhook and device-data ledger.
+ * @brief Shared notes for report payload construction.
  *
  * @details
- * 1) Builds a compact JSON payload expected by the Ubidots webhook template
- *    and enqueues it via PublishQueuePosix to the "Ubidots-Parking-Hook-v1" event.
- * 2) Updates the Particle Ledger "device-data" with a richer JSON snapshot
- *    via Cloud::publishDataToLedger() for Console visibility.
+ * - Webhook payloads are compact and follow the legacy Ubidots field contract.
+ * - Device-data ledger publishes carry a richer structured snapshot for Console visibility.
+ * - Occupancy totals are reported in whole minutes for both webhook and ledger paths.
  */
+/**
+ * @brief Returns true for transient alerts that may auto-clear after reporting.
+ *
+ * @details These alerts represent operational failures that are re-evaluated
+ *          frequently enough to be raised again on later cycles if the
+ *          underlying condition persists.
+ *
+ * @param alertCode Current alert code carried in the report payload.
+ * @return true if the alert should auto-clear after successful queueing.
+ */
+static bool isAutoClearAfterReportAlert(int alertCode) {
+  switch (alertCode) {
+  case 15:
+  case 31:
+  case 41:
+  case 43:
+  case 44:
+    return true;
+  default:
+    return false;
+  }
+}
+
 void publishData() {
   // Legacy Ubidots context strings describing battery state
   static const char *batteryContext[7] = {
     "Unknown", "Not Charging", "Charging",
     "Charged", "Discharging", "Fault",
-    "Diconnected"
+    "Disconnected"
   };
 
   char data[256];
 
-  // Compute the timestamp as the last second of the previous hour so the
-  // webhook data aggregates correctly into hourly buckets in Ubidots.
-  unsigned long timeStampValue = Time.now() - (Time.minute() * 60L + Time.second() + 1L);
+  // We support two timestamp strategies:
+  // - Occupancy mode: use current time so the value updates in Ubidots even
+  //   if multiple publishes happen within the same hour.
+  // - Counting mode: keep the legacy "end of previous hour" timestamp so
+  //   hourly bucket aggregation behavior remains unchanged.
+  const unsigned long nowStampSec = Time.now();
+  const unsigned long endOfPrevHourStampSec = nowStampSec - (Time.minute() * 60L + Time.second() + 1L);
 
   // Bounds check battery state index for safety
   uint8_t battState = current.get_batteryState();
@@ -526,35 +1169,112 @@ void publishData() {
     battState = 0;
   }
 
-  // Correct Ubidots webhook JSON structure
-  snprintf(data, sizeof(data),
-           "{\"hourly\":%i, \"daily\":%i, \"battery\":%4.2f,\"key1\":\"%s\", \"temp\":%4.2f, \"resets\":%i, \"alerts\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
-           current.get_hourlyCount(),
-           current.get_dailyCount(),
-           current.get_stateOfCharge(),
-           batteryContext[battState],
-           current.get_internalTempC(),
-           sysStatus.get_resetCount(),
-           current.get_alertCode(),
-           sysStatus.get_lastConnectionDuration(),
-           timeStampValue);
+  uint8_t sensorMode = sysStatus.get_sensorMode();
+  const int8_t reportedAlertCode = current.get_alertCode();
 
-  // Explicitly log the counts and alert code used in this report
-  Log.info("Report payload: hourly=%d daily=%d alert=%d",
-           (int)current.get_hourlyCount(),
-           (int)current.get_dailyCount(),
-           (int)current.get_alertCode());
+  // Ensure battery value is always a finite number for webhook ingestion.
+  // Ubidots rejects NaN/Inf with a 400 response.
+  float stateOfCharge = current.get_stateOfCharge();
+  if (!(stateOfCharge == stateOfCharge) || stateOfCharge < 0.0f || stateOfCharge > 100.0f) {
+    stateOfCharge = 0.0f;
+    battState = 0;
+  }
 
-  PublishQueuePosix::instance().publish(ProjectConfig::webhookEventName(), data, PRIVATE | WITH_ACK);
-  Log.info("Ubidots Webhook: %s", data);
+  // Build webhook payload based on sensor mode
+  if (sensorMode == OCCUPANCY) {
+    const unsigned long timeStampValue = nowStampSec;
+    const unsigned long totalOccupiedMinutes = (unsigned long)(current.get_totalOccupiedSeconds() / 60UL);
+
+    // Occupancy mode webhook format (occupancy as 0/1 numeric value)
+    snprintf(data, sizeof(data),
+             "{\"occupancy\":%d,\"dailyoccupancy\":%lu,\"battery\":%4.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"alerts\":%i,\"resets\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
+             current.get_occupied() ? 1 : 0,
+             totalOccupiedMinutes,
+             stateOfCharge,
+             batteryContext[battState],
+             current.get_internalTempC(),
+             reportedAlertCode,
+             sysStatus.get_resetCount(),
+             sysStatus.get_lastConnectionDuration(),
+             timeStampValue);
+
+  } else {
+    const unsigned long timeStampValue = endOfPrevHourStampSec;
+
+    // Counting mode webhook format (original format)
+    snprintf(data, sizeof(data),
+             "{\"hourly\":%i,\"daily\":%i,\"battery\":%4.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"resets\":%i,\"alerts\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
+             current.get_hourlyCount(),
+             current.get_dailyCount(),
+             stateOfCharge,
+             batteryContext[battState],
+             current.get_internalTempC(),
+             sysStatus.get_resetCount(),
+             reportedAlertCode,
+             sysStatus.get_lastConnectionDuration(),
+             timeStampValue);
+
+  }
+
+  // Get webhook name from cloud configuration (with fallback to convention)
+  const char *webhookName = Cloud::instance().getWebhookName();
+
+  bool queued = PublishQueuePosix::instance().publish(webhookName, data, PRIVATE);
+  if (!queued) {
+    Log.warn("Report webhook queue rejected name=%s", webhookName);
+  }
+
+  // General alert lifecycle rule: once an alert has been included in a report
+  // and that report is accepted by the publish queue, clear it locally.
+  // If the underlying condition persists, it will be raised again.
+  if (queued &&
+      reportedAlertCode > 0 &&
+      isAutoClearAfterReportAlert(reportedAlertCode) &&
+      current.get_alertCode() == reportedAlertCode) {
+    if (sysStatus.get_verboseMode()) {
+      Log.info("Clearing alert %d after queueing report payload", (int)reportedAlertCode);
+    }
+    current.set_alertCode(0);
+    current.set_lastAlertTime(0);
+  }
+
+  // Arm short-term webhook supervision.
+  // If we're already connected, start the 20s window immediately.
+  // Otherwise start it when CONNECTING_STATE reports a successful cloud connect.
+  session.webhookExpectedOnConnect = true;
+  if (Particle.connected()) {
+    session.webhookExpectedOnConnect = false;
+    session.awaitingWebhookResponse = true;
+    session.webhookAwaitStartMs = millis();
+  }
 
   // Also update device-data ledger with structured JSON snapshot
-  if (!Cloud::instance().publishDataToLedger()) {
+  const bool ledgerOk = Cloud::instance().publishDataToLedger();
+  const char *ledgerState = ledgerOk ? "req" : "err";
+  if (!ledgerOk) {
     // Data ledger publish failure; escalate via alert so the error
     // supervisor can decide on corrective action.
     current.raiseAlert(42);
   }
+
+  if (sensorMode == OCCUPANCY) {
+    Log.info("Report: occ=%d totalMin=%lu alert=%d q=%d ledger=%s",
+             current.get_occupied() ? 1 : 0,
+             (unsigned long)(current.get_totalOccupiedSeconds() / 60UL),
+             (int)reportedAlertCode,
+             queued ? 1 : 0,
+             ledgerState);
+  } else {
+    Log.info("Report: hourly=%d daily=%d alert=%d q=%d ledger=%s",
+             (int)current.get_hourlyCount(),
+             (int)current.get_dailyCount(),
+             (int)reportedAlertCode,
+             queued ? 1 : 0,
+             ledgerState);
+  }
 }
+
+// ===== Startup status and webhook supervision =====
 
 /**
  * @brief Enqueue a one-time startup status event summarizing
@@ -565,58 +1285,112 @@ void publishData() {
  * before the radio is brought up.
  */
 void publishStartupStatus() {
-  char status[192];
+  char status[416];
 
   int resetReason = System.resetReason();
   uint32_t resetReasonData = System.resetReasonData();
   int8_t alertCode = current.get_alertCode();
   time_t lastAlert = current.get_lastAlertTime();
+  unsigned long freeHeap = System.freeMemory();
+  const uint8_t failsafeStage = sysStatus.get_connectivityRecoveryStage();
+  const uint8_t failsafeCount = sysStatus.get_connectivityRecoveryCount();
+  const time_t failsafeLastAction = sysStatus.get_lastConnectivityRecoveryAction();
+  const time_t lastConnection = sysStatus.get_lastConnection();
+  const long lastConnectionAgeSec =
+      (Time.isValid() && lastConnection != 0 && Time.now() > lastConnection)
+          ? (long)(Time.now() - lastConnection)
+          : -1L;
 
   snprintf(status, sizeof(status),
-           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld}",
+           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d}",
            FIRMWARE_VERSION,
            resetReason,
            (unsigned long)resetReasonData,
            (int)alertCode,
-           (long)lastAlert);
+           (long)lastAlert,
+           freeHeap,
+           (unsigned)startupPreviousBreadcrumb,
+           (unsigned long)startupPreviousBreadcrumbMs,
+           (unsigned)failsafeStage,
+           (unsigned)failsafeCount,
+           (long)failsafeLastAction,
+           lastConnectionAgeSec,
+           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
+           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0);
 
-  PublishQueuePosix::instance().publish("status", status, PRIVATE | WITH_ACK);
-  Log.info("Startup status: %s", status);
+  PublishQueuePosix::instance().publish("status", status, PRIVATE);
 }
 
+/**
+ * @brief Handle response from Ubidots webhook.
+ *
+ * @details This handler is necessary for webhook response supervision (alert 40).
+ * PublishQueue tracks publish success, but cannot verify end-to-end webhook delivery
+ * to Ubidots. This handler confirms the webhook template executed successfully and
+ * Ubidots accepted the data (HTTP 200/201). Without this, we cannot distinguish
+ * between "event published to Particle cloud" vs "data actually received by Ubidots".
+ *
+ * During each connection, devices must complete 4 tasks:
+ *   1) Clear the publish queue (drain queued events)
+ *   2) Sync Ledger (configuration and data)
+ *   3) Check for firmware updates
+ *   4) Receive Ubidots webhook response (this handler)
+ *
+ * The webhook response arrives asynchronously (typically 5-15 seconds after publish),
+ * so devices must remain connected long enough to complete all 4 tasks. Task timing
+ * is managed by connection budget and state machine logic in CONNECTING_STATE and
+ * REPORTING_STATE.
+ */
 void UbidotsHandler(const char *event, const char *data) {
   // Handle response from Ubidots webhook (legacy integration)
   char responseString[64];
-  // Response is only a single number thanks to Template
-  if (!strlen(data)) { // No data in response - Error
+  bool responseOk = true;
+  // Response is expected to be a single numeric code from the Particle
+  // integration response template (e.g. "200" or "201").
+  if (!data || !strlen(data)) {
     snprintf(responseString, sizeof(responseString), "No Data");
-  } else if (atoi(data) == 200 || atoi(data) == 201) {
-    snprintf(responseString, sizeof(responseString), "Response Received");
-    dataInFlight =
-        false; // We have received a response - so we can send another
-    sysStatus.set_lastHookResponse(
-        Time.now()); // Record the last successful Webhook Response
+    responseOk = false;
+    Log.warn("Webhook response empty");
+  } else {
+    // Any webhook response indicates the integration path is alive.
+    // Update lastHookResponse even if it arrived after our short-term window.
+    sysStatus.set_lastHookResponse(Time.now());
 
-    // If a webhook supervision alert (40) was active, clear it now that
-    // we have a confirmed successful response, so future reports reflect
-    // the healthy state.
+    if (session.awaitingWebhookResponse) {
+      session.awaitingWebhookResponse = false;
+      session.webhookAwaitStartMs = 0;
+    }
+
+    // Clear webhook supervision alert (40) on any response.
     if (current.get_alertCode() == 40) {
       current.set_alertCode(0);
       current.set_lastAlertTime(0);
     }
-  } else {
-    snprintf(responseString, sizeof(responseString),
-             "Unknown response recevied %i", atoi(data));
+
+    // If the response is numeric, treat 200/201 as success.
+    // Otherwise, treat it as an opaque success marker.
+    if (isdigit((unsigned char)data[0])) {
+      int code = atoi(data);
+      if (code == 200 || code == 201) {
+        snprintf(responseString, sizeof(responseString), "Response Received");
+      } else {
+        snprintf(responseString, sizeof(responseString), "Hook response %d", code);
+        responseOk = false;
+        Log.warn("%s", responseString);
+      }
+    } else {
+      snprintf(responseString, sizeof(responseString), "Response Received");
+    }
   }
-  if (sysStatus.get_verboseMode() && Particle.connected()) {
+  if (sysStatus.get_verboseMode() && Particle.connected() && PublishQueuePosix::instance().getCanSleep()) {
     publishDiagnosticSafe("Ubidots Hook", responseString, PRIVATE);
   }
-  Log.info(responseString);
+  if (sysStatus.get_verboseMode() && responseOk) {
+    Log.info("%s", responseString);
+  }
 }
 
-/**
- * @brief Publish a state transition to the log handler.
- */
+
 /**
  * @brief Safely publish diagnostic message through queue with depth guard.
  *
@@ -644,30 +1418,186 @@ bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags
   }
   
   // Queue has capacity; safe to add diagnostic message
-  PublishQueuePosix::instance().publish(eventName, data, flags | WITH_ACK);
+  PublishQueuePosix::instance().publish(eventName, data, flags);
   return true;
 }
 
+/**
+ * @brief Publish a state transition to the log handler.
+ * 
+ * @details Logs transitions between states with context on time validity
+ *          when entering IDLE_STATE. Updates oldState to current state.
+ */
 void publishStateTransition() {
-  char stateTransitionString[256];
-  if (state == IDLE_STATE) {
-    if (!Time.isValid())
-      snprintf(stateTransitionString, sizeof(stateTransitionString),
-               "From %s to %s with invalid time", stateNames[oldState],
-               stateNames[state]);
-    else
-      snprintf(stateTransitionString, sizeof(stateTransitionString),
-               "From %s to %s", stateNames[oldState], stateNames[state]);
-  } else
-    snprintf(stateTransitionString, sizeof(stateTransitionString),
-             "From %s to %s", stateNames[oldState], stateNames[state]);
+  thrashGuard.recordStateTransition(oldState, state);
+  thrashGuard.markProgress("STATE_TRANSITION");
+  Log.info("State: %s->%s",
+           stateShortName(oldState),
+           stateShortName(state));
   oldState = state;
-  Log.info(stateTransitionString);
 }
 
-// ********** Interrupt Service Routines **********
+// ===== Recovery, failsafe, and maintenance helpers =====
+
 void outOfMemoryHandler(system_event_t event, int param) {
   outOfMemory = param;
+}
+
+void clearConnectivityFailsafeRecovery(const char *reason) {
+  const bool hadRecoveryState =
+      sysStatus.get_connectivityRecoveryStage() != 0 ||
+      sysStatus.get_lastConnectivityRecoveryAction() != 0 ||
+      sysStatus.get_connectivityRecoveryCount() != 0;
+  const bool hadAlert = (current.get_alertCode() == ConnectivityPolicy::CONNECTIVITY_FAILSAFE_ALERT);
+
+  if (!hadRecoveryState && !hadAlert) {
+    return;
+  }
+
+  sysStatus.set_connectivityRecoveryStage(0);
+  sysStatus.set_lastConnectivityRecoveryAction(0);
+  sysStatus.set_connectivityRecoveryCount(0);
+  sysStatus.flush(true);
+
+  if (hadAlert) {
+    current.set_alertCode(0);
+    current.set_lastAlertTime(0);
+  }
+
+  Log.info("Failsafe: cleared reason=%s", reason ? reason : "unknown");
+}
+
+void connectivityFailsafeSupervisor() {
+  if (sysStatus.get_connectionMode() == DISCONNECTED) {
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+    if (claimFailsafeDeferLog(FAILSAFE_DEFER_DISCONNECTED_MODE)) {
+      Log.info("FailsafeDefer: reason=%s mode=%u",
+               failsafeDeferReasonName(FAILSAFE_DEFER_DISCONNECTED_MODE),
+               (unsigned)sysStatus.get_connectionMode());
+    }
+#endif
+    return;
+  }
+
+  if (state == FIRMWARE_UPDATE_STATE || System.updatesPending()) {
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+    if (claimFailsafeDeferLog(FAILSAFE_DEFER_UPDATE_PENDING)) {
+      Log.info("FailsafeDefer: reason=%s state=%s pending=%d",
+               failsafeDeferReasonName(FAILSAFE_DEFER_UPDATE_PENDING),
+               stateShortName(state),
+               System.updatesPending() ? 1 : 0);
+    }
+#endif
+    return;
+  }
+
+  if (!Time.isValid()) {
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+    if (claimFailsafeDeferLog(FAILSAFE_DEFER_INVALID_TIME)) {
+      Log.info("FailsafeDefer: reason=%s",
+               failsafeDeferReasonName(FAILSAFE_DEFER_INVALID_TIME));
+    }
+#endif
+    return;
+  }
+
+  const time_t lastConnection = sysStatus.get_lastConnection();
+  if (lastConnection == 0) {
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+    if (claimFailsafeDeferLog(FAILSAFE_DEFER_NO_LAST_CONNECTION)) {
+      Log.info("FailsafeDefer: reason=%s",
+               failsafeDeferReasonName(FAILSAFE_DEFER_NO_LAST_CONNECTION));
+    }
+#endif
+    return;
+  }
+
+  const time_t now = Time.now();
+  if (now <= lastConnection) {
+    return;
+  }
+
+  const time_t connectionAgeSec = now - lastConnection;
+  if (connectionAgeSec < ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC) {
+    return;
+  }
+
+  uint8_t currentStage = sysStatus.get_connectivityRecoveryStage();
+  if (currentStage > 3) {
+    currentStage = 0;
+  }
+  if (currentStage >= 3) {
+    return;
+  }
+
+  time_t lastAction = sysStatus.get_lastConnectivityRecoveryAction();
+  if (lastAction > now) {
+    lastAction = 0;
+  }
+
+  const uint8_t nextStage = currentStage + 1;
+  time_t requiredDelay = ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC;
+  if (nextStage >= 2) {
+    requiredDelay += (time_t)connectivityFailsafeJitterSec(nextStage);
+  }
+
+  if (currentStage != 0 && lastAction != 0 && (now - lastAction) < requiredDelay) {
+    return;
+  }
+
+  if (activeConnectAttemptWithinBudget()) {
+    return;
+  }
+
+  const BatteryTier tier = currentBatteryTierForFailsafe();
+  const bool externalPowerPresent = connectivityFailsafeHasExternalPower();
+  const bool lowBatteryHardActionBlocked =
+      nextStage >= 2 &&
+      !externalPowerPresent &&
+      (sysStatus.get_lowBatteryMode() || tier == TIER_SURVIVAL);
+
+  if (lowBatteryHardActionBlocked) {
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+    if (claimFailsafeDeferLog(FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED)) {
+      Log.info("FailsafeDefer: reason=%s stage=%u tier=%s",
+               failsafeDeferReasonName(FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED),
+               (unsigned)nextStage,
+               batteryTierShortName(tier));
+    }
+#else
+    Log.info("Failsafe: defer reason=low-battery stage=%u tier=%s",
+             (unsigned)nextStage,
+             batteryTierShortName(tier));
+#endif
+    persistConnectivityFailsafeState(currentStage, now, false);
+    return;
+  }
+
+  if (nextStage == 1) {
+    current.raiseAlert(ConnectivityPolicy::CONNECTIVITY_FAILSAFE_ALERT);
+    setAppBreadcrumb(BREADCRUMB_CONNECTIVITY_FAILSAFE);
+    persistConnectivityFailsafeState(1, now, true);
+    Log.info("Failsafe: stage=1 action=radio-reset age=%lds",
+             (long)connectionAgeSec);
+    Connectivity::requestFullDisconnectAndRadioOff();
+    state = CONNECTING_STATE;
+    return;
+  }
+
+  if (nextStage == 2) {
+    setAppBreadcrumb(BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD);
+    persistConnectivityFailsafeState(2, now, true);
+    Log.info("Failsafe: stage=2 action=system-reset age=%lds",
+             (long)connectionAgeSec);
+    System.reset();
+    return;
+  }
+
+  setAppBreadcrumb(BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD);
+  persistConnectivityFailsafeState(3, now, true);
+  Log.info("Failsafe: stage=3 action=deep-powerdown age=%lds",
+           (long)connectionAgeSec);
+  ab1805.deepPowerDown();
 }
 
 void userSwitchISR() { userSwitchDetected = true; }
@@ -681,32 +1611,47 @@ void sensorISR() {
     frontTireFlag = true;
 }
 
-void countSignalTimerISR() { digitalWrite(BLUE_LED, LOW); }
-
 /**
  * @brief Cleanup function that is run at the beginning of the day.
  *
- * @details May or may not be in connected state.  Syncs time with remote
- * service and sets low power mode. Called from Reporting State ONLY. Cleans
- * house at the beginning of a new day.
+ * @details Called from REPORTING_STATE once per local day. If connected, it
+ *          requests a time sync and records lastTimeSync, then resets daily
+ *          counters and related housekeeping state.
  */
 void dailyCleanup() {
   if (Particle.connected()) {
     publishDiagnosticSafe("Daily Cleanup", "Running", PRIVATE);
     
-    // Force time sync once per day to prevent clock drift
+    // Force time sync once per day to prevent clock drift.
+    // dailyCleanup() is called once per day from REPORTING_STATE. All devices
+    // should connect at least daily, but LOW_POWER and DISCONNECTED mode devices
+    // may not be connected at the specific time dailyCleanup runs. If a device
+    // connects daily but misses the cleanup window each day, it won't sync time
+    // despite daily connections, causing drift to accumulate over multiple days.
+    // The AB1805 RTC has ±2.0 ppm accuracy (~±5 seconds/month typical), so
+    // missing sync for several days can accumulate noticeable drift. This ensures
+    // at least one time sync per day when the device happens to be connected
+    // during the cleanup window.
     Log.info("Daily time sync requested");
     Particle.syncTime();
     sysStatus.set_lastTimeSync(Time.now());
   }
   
   Log.info("Running Daily Cleanup");
-  // Leave verbose mode enabled for now to aid debugging
-  if (sysStatus.get_solarPowerMode() ||
-      current.get_stateOfCharge() <=
-          65) { // If Solar or if the battery is being discharged
-    // setLowPowerMode("1");
+  
+  // Automatic low-power mode activation on low battery:
+  // When state of charge drops to 65% or below, the device should transition
+  // to LOW_POWER mode to preserve remaining battery. This typically happens
+  // when solar charging is insufficient for current operating mode.
+  // TODO: Implement automatic operatingMode transition via setOperatingMode()
+  // function (from Particle_Functions) to switch from CONNECTED (mode 0) to
+  // LOW_POWER (mode 1) when battery threshold is crossed. Current implementation
+  // has this logic disabled (setLowPowerMode commented out) pending testing.
+  if (sysStatus.get_solarPowerMode() || current.get_stateOfCharge() <= 65) {
+    // Automatic power mode adjustment needed here
+    // setLowPowerMode("1");  // Commented pending implementation validation
   }
-  current
-      .resetEverything(); // If so, we need to Zero the counts for the new day
+  
+  current.resetEverything(); // Zero the counts for the new day
 }
+

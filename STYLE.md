@@ -71,8 +71,7 @@ Top-level sections:
     - `1` – OCCUPANCY (interrupt).
     - `2` – SCHEDULED (time-based).
   - `occupancyDebounceMs` (uint, 0–600000).
-  - `connectedReportingIntervalSec` (int, 60–86400).
-  - `lowPowerReportingIntervalSec` (int, 300–86400).
+  - `connectAttemptBudgetSec` (int, 30–900).
 - `power`
   - `solarPowerMode` (bool).
 - `messaging`
@@ -98,8 +97,7 @@ Published from the device as:
   - `countingMode` (0/1/2).
   - `operatingMode` (0/1/2).
   - `occupancyDebounceMs`.
-  - `connectedReportingIntervalSec`.
-  - `lowPowerReportingIntervalSec`.
+  - `connectAttemptBudgetSec`.
 - `firmware`
   - `version`.
   - `notes`.
@@ -163,6 +161,7 @@ Published from the device after each report:
 - Use `current.raiseAlert(code)` to record problems. Severity is determined centrally in `MyPersistentData.cpp`:
   - Critical (3): OOM (14), modem/disconnect failure (15).
   - Major (2): connect timeouts (30–32), webhook failures (40), config/ledger failures (41–43).
+  - Minor (1): ledger sync timeout before sleep (44) - config already working.
   - Minor (1): everything else.
 - `raiseAlert` only upgrades the stored code if the new alert is **more severe** than the existing one.
 - `resolveErrorAction()` in `Generalized-Core-Counter.cpp` maps the active alert + reset count to recovery behavior:
@@ -221,5 +220,13 @@ Published from the device after each report:
 - When adding new alerts or error paths:
   - Add a code and description to the `getAlertSeverity` switch.
   - Decide where to raise it (`current.raiseAlert`) and where to clear it once healthy.
+  - Document in README.md alert list with appropriate severity tier.
+
+**Alert Code Reference:**
+- 14-16: Memory, connectivity, sleep system failures
+- 17: State machine thrash (ThrashGuard timeout protection)
+- 20-23: PMIC/charging faults (Boron only)
+- 30-32: Cloud connectivity issues
+- 40-43: Webhook, ledger, and queue management issues
 
 This guide is intentionally concise; extend it as new patterns emerge so future changes remain predictable and maintainable.

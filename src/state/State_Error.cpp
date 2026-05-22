@@ -1,13 +1,14 @@
 #include "state/State_Common.h"
 #include "Config.h"
-#include "Cloud.h"
+#include "cloud/Cloud.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
 #include "PublishQueuePosixRK.h"
-#include "SensorManager.h"
+#include "sensors/SensorManager.h"
 #include "device_pinout.h"
-#include "SensorDefinitions.h"
+#include "sensors/SensorDefinitions.h"
 #include "AB1805_RK.h"
+#include "power/Connectivity.h"
 
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
@@ -43,7 +44,7 @@ static int resolveErrorAction() {
 
   case 15: // modem or disconnect failure
   case 31: // failed to connect to cloud
-  case 44: // prolonged offline (>3 hours during open hours)
+  case 44: // ledger sync timeout before sleep
     if (resets >= 4) {
       Log.info("Connectivity alert %d with reset count=%u; suppressing further resets", alert, resets);
       return 0;
@@ -90,6 +91,18 @@ static int resolveErrorAction() {
     return 2;   // start with a soft reset
   }
 
+  case 17: // boot storm detected during setup/early boot
+    // Boot-storm logic has already enforced holdoff and surfaced the event.
+    // No additional recovery action needed here; just report via webhook.
+    Log.info("Alert 17 (boot storm) - holdoff logic already handled; no additional action");
+    return 0;
+
+  case 18: // state machine thrash detected by ThrashGuard
+    // ThrashGuard has already taken corrective action (tier 2: force sleep, tier 3: reset).
+    // No additional recovery action needed here; just report via webhook.
+    Log.info("Alert 18 (thrash) - ThrashGuard already handled; no additional action");
+    return 0;
+
   default:
     // Unknown or less critical alert: don't take drastic action here.
     return 0;
@@ -106,10 +119,10 @@ void handleErrorState() {
 
     // Safety: regardless of recovery choice, do not leave radio/modem powered
     // while we sit in ERROR_STATE waiting for reset.
-    requestFullDisconnectAndRadioOff();
+    Connectivity::requestFullDisconnectAndRadioOff();
 
-    // In LOW_POWER or DISCONNECTED modes, avoid reset loops for connectivity/sleep alerts.
-    if (sysStatus.get_operatingMode() != CONNECTED) {
+    // In INTERMITTENT or DISCONNECTED modes, avoid reset loops for connectivity/sleep alerts.
+    if (sysStatus.get_connectionMode() != CONNECTED) {
       int8_t alert = current.get_alertCode();
       if (alert == 15 || alert == 16 || alert == 31) {
         Log.warn("Low-power mode: clearing alert %d to avoid reset loop", alert);

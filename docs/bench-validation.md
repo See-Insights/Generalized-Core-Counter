@@ -28,6 +28,62 @@ Also set open/close hours wide open for bench testing:
 - `timing.openHour`: `0`
 - `timing.closeHour`: `24`
 
+## Connectivity Failsafe Bench Build
+
+Production builds keep the connectivity failsafe at the normal thresholds:
+
+- stale threshold: `12h`
+- cooldown: `6h`
+- jitter max: `30m`
+
+For bench validation only, you can opt into a short-threshold build with
+`CONNECTIVITY_FAILSAFE_TEST_MODE=1`. This changes only the failsafe timing:
+
+- stale threshold: `5m`
+- cooldown: `15m`
+- jitter max: `0s`
+- closed-hours sleep cap: `60s`
+
+Use this Boron local build command from the workspace root:
+
+```bash
+DEVICE_OS_PATH="/Users/chipmc/.particle/toolchains/deviceOS/6.4.1" \
+APPDIR="$PWD" \
+PLATFORM="boron" \
+DEVICE_OS_VERSION="6.4.1" \
+GCC_ARM_PATH="/Users/chipmc/.particle/toolchains/gcc-arm/10.2.1/bin/" \
+PATH="$PATH:/Users/chipmc/.particle/toolchains/gcc-arm/10.2.1/bin" \
+EXTRA_CFLAGS="-DCONNECTIVITY_FAILSAFE_TEST_MODE=1" \
+make -f '/Users/chipmc/.particle/toolchains/buildscripts/1.17.2/Makefile' compile-user -s
+```
+
+Expected confirmation markers in the test build:
+
+- Boot log includes: `FailsafeTest=1`
+- Failsafe timing log: `Failsafe: test=1 stale=300s cooldown=900s jitter=0s`
+- Failsafe boot diagnostic: `FailsafeBoot: test=1 stale=300s cd=900s jit=0s ...`
+- One-time deferral log when overnight sleep would block validation: `FailsafeDefer: reason=closed-hours-long-sleep open=0 sleep=28012s`
+- Test-mode closed-hours cap log: `FailsafeTest: cap closed sleep 28012s->60s`
+- Test-mode HIB fallback marker: `SleepWarn: HIB returned fallback=ULP test=1`
+- Startup status payload includes: `"failsafeCount":0`, `"failsafeTest":1`
+
+Do not use this flag for production or soak builds unless the short timing is
+explicitly intended for bench validation.
+
+### Disabling Test Mode For Production
+
+- Production and soak builds must compile with `CONNECTIVITY_FAILSAFE_TEST_MODE=0`.
+- The repository default in `BuildProfile.h` is already `0`.
+- If you enabled the test mode through `EXTRA_CFLAGS`, remove the flag entirely or
+  override it with `-DCONNECTIVITY_FAILSAFE_TEST_MODE=0`.
+
+Recommended production verification:
+
+- Build without `EXTRA_CFLAGS` overrides.
+- Confirm boot logs show `FailsafeTest=0`.
+- Confirm failsafe timing logs show the production values: `stale=43200s`,
+  `cooldown=21600s`, `jitter=1800s`.
+
 ## Bench Setup
 
 - Put the device on a **bench supply** or a known-good LiPo.

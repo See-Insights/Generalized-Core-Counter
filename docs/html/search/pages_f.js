@@ -1,18 +1,12 @@
 var searchData=
 [
-  ['sensor_0',['Adding a New Sensor',['../index.html#autotoc_md30',1,'']]],
-  ['sensor_20interface_20pattern_1',['Sensor Interface Pattern',['../index.html#autotoc_md7',1,'']]],
-  ['sensor_20on_20carrier_2',['Carrier board header (PIR sensor on carrier)',['../device__pinout_8h.html#autotoc_md0',1,'']]],
-  ['settings_3',['Creating Device-Specific Settings',['../index.html#autotoc_md26',1,'']]],
-  ['setup_20in_20particle_20console_4',['Setup in Particle Console',['../index.html#autotoc_md22',1,'']]],
-  ['severity_20levels_5',['Alert Severity Levels',['../index.html#autotoc_md34',1,'']]],
-  ['specific_20settings_6',['Creating Device-Specific Settings',['../index.html#autotoc_md26',1,'']]],
-  ['started_7',['Getting Started',['../index.html#autotoc_md21',1,'']]],
-  ['state_20machine_8',['State Machine',['../index.html#autotoc_md8',1,'']]],
-  ['state_20machine_20handlers_9',['Application State Machine &amp;amp; Handlers',['../index.html#autotoc_md9',1,'']]],
-  ['storage_10',['Persistent Storage',['../index.html#autotoc_md10',1,'']]],
-  ['strategy_11',['Error Recovery Strategy',['../index.html#autotoc_md36',1,'']]],
-  ['structure_12',['Configuration Structure',['../index.html#autotoc_md13',1,'']]],
-  ['support_13',['Support',['../index.html#autotoc_md40',1,'']]],
-  ['system_14',['Error Handling &amp;amp; Alert System',['../index.html#autotoc_md33',1,'']]]
+  ['scope_0',['Deployment Scope',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md23',1,'']]],
+  ['sensor_20on_20carrier_1',['Carrier board header (PIR sensor on carrier)',['../device__pinout_8h.html#autotoc_md0',1,'']]],
+  ['sensor_20patterns_2',['Supported Sensor Patterns',['../index.html#autotoc_md4',1,'']]],
+  ['shape_3',['Configuration Shape',['../index.html#autotoc_md10',1,'']]],
+  ['soak_20follow_20up_4',['Post-Soak Follow-Up',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md25',1,'']]],
+  ['status_5',['Current Release Status',['../index.html#autotoc_md17',1,'']]],
+  ['summary_6',['Bench Validation Summary',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md22',1,'']]],
+  ['supported_20platforms_7',['Supported Platforms',['../index.html#autotoc_md3',1,'']]],
+  ['supported_20sensor_20patterns_8',['Supported Sensor Patterns',['../index.html#autotoc_md4',1,'']]]
 ];

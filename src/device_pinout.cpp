@@ -1,3 +1,19 @@
+/**
+ * @file device_pinout.cpp
+ * @author Chip McClelland
+ * @email chip@seeinsights.com
+ * @brief Platform-specific pin mappings and pin-helper implementations.
+ *
+ * @details
+ * This file translates logical carrier-board signals into the correct pin names
+ * for each supported Particle platform so the rest of the firmware can stay
+ * platform-agnostic. It also owns the small LED helper routines used throughout
+ * the state machine.
+ *
+ * @copyright Copyright (c) 2026 Chip McClelland
+ * @license MIT License
+ */
+
 // Particle Functions
 #include "Particle.h"
 #include "device_pinout.h"
@@ -27,6 +43,9 @@ const pin_t BUTTON_PIN        = D4;
 const pin_t BLUE_LED          = D7;
 const pin_t WAKEUP_PIN        = WKP;  // D10 on Photon2 (was D8 on Argon/Boron)
 
+// These carrier functions are intentionally kept stable across platforms so
+// higher-level state code never has to care which module is underneath.
+
 // Convenience aliases for carrier functions
 // (No additional aliases; use the base names directly in application code.)
 
@@ -52,39 +71,74 @@ const pin_t ledPower      = MISO; // D11 on Boron
 
 #else
 // Fallback: assume SPI pins follow the common SCK/MOSI/MISO aliases.
+// This keeps new boards usable during bring-up even before they get an
+// explicit PLATFORM_ID branch.
 const pin_t intPin        = SCK;
 const pin_t disableModule = MOSI;
 const pin_t ledPower      = MISO;
 #endif
 
 bool initializePinModes() {
-    Log.info("Initalizing the pinModes");
-    // Define as inputs or outputs
+    // Keep carrier inputs passive here; any pull-ups/drive assumptions are
+    // owned by the carrier hardware and the AB1805 wiring.
     pinMode(BUTTON_PIN, INPUT);    // User button on the carrier board - external pull-up on carrier
     pinMode(WAKEUP_PIN, INPUT_PULLUP);    // AB1805 FOUT/nIRQ (open-drain, active-LOW, needs pull-up)
     pinMode(BLUE_LED, OUTPUT);     // On-module status LED
-     return true;
+    return true;
 }
 
 
-bool initializePowerCfg() {
-    /*
-    Log.info("Initializing Power Config");
-    const int maxCurrentFromPanel = 900;            // Not currently used (100,150,500,900,1200,2000 - will pick closest) (550mA for 3.5W Panel, 340 for 2W panel)
-    SystemPowerConfiguration conf;
-    System.setPowerConfiguration(SystemPowerConfiguration());  // To restore the default configuration
+// ---------------------------------------------------------------------------
+// Centralized LED management
+// ---------------------------------------------------------------------------
+// Use RTC seconds (not millis) so time advances during sleep
+retained time_t ledOffTime = 0;  // RTC time when LED should turn off (0 = indefinite)
 
-    conf.powerSourceMaxCurrent(maxCurrentFromPanel) // Set maximum current the power source can provide  3.5W Panel (applies only when powered through VIN)
-        .powerSourceMinVoltage(5080) // Set minimum voltage the power source can provide (applies only when powered through VIN)
-        .batteryChargeCurrent(maxCurrentFromPanel) // Set battery charge current
-        .batteryChargeVoltage(4208) // Set battery termination voltage
-        .feature(SystemPowerFeature::USE_VIN_SETTINGS_WITH_USB_HOST); // For the cases where the device is powered through VIN
-                                                                     // but the USB cable is connected to a USB host, this feature flag
-                                                                     // enforces the voltage/current limits specified in the configuration
-                                                                     // (where by default the device would be thinking that it's powered by the USB Host)
-    int res = System.setPowerConfiguration(conf); // returns SYSTEM_ERROR_NONE (0) in case of success
-    return res;
-    */
-    return true;
+void signalLED(bool state, uint32_t durationMs) {
+    digitalWrite(BLUE_LED, state ? HIGH : LOW);
+    
+    if (state && durationMs > 0) {
+        // Record the deadline in retained RTC time so sleep/wake cycles do not
+        // extend the requested on-time.
+        if (Time.isValid()) {
+            ledOffTime = Time.now() + (durationMs / 1000);
+        } else {
+            ledOffTime = 0;  // Fallback to indefinite if no valid time
+        }
+    } else if (state) {
+        ledOffTime = 0;
+    } else {
+        ledOffTime = 0;
+    }
+}
+
+void signalLEDUpdate() {
+    // Only the main loop should clear timeout-driven LED state so the timeout
+    // behavior stays deterministic and easy to reason about.
+    if (ledOffTime > 0 && Time.isValid() && Time.now() >= ledOffTime) {
+        digitalWrite(BLUE_LED, LOW);
+        ledOffTime = 0;
+    }
+}
+
+uint32_t signalLEDTimeRemaining() {
+    if (ledOffTime == 0) {
+        return 0;
+    }
+    
+    if (!Time.isValid()) {
+        return 0;
+    }
+    
+    time_t now = Time.now();
+    if (now >= ledOffTime) {
+        return 0;
+    }
+    
+    return (uint32_t)(ledOffTime - now);  // Return seconds remaining
+}
+
+bool signalLEDStatus() {
+    return digitalRead(BLUE_LED) == HIGH;
 }
                 

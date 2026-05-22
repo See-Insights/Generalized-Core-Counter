@@ -1,12 +1,14 @@
 #include "state/State_Common.h"
 #include "Config.h"
-#include "Cloud.h"
+#include "cloud/Cloud.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
 #include "PublishQueuePosixRK.h"
-#include "SensorManager.h"
+#include "sensors/SensorManager.h"
 #include "device_pinout.h"
-#include "SensorDefinitions.h"
+#include "sensors/SensorDefinitions.h"
+#include "power/Connectivity.h"
+#include "ThrashGuard.h"
 
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
@@ -31,6 +33,55 @@ void handleIdleState() {
     publishStateTransition();
   }
 
+  // Process LED timers for timed flashes (COUNTING mode)
+  signalLEDUpdate();
+
+  // Maintain LED state for OCCUPANCY mode and check debounce timeout
+  if (sysStatus.get_sensorMode() == OCCUPANCY) {
+    // Check if debounce timeout expired (no motion for debounce period)
+    if (current.get_occupied()) {
+      uint32_t debounceMs = sensorConfig.get_sensorSetting1();
+      if (debounceMs == 0) {
+        debounceMs = 60000; // default 60s
+      }
+
+      uint32_t lastEvent = current.get_lastOccupancyEvent();
+      if (lastEvent == 0) {
+        lastEvent = millis();
+        current.set_lastOccupancyEvent(lastEvent);
+      }
+      uint32_t timeSinceLastEvent = millis() - lastEvent;
+
+      if (timeSinceLastEvent >= debounceMs) {
+        // Debounce timeout expired - space is now unoccupied
+        uint32_t sessionDuration = Time.now() - current.get_occupancyStartTime();
+        uint32_t totalOccupied = current.get_totalOccupiedSeconds() + sessionDuration;
+        const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
+        current.set_totalOccupiedSeconds(totalOccupied);
+        current.set_occupied(false);
+        current.set_occupancyStartTime(0);
+        signalLED(false);  // Turn off LED
+        logUnoccupiedEvent("debounce", sessionDuration, totalOccupied, reportNow);
+        
+        // In INTERMITTENT_KEEP_ALIVE mode (connectionMode 3), report immediately
+        // on occupancy transitions. In other modes, occupancy transitions are
+        // still tracked, but do not force an immediate report/connect.
+        if (reportNow) {
+          session.occupancyChangeTriggered = true;
+          state = REPORTING_STATE;
+          return;
+        }
+      }
+    }
+    
+    // Maintain LED state based on occupancy
+    if (current.get_occupied() && !signalLEDStatus()) {
+      signalLED(true);   // Keep LED on while occupied
+    } else if (!current.get_occupied() && signalLEDStatus()) {
+      signalLED(false);  // Ensure LED off when unoccupied
+    }
+  }
+
   // If configuration changes (for example, device-settings ledger updates)
   // move the park from CLOSED->OPEN while the device is already awake,
   // ensure the sensor stack is enabled. Previously this only happened on
@@ -51,7 +102,7 @@ void handleIdleState() {
   // In CONNECTED operating mode, the device stays awake during park open hours.
   // When the park is closed, it should disconnect, power down the sensor, and
   // deep-sleep until the next opening time.
-  if (Time.isValid() && sysStatus.get_operatingMode() == CONNECTED) {
+  if (Time.isValid() && sysStatus.get_connectionMode() == CONNECTED) {
     if (!isWithinOpenHours()) {
       Log.info("CONNECTED mode: park CLOSED - transitioning to SLEEPING_STATE for overnight sleep");
       state = SLEEPING_STATE;
@@ -64,7 +115,7 @@ void handleIdleState() {
   // ********** Scheduled Mode Sampling **********
   // SCHEDULED mode uses time-based sampling (non-interrupt).
   // Interrupt-driven modes (COUNTING/OCCUPANCY) are handled centrally in main loop().
-  if (sysStatus.get_countingMode() == SCHEDULED) {
+  if (sysStatus.get_sensorMode() == MEASUREMENT) {
     if (Time.isValid()) {
       static time_t lastScheduledSample = 0;
       uint16_t intervalSec = sysStatus.get_reportingInterval();
@@ -86,11 +137,22 @@ void handleIdleState() {
   // publish queue has fully drained so we can confirm that any
   // pending offline events (for example, from before boot) have
   // been flushed.
-  if (firstConnectionObserved && !firstConnectionQueueDrainedLogged && Particle.connected()) {
+  {
+    static uint16_t lastQueueDepth = 0xFFFF;
+    if (Particle.connected()) {
+      uint16_t depth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
+      if (lastQueueDepth != 0xFFFF && depth < lastQueueDepth) {
+        thrashGuard.markProgress("QUEUE_DRAIN");
+      }
+      lastQueueDepth = depth;
+    } else {
+      lastQueueDepth = 0xFFFF;
+    }
+  }
+  if (session.firstConnectionObserved && !session.firstConnectionQueueDrainedLogged && Particle.connected()) {
     if (PublishQueuePosix::instance().getCanSleep() &&
         PublishQueuePosix::instance().getNumEvents() == 0) {
-      Log.info("First connection queue drained - all pending events flushed");
-      firstConnectionQueueDrainedLogged = true;
+      session.firstConnectionQueueDrainedLogged = true;
     }
   }
 
@@ -98,6 +160,13 @@ void handleIdleState() {
   // Use the configured reportingIntervalSec to determine when to
   // generate a periodic report, regardless of trigger mode.
   if (Time.isValid() && isWithinOpenHours()) {
+    // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, do not generate periodic
+    // reports while occupied. Occupancy=1 should only be reported on the
+    // transition 0->1 (and 1->0 when it clears).
+    if (sysStatus.get_sensorMode() == OCCUPANCY && current.get_occupied() &&
+        sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
+      // Skip periodic reporting while occupied in this mode.
+    } else {
     uint16_t intervalSec = sysStatus.get_reportingInterval();
     if (intervalSec == 0) {
       intervalSec = 3600; // Fallback to 1 hour
@@ -115,30 +184,16 @@ void handleIdleState() {
       state = REPORTING_STATE;
       return;
     }
+    }
   }
 
-  // ********** Power Management **********
-  // In LOW_POWER (1) or DISCONNECTED (2) modes, manage connection lifecycle.
-  if (sysStatus.get_operatingMode() != CONNECTED) {
-    // In LOW_POWER or DISCONNECTED modes, enforce maximum connected time.
-    // Use connectAttemptBudgetSec as the max connected duration.
-    if (Particle.connected() && connectedStartMs != 0) {
-      uint16_t budgetSec = sysStatus.get_connectAttemptBudgetSec();
-      if (budgetSec >= 30 && budgetSec <= 900) {
-        unsigned long connectedMs = millis() - connectedStartMs;
-        unsigned long budgetMs = (unsigned long)budgetSec * 1000UL;
-        if (connectedMs > budgetMs) {
-          Log.info("Connection timeout (%lu ms > %lu ms) - returning to sleep",
-                   (unsigned long)connectedMs, (unsigned long)budgetMs);
-          connectedStartMs = 0;
-          state = SLEEPING_STATE;
-          return;
-        }
-      }
-    }
+  
 
+  // ********** Power Management **********
+  // In INTERMITTENT (1) or DISCONNECTED (2) modes, manage connection lifecycle.
+  if (sysStatus.get_connectionMode() != CONNECTED) {
     // In CONNECTED mode during open hours, never auto-sleep.
-    if (Time.isValid() && sysStatus.get_operatingMode() == CONNECTED && isWithinOpenHours()) {
+    if (Time.isValid() && sysStatus.get_connectionMode() == CONNECTED && isWithinOpenHours()) {
       return;
     }
 
@@ -156,12 +211,17 @@ void handleIdleState() {
     }
 
     if (!updatesPending && canSleepGate) {
-      // If a sensor event is still pending or the BLUE LED timer is
-      // active from a recent count, defer transitioning into the
-      // SLEEPING_STATE. This avoids rapid Idle<->Sleeping ping-pong
-      // and the associated extra logging while still honouring the
-      // low-power policy once the indication has finished.
-      if (sensorDetect || countSignalTimer.isActive()) {
+      // If a sensor event is still pending or the BLUE LED is still on
+      // from a recent count, defer transitioning into the SLEEPING_STATE.
+      // This avoids rapid Idle<->Sleeping ping-pong and the associated
+      // extra logging while still honouring the low-power policy once
+      // the indication has finished.
+      // NOTE: In OCCUPANCY mode, we intentionally allow sleep even while the
+      // debounce/LED timer is running. The PIR interrupt will wake us early
+      // for new motion, and SLEEPING_STATE already wakes on timer to evaluate
+      // the debounce timeout. Keeping the device awake here causes it to
+      // remain connected and burn power during continued motion.
+      if (sensorDetect || (sysStatus.get_sensorMode() == COUNTING && signalLEDTimeRemaining() > 0)) {
         return;
       }
 
@@ -174,6 +234,71 @@ void handleIdleState() {
       }
       state = SLEEPING_STATE;
       return; // Go back to sleep when there's no work this hour
+    }
+  }
+
+  // ********** IDLE Connectivity Ceiling Safety Net **********
+  // ThrashGuard intentionally does not supervise IDLE_STATE, so enforce a
+  // conservative max awake ceiling when cloud/modem remains powered without
+  // meaningful work. This prevents modem-on battery drain wedges.
+  {
+    static unsigned long idleCeilingStartMs = 0;
+
+    const unsigned long nowMs = millis();
+    const bool cloudConnected = Particle.connected();
+    const bool radioOn = Connectivity::isRadioPoweredOn();
+    const bool connectivityPowered = cloudConnected || radioOn;
+    const bool updatesPending = System.updatesPending();
+
+    bool queueCanSleep = true;
+    if (cloudConnected) {
+      queueCanSleep = PublishQueuePosix::instance().getCanSleep();
+    }
+
+    const bool openHoursKeepAwakeValid = Time.isValid() && isWithinOpenHours();
+    const bool healthyConnectedAwakePath =
+      (sysStatus.get_connectionMode() == CONNECTED) &&
+      openHoursKeepAwakeValid &&
+      cloudConnected;
+
+    const bool noMeaningfulWorkRemains = !updatesPending && queueCanSleep;
+    const bool shouldApplyIdleCeiling =
+      connectivityPowered &&
+      noMeaningfulWorkRemains &&
+      !healthyConnectedAwakePath;
+
+    if (!shouldApplyIdleCeiling) {
+      idleCeilingStartMs = 0;
+    } else {
+      // Reuse existing connectAttemptBudgetSec behavior with conservative fallback.
+      uint16_t budgetSec = sysStatus.get_connectAttemptBudgetSec();
+      if (budgetSec < 30 || budgetSec > 900) {
+        budgetSec = 300;
+      }
+      const unsigned long budgetMs = (unsigned long)budgetSec * 1000UL;
+
+      // Use connectedStartMs when available; otherwise track this IDLE-powered
+      // dwell with a local timer so radio-on/cloud-off wedges are also bounded.
+      const unsigned long startMs = (connectedStartMs != 0) ? connectedStartMs : idleCeilingStartMs;
+      if (startMs == 0) {
+        idleCeilingStartMs = nowMs;
+      } else {
+        const unsigned long elapsedMs = nowMs - startMs;
+        if (elapsedMs > budgetMs) {
+          Log.warn("IDLE ceiling trip: mode=%d cloud=%d radioOn=%d elapsedMs=%lu connectedStartMs=%lu -> forcing teardown and sleep",
+                   (int)sysStatus.get_connectionMode(),
+                   (int)cloudConnected,
+                   (int)radioOn,
+                   elapsedMs,
+                   connectedStartMs);
+
+          Connectivity::requestFullDisconnectAndRadioOff();
+          connectedStartMs = 0;
+          idleCeilingStartMs = 0;
+          state = SLEEPING_STATE;
+          return;
+        }
+      }
     }
   }
 }

@@ -1,549 +1,236 @@
 # Generalized-Core-Counter
 
-A generalized IoT firmware core for outdoor sensor devices supporting multiple operating modes and sensor types.
+**Version:** 11.0.0 | **Latest:** Connectivity resiliency soak release
 
-## Overview
+Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v11 release is the production soak candidate for the new connectivity recovery ladder and its supporting observability.
 
-This firmware provides a flexible, production-ready platform for outdoor IoT devices (Particle P2 WiFi and Boron Cellular) that can operate in different modes while maintaining a clean, extensible codebase. The architecture uses Particle Ledger for cloud configuration management, enabling offline device configuration updates and real-time data visibility.
+## Release Focus
 
-## Features
+- Stable soak candidate for `1` Photon 2 in Singapore and `6` Borons in North Carolina.
+- Recovery-first connectivity behavior for marginal RF conditions.
+- Clear operator documentation for ledger-backed configuration, wake-cycle diagnostics, and release validation.
+- No new feature refactor in this release; focus is resiliency, maintainability, and deployment clarity.
 
-- **Multiple Operating Modes**:
-  - **Counting Mode**: Track individual events (counts per hour/day)
-  - **Occupancy Mode**: Monitor occupied time with debounce logic
-  
-- **Power Management**:
-  - **Connected Mode**: Stay connected for real-time updates
-  - **Low-Power Mode**: Sleep between scheduled reports
-  
-- **Trigger Types**:
-  - **Interrupt-Driven**: Event-based sensor triggering
-  - **Scheduled Polling**: Periodic sensor checks
+## Supported Platforms
 
-- **Cloud Configuration**:
-  - Product-level defaults via Ledger
-  - Device-specific overrides (editable offline in Console)
-  - Auto-sync on connection
-  
-- **Data Publishing**:
-  - Webhook integration (Ubidots)
-  - Device-to-cloud ledger for Console visibility
-  - Mode-aware JSON payloads
+- Particle Boron, Device OS `6.4.1`
+- Particle Photon 2 / P2, Device OS `6.4.1`
+- Particle Argon, Device OS `6.4.1`
 
-## Hardware
+The firmware is written to keep platform-specific power behavior behind platform guards. Cellular-only behaviors such as modem standby and AB1805 deep power-down apply only where the hardware supports them.
 
-Supported Platforms:
-- **Particle P2** (WiFi, DeviceOS 6.3.4)
-- **Particle Boron** (Cellular, DeviceOS 6.3.4)
+## Supported Sensor Patterns
 
-Sensor Support (Extensible):
-- PIR motion sensor (implemented)
-- Ultrasonic distance sensor (template)
-- Custom sensors via ISensor interface
+- Counting mode for discrete events.
+- Occupancy mode for occupied/unoccupied state with debounce and accumulated occupied time.
+- Measurement mode for threshold-driven analog or custom sensors.
+- Interrupt-driven and polling-driven sampling paths.
 
-## Documentation
+The current repository ships PIR support and the abstractions needed to add additional sensors through the `ISensor` interface and `SensorFactory`.
 
-- Bench validation checklist: [docs/bench-validation.md](docs/bench-validation.md)
+## Core Architecture
 
-- Generated API reference (Doxygen): **https://see-insights.github.io/Generalized-Core-Counter/**
-  - To browse locally: Open `docs/html/index.html` in your browser
+The application is a small explicit state machine with focused handler modules:
 
-## Architecture
+- `INITIALIZATION_STATE`
+- `IDLE_STATE`
+- `CONNECTING_STATE`
+- `REPORTING_STATE`
+- `SLEEPING_STATE`
+- `FIRMWARE_UPDATE_STATE`
+- `ERROR_STATE`
 
-### Sensor Interface Pattern
-All sensors implement the `ISensor` interface:
-- `setup()`: Initialize hardware
-- `loop()`: Update sensor state
-- `getSensorData()`: Return latest readings
-- `getSensorType()`: Identify sensor type
+`Generalized-Core-Counter.cpp` owns global lifecycle, retained breadcrumbs, startup telemetry, and top-level supervision. State-specific behavior lives under `src/state/`. Power and connectivity policies live under `src/power/`. Cloud configuration and ledger publishing live under `src/cloud/`.
 
-New sensors are added via `SensorFactory.h` without modifying core code.
+## Recovery Architecture
 
-### State Machine
-- INITIALIZATION → IDLE → REPORTING → IDLE (connected mode)
-- INITIALIZATION → IDLE → SLEEPING → IDLE (low-power mode)
-- ERROR handling with cloud reporting (no reset loops)
+v11 adds a persisted long-duration connectivity failsafe on top of the existing bounded connect and teardown budgets.
 
-### Application State Machine & Handlers
+Normal protection layers:
 
-The main application logic is implemented as a small, explicit state machine:
+- Per-wake connect attempt budgets prevent indefinite cloud connect waits.
+- Service and disconnect gates prevent the modem from remaining powered after work is complete or stuck.
+- ThrashGuard detects no-progress state machine behavior.
 
-- **Core states** (see src/StateMachine.h): INITIALIZATION, IDLE, CONNECTING,
-  REPORTING, SLEEPING, FIRMWARE_UPDATE, ERROR.
-- **State handlers** (see src/StateHandlers.cpp) encapsulate behaviour for each
-  state (e.g. connection policy, publish cadence, sleep scheduling, and
-  firmware/config update flows).
-- **State driver** (see src/Generalized-Core-Counter.cpp) selects the current
-  state in `loop()` and logs transitions via `publishStateTransition()`.
+Long-duration recovery ladder:
 
-This split keeps the outer `setup()/loop()` structure simple while allowing the
-per-state behaviour to evolve independently as new modes or error conditions
-are added.
+1. Stage 1: radio reset
+2. Stage 2: `System.reset()`
+3. Stage 3: AB1805 `deepPowerDown()`
 
-### Persistent Storage
-Three storage structures:
-- `sysStatus`: System configuration and state
-- `sensorConfig`: Sensor-specific parameters
-- `current`: Live data (counts, occupancy, battery, temp)
+The ladder persists its stage and count in `sysStatus` so it can escalate across resets. A successful cloud connection clears the recovery state. The supervisor now defers action while `CONNECTING_STATE` still owns an in-budget connect attempt, which prevents the long-duration monitor from fighting the short-term connect policy.
 
-## Configuration Management
+See [docs/recovery-architecture.md](docs/recovery-architecture.md) for the operator-facing description.
 
-### Ledger Architecture
+## Power And Connectivity Model
 
-| Ledger | Scope | Direction | Purpose | Editable? |
-|--------|-------|-----------|---------|-----------|
-| `default-settings` | Product | Cloud→Device | Product-wide defaults for all devices | Yes (Console) |
-| `device-settings` | Device | Cloud→Device | Device-specific config overrides | Yes (Console, even offline) |
-| `device-status` | Device | Device→Cloud | Current device configuration snapshot | No (auto-updated by device) |
-| `device-data` | Device | Device→Cloud | Latest sensor readings | No (auto-updated by device) |
+Connectivity and power policy are centralized in `ConnectivityPolicy.h`. The important operational guardrails are:
 
-**Key Concepts:**
-- **Cloud→Device**: You edit in Console, device reads/applies on connection
-- **Device→Cloud**: Device writes, you view in Console (read-only from Console)
-- **device-settings vs device-status**: Settings = what you *want*, Status = what device *has*
+- Production failsafe stale threshold: `12h`
+- Production failsafe cooldown: `6h`
+- Production failsafe jitter cap: `30m`
+- Connect attempt default budget: `5m`
+- Periodic deep connect budget: `11m`
+- Cloud operations gate: `30s`
+- Output-ledger sync gate: `70s` cellular, `30s` Wi-Fi
 
-### Configuration Structure
+Battery-aware connection behavior can reduce connectivity aggressiveness as state of charge drops. Occupancy keep-alive is retained only when the platform and current battery tier can justify it.
+
+## `CONNECTIVITY_FAILSAFE_TEST_MODE`
+
+`CONNECTIVITY_FAILSAFE_TEST_MODE` exists only to validate the long-duration recovery ladder on the bench.
+
+When enabled, it changes only the failsafe timing:
+
+- stale threshold: `5m`
+- cooldown: `15m`
+- jitter: `0s`
+- closed-hours sleep cap: `60s`
+
+Production rules:
+
+- Default is `OFF` in `BuildProfile.h`.
+- Do not enable it for soak or production builds.
+- If you enabled it via `EXTRA_CFLAGS`, remove the flag or force `-DCONNECTIVITY_FAILSAFE_TEST_MODE=0` before cutting a release build.
+- Production validation must confirm `FailsafeTest=0` in logs and production timing values in the failsafe boot line.
+
+See <a href="docs/bench-validation.md">docs/bench-validation.md</a> for the short-threshold validation workflow.
+
+## Ledger Configuration Model
+
+The firmware uses Particle Ledger for both cloud-to-device configuration and device-to-cloud status visibility.
+
+| Ledger | Scope | Direction | Purpose |
+| --- | --- | --- | --- |
+| `default-settings` | Product | Cloud to device | Product-wide default configuration |
+| `device-settings` | Device | Cloud to device | Per-device overrides |
+| `device-status` | Device | Device to cloud | Current applied configuration and status snapshot |
+| `device-data` | Device | Device to cloud | Latest sensor data |
+
+Typical flow:
+
+1. Device boots and connects.
+2. Product defaults sync first.
+3. Device overrides sync if present.
+4. Merged configuration is applied to persistent storage.
+5. Device publishes `device-status` so Console reflects what is actually running.
+
+This split allows offline edits in Console without requiring the device to stay continuously connected.
+
+### Configuration Shape
 
 ```json
 {
-    "messaging": {
-        "disconnectedMode": false,
-        "serial": false,
-        "verboseMode": false
-    },
-    "power": {
-        "lowPowerMode": false,
-        "solarPowerMode": true
-    },
-    "sensor": {
-        "threshold1": 60,
-        "threshold2": 60
-    },
-    "timing": {
-      "closeHour": 22,
-      "openHour": 6,
-      "pollingRateSec": 0,
-      "reportingIntervalSec": 3600,
-      "timezone": "SGT-8"   
+  "messaging": {
+    "serial": false,
+    "verboseMode": false,
+    "verboseTimeoutMin": 60
   },
-    "modes": {
-        "countingMode": 0,
-        "operatingMode": 0,
-        "triggerMode": 0,
-        "occupancyDebounceMs": 0,
-        "connectedReportingIntervalSec": 300,
-      "lowPowerReportingIntervalSec": 3600,
-      "connectAttemptBudgetSec": 300
-    }
-}
-```
-
-  **Timezone notes:**
-  - `timing.timezone` must be a POSIX timezone string (not an IANA name like "Asia/Singapore").
-  - Example for Singapore (UTC+8, no DST): `"SGT-8"`.
-  - See the LocalTimeRK documentation for examples and guidance on building POSIX strings for major cities: https://rickkas7.github.io/LocalTimeRK/
-
-### Mode Values
-
-**countingMode**: 
-- `0` = COUNTING (count events)
-- `1` = OCCUPANCY (track occupied time)
-
-**operatingMode**:
-- `0` = CONNECTED (stay connected)
-- `1` = LOW_POWER (sleep between reports)
-
-**triggerMode**:
-- `0` = INTERRUPT (event-driven)
-- `1` = SCHEDULED (periodic polling)
-
-## Device Commissioning Workflow
-
-1. **Device Flashed**: Start with generic Particle firmware
-2. **Added to Product**: Assign to "Generalized-Core-Counter-P2" product
-3. **Auto-Flashed**: Receives product firmware OTA
-4. **First Connection**: 
-   - Syncs `default-settings` (product-level defaults)
-   - Checks for `device-settings` ledger (Cloud→Device)
-   - **If no device-settings exists** (new device):
-     - Applies `default-settings` to persistent memory
-     - **Writes `device-status` ledger** (Device→Cloud) for visibility
-     - Device waits for you to create `device-settings` in Console
-   - **If device-settings exists** (configured device):
-     - Applies `device-settings` (overrides defaults)
-     - Updates `device-status` to reflect current config
-   - May reset if sensor initialization requires I2C driver changes
-5. **Data Collection**: Starts operating based on configured modes
-6. **Data Publishing**:
-   - Publishes to webhook (real-time Ubidots integration)
-   - Updates `device-data` ledger (Console visibility)
-   - Updates `device-status` periodically
-7. **Configuration Updates**: 
-   - On each connection, checks if `device-settings` changed
-   - Auto-applies updates if Console values were modified
-   - Logs all configuration changes
-   - Updates `device-status` to confirm new config applied
-
-### Configuration Management Flow
-
-**Most Devices (Use Product Defaults):**
-1. Device connects → Loads `default-settings` → Writes `device-status`
-2. Device operates with product-level configuration
-3. No manual intervention needed
-
-**Devices Needing Custom Config (Different park hours, sensor types, testing mode):**
-1. Device connects → Loads `default-settings` → Writes `device-status`
-2. In Console, view `device-status` ledger (shows current config as JSON)
-3. **Copy JSON from `device-status`**
-4. **Create new `device-settings` ledger** for that device (Cloud→Device, Device scope)
-5. **Paste JSON, modify only the fields you need** (e.g., openHour, closeHour, operatingMode)
-6. Save ledger
-7. Device syncs `device-settings` on next connection (or trigger connection)
-8. `device-status` updates to confirm new config
-
-**Example: Park with Different Hours**
-- `default-settings`: `"openHour": 6, "closeHour": 22`
-- For specific device, create `device-settings`:
-  ```json
-  {
-    "timing": {
-      "openHour": 7,
-      "closeHour": 20
-    }
+  "sensor": {
+    "type": 1,
+    "setting1": 5000,
+    "setting2": 0,
+    "setting3": 0,
+    "setting4": 0
+  },
+  "timing": {
+    "openHour": 6,
+    "closeHour": 22,
+    "reportingIntervalSec": 3600,
+    "timezone": "SGT-8",
+    "connectAttemptBudgetSec": 300,
+    "cloudDisconnectBudgetSec": 15,
+    "modemOffBudgetSec": 30
+  },
+  "modes": {
+    "sensorMode": 0,
+    "connectionMode": 1,
+    "reportingMode": 0,
+    "samplingMode": 0
   }
-  ```
-- Only override fields that differ, device uses defaults for everything else
-
-**Example: Testing Device (Stay Connected)**
-- Create `device-settings`:
-  ```json
-  {
-    "modes": {
-      "operatingMode": 0
-    }
-  }
-  ```
-- Device stays in CONNECTED mode instead of LOW_POWER
-
-**Offline Editing:**
-- Edit `device-settings` in Console anytime (even while device offline)
-- Device syncs changes on next connection
-- `device-status` updates to confirm applied config
-- Compare `device-settings` (desired) vs `device-status` (actual) to verify sync
-
-## Offline Device Management
-
-You can:
-- ✅ Edit device configuration in Console while device is offline
-- ✅ View last sensor data in `device-data` ledger
-- ✅ Changes sync automatically on next connection
-- ✅ Real-time data continues to flow to Ubidots via webhook
-
-## Data Reporting
-
-### Counting Mode Payload
-```json
-{
-    "timestamp": 1702345678,
-    "deviceId": "e00fce68...",
-    "battery": 85.2,
-    "temp": 23.5,
-    "mode": "counting",
-    "hourlyCount": 42,
-    "dailyCount": 327,
-    "lastCount": 1702345670,
-    "powerMode": "connected",
-    "triggerMode": "interrupt"
 }
 ```
 
-### Occupancy Mode Payload
-```json
-{
-    "timestamp": 1702345678,
-    "deviceId": "e00fce68...",
-    "battery": 85.2,
-    "temp": 23.5,
-    "mode": "occupancy",
-    "occupied": true,
-    "sessionDuration": 120,
-    "occupancyStart": 1702345558,
-    "totalOccupiedSec": 3847,
-    "powerMode": "lowPower",
-    "triggerMode": "scheduled"
-}
-```
+Timezone values must be POSIX timezone strings, not IANA names.
 
-## Getting Started
+## Build And Validation
 
-### Setup in Particle Console
+The repository is build-validated on Boron, Photon 2, and Argon using Device OS `6.4.1`.
 
-1. **Create Product**: "Generalized-Core-Counter-P2"
-
-2. **Create Product-Level Ledger** (`default-settings`):
-   - Direction: Cloud→Device
-   - Scope: Product
-   - Add JSON configuration (see Configuration Structure above)
-   - **This is the ONLY ledger you need to manually create**
-
-3. **Device Ledgers** (Auto-Created by Firmware):
-   - `device-status` (Device→Cloud): Auto-created on first connection, shows current config
-   - `device-data` (Device→Cloud): Auto-created when device publishes data
-   - These are read-only from Console perspective
-
-4. **Device-Settings Ledger** (Optional Override):
-   - **Create manually in Console** if you want device-specific overrides
-   - Direction: Cloud→Device
-   - Scope: Device
-   - Start with JSON from `device-status`, then modify as needed
-   - If absent, device uses `default-settings`
-
-5. **Set Up Webhook** for Ubidots integration:
-   - Event name: `sensor-data`
-   - URL: Your Ubidots endpoint
-   - Request type: POST
-   - JSON template as needed
-
-### Flash Firmware
+Typical local compile pattern:
 
 ```bash
-particle compile p2 --saveTo firmware.bin
-particle flash <device-name> firmware.bin
+DEVICE_OS_PATH="/Users/chipmc/.particle/toolchains/deviceOS/6.4.1" \
+APPDIR="$PWD" \
+PLATFORM="boron" \
+DEVICE_OS_VERSION="6.4.1" \
+GCC_ARM_PATH="/Users/chipmc/.particle/toolchains/gcc-arm/10.2.1/bin/" \
+PATH="$PATH:/Users/chipmc/.particle/toolchains/gcc-arm/10.2.1/bin" \
+make -f '/Users/chipmc/.particle/toolchains/buildscripts/1.17.2/Makefile' compile-user -s
 ```
 
-Or flash via OTA when device is added to product.
+Supported production targets for this release:
 
-### Monitor Operation
+- `boron`
+- `p2`
+- `argon`
 
-```bash
-particle serial monitor
-```
+Bench-only short-threshold validation builds can add `EXTRA_CFLAGS="-DCONNECTIVITY_FAILSAFE_TEST_MODE=1"`, but release builds must not.
 
-Look for:
-- "Configuration loaded from cloud"
-- "Counting mode set to: X"
-- "Operating mode set to: X"
-- "Published to webhook: {...}"
-- "Published data to ledger: {...}"
+## Observability
 
-## How-To: Common Configuration Tasks
+The firmware emits compact operational diagnostics designed for poor-connectivity, power-constrained deployments.
 
-### Creating Device-Specific Settings
+Important signals:
 
-**Step 1: View Current Configuration**
-1. In Particle Console, go to your device
-2. Click "Ledger" tab
-3. Find `device-status` ledger (Device→Cloud)
-4. Copy the entire JSON
+- wake-cycle summary log (`CYCLE end ...`)
+- startup status payload
+- retained breadcrumb reason for prior reset or deep power-down attribution
+- failsafe boot and action lines
+- alert codes for bounded connect, ledger sync, and recovery conditions
 
-**Step 2: Create Override**
-1. In Console, still on device page
-2. Click "Create Ledger"
-3. Name: `device-settings`
-4. Scope: Device
-5. Direction: Cloud→Device
-6. Paste JSON from `device-status`
+Startup status for v11 includes the connectivity recovery state needed for soak analysis:
 
-**Step 3: Modify Only What's Different**
-Example - Different park hours:
-```json
-{
-    "timing": {
-        "timezone": "PST8PDT",
-        "reportingIntervalSec": 3600,
-        "pollingRateSec": 0,
-        "openHour": 7,          ← Changed from 6
-        "closeHour": 20         ← Changed from 22
-    }
-}
-```
+- `failsafeStage`
+- `failsafeCount`
+- `lastConnectionAgeSec`
+- `failsafeTest`
 
-**Tip:** You only need to include sections with changes. Device merges with defaults.
+## Documentation Index
 
-### Common Customizations
+- <a href="RELEASE_NOTES_v11.md">RELEASE_NOTES_v11.md</a>
+- <a href="docs/recovery-architecture.md">docs/recovery-architecture.md</a>
+- <a href="docs/v11-soak-plan.md">docs/v11-soak-plan.md</a>
+- <a href="docs/bench-validation.md">docs/bench-validation.md</a>
+- Generated API reference: `docs/html/index.html`
 
-**Different Operating Hours:**
-```json
-{
-    "timing": {
-        "openHour": 8,
-        "closeHour": 18
-    }
-}
-```
+## Repository Layout
 
-**Testing Device (Stay Connected, Verbose Logs):**
-```json
-{
-    "messaging": {
-        "serial": true,
-        "verboseMode": true
-    },
-    "modes": {
-        "operatingMode": 0
-    }
-}
-```
+- `src/`: firmware source
+- `src/state/`: state handlers and shared state-machine interfaces
+- `src/power/`: connectivity and power policies, platform abstractions, and power manager
+- `src/cloud/`: Particle Ledger integration and device/cloud publishing helpers
+- `src/sensors/`: sensor abstraction and concrete sensor implementations
+- `docs/`: operator and design documentation
+- `lib/`: vendored dependencies
 
-**Different Sensor Type:**
-```json
-{
-    "sensor": {
-        "threshold1": 75,
-        "threshold2": 50
-    }
-}
-```
+## Deployment Workflow
 
-**Occupancy Mode Instead of Counting:**
-```json
-{
-    "modes": {
-        "countingMode": 1,
-        "occupancyDebounceMs": 600000
-    }
-}
-```
+1. Build a production image with `CONNECTIVITY_FAILSAFE_TEST_MODE=0`.
+2. Flash or OTA deploy to the intended platform.
+3. Confirm startup status includes the expected version and recovery fields.
+4. Confirm ledger sync and publish behavior during the first connection window.
+5. Monitor wake-cycle summaries, connection age, and any recovery-stage transitions.
 
-### Verifying Configuration Applied
+For the v11 soak rollout, follow <a href="docs/v11-soak-plan.md">docs/v11-soak-plan.md</a>.
 
-1. After creating/editing `device-settings`, wait for device to connect (or force connection)
-2. Check `device-status` ledger - should match your `device-settings`
-3. Check device logs for "Configuration loaded" messages
-4. If mismatch, check logs for validation errors
+## Contributor Notes
 
-## Extending the Firmware
+- Keep new power and connectivity timing values centralized in `ConnectivityPolicy.h`.
+- Preserve persistent storage layout compatibility in `MyPersistentData.h` unless you are deliberately performing a migration.
+- Prefer comment-only clarity improvements before architectural refactors during soak.
+- Treat generated docs as release artifacts and regenerate them when public headers or release-facing markdown changes.
 
-### Adding a New Sensor
+## Current Release Status
 
-1. **Create sensor class** implementing `ISensor` interface:
-```cpp
-class MyNewSensor : public ISensor {
-public:
-    static MyNewSensor* instance();
-    bool setup() override;
-    bool loop() override;
-    SensorData getSensorData() override;
-    const char* getSensorType() const override;
-};
-```
-
-2. **Add to SensorFactory.h**:
-```cpp
-case MYNEWSENSOR:
-    return MyNewSensor::instance();
-```
-
-3. **Update Config.h** with new sensor type enum
-
-4. **No changes needed** to core state machine or data handling!
-
-## Memory Constraints
-
-- No `String` allocations in hot path (loop)
-- Static buffers for frequently-used data (deviceID)
-- Stack allocation for JSON (512 bytes acceptable)
-- Persistent storage auto-managed by StorageHelperRK
-
-## Offline Data Retention & Firmware Updates
-
-- **Persistent publish queue**: All cloud publishes go through PublishQueuePosixRK, which buffers events in RAM and on the `/usr` flash filesystem.
-- **30+ days of hourly data**: The firmware configures a file-backed queue size of 800 events, allowing at least 30 days of hourly reports to be retained during extended network outages before the oldest events are discarded.
-- **Guaranteed retry on reconnect**: Buffered events are sent on subsequent connections with `WITH_ACK` enabled; events are only removed from the queue after successful delivery.
-- **Sleep-aware queue handling**: The state machine checks that the publish queue is in a sleep-safe state before entering long low-power sleeps, avoiding data loss due to mid-flight publishes.
-- **Bounded firmware-update mode**: The FIRMWARE_UPDATE state is time-limited (5 minutes by default). If no updates are applied within this window, the device exits update mode and returns toward its normal connect/report/sleep cycle to protect battery life.
-
-## Error Handling & Alert System
-
-The firmware implements a comprehensive alert system that monitors device health and reports issues through webhooks:
-
-### Alert Severity Levels
-
-**Critical (Tier 3)** - Requires immediate attention:
-- `14`: Out of memory
-- `15`: Modem/disconnect failure
-- `16`: Repeated sleep failures (HIBERNATE/ULP)
-- `20`: **PMIC thermal shutdown** (charging stopped due to temperature)
-- `21`: **PMIC charge timeout** (stuck charging - safety timer expired)
-
-**Major (Tier 2)** - Should be addressed soon:
-- `22`: **PMIC input fault** (VBUS overvoltage)
-- `23`: **PMIC battery fault** (general charging issue)
-- `30`: Connectivity timeout with radio up
-- `31`: Failed to connect to cloud
-- `32`: Connect taking too long
-- `40`: Repeated webhook failures (>6 hours without response)
-- `41`: Configuration/ledger apply failure
-- `42`: Data ledger publish failure
-- `43`: Publish queue not drained before forced sleep
-
-**Minor (Tier 1)** - Informational warnings
-
-### PMIC Monitoring & Remediation (Boron Only)
-
-For Boron devices with BQ24195 PMIC, the firmware actively monitors charging health:
-
-**Detection:**
-- Reads PMIC fault registers every battery check cycle
-- Monitors for thermal shutdown, charge timeout, input faults
-- Tracks stuck charging states (>6 hours at same SoC)
-- Logs detailed PMIC status (charge state, VBUS, thermal regulation)
-
-**Smart Remediation with Anti-Thrashing:**
-- **Level 0** (Initial): Monitor only, log diagnostics
-- **Level 1** (2+ consecutive faults): Soft reset - cycle charging off/on
-- **Level 2** (3+ consecutive faults): Power cycle with watchdog supervision
-- **Cooldown**: 1 hour minimum between remediation attempts
-- **Auto-Clear**: Resets counters when charging returns to healthy state
-
-**Escalation Example:**
-1. First fault detected → Alert raised, monitor only (wait for cooldown)
-2. Second fault after cooldown → Level 1: Cycle charging (disable 500ms, re-enable)
-3. Third fault after cooldown → Level 2: Power cycle with watchdog reset
-4. Charging recovers → Clear alert, reset remediation level
-
-**Benefits:**
-- Automatic recovery from common "1Hz amber LED" charging faults
-- Prevents thrashing (repeated fix attempts)
-- Detailed diagnostic logs for root cause analysis
-- Alert webhooks notify monitoring systems before manual intervention needed
-
-### Error Recovery Strategy
-
-- Sensor failures → Connect and report (no reset loops)
-- Configuration validation with range checking
-- Graceful degradation for remote deployments
-- Alerts automatically clear when underlying condition resolves
-
-## Dependencies
-
-- AB1805_RK: RTC and watchdog
-- LocalTimeRK: Timezone support
-- PublishQueuePosixRK: Reliable publishing
-- StorageHelperRK: Persistent storage
-- BackgroundPublishRK: Non-blocking publishes
-- SequentialFileRK: File operations
-
-## Contributing
-
-When adding features:
-1. **Maintain simplicity**: Keep core logic clean
-2. **Comment thoroughly**: Explain non-obvious decisions
-3. **Extend, don't modify**: Use factory pattern for new types
-4. **Test remotely**: Ensure devices don't brick in field
-
-## License
-
-This project is licensed under the MIT License.
-
-You are free to use, copy, modify, merge, publish, distribute,
-sublicense, and/or sell copies of this software, subject to the
-conditions of the MIT License.
-
-See the top-level `LICENSE` file in this repository for the
-complete license text.
-
-## Support
-
-For issues or questions, contact [Your Contact Info]
-
+v11.0.0 is the connectivity resiliency soak release. It is intended to validate the new long-duration recovery ladder under real deployment conditions without widening scope into post-soak refactors.

@@ -1,5 +1,6 @@
 var searchData=
 [
-  ['sensortype_0',['SensorType',['../_sensor_factory_8h.html#a87ca7b4499ea761999a872674eba32af',1,'SensorFactory.h']]],
-  ['state_1',['State',['../_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8',1,'StateMachine.h']]]
+  ['connectattempttype_0',['ConnectAttemptType',['../struct_observability_1_1_wake_cycle_stats.html#a54f787bfc1fab38f76cbd367716e8c12',1,'Observability::WakeCycleStats']]],
+  ['connectionmode_1',['ConnectionMode',['../_my_persistent_data_8h.html#a6ed5b36c9cd209c52088cb9029de61b3',1,'MyPersistentData.h']]],
+  ['connectresult_2',['ConnectResult',['../struct_observability_1_1_wake_cycle_stats.html#aba2be75384b01e768f8572821ec378b3',1,'Observability::WakeCycleStats']]]
 ];

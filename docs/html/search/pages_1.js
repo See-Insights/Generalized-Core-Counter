@@ -1,5 +1,6 @@
 var searchData=
 [
-  ['board_20header_20pir_20sensor_20on_20carrier_0',['Carrier board header (PIR sensor on carrier)',['../device__pinout_8h.html#autotoc_md0',1,'']]],
-  ['boron_20only_1',['PMIC Monitoring &amp;amp; Remediation (Boron Only)',['../index.html#autotoc_md35',1,'']]]
+  ['and_20connectivity_20model_0',['Power And Connectivity Model',['../index.html#autotoc_md7',1,'']]],
+  ['and_20validation_1',['Build And Validation',['../index.html#autotoc_md11',1,'']]],
+  ['architecture_2',['Architecture',['../index.html#autotoc_md5',1,'Core Architecture'],['../index.html#autotoc_md6',1,'Recovery Architecture']]]
 ];

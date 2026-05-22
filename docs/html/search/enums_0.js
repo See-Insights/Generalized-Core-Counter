@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['countingmode_0',['CountingMode',['../_my_persistent_data_8h.html#a71f9be68dae9de12b5fedade6cc3972a',1,'MyPersistentData.h']]]
+  ['appbreadcrumb_0',['AppBreadcrumb',['../namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4b',1,'anonymous_namespace{Generalized-Core-Counter.cpp}']]]
 ];

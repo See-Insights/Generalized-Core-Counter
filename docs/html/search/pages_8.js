@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['in_20particle_20console_0',['Setup in Particle Console',['../index.html#autotoc_md22',1,'']]],
-  ['interface_20pattern_1',['Sensor Interface Pattern',['../index.html#autotoc_md7',1,'']]]
+  ['index_0',['Documentation Index',['../index.html#autotoc_md13',1,'']]],
+  ['intent_1',['Intent',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md19',1,'']]]
 ];

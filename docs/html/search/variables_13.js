@@ -1,4 +1,20 @@
 var searchData=
 [
-  ['verbosemode_0',['verboseMode',['../classsys_status_data_1_1_sys_data.html#a16316871cb17f0e9643e7a8a4efab0b0',1,'sysStatusData::SysData']]]
+  ['teardown_5fduration_5fms_0',['teardown_duration_ms',['../struct_observability_1_1_wake_cycle_stats.html#a01919984ad1f9ed240ef2dcebb566593',1,'Observability::WakeCycleStats']]],
+  ['teardown_5fstart_5fms_1',['teardown_start_ms',['../struct_observability_1_1_wake_cycle_stats.html#a68409cb3ee5a196278ea4d3ea0990150',1,'Observability::WakeCycleStats']]],
+  ['testconnectiondurationoverride_2',['testConnectionDurationOverride',['../classsys_status_data_1_1_sys_data.html#a39651ca58480ee88783a85f0967df627',1,'sysStatusData::SysData']]],
+  ['thrashguard_3',['thrashGuard',['../_thrash_guard_8cpp.html#a09dfa8a5d5d3412e9f4a24f54595e5a0',1,'thrashGuard:&#160;ThrashGuard.cpp'],['../_thrash_guard_8h.html#a09dfa8a5d5d3412e9f4a24f54595e5a0',1,'thrashGuard:&#160;ThrashGuard.cpp']]],
+  ['thrashresetcount_4',['thrashResetCount',['../_thrash_guard_8cpp.html#a3f9c465b45599dab066e4d85fe4f3807',1,'thrashResetCount:&#160;ThrashGuard.cpp'],['../_thrash_guard_8h.html#a3f9c465b45599dab066e4d85fe4f3807',1,'thrashResetCount:&#160;ThrashGuard.cpp']]],
+  ['thrashtripcount_5',['thrashTripCount',['../_thrash_guard_8cpp.html#aa27b7d360b53e8706dfe92aab25b5aa5',1,'thrashTripCount:&#160;ThrashGuard.cpp'],['../_thrash_guard_8h.html#aa27b7d360b53e8706dfe92aab25b5aa5',1,'thrashTripCount:&#160;ThrashGuard.cpp']]],
+  ['tier_6',['tier',['../struct_power_policy.html#acb76dc33668fbf7c54982c2c95662abe',1,'PowerPolicy']]],
+  ['tier2_5fwindow_5fms_7',['TIER2_WINDOW_MS',['../namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afc75631d91905ff375e5056c5ddffafb',1,'anonymous_namespace{ThrashGuard.cpp}']]],
+  ['tier3_5ftrip_5fcount_8',['TIER3_TRIP_COUNT',['../namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#af396c832c1943dc159954049a9503303',1,'anonymous_namespace{ThrashGuard.cpp}']]],
+  ['tier3_5fwindow_5fms_9',['TIER3_WINDOW_MS',['../namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afbb332fff9abe10374e0a8920493b9d2',1,'anonymous_namespace{ThrashGuard.cpp}']]],
+  ['timestamp_10',['timestamp',['../struct_sensor_data.html#a9d8f49a4ee41d10300a511c533c954db',1,'SensorData']]],
+  ['timevalid_11',['timeValid',['../struct_local_time_cache_1_1_local_time_snapshot.html#aac03e91e0ac8a8bfc5e236fea8f9d366',1,'LocalTimeCache::LocalTimeSnapshot']]],
+  ['timezonestr_12',['timeZoneStr',['../classsys_status_data_1_1_sys_data.html#aed0d32647da7c17e449cabda33e200c0',1,'sysStatusData::SysData']]],
+  ['tmp36_5fsense_5fpin_13',['TMP36_SENSE_PIN',['../device__pinout_8cpp.html#abe0da77b4714252385701ee7c36ddfa5',1,'TMP36_SENSE_PIN:&#160;device_pinout.cpp'],['../device__pinout_8h.html#abe0da77b4714252385701ee7c36ddfa5',1,'TMP36_SENSE_PIN:&#160;device_pinout.cpp']]],
+  ['total_5fawake_5fms_14',['total_awake_ms',['../struct_observability_1_1_wake_cycle_stats.html#a4eed46fd424bbf249324230bb7db9f6a',1,'Observability::WakeCycleStats']]],
+  ['totaloccupiedseconds_15',['totalOccupiedSeconds',['../classcurrent_status_data_1_1_current_data.html#aa0e5a3b1fe72a2fcc64c4048fb83df3a',1,'currentStatusData::CurrentData']]],
+  ['type_16',['type',['../classsensor_config_data_1_1_sensor_data.html#a42f3f8e1b0f6e6c504c92d94405627c7',1,'sensorConfigData::SensorData::type'],['../struct_sensor_definition.html#aeeac185140f5cca31b010b3033eff544',1,'SensorDefinition::type']]]
 ];

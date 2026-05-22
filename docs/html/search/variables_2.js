@@ -1,7 +1,23 @@
 var searchData=
 [
-  ['batterycontext_0',['batteryContext',['../_sensor_manager_8cpp.html#aef74f36dc982b031c818fa1eaed04c92',1,'SensorManager.cpp']]],
-  ['batterystate_1',['batteryState',['../classcurrent_status_data_1_1_current_data.html#a993ee22053b60140581d1ea79a70e829',1,'currentStatusData::CurrentData']]],
-  ['blue_5fled_2',['BLUE_LED',['../device__pinout_8cpp.html#aa4e58025e38ebad58b71cdfa59e76ebe',1,'BLUE_LED:&#160;device_pinout.cpp'],['../device__pinout_8h.html#aa4e58025e38ebad58b71cdfa59e76ebe',1,'BLUE_LED:&#160;device_pinout.cpp']]],
-  ['button_5fpin_3',['BUTTON_PIN',['../device__pinout_8cpp.html#ae2f2771b68bc677751483fae6699726a',1,'BUTTON_PIN:&#160;device_pinout.cpp'],['../device__pinout_8h.html#ae2f2771b68bc677751483fae6699726a',1,'BUTTON_PIN:&#160;device_pinout.cpp']]]
+  ['backoff_5fms_0',['BACKOFF_MS',['../namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a7051561c04cc971e71f1db9dbc2a9b8f',1,'anonymous_namespace{ThrashGuard.cpp}']]],
+  ['battery_5fsoc_5ftenths_1',['battery_soc_tenths',['../struct_observability_1_1_wake_cycle_stats.html#a2455d3a9b38024954fc703703e1dba25',1,'Observability::WakeCycleStats']]],
+  ['battery_5fwake_5fmax_5fretries_2',['BATTERY_WAKE_MAX_RETRIES',['../namespace_connectivity_policy.html#aab6a8ffd368bd5a38fa7027aa9132dc4',1,'ConnectivityPolicy']]],
+  ['battery_5fwake_5fquickstart_5fdelay_5fms_3',['BATTERY_WAKE_QUICKSTART_DELAY_MS',['../namespace_connectivity_policy.html#accb711c2bdb603b993647a684f509e61',1,'ConnectivityPolicy']]],
+  ['battery_5fwake_5fretry_5fdelay_5fms_4',['BATTERY_WAKE_RETRY_DELAY_MS',['../namespace_connectivity_policy.html#a41c8f007142126ba744f363302a5e8f3',1,'ConnectivityPolicy']]],
+  ['batterycontext_5',['batteryContext',['../struct_power_reading.html#aaa30e5367a57bee21e69c405f967d6c1',1,'PowerReading::batteryContext'],['../_sensor_manager_8cpp.html#aef74f36dc982b031c818fa1eaed04c92',1,'batteryContext:&#160;SensorManager.cpp']]],
+  ['batterycontextstatus_6',['batteryContextStatus',['../struct_power_reading.html#a88a5c6a9ee5fb344021ce0b96b5f2e2b',1,'PowerReading']]],
+  ['batterystate_7',['batteryState',['../classcurrent_status_data_1_1_current_data.html#a993ee22053b60140581d1ea79a70e829',1,'currentStatusData::CurrentData']]],
+  ['batteryvoltage_8',['batteryVoltage',['../struct_power_reading.html#a47ca98250fb6055388c24cee2bfcb1d2',1,'PowerReading']]],
+  ['batteryvoltagestatus_9',['batteryVoltageStatus',['../struct_power_reading.html#a504e40cea3a64d1f7016c446d59d01a5',1,'PowerReading']]],
+  ['blue_5fled_10',['BLUE_LED',['../device__pinout_8cpp.html#aa4e58025e38ebad58b71cdfa59e76ebe',1,'BLUE_LED:&#160;device_pinout.cpp'],['../device__pinout_8h.html#aa4e58025e38ebad58b71cdfa59e76ebe',1,'BLUE_LED:&#160;device_pinout.cpp']]],
+  ['bootinprogress_11',['bootInProgress',['../_generalized-_core-_counter_8cpp.html#a605e2a8fc2b1340964810872cfc48ebc',1,'Generalized-Core-Counter.cpp']]],
+  ['bootstormalertpending_12',['bootStormAlertPending',['../_generalized-_core-_counter_8cpp.html#aab460ebc929e6456962e8824df9fcf50',1,'Generalized-Core-Counter.cpp']]],
+  ['bootstormcount_13',['bootStormCount',['../_generalized-_core-_counter_8cpp.html#a24d9de3f59d41edb50dde2e6ec6fad9e',1,'Generalized-Core-Counter.cpp']]],
+  ['bootstormlastresetreason_14',['bootStormLastResetReason',['../_generalized-_core-_counter_8cpp.html#ac16a315a5eca7df5546ff98c90c5072e',1,'Generalized-Core-Counter.cpp']]],
+  ['bootstormlastresetreasondata_15',['bootStormLastResetReasonData',['../_generalized-_core-_counter_8cpp.html#a674fc2744d16fc35c39658acebfcbe25',1,'Generalized-Core-Counter.cpp']]],
+  ['bootstormtripcount_16',['bootStormTripCount',['../_generalized-_core-_counter_8cpp.html#a86638d99bd9bb52857597c7d38466738',1,'Generalized-Core-Counter.cpp']]],
+  ['bootstormwindowstart_17',['bootStormWindowStart',['../_generalized-_core-_counter_8cpp.html#af8a9485888db942f2d739396dae30e4a',1,'Generalized-Core-Counter.cpp']]],
+  ['budgetms_18',['budgetMs',['../structanonymous__namespace_02_state___connect_8cpp_03_1_1_connect_budget_context.html#af00dacf104328d07c52c16740102f169',1,'anonymous_namespace{State_Connect.cpp}::ConnectBudgetContext']]],
+  ['button_5fpin_19',['BUTTON_PIN',['../device__pinout_8cpp.html#ae2f2771b68bc677751483fae6699726a',1,'BUTTON_PIN:&#160;device_pinout.cpp'],['../device__pinout_8h.html#ae2f2771b68bc677751483fae6699726a',1,'BUTTON_PIN:&#160;device_pinout.cpp']]]
 ];
