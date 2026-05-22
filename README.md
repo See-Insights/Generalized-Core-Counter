@@ -199,6 +199,7 @@ Startup status for v11 includes the connectivity recovery state needed for soak 
 ## Documentation Index
 
 - <a href="RELEASE_NOTES_v11.md">RELEASE_NOTES_v11.md</a>
+- <a href="docs/architecture-overview.md">docs/architecture-overview.md</a>
 - <a href="docs/recovery-architecture.md">docs/recovery-architecture.md</a>
 - <a href="docs/v11-soak-plan.md">docs/v11-soak-plan.md</a>
 - <a href="docs/bench-validation.md">docs/bench-validation.md</a>

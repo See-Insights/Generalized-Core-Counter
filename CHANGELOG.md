@@ -22,7 +22,7 @@ All notable changes to this project will be documented in this file.
 
 - **Connectivity failsafe recovery ladder**: Added a persisted long-duration connectivity supervisor with bounded escalation from radio reset to system reset to AB1805 deep power-down after repeated stale-cloud episodes.
 - **Bench-only failsafe validation mode**: Added `CONNECTIVITY_FAILSAFE_TEST_MODE` with short stale and cooldown windows plus explicit diagnostics so the recovery ladder can be validated quickly without changing production thresholds.
-- **Recovery and soak documentation**: Added release notes, recovery architecture notes, and a soak plan covering the Photon 2 deployment in Singapore and the Boron deployment in North Carolina.
+- **Recovery and soak documentation**: Added release notes, recovery architecture notes, an architecture overview, and a soak plan covering the Photon 2 deployment in Singapore and the Boron deployment in North Carolina.
 
 ### Changed
 

@@ -24,3 +24,15 @@ p2_firmware_*.bin
 # LOC reports
 loc-*.tsv
 loc-by-file.preview.txt
+
+# Local validation artifacts
+/build_output.txt
+/compile*.log
+/compile*.txt
+/proof_*.log
+/failsafe_test_build.log
+/doxygen_v11.log
+
+# Local bench-only helpers
+/test_mode_macro.h
+/user-connectivity-test.h

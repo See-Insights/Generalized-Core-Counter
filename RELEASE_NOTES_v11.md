@@ -16,6 +16,7 @@ This is a stability and resiliency release. It is not an architectural refactor 
   - AB1805 deep power-down
 - Ensured the failsafe does not interrupt an active, in-budget `CONNECTING_STATE` attempt.
 - Added targeted diagnostics so boot logs and startup status clearly show recovery stage, recovery count, and whether bench-only test timing is enabled.
+- Added a developer-focused architecture overview covering subsystem boundaries, data flow, recovery flow, power management, and cloud integration.
 - Removed the runtime battery-test harness so battery data and connectivity validation no longer share test-only code paths.
 - Refreshed release-facing documentation, recovery documentation, and public API comments for operator and collaborator onboarding.
 
