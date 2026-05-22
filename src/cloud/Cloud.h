@@ -74,7 +74,9 @@ public:
     /**
      * @brief Write current device configuration to device-status ledger
      * 
-     * Updates Device→Cloud ledger with current configuration for Console visibility.
+        * Updates Device→Cloud ledger with current configuration for Console visibility.
+        * A successful return means the local ledger accepted the write; cloud sync
+        * may still be pending.
      * 
      * @return true if successful
      */
@@ -84,11 +86,23 @@ public:
      * @brief Publish latest sensor data to device-data ledger
      * 
      * Updates the Device→Cloud ledger with current sensor readings,
-     * making data visible in Particle Console even when device is offline
+        * making data visible in Particle Console even when device is offline.
+        * A successful return means the local ledger accepted the write; cloud sync
+        * may still be pending.
      * 
      * @return true if successful
      */
     bool publishDataToLedger();
+
+        /**
+        * @brief Check whether any device-to-cloud ledger work is still pending.
+        *
+        * This includes deferred device-status writes that have not yet been issued
+        * and accepted local writes whose cloud synchronization has not completed.
+        *
+        * @return true if device-data/device-status ledger work is still pending
+        */
+        bool hasPendingOutputLedgerSync() const;
 
     /**
      * @brief Get the webhook event name for data publishing
@@ -138,6 +152,16 @@ private:
      * @brief Callback when device-settings ledger syncs
      */
     static void onDeviceSettingsSync(Ledger ledger);
+
+    /**
+     * @brief Callback when device-status ledger syncs to the cloud
+     */
+    static void onDeviceStatusLedgerSync(Ledger ledger);
+
+    /**
+     * @brief Callback when device-data ledger syncs to the cloud
+     */
+    static void onDeviceDataLedgerSync(Ledger ledger);
     
     /**
      * @brief Apply messaging configuration section
@@ -299,6 +323,8 @@ private:
     // Deferred work flags
     bool pendingStatusPublish;
     bool pendingConfigApply;
+    bool pendingDeviceStatusSync;
+    bool pendingDeviceDataSync;
 
 protected:
     /**

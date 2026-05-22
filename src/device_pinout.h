@@ -87,17 +87,6 @@ extern const pin_t ledPower;          // Sensor LED power
 bool initializePinModes();
 
 /**
- * @brief Initialize platform power configuration.
- *
- * @details The active implementation currently leaves the system power profile
- *          unchanged, but this hook remains as the single place to enable a
- *          board-specific power configuration in the future.
- *
- * @return true when power-configuration initialization completes.
- */
-bool initializePowerCfg();
-
-/**
  * @brief Set the on-module blue LED state with an optional auto-off duration.
  *
  * @param state `true` turns the LED on and `false` turns it off.

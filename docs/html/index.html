@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;10.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -93,782 +93,227 @@ $(function(){initNavTree('index.html','',''); });
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><p><a class="anchor" id="md__r_e_a_d_m_e"></a></p>
-<p><b>Version:</b> 10.00 | <b>Latest:</b> Battery wake stabilization and nightly heap guard hardening</p>
-<p>A generalized IoT firmware core for outdoor sensor devices supporting multiple operating modes and sensor types.</p>
+<p><b>Version:</b> 11.0.0 | <b>Latest:</b> <a class="el" href="namespace_connectivity.html">Connectivity</a> resiliency soak release</p>
+<p>Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v11 release is the production soak candidate for the new connectivity recovery ladder and its supporting observability.</p>
 <h1 class="doxsection"><a class="anchor" id="autotoc_md2"></a>
-Overview</h1>
-<p>This firmware provides a flexible, production-ready platform for outdoor IoT devices (Particle P2 WiFi and Boron Cellular) that can operate in different modes while maintaining a clean, extensible codebase. The architecture uses Particle Ledger for cloud configuration management, enabling offline device configuration updates and real-time data visibility.</p>
+Release Focus</h1>
+<ul>
+<li>Stable soak candidate for <span class="tt">1</span> Photon 2 in Singapore and <span class="tt">6</span> Borons in North Carolina.</li>
+<li>Recovery-first connectivity behavior for marginal RF conditions.</li>
+<li>Clear operator documentation for ledger-backed configuration, wake-cycle diagnostics, and release validation.</li>
+<li>No new feature refactor in this release; focus is resiliency, maintainability, and deployment clarity.</li>
+</ul>
 <h1 class="doxsection"><a class="anchor" id="autotoc_md3"></a>
-Features</h1>
+Supported Platforms</h1>
 <ul>
-<li><b>Multiple Operating Modes</b>:<ul>
-<li><b>Counting Mode</b>: Track individual events (counts per hour/day)</li>
-<li><b>Occupancy Mode</b>: Monitor occupied time with debounce logic and real-time state-change reporting</li>
+<li>Particle Boron, Device OS <span class="tt">6.4.1</span></li>
+<li>Particle Photon 2 / P2, Device OS <span class="tt">6.4.1</span></li>
+<li>Particle Argon, Device OS <span class="tt">6.4.1</span></li>
 </ul>
-</li>
-<li><b>Power Management</b>:<ul>
-<li><b>Connected Mode</b>: Stay connected for real-time updates</li>
-<li><b>Low-Power Mode</b>: Sleep between scheduled reports</li>
-<li><b>Disconnected Mode</b>: Stay offline unless manually connected</li>
-<li><b>Disconnected Keep-Alive Mode</b>: Network standby during open hours for rapid occupancy reporting (cellular only)</li>
-</ul>
-</li>
-<li><b>Trigger Types</b>:<ul>
-<li><b>Interrupt-Driven</b>: Event-based sensor triggering</li>
-<li><b>Scheduled Polling</b>: Periodic sensor checks</li>
-</ul>
-</li>
-<li><b><a class="el" href="class_cloud.html" title="This class is a singleton; you do not create one as a global, on the stack, or with new.">Cloud</a> Configuration</b>:<ul>
-<li>Product-level defaults via Ledger</li>
-<li>Device-specific overrides (editable offline in Console)</li>
-<li>Auto-sync on connection</li>
-</ul>
-</li>
-<li><b>Data Publishing</b>:<ul>
-<li>Webhook integration (Ubidots)</li>
-<li>Device-to-cloud ledger for Console visibility</li>
-<li>Mode-aware JSON payloads</li>
-</ul>
-</li>
-</ul>
+<p>The firmware is written to keep platform-specific power behavior behind platform guards. Cellular-only behaviors such as modem standby and AB1805 deep power-down apply only where the hardware supports them.</p>
 <h1 class="doxsection"><a class="anchor" id="autotoc_md4"></a>
-Hardware</h1>
-<p>Supported Platforms:</p><ul>
-<li><b>Particle P2</b> (WiFi, DeviceOS 6.3.4)</li>
-<li><b>Particle Boron</b> (Cellular, DeviceOS 6.3.4)</li>
+Supported Sensor Patterns</h1>
+<ul>
+<li>Counting mode for discrete events.</li>
+<li>Occupancy mode for occupied/unoccupied state with debounce and accumulated occupied time.</li>
+<li>Measurement mode for threshold-driven analog or custom sensors.</li>
+<li>Interrupt-driven and polling-driven sampling paths.</li>
 </ul>
-<p>Sensor Support (Extensible):</p><ul>
-<li>PIR motion sensor (implemented)</li>
-<li>Ultrasonic distance sensor (template)</li>
-<li>Custom sensors via <a class="el" href="class_i_sensor.html" title="Abstract interface for all sensors.">ISensor</a> interface</li>
-</ul>
+<p>The current repository ships PIR support and the abstractions needed to add additional sensors through the <span class="tt"><a class="el" href="class_i_sensor.html" title="Abstract interface for all sensors.">ISensor</a></span> interface and <span class="tt"><a class="el" href="class_sensor_factory.html" title="Factory for creating sensor instances.">SensorFactory</a></span>.</p>
 <h1 class="doxsection"><a class="anchor" id="autotoc_md5"></a>
-Occupancy Mode Details</h1>
-<p>When configured in <b>OCCUPANCY</b> counting mode with <b>DISCONNECTED_KEEP_ALIVE</b> operating mode:</p>
-<p><b>State-Change Reporting:</b></p><ul>
-<li>Device reports immediately when occupancy state changes (occupied ↔ unoccupied)</li>
-<li>No waiting for scheduled reporting intervals</li>
-<li>Enables real-time dashboard updates for occupancy status</li>
+Core Architecture</h1>
+<p>The application is a small explicit state machine with focused handler modules:</p>
+<ul>
+<li><span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8ae6345fad0beb5f8f70fed55dcdae6003">INITIALIZATION_STATE</a></span></li>
+<li><span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aeca4500f6f729608a014643f8c8f4003">IDLE_STATE</a></span></li>
+<li><span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a549bd89b38411c3eb84cead55c7df867">CONNECTING_STATE</a></span></li>
+<li><span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a927b7910140065b2cef01ac3557b91a6">REPORTING_STATE</a></span></li>
+<li><span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24">SLEEPING_STATE</a></span></li>
+<li><span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a6d4ca25a3d420813862ff4e2e874373e">FIRMWARE_UPDATE_STATE</a></span></li>
+<li><span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aa07813f3418b83dc769daa78689fb9c3">ERROR_STATE</a></span></li>
 </ul>
-<p><b>Debounce Logic:</b></p><ul>
-<li>Configurable debounce timer (<span class="tt">occupancyDebounceMs</span>) prevents rapid state flipping</li>
-<li>Timer resets on each new sensor detection while occupied</li>
-<li>Space becomes "unoccupied" only after full timeout without new detections</li>
-<li>Accumulates total occupied time per day (reported in minutes)</li>
-</ul>
-<p><b>Network Standby (Cellular Only):</b></p><ul>
-<li>During open hours, cellular modem stays in low-power standby (~14mA)</li>
-<li>Prevents 30-60 second reconnection delays on state changes</li>
-<li>Essential for preventing carrier blacklisting from rapid connect/disconnect cycles</li>
-<li>Automatically disabled outside open hours to save power</li>
-<li>WiFi devices don't need standby (reconnection already fast at ~2-5s)</li>
-</ul>
-<p><b>Use Case:</b> Tennis courts, sports facilities where real-time occupancy visibility matters and solar power provides adequate budget for network standby.</p>
+<p><span class="tt"><a class="el" href="_generalized-_core-_counter_8cpp.html">Generalized-Core-Counter.cpp</a></span> owns global lifecycle, retained breadcrumbs, startup telemetry, and top-level supervision. State-specific behavior lives under <span class="tt">src/state/</span>. Power and connectivity policies live under <span class="tt">src/power/</span>. <a class="el" href="class_cloud.html" title="This class is a singleton; you do not create one as a global, on the stack, or with new.">Cloud</a> configuration and ledger publishing live under <span class="tt">src/cloud/</span>.</p>
 <h1 class="doxsection"><a class="anchor" id="autotoc_md6"></a>
-Documentation</h1>
+Recovery Architecture</h1>
+<p>v11 adds a persisted long-duration connectivity failsafe on top of the existing bounded connect and teardown budgets.</p>
+<p>Normal protection layers:</p>
 <ul>
-<li>Bench validation checklist: docs/bench-validation.md</li>
-<li>Generated API reference (Doxygen): <b><a href="https://see-insights.github.io/Generalized-Core-Counter/">https://see-insights.github.io/Generalized-Core-Counter/</a></b><ul>
-<li>To browse locally: Open <span class="tt">docs/html/index.html</span> in your browser</li>
+<li>Per-wake connect attempt budgets prevent indefinite cloud connect waits.</li>
+<li>Service and disconnect gates prevent the modem from remaining powered after work is complete or stuck.</li>
+<li><a class="el" href="class_thrash_guard.html">ThrashGuard</a> detects no-progress state machine behavior.</li>
 </ul>
-</li>
-</ul>
+<p>Long-duration recovery ladder:</p>
+<ol type="1">
+<li>Stage 1: radio reset</li>
+<li>Stage 2: <span class="tt">System.reset()</span></li>
+<li>Stage 3: AB1805 <span class="tt">deepPowerDown()</span></li>
+</ol>
+<p>The ladder persists its stage and count in <span class="tt"><a class="el" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a></span> so it can escalate across resets. A successful cloud connection clears the recovery state. The supervisor now defers action while <span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a549bd89b38411c3eb84cead55c7df867">CONNECTING_STATE</a></span> still owns an in-budget connect attempt, which prevents the long-duration monitor from fighting the short-term connect policy.</p>
+<p>See docs/recovery-architecture.md for the operator-facing description.</p>
 <h1 class="doxsection"><a class="anchor" id="autotoc_md7"></a>
-Architecture</h1>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md8"></a>
-Sensor Interface Pattern</h2>
-<p>All sensors implement the <span class="tt"><a class="el" href="class_i_sensor.html" title="Abstract interface for all sensors.">ISensor</a></span> interface:</p><ul>
-<li><span class="tt"><a class="el" href="_generalized-_core-_counter_8cpp.html#a4fc01d736fe50cf5b977f755b675f11d">setup()</a></span>: Initialize hardware</li>
-<li><span class="tt"><a class="el" href="_generalized-_core-_counter_8cpp.html#afe461d27b9c48d5921c00d521181f12f">loop()</a></span>: Update sensor state</li>
-<li><span class="tt">getSensorData()</span>: Return latest readings</li>
-<li><span class="tt">getSensorType()</span>: Identify sensor type</li>
-</ul>
-<p>New sensors are added via <span class="tt"><a class="el" href="_sensor_factory_8h.html">SensorFactory.h</a></span> without modifying core code.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md9"></a>
-State Machine</h2>
+Power And Connectivity Model</h1>
+<p><a class="el" href="namespace_connectivity.html">Connectivity</a> and power policy are centralized in <span class="tt"><a class="el" href="_connectivity_policy_8h.html">ConnectivityPolicy.h</a></span>. The important operational guardrails are:</p>
 <ul>
-<li>INITIALIZATION → IDLE → REPORTING → IDLE (connected mode)</li>
-<li>INITIALIZATION → IDLE → SLEEPING → IDLE (low-power mode)</li>
-<li>ERROR handling with cloud reporting (no reset loops)</li>
+<li>Production failsafe stale threshold: <span class="tt">12h</span></li>
+<li>Production failsafe cooldown: <span class="tt">6h</span></li>
+<li>Production failsafe jitter cap: <span class="tt">30m</span></li>
+<li>Connect attempt default budget: <span class="tt">5m</span></li>
+<li>Periodic deep connect budget: <span class="tt">11m</span></li>
+<li><a class="el" href="class_cloud.html" title="This class is a singleton; you do not create one as a global, on the stack, or with new.">Cloud</a> operations gate: <span class="tt">30s</span></li>
+<li>Output-ledger sync gate: <span class="tt">70s</span> cellular, <span class="tt">30s</span> Wi-Fi</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md10"></a>
-Application State Machine &amp; Handlers</h2>
-<p>The main application logic is implemented as a small, explicit state machine:</p>
+<p>Battery-aware connection behavior can reduce connectivity aggressiveness as state of charge drops. Occupancy keep-alive is retained only when the platform and current battery tier can justify it.</p>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md8"></a>
+<span class="tt">CONNECTIVITY_FAILSAFE_TEST_MODE</span></h1>
+<p><span class="tt"><a class="el" href="_build_profile_8h.html#ace016f8be71ba4de13d0741f003ce9a1" title="Bench-only override for connectivity failsafe timing.">CONNECTIVITY_FAILSAFE_TEST_MODE</a></span> exists only to validate the long-duration recovery ladder on the bench.</p>
+<p>When enabled, it changes only the failsafe timing:</p>
 <ul>
-<li><b>Core states</b> (see src/StateMachine.h): INITIALIZATION, IDLE, CONNECTING, REPORTING, SLEEPING, FIRMWARE_UPDATE, ERROR.</li>
-<li><b><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8">State</a> handlers</b> (see src/StateHandlers.cpp) encapsulate behaviour for each state (e.g. connection policy, publish cadence, sleep scheduling, and firmware/config update flows).</li>
-<li><b><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8">State</a> driver</b> (see <a class="el" href="_generalized-_core-_counter_8cpp.html">src/Generalized-Core-Counter.cpp</a>) selects the current state in <span class="tt"><a class="el" href="_generalized-_core-_counter_8cpp.html#afe461d27b9c48d5921c00d521181f12f">loop()</a></span> and logs transitions via <span class="tt"><a class="el" href="_generalized-_core-_counter_8cpp.html#afb2932b86bac021e349213b370798543" title="Publish a state transition to the log handler.">publishStateTransition()</a></span>.</li>
+<li>stale threshold: <span class="tt">5m</span></li>
+<li>cooldown: <span class="tt">15m</span></li>
+<li>jitter: <span class="tt">0s</span></li>
+<li>closed-hours sleep cap: <span class="tt">60s</span></li>
 </ul>
-<p>This split keeps the outer <span class="tt"><a class="el" href="_generalized-_core-_counter_8cpp.html#a4fc01d736fe50cf5b977f755b675f11d">setup()</a>/loop()</span> structure simple while allowing the per-state behaviour to evolve independently as new modes or error conditions are added.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md11"></a>
-Wake-Cycle Observability (Field Diagnostics)</h2>
-<p>The firmware emits a single compact log line per wake cycle right before entering sleep. This is designed to be safe in low-power and poor-connectivity conditions (no blocking, no extra cloud work).</p>
-<p>Example log line:</p>
-<div class="fragment"><div class="line">CYCLE end awake=12345ms conn=normal/ok/4567ms svc=890ms td=321ms q=3/0/0 soc=78.4% chg=1 lastOk=1739160000</div>
-</div><!-- fragment --><p>Field meanings:</p><ul>
-<li><span class="tt">awake</span>: total awake time in this cycle (ms)</li>
-<li><span class="tt">conn</span>: connect attempt type/result/duration (type is <span class="tt">normal|deep|none</span>)</li>
-<li><span class="tt">svc</span>: service window duration (ledger sync + queue drain + OTA check) in ms</li>
-<li><span class="tt">td</span>: teardown duration (disconnect + modem off) in ms</li>
-<li><span class="tt">q</span>: publish queue depth <span class="tt">beforeConnect/afterConnect/beforeSleep</span></li>
-<li><span class="tt">soc</span>: battery state of charge (percent; <span class="tt">-1.0</span> means unknown)</li>
-<li><span class="tt">chg</span>: charging flag (<span class="tt">1</span> charging, <span class="tt">0</span> not charging, <span class="tt">-1</span> unknown)</li>
-<li><span class="tt">lastOk</span>: last successful connection epoch (seconds)</li>
+<p>Production rules:</p>
+<ul>
+<li>Default is <span class="tt">OFF</span> in <span class="tt"><a class="el" href="_build_profile_8h.html" title="Build-profile guardrails for serial/debug waits.">BuildProfile.h</a></span>.</li>
+<li>Do not enable it for soak or production builds.</li>
+<li>If you enabled it via <span class="tt">EXTRA_CFLAGS</span>, remove the flag or force <span class="tt">-DCONNECTIVITY_FAILSAFE_TEST_MODE=0</span> before cutting a release build.</li>
+<li>Production validation must confirm <span class="tt">FailsafeTest=0</span> in logs and production timing values in the failsafe boot line.</li>
 </ul>
-<p>Optional device-status fields:</p><ul>
-<li>When the device is already publishing <span class="tt">device-status</span> (config changed), a <span class="tt">cycle</span> object is included with the same data. This does not increase the publish rate and is only present on those existing status updates.</li>
-</ul>
-<p>Keys in the <span class="tt">cycle</span> object:</p><ul>
-<li><span class="tt">awakeMs</span>, <span class="tt">connectType</span>, <span class="tt">connectResult</span>, <span class="tt">connectMs</span>, <span class="tt">serviceMs</span>, <span class="tt">teardownMs</span>, <span class="tt">qBefore</span>, <span class="tt">qAfter</span>, <span class="tt">qSleep</span>, <span class="tt">socTenths</span>, <span class="tt">charging</span>, <span class="tt">lastOk</span></li>
-</ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md12"></a>
-Persistent Storage</h2>
-<p>Three storage structures:</p><ul>
-<li><span class="tt"><a class="el" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a></span>: System configuration and state</li>
-<li><span class="tt"><a class="el" href="_my_persistent_data_8h.html#a0b7dcc5eefa72dd2fef2a6d42bbb3421">sensorConfig</a></span>: Sensor-specific parameters</li>
-<li><span class="tt"><a class="el" href="_my_persistent_data_8h.html#a7ccda8a3a0f47702f9fa962899b0a3a1">current</a></span>: Live data (counts, occupancy, battery, temp)</li>
-</ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md13"></a>
-Configuration Management</h1>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md14"></a>
-Ledger Architecture</h2>
+<p>See <a href="docs/bench-validation.md">docs/bench-validation.md</a> for the short-threshold validation workflow.</p>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md9"></a>
+Ledger Configuration Model</h1>
+<p>The firmware uses Particle Ledger for both cloud-to-device configuration and device-to-cloud status visibility.</p>
 <table class="markdownTable">
 <tr class="markdownTableHead">
-<th class="markdownTableHeadNone">Ledger  </th><th class="markdownTableHeadNone">Scope  </th><th class="markdownTableHeadNone">Direction  </th><th class="markdownTableHeadNone">Purpose  </th><th class="markdownTableHeadNone">Editable?  </th></tr>
+<th class="markdownTableHeadNone">Ledger  </th><th class="markdownTableHeadNone">Scope  </th><th class="markdownTableHeadNone">Direction  </th><th class="markdownTableHeadNone">Purpose  </th></tr>
 <tr class="markdownTableRowOdd">
-<td class="markdownTableBodyNone"><span class="tt">default-settings</span>  </td><td class="markdownTableBodyNone">Product  </td><td class="markdownTableBodyNone">Cloud→Device  </td><td class="markdownTableBodyNone">Product-wide defaults for all devices  </td><td class="markdownTableBodyNone">Yes (Console)  </td></tr>
+<td class="markdownTableBodyNone"><span class="tt">default-settings</span>  </td><td class="markdownTableBodyNone">Product  </td><td class="markdownTableBodyNone"><a class="el" href="class_cloud.html" title="This class is a singleton; you do not create one as a global, on the stack, or with new.">Cloud</a> to device  </td><td class="markdownTableBodyNone">Product-wide default configuration  </td></tr>
 <tr class="markdownTableRowEven">
-<td class="markdownTableBodyNone"><span class="tt">device-settings</span>  </td><td class="markdownTableBodyNone">Device  </td><td class="markdownTableBodyNone">Cloud→Device  </td><td class="markdownTableBodyNone">Device-specific config overrides  </td><td class="markdownTableBodyNone">Yes (Console, even offline)  </td></tr>
+<td class="markdownTableBodyNone"><span class="tt">device-settings</span>  </td><td class="markdownTableBodyNone">Device  </td><td class="markdownTableBodyNone"><a class="el" href="class_cloud.html" title="This class is a singleton; you do not create one as a global, on the stack, or with new.">Cloud</a> to device  </td><td class="markdownTableBodyNone">Per-device overrides  </td></tr>
 <tr class="markdownTableRowOdd">
-<td class="markdownTableBodyNone"><span class="tt">device-status</span>  </td><td class="markdownTableBodyNone">Device  </td><td class="markdownTableBodyNone">Device→Cloud  </td><td class="markdownTableBodyNone">Current device configuration snapshot  </td><td class="markdownTableBodyNone">No (auto-updated by device)  </td></tr>
+<td class="markdownTableBodyNone"><span class="tt">device-status</span>  </td><td class="markdownTableBodyNone">Device  </td><td class="markdownTableBodyNone">Device to cloud  </td><td class="markdownTableBodyNone">Current applied configuration and status snapshot  </td></tr>
 <tr class="markdownTableRowEven">
-<td class="markdownTableBodyNone"><span class="tt">device-data</span>  </td><td class="markdownTableBodyNone">Device  </td><td class="markdownTableBodyNone">Device→Cloud  </td><td class="markdownTableBodyNone">Latest sensor readings  </td><td class="markdownTableBodyNone">No (auto-updated by device)  </td></tr>
+<td class="markdownTableBodyNone"><span class="tt">device-data</span>  </td><td class="markdownTableBodyNone">Device  </td><td class="markdownTableBodyNone">Device to cloud  </td><td class="markdownTableBodyNone">Latest sensor data  </td></tr>
 </table>
-<p><b>Key Concepts:</b></p><ul>
-<li><b>Cloud→Device</b>: You edit in Console, device reads/applies on connection</li>
-<li><b>Device→Cloud</b>: Device writes, you view in Console (read-only from Console)</li>
-<li><b>device-settings vs device-status</b>: Settings = what you <em>want</em>, Status = what device <em>has</em></li>
-</ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md15"></a>
-Configuration Structure</h2>
+<p>Typical flow:</p>
+<ol type="1">
+<li>Device boots and connects.</li>
+<li>Product defaults sync first.</li>
+<li>Device overrides sync if present.</li>
+<li>Merged configuration is applied to persistent storage.</li>
+<li>Device publishes <span class="tt">device-status</span> so Console reflects what is actually running.</li>
+</ol>
+<p>This split allows offline edits in Console without requiring the device to stay continuously connected.</p>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md10"></a>
+Configuration Shape</h2>
 <div class="fragment"><div class="line">{</div>
-<div class="line">    &quot;messaging&quot;: {</div>
-<div class="line">        &quot;disconnectedMode&quot;: false,</div>
-<div class="line">        &quot;serial&quot;: false,</div>
-<div class="line">        &quot;verboseMode&quot;: false,</div>
-<div class="line">        &quot;verboseTimeoutMin&quot;: 60</div>
-<div class="line">    },</div>
-<div class="line">    &quot;sensor&quot;: {</div>
-<div class="line">        &quot;type&quot;: 1,</div>
-<div class="line">        &quot;setting1&quot;: 5000,</div>
-<div class="line">        &quot;setting2&quot;: 0,</div>
-<div class="line">        &quot;setting3&quot;: 0,</div>
-<div class="line">        &quot;setting4&quot;: 0</div>
-<div class="line">    },</div>
-<div class="line">    &quot;timing&quot;: {</div>
-<div class="line">      &quot;closeHour&quot;: 22,</div>
-<div class="line">      &quot;openHour&quot;: 6,</div>
-<div class="line">      &quot;reportingIntervalSec&quot;: 3600,</div>
-<div class="line">      &quot;timezone&quot;: &quot;SGT-8&quot;,</div>
-<div class="line">      &quot;connectAttemptBudgetSec&quot;: 300</div>
+<div class="line">  &quot;messaging&quot;: {</div>
+<div class="line">    &quot;serial&quot;: false,</div>
+<div class="line">    &quot;verboseMode&quot;: false,</div>
+<div class="line">    &quot;verboseTimeoutMin&quot;: 60</div>
 <div class="line">  },</div>
-<div class="line">    &quot;modes&quot;: {</div>
-<div class="line">        &quot;sensorMode&quot;: 0,</div>
-<div class="line">        &quot;connectionMode&quot;: 0,</div>
-<div class="line">        &quot;reportingMode&quot;: 0,</div>
-<div class="line">        &quot;samplingMode&quot;: 0</div>
-<div class="line">    }</div>
+<div class="line">  &quot;sensor&quot;: {</div>
+<div class="line">    &quot;type&quot;: 1,</div>
+<div class="line">    &quot;setting1&quot;: 5000,</div>
+<div class="line">    &quot;setting2&quot;: 0,</div>
+<div class="line">    &quot;setting3&quot;: 0,</div>
+<div class="line">    &quot;setting4&quot;: 0</div>
+<div class="line">  },</div>
+<div class="line">  &quot;timing&quot;: {</div>
+<div class="line">    &quot;openHour&quot;: 6,</div>
+<div class="line">    &quot;closeHour&quot;: 22,</div>
+<div class="line">    &quot;reportingIntervalSec&quot;: 3600,</div>
+<div class="line">    &quot;timezone&quot;: &quot;SGT-8&quot;,</div>
+<div class="line">    &quot;connectAttemptBudgetSec&quot;: 300,</div>
+<div class="line">    &quot;cloudDisconnectBudgetSec&quot;: 15,</div>
+<div class="line">    &quot;modemOffBudgetSec&quot;: 30</div>
+<div class="line">  },</div>
+<div class="line">  &quot;modes&quot;: {</div>
+<div class="line">    &quot;sensorMode&quot;: 0,</div>
+<div class="line">    &quot;connectionMode&quot;: 1,</div>
+<div class="line">    &quot;reportingMode&quot;: 0,</div>
+<div class="line">    &quot;samplingMode&quot;: 0</div>
+<div class="line">  }</div>
 <div class="line">}</div>
-</div><!-- fragment --><p><b>Timezone notes:</b></p><ul>
-<li><span class="tt">timing.timezone</span> must be a POSIX timezone string (not an IANA name like "Asia/Singapore").</li>
-<li>Example for Singapore (UTC+8, no DST): <span class="tt">"SGT-8"</span>.</li>
-<li>See the LocalTimeRK documentation for examples and guidance on building POSIX strings for major cities: <a href="https://rickkas7.github.io/LocalTimeRK/">https://rickkas7.github.io/LocalTimeRK/</a></li>
+</div><!-- fragment --><p>Timezone values must be POSIX timezone strings, not IANA names.</p>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md11"></a>
+Build And Validation</h1>
+<p>The repository is build-validated on Boron, Photon 2, and Argon using Device OS <span class="tt">6.4.1</span>.</p>
+<p>Typical local compile pattern:</p>
+<div class="fragment"><div class="line">DEVICE_OS_PATH=&quot;/Users/chipmc/.particle/toolchains/deviceOS/6.4.1&quot; \</div>
+<div class="line">APPDIR=&quot;$PWD&quot; \</div>
+<div class="line">PLATFORM=&quot;boron&quot; \</div>
+<div class="line">DEVICE_OS_VERSION=&quot;6.4.1&quot; \</div>
+<div class="line">GCC_ARM_PATH=&quot;/Users/chipmc/.particle/toolchains/gcc-arm/10.2.1/bin/&quot; \</div>
+<div class="line">PATH=&quot;$PATH:/Users/chipmc/.particle/toolchains/gcc-arm/10.2.1/bin&quot; \</div>
+<div class="line">make -f &#39;/Users/chipmc/.particle/toolchains/buildscripts/1.17.2/Makefile&#39; compile-user -s</div>
+</div><!-- fragment --><p>Supported production targets for this release:</p>
+<ul>
+<li><span class="tt">boron</span></li>
+<li><span class="tt">p2</span></li>
+<li><span class="tt">argon</span></li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md16"></a>
-Mode Values</h2>
-<p><b>sensorMode</b> (what the sensor measures):</p><ul>
-<li><span class="tt">0</span> = COUNTING (count discrete events)</li>
-<li><span class="tt">1</span> = OCCUPANCY (track occupied/unoccupied state)</li>
-<li><span class="tt">2</span> = MEASUREMENT (periodic measurements)</li>
+<p>Bench-only short-threshold validation builds can add <span class="tt">EXTRA_CFLAGS="-DCONNECTIVITY_FAILSAFE_TEST_MODE=1"</span>, but release builds must not.</p>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md12"></a>
+Observability</h1>
+<p>The firmware emits compact operational diagnostics designed for poor-connectivity, power-constrained deployments.</p>
+<p>Important signals:</p>
+<ul>
+<li>wake-cycle summary log (<span class="tt">CYCLE end ...</span>)</li>
+<li>startup status payload</li>
+<li>retained breadcrumb reason for prior reset or deep power-down attribution</li>
+<li>failsafe boot and action lines</li>
+<li>alert codes for bounded connect, ledger sync, and recovery conditions</li>
 </ul>
-<p><b>connectionMode</b> (network behavior):</p><ul>
-<li><span class="tt">0</span> = CONNECTED (always connected during open hours)</li>
-<li><span class="tt">1</span> = INTERMITTENT (connect only to report, then sleep)</li>
-<li><span class="tt">2</span> = DISCONNECTED (stay offline, log locally)</li>
-<li><span class="tt">3</span> = INTERMITTENT_KEEP_ALIVE (network standby during open hours)</li>
+<p>Startup status for v11 includes the connectivity recovery state needed for soak analysis:</p>
+<ul>
+<li><span class="tt">failsafeStage</span></li>
+<li><span class="tt">failsafeCount</span></li>
+<li><span class="tt">lastConnectionAgeSec</span></li>
+<li><span class="tt">failsafeTest</span></li>
 </ul>
-<p><b>reportingMode</b> (when to send data):</p><ul>
-<li><span class="tt">0</span> = SCHEDULED (time-based intervals)</li>
-<li><span class="tt">1</span> = ON_CHANGE (when sensor value changes)</li>
-<li><span class="tt">2</span> = THRESHOLD (when threshold exceeded)</li>
-<li><span class="tt">3</span> = SCHEDULED_OR_THRESHOLD (either condition)</li>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md13"></a>
+Documentation Index</h1>
+<ul>
+<li><a href="RELEASE_NOTES_v11.md">RELEASE_NOTES_v11.md</a></li>
+<li><a href="docs/recovery-architecture.md">docs/recovery-architecture.md</a></li>
+<li><a href="docs/v11-soak-plan.md">docs/v11-soak-plan.md</a></li>
+<li><a href="docs/bench-validation.md">docs/bench-validation.md</a></li>
+<li>Generated API reference: <span class="tt">docs/html/index.html</span></li>
 </ul>
-<p><b>samplingMode</b> (how sensor operates):</p><ul>
-<li><span class="tt">0</span> = INTERRUPT (event-driven, sensor wakes device)</li>
-<li><span class="tt">1</span> = POLLING (periodic sampling at intervals)</li>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md14"></a>
+Repository Layout</h1>
+<ul>
+<li><span class="tt">src/</span>: firmware source</li>
+<li><span class="tt">src/state/</span>: state handlers and shared state-machine interfaces</li>
+<li><span class="tt">src/power/</span>: connectivity and power policies, platform abstractions, and power manager</li>
+<li><span class="tt">src/cloud/</span>: Particle Ledger integration and device/cloud publishing helpers</li>
+<li><span class="tt">src/sensors/</span>: sensor abstraction and concrete sensor implementations</li>
+<li><span class="tt">docs/</span>: operator and design documentation</li>
+<li><span class="tt">lib/</span>: vendored dependencies</li>
 </ul>
-<p><b>sensor.type</b> (hardware sensor):</p><ul>
-<li><span class="tt">1</span> = PIR motion sensor</li>
-<li><span class="tt">2</span> = Analog sensor</li>
-<li>Future types can be added without firmware changes</li>
-</ul>
-<p><b>sensor.setting1-4</b> (sensor-specific configuration):</p><ul>
-<li>PIR sensor: <span class="tt">setting1</span> = debounce time in milliseconds (e.g., 5000)</li>
-<li>Analog sensor: <span class="tt">setting1</span> = threshold value, <span class="tt">setting2</span> = hysteresis, etc.</li>
-<li>Configuration meaning depends on sensor.type</li>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md15"></a>
+Deployment Workflow</h1>
+<ol type="1">
+<li>Build a production image with <span class="tt"><a class="el" href="_build_profile_8h.html#ace016f8be71ba4de13d0741f003ce9a1" title="Bench-only override for connectivity failsafe timing.">CONNECTIVITY_FAILSAFE_TEST_MODE</a>=0</span>.</li>
+<li>Flash or OTA deploy to the intended platform.</li>
+<li>Confirm startup status includes the expected version and recovery fields.</li>
+<li>Confirm ledger sync and publish behavior during the first connection window.</li>
+<li>Monitor wake-cycle summaries, connection age, and any recovery-stage transitions.</li>
+</ol>
+<p>For the v11 soak rollout, follow <a href="docs/v11-soak-plan.md">docs/v11-soak-plan.md</a>.</p>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md16"></a>
+Contributor Notes</h1>
+<ul>
+<li>Keep new power and connectivity timing values centralized in <span class="tt"><a class="el" href="_connectivity_policy_8h.html">ConnectivityPolicy.h</a></span>.</li>
+<li>Preserve persistent storage layout compatibility in <span class="tt"><a class="el" href="_my_persistent_data_8h.html" title="Persistent Data Storage Structures - EEPROM/Retained Memory Management.">MyPersistentData.h</a></span> unless you are deliberately performing a migration.</li>
+<li>Prefer comment-only clarity improvements before architectural refactors during soak.</li>
+<li>Treat generated docs as release artifacts and regenerate them when public headers or release-facing markdown changes.</li>
 </ul>
 <h1 class="doxsection"><a class="anchor" id="autotoc_md17"></a>
-Device Commissioning Workflow</h1>
-<ol type="1">
-<li><b>Device Flashed</b>: Start with generic Particle firmware</li>
-<li><b>Added to Product</b>: Assign to "Generalized-Core-Counter-P2" product</li>
-<li><b>Auto-Flashed</b>: Receives product firmware OTA</li>
-<li><b>First Connection</b>:<ul>
-<li>Syncs <span class="tt">default-settings</span> (product-level defaults)</li>
-<li>Checks for <span class="tt">device-settings</span> ledger (Cloud→Device)</li>
-<li><b>If no device-settings exists</b> (new device):<ul>
-<li>Applies <span class="tt">default-settings</span> to persistent memory</li>
-<li><b>Writes <span class="tt">device-status</span> ledger</b> (Device→Cloud) for visibility</li>
-<li>Device waits for you to create <span class="tt">device-settings</span> in Console</li>
-</ul>
-</li>
-<li><b>If device-settings exists</b> (configured device):<ul>
-<li>Applies <span class="tt">device-settings</span> (overrides defaults)</li>
-<li>Updates <span class="tt">device-status</span> to reflect current config</li>
-</ul>
-</li>
-<li>May reset if sensor initialization requires I2C driver changes</li>
-</ul>
-</li>
-<li><b>Data Collection</b>: Starts operating based on configured modes</li>
-<li><b>Data Publishing</b>:<ul>
-<li>Publishes to webhook (real-time Ubidots integration)</li>
-<li>Updates <span class="tt">device-data</span> ledger (Console visibility)</li>
-<li>Updates <span class="tt">device-status</span> periodically</li>
-</ul>
-</li>
-<li><b>Configuration Updates</b>:<ul>
-<li>On each connection, checks if <span class="tt">device-settings</span> changed</li>
-<li>Auto-applies updates if Console values were modified</li>
-<li>Logs all configuration changes</li>
-<li>Updates <span class="tt">device-status</span> to confirm new config applied</li>
-</ul>
-</li>
-</ol>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md18"></a>
-Configuration Management Flow</h2>
-<p><b>Most Devices (Use Product Defaults):</b></p><ol type="1">
-<li>Device connects → Loads <span class="tt">default-settings</span> → Writes <span class="tt">device-status</span></li>
-<li>Device operates with product-level configuration</li>
-<li>No manual intervention needed</li>
-</ol>
-<p><b>Devices Needing Custom Config (Different park hours, sensor types, testing mode):</b></p><ol type="1">
-<li>Device connects → Loads <span class="tt">default-settings</span> → Writes <span class="tt">device-status</span></li>
-<li>In Console, view <span class="tt">device-status</span> ledger (shows current config as JSON)</li>
-<li><b>Copy JSON from <span class="tt">device-status</span></b></li>
-<li><b>Create new <span class="tt">device-settings</span> ledger</b> for that device (Cloud→Device, Device scope)</li>
-<li><b>Paste JSON, modify only the fields you need</b> (e.g., openHour, closeHour, operatingMode)</li>
-<li>Save ledger</li>
-<li>Device syncs <span class="tt">device-settings</span> on next connection (or trigger connection)</li>
-<li><span class="tt">device-status</span> updates to confirm new config</li>
-</ol>
-<p><b>Example: Park with Different Hours</b></p><ul>
-<li><span class="tt">default-settings</span>: <span class="tt">"openHour": 6, "closeHour": 22</span></li>
-<li>For specific device, create <span class="tt">device-settings</span>: <div class="fragment"><div class="line">{</div>
-<div class="line">  &quot;timing&quot;: {</div>
-<div class="line">    &quot;openHour&quot;: 7,</div>
-<div class="line">    &quot;closeHour&quot;: 20</div>
-<div class="line">  }</div>
-<div class="line">}</div>
-</div><!-- fragment --></li>
-<li>Only override fields that differ, device uses defaults for everything else</li>
-</ul>
-<p><b>Example: Testing Device (Stay Connected)</b></p><ul>
-<li>Create <span class="tt">device-settings</span>: <div class="fragment"><div class="line">{</div>
-<div class="line">  &quot;modes&quot;: {</div>
-<div class="line">    &quot;operatingMode&quot;: 0</div>
-<div class="line">  }</div>
-<div class="line">}</div>
-</div><!-- fragment --></li>
-<li>Device stays in CONNECTED mode instead of LOW_POWER</li>
-</ul>
-<p><b>Offline Editing:</b></p><ul>
-<li>Edit <span class="tt">device-settings</span> in Console anytime (even while device offline)</li>
-<li>Device syncs changes on next connection</li>
-<li><span class="tt">device-status</span> updates to confirm applied config</li>
-<li>Compare <span class="tt">device-settings</span> (desired) vs <span class="tt">device-status</span> (actual) to verify sync</li>
-</ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md19"></a>
-Offline Device Management</h1>
-<p>You can:</p><ul>
-<li>✅ Edit device configuration in Console while device is offline</li>
-<li>✅ View last sensor data in <span class="tt">device-data</span> ledger</li>
-<li>✅ Changes sync automatically on next connection</li>
-<li>✅ Real-time data continues to flow to Ubidots via webhook</li>
-</ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md20"></a>
-Data Reporting</h1>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md21"></a>
-Counting Mode Payload</h2>
-<div class="fragment"><div class="line">{</div>
-<div class="line">    &quot;hourly&quot;: 42,</div>
-<div class="line">    &quot;daily&quot;: 327,</div>
-<div class="line">    &quot;battery&quot;: 85.2,</div>
-<div class="line">    &quot;key1&quot;: &quot;Healthy&quot;,</div>
-<div class="line">    &quot;temp&quot;: 23.5,</div>
-<div class="line">    &quot;resets&quot;: 2,</div>
-<div class="line">    &quot;alerts&quot;: 0,</div>
-<div class="line">    &quot;connecttime&quot;: 15,</div>
-<div class="line">    &quot;timestamp&quot;: 1702345678000</div>
-<div class="line">}</div>
-</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md22"></a>
-Occupancy Mode Payload</h2>
-<div class="fragment"><div class="line">{</div>
-<div class="line">    &quot;occupancy&quot;: &quot;occupied&quot;,</div>
-<div class="line">  &quot;dailyoccupancy&quot;: 320,</div>
-<div class="line">    &quot;battery&quot;: {</div>
-<div class="line">        &quot;value&quot;: 85.2,</div>
-<div class="line">        &quot;context&quot;: {</div>
-<div class="line">            &quot;key1&quot;: &quot;Healthy&quot;</div>
-<div class="line">        }</div>
-<div class="line">    },</div>
-<div class="line">    &quot;temp&quot;: 23.5,</div>
-<div class="line">    &quot;alerts&quot;: 0,</div>
-<div class="line">    &quot;resets&quot;: 2,</div>
-<div class="line">    &quot;connecttime&quot;: 15,</div>
-<div class="line">    &quot;timestamp&quot;: 1702345678000</div>
-<div class="line">}</div>
-</div><!-- fragment --><p><b>Note:</b> <span class="tt">dailyoccupancy</span> is reported in whole minutes (derived from total occupied seconds). The <span class="tt">device-data</span> ledger field <span class="tt">totalOccupiedSec</span> is also reported in minutes.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md23"></a>
-Webhook Configuration</h1>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md24"></a>
-Overview</h2>
-<p>The firmware uses a <b>cloud-configurable webhook system</b> that allows you to specify different webhook names for different products or deployment scenarios without changing firmware. The webhook name is resolved using a 3-tier priority system:</p>
-<ol type="1">
-<li><b><a class="el" href="class_cloud.html" title="This class is a singleton; you do not create one as a global, on the stack, or with new.">Cloud</a> Configuration</b> (highest priority): Explicitly set webhook name in cloud ledger</li>
-<li><b>Convention-Based</b>: Auto-generated based on sensor mode (<span class="tt">counting-webhook-v1</span>, <span class="tt">occupancy-webhook-v1</span>)</li>
-<li><b>Legacy Default</b>: Fallback to configured default if no cloud config exists</li>
-</ol>
-<p>This architecture enables:</p><ul>
-<li>Different products to use different backend services</li>
-<li>Testing webhooks vs production webhooks</li>
-<li>Mode-specific webhooks for different payload formats</li>
-<li>Zero-firmware-change webhook updates</li>
-</ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md25"></a>
-Configuration Method</h2>
-<p>Add a <span class="tt">reporting</span> section to your <span class="tt">default-settings</span> or <span class="tt">device-settings</span> ledger:</p>
-<div class="fragment"><div class="line">{</div>
-<div class="line">  &quot;reporting&quot;: {</div>
-<div class="line">    &quot;webhook&quot;: {</div>
-<div class="line">      &quot;name&quot;: &quot;Ubidots-Sensor-Hook-v1&quot;,</div>
-<div class="line">      &quot;enabled&quot;: true,</div>
-<div class="line">      &quot;timeoutMs&quot;: 20000</div>
-<div class="line">    }</div>
-<div class="line">  }</div>
-<div class="line">}</div>
-</div><!-- fragment --><p><b>Configuration Fields:</b></p><ul>
-<li><span class="tt">name</span> (string): Webhook event name to publish to</li>
-<li><span class="tt">enabled</span> (boolean): Enable/disable webhook publishing</li>
-<li><span class="tt">timeoutMs</span> (number): Webhook response timeout in milliseconds (1000-60000)</li>
-</ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md26"></a>
-Webhook Resolution Examples</h2>
-<p><b>Example 1: Product-Level Webhook (Recommended)</b> </p><div class="fragment"><div class="line">// In default-settings ledger (Product scope)</div>
-<div class="line">{</div>
-<div class="line">  &quot;reporting&quot;: {</div>
-<div class="line">    &quot;webhook&quot;: {</div>
-<div class="line">      &quot;name&quot;: &quot;Trail-Counter-Webhook-v1&quot;</div>
-<div class="line">    }</div>
-<div class="line">  }</div>
-<div class="line">}</div>
-</div><!-- fragment --><ul>
-<li>All devices in product publish to "Trail-Counter-Webhook-v1"</li>
-<li>Easy to change all devices at once via product configuration</li>
-</ul>
-<p><b>Example 2: Device-Specific Testing Webhook</b> </p><div class="fragment"><div class="line">// In device-settings ledger (Device scope)</div>
-<div class="line">{</div>
-<div class="line">  &quot;reporting&quot;: {</div>
-<div class="line">    &quot;webhook&quot;: {</div>
-<div class="line">      &quot;name&quot;: &quot;Test-Webhook-Dev&quot;</div>
-<div class="line">    }</div>
-<div class="line">  }</div>
-<div class="line">}</div>
-</div><!-- fragment --><ul>
-<li>Specific device publishes to test webhook</li>
-<li>Other devices continue using product default</li>
-<li>Perfect for testing new integrations</li>
-</ul>
-<p><b>Example 3: Mode-Based Convention (No Config)</b></p><ul>
-<li>If no <span class="tt">reporting.webhook.name</span> is configured</li>
-<li>Device automatically generates webhook name based on sensor mode:<ul>
-<li>COUNTING mode → publishes to <span class="tt">counting-webhook-v1</span></li>
-<li>OCCUPANCY mode → publishes to <span class="tt">occupancy-webhook-v1</span></li>
-<li>MEASUREMENT mode → publishes to <span class="tt">measurement-webhook-v1</span></li>
-</ul>
-</li>
-</ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md27"></a>
-Setting Up Webhooks in Particle Console</h2>
-<ol type="1">
-<li><b>Navigate to Integrations</b>:<ul>
-<li>Go to your product in Particle Console</li>
-<li>Click "Integrations" → "New Integration" → "Webhook"</li>
-</ul>
-</li>
-<li><b>Configure Webhook</b>:<ul>
-<li><b>Event Name</b>: Match your configured webhook name (e.g., "Ubidots-Sensor-Hook-v1")</li>
-<li><b>URL</b>: Your backend endpoint (e.g., Ubidots API)</li>
-<li><b>Request Type</b>: POST</li>
-<li><b>Request Format</b>: JSON</li>
-<li><b>Device</b>: Any (all devices can trigger this webhook)</li>
-</ul>
-</li>
-<li><b>Add Custom Template</b> (Optional):<ul>
-<li>Transform the payload before sending to your backend</li>
-<li>Extract specific fields</li>
-<li>Add authentication headers</li>
-</ul>
-</li>
-<li><b>Response Integration</b>:<ul>
-<li>Check "Send custom response"</li>
-<li>Configure response topic if needed</li>
-<li>Device logs webhook response for troubleshooting</li>
-</ul>
-</li>
-</ol>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md28"></a>
-Multiple Products Example</h2>
-<p><b>Product: Trail-Counter-P2</b> </p><div class="fragment"><div class="line">// default-settings</div>
-<div class="line">{</div>
-<div class="line">  &quot;reporting&quot;: {</div>
-<div class="line">    &quot;webhook&quot;: {</div>
-<div class="line">      &quot;name&quot;: &quot;Trail-Counter-Webhook-v1&quot;</div>
-<div class="line">    }</div>
-<div class="line">  }</div>
-<div class="line">}</div>
-</div><!-- fragment --><p><b>Product: Parking-Sensor-Boron</b> </p><div class="fragment"><div class="line">// default-settings</div>
-<div class="line">{</div>
-<div class="line">  &quot;reporting&quot;: {</div>
-<div class="line">    &quot;webhook&quot;: {</div>
-<div class="line">      &quot;name&quot;: &quot;Parking-Sensor-Webhook-v1&quot;</div>
-<div class="line">    }</div>
-<div class="line">  }</div>
-<div class="line">}</div>
-</div><!-- fragment --><p>Each product uses different webhooks pointing to different backend services, all running the same firmware.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md29"></a>
-Monitoring Webhook Activity</h2>
-<p>View webhook events in device logs: </p><div class="fragment"><div class="line">Publishing to webhook &#39;Ubidots-Sensor-Hook-v1&#39;: {&quot;occupancy&quot;:&quot;occupied&quot;,...}</div>
-<div class="line">Using cloud-configured webhook: Ubidots-Sensor-Hook-v1</div>
-</div><!-- fragment --><p>Or check convention-based fallback: </p><div class="fragment"><div class="line">Using convention-based webhook: occupancy-webhook-v1</div>
-</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md30"></a>
-Troubleshooting</h2>
-<p><b>Webhook not publishing:</b></p><ol type="1">
-<li>Check <span class="tt">device-status</span> ledger to see current webhook configuration</li>
-<li>Verify <span class="tt">webhook.enabled = true</span></li>
-<li>Check logs for webhook resolution messages</li>
-<li>Verify webhook exists in Console Integrations</li>
-</ol>
-<p><b>Wrong webhook being used:</b></p><ol type="1">
-<li>Check merge priority: device-settings overrides default-settings</li>
-<li>View logs to see which webhook name is resolved</li>
-<li>Confirm spelling of webhook name in configuration</li>
-</ol>
-<p><b>Webhook timeout:</b></p><ol type="1">
-<li>Increase <span class="tt">webhook.timeoutMs</span> in configuration</li>
-<li>Default is 20000ms (20 seconds)</li>
-<li>Check backend service response time</li>
-</ol>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md31"></a>
-Getting Started</h1>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md32"></a>
-Setup in Particle Console</h2>
-<ol type="1">
-<li><b>Create Product</b>: "Generalized-Core-Counter-P2"</li>
-<li><b>Create Product-Level Ledger</b> (<span class="tt">default-settings</span>):<ul>
-<li>Direction: Cloud→Device</li>
-<li>Scope: Product</li>
-<li>Add JSON configuration (see Configuration Structure above)</li>
-<li><b>This is the ONLY ledger you need to manually create</b></li>
-</ul>
-</li>
-<li><b>Device Ledgers</b> (Auto-Created by Firmware):<ul>
-<li><span class="tt">device-status</span> (Device→Cloud): Auto-created on first connection, shows current config</li>
-<li><span class="tt">device-data</span> (Device→Cloud): Auto-created when device publishes data</li>
-<li>These are read-only from Console perspective</li>
-</ul>
-</li>
-<li><b>Device-Settings Ledger</b> (Optional Override):<ul>
-<li><b>Create manually in Console</b> if you want device-specific overrides</li>
-<li>Direction: Cloud→Device</li>
-<li>Scope: Device</li>
-<li>Start with JSON from <span class="tt">device-status</span>, then modify as needed</li>
-<li>If absent, device uses <span class="tt">default-settings</span></li>
-</ul>
-</li>
-<li><b>Set Up Webhook</b> for data integration:<ul>
-<li>See <b>Webhook Configuration</b> section above for detailed instructions</li>
-<li>Event name must match your configured webhook name</li>
-<li>Default webhook name in <span class="tt">default-settings-v3.23.json</span>: <span class="tt">Ubidots-Sensor-Hook-v1</span></li>
-<li><b>Important:</b> Configure webhook name in <span class="tt">default-settings</span> ledger before creating webhook</li>
-<li>Counting mode and occupancy mode send different JSON structures (see Data Reporting section)</li>
-</ul>
-</li>
-</ol>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md33"></a>
-Flash Firmware</h2>
-<div class="fragment"><div class="line">particle compile p2 --saveTo firmware.bin</div>
-<div class="line">particle flash &lt;device-name&gt; firmware.bin</div>
-</div><!-- fragment --><p>Or flash via OTA when device is added to product.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md34"></a>
-Monitor Operation</h2>
-<div class="fragment"><div class="line">particle serial monitor</div>
-</div><!-- fragment --><p>Look for:</p><ul>
-<li>"Configuration loaded from cloud"</li>
-<li>"Counting mode set to: X"</li>
-<li>"Operating mode set to: X"</li>
-<li>"Published to webhook: {...}"</li>
-<li>"Published data to ledger: {...}"</li>
-</ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md35"></a>
-How-To: Common Configuration Tasks</h1>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md36"></a>
-Creating Device-Specific Settings</h2>
-<p><b>Step 1: View Current Configuration</b></p><ol type="1">
-<li>In Particle Console, go to your device</li>
-<li>Click "Ledger" tab</li>
-<li>Find <span class="tt">device-status</span> ledger (Device→Cloud)</li>
-<li>Copy the entire JSON</li>
-</ol>
-<p><b>Step 2: Create Override</b></p><ol type="1">
-<li>In Console, still on device page</li>
-<li>Click "Create Ledger"</li>
-<li>Name: <span class="tt">device-settings</span></li>
-<li>Scope: Device</li>
-<li>Direction: Cloud→Device</li>
-<li>Paste JSON from <span class="tt">device-status</span></li>
-</ol>
-<p><b>Step 3: Modify Only What's Different</b> Example - Different park hours: </p><div class="fragment"><div class="line">{</div>
-<div class="line">    &quot;timing&quot;: {</div>
-<div class="line">        &quot;timezone&quot;: &quot;PST8PDT&quot;,</div>
-<div class="line">        &quot;reportingIntervalSec&quot;: 3600,</div>
-<div class="line">        &quot;pollingRateSec&quot;: 0,</div>
-<div class="line">        &quot;openHour&quot;: 7,          ← Changed from 6</div>
-<div class="line">        &quot;closeHour&quot;: 20         ← Changed from 22</div>
-<div class="line">    }</div>
-<div class="line">}</div>
-</div><!-- fragment --><p><b>Tip:</b> You only need to include sections with changes. Device merges with defaults.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md37"></a>
-Common Customizations</h2>
-<p><b>Different Operating Hours:</b> </p><div class="fragment"><div class="line">{</div>
-<div class="line">    &quot;timing&quot;: {</div>
-<div class="line">        &quot;openHour&quot;: 8,</div>
-<div class="line">        &quot;closeHour&quot;: 18</div>
-<div class="line">    }</div>
-<div class="line">}</div>
-</div><!-- fragment --><p><b>Testing Device (Stay Connected, Verbose Logs):</b> </p><div class="fragment"><div class="line">{</div>
-<div class="line">    &quot;messaging&quot;: {</div>
-<div class="line">        &quot;serial&quot;: true,</div>
-<div class="line">        &quot;verboseMode&quot;: true</div>
-<div class="line">    },</div>
-<div class="line">    &quot;modes&quot;: {</div>
-<div class="line">        &quot;operatingMode&quot;: 0</div>
-<div class="line">    }</div>
-<div class="line">}</div>
-</div><!-- fragment --><p><b>Different Sensor Type:</b> </p><div class="fragment"><div class="line">{</div>
-<div class="line">    &quot;sensor&quot;: {</div>
-<div class="line">        &quot;threshold1&quot;: 75,</div>
-<div class="line">        &quot;threshold2&quot;: 50</div>
-<div class="line">    }</div>
-<div class="line">}</div>
-</div><!-- fragment --><p><b>Occupancy Mode Instead of Counting:</b> </p><div class="fragment"><div class="line">{</div>
-<div class="line">    &quot;modes&quot;: {</div>
-<div class="line">        &quot;countingMode&quot;: 1,</div>
-<div class="line">        &quot;occupancyDebounceMs&quot;: 600000,</div>
-<div class="line">        &quot;operatingMode&quot;: 3</div>
-<div class="line">    }</div>
-<div class="line">}</div>
-</div><!-- fragment --><p> <b>Note:</b> For occupancy sensors (e.g., tennis courts), <span class="tt">operatingMode: 3</span> (DISCONNECTED_KEEP_ALIVE) enables real-time reporting on state changes while maintaining cellular network standby during open hours to prevent carrier blacklisting. WiFi devices will function normally but won't use network standby (not needed - WiFi reconnection is already fast). </p><div class="fragment"><div class="line">### Verifying Configuration Applied</div>
-<div class="line"> </div>
-<div class="line">1. After creating/editing `device-settings`, wait for device to connect (or force connection)</div>
-<div class="line">2. Check `device-status` ledger - should match your `device-settings`</div>
-<div class="line">3. Check device logs for &quot;Configuration loaded&quot; messages</div>
-<div class="line">4. If mismatch, check logs for validation errors</div>
-<div class="line"> </div>
-<div class="line">## Extending the Firmware</div>
-<div class="line"> </div>
-<div class="line">### Adding a New Sensor</div>
-<div class="line"> </div>
-<div class="line">1. **Create sensor class** implementing `ISensor` interface:</div>
-</div><!-- fragment --><p> cpp class MyNewSensor : public <a class="el" href="class_i_sensor.html" title="Abstract interface for all sensors.">ISensor</a> { public: static MyNewSensor* instance(); bool <a class="el" href="_generalized-_core-_counter_8cpp.html#a4fc01d736fe50cf5b977f755b675f11d">setup()</a> override; bool <a class="el" href="_generalized-_core-_counter_8cpp.html#afe461d27b9c48d5921c00d521181f12f">loop()</a> override; <a class="el" href="struct_sensor_data.html" title="Generic sensor data structure.">SensorData</a> getSensorData() override; const char* getSensorType() const override; }; </p><div class="fragment"><div class="line">2. **Add to SensorFactory.h**:</div>
-</div><!-- fragment --><p> cpp case MYNEWSENSOR: return MyNewSensor::instance(); </p><div class="fragment"><div class="line">3. **Update Config.h** with new sensor type enum</div>
-<div class="line"> </div>
-<div class="line">4. **No changes needed** to core state machine or data handling!</div>
-<div class="line"> </div>
-<div class="line">## Memory Constraints</div>
-<div class="line"> </div>
-<div class="line">- No `String` allocations in hot path (loop)</div>
-<div class="line">- Static buffers for frequently-used data (deviceID)</div>
-<div class="line">- Stack allocation for JSON (512 bytes acceptable)</div>
-<div class="line">- Persistent storage auto-managed by StorageHelperRK</div>
-<div class="line"> </div>
-<div class="line">## Offline Data Retention &amp; Firmware Updates</div>
-<div class="line"> </div>
-<div class="line">- **Persistent publish queue**: All cloud publishes go through PublishQueuePosixRK, which buffers events in RAM and on the `/usr` flash filesystem.</div>
-<div class="line">- **30+ days of hourly data**: The firmware configures a file-backed queue size of 800 events, allowing at least 30 days of hourly reports to be retained during extended network outages before the oldest events are discarded.</div>
-<div class="line">- **Guaranteed retry on reconnect**: Buffered events are sent on subsequent connections with `WITH_ACK` enabled; events are only removed from the queue after successful delivery.</div>
-<div class="line">- **Sleep-aware queue handling**: The state machine checks that the publish queue is in a sleep-safe state before entering long low-power sleeps, avoiding data loss due to mid-flight publishes.</div>
-<div class="line">- **Bounded firmware-update mode**: The FIRMWARE_UPDATE state is time-limited (5 minutes by default). If no updates are applied within this window, the device exits update mode and returns toward its normal connect/report/sleep cycle to protect battery life.</div>
-<div class="line"> </div>
-<div class="line">## Error Handling &amp; Alert System</div>
-<div class="line"> </div>
-<div class="line">The firmware implements a comprehensive alert system that monitors device health and reports issues through webhooks:</div>
-<div class="line"> </div>
-<div class="line">### Alert Severity Levels</div>
-<div class="line"> </div>
-<div class="line">**Critical (Tier 3)** - Requires immediate attention:</div>
-<div class="line">- `14`: Out of memory</div>
-<div class="line">- `15`: Modem/disconnect failure</div>
-<div class="line">- `16`: Repeated sleep failures (HIBERNATE/ULP)</div>
-<div class="line">- `17`: **State machine thrash detected** (ThrashGuard timeout)</div>
-<div class="line">- `20`: **PMIC thermal shutdown** (charging stopped due to temperature)</div>
-<div class="line">- `21`: **PMIC charge timeout** (stuck charging - safety timer expired)</div>
-<div class="line"> </div>
-<div class="line">**Major (Tier 2)** - Should be addressed soon:</div>
-<div class="line">- `22`: **PMIC input fault** (VBUS overvoltage)</div>
-<div class="line">- `23`: **PMIC battery fault** (general charging issue)</div>
-<div class="line">- `30`: Connectivity timeout with radio up</div>
-<div class="line">- `31`: Failed to connect to cloud</div>
-<div class="line">- `32`: Connect taking too long</div>
-<div class="line">- `40`: Repeated webhook failures (&gt;6 hours without response)</div>
-<div class="line">- `41`: Configuration apply failure (during CONNECT phase - device may have stale config)</div>
-<div class="line">- `42`: Data ledger publish failure</div>
-<div class="line">- `43`: Publish queue not drained before forced sleep</div>
-<div class="line"> </div>
-<div class="line">**Minor (Tier 1)** - Informational warnings</div>
-<div class="line">- `44`: Ledger sync timeout before sleep (cosmetic - config already applied successfully)</div>
-<div class="line"> </div>
-<div class="line">### PMIC Monitoring &amp; Remediation (Boron Only)</div>
-<div class="line"> </div>
-<div class="line">For Boron devices with BQ24195 PMIC, the firmware actively monitors charging health:</div>
-<div class="line"> </div>
-<div class="line">**Detection:**</div>
-<div class="line">- Reads PMIC fault registers every battery check cycle</div>
-<div class="line">- Monitors for thermal shutdown, charge timeout, input faults</div>
-<div class="line">- Tracks stuck charging states (&gt;6 hours at same SoC)</div>
-<div class="line">- Logs detailed PMIC status (charge state, VBUS, thermal regulation)</div>
-<div class="line"> </div>
-<div class="line">**Smart Remediation with Anti-Thrashing:**</div>
-<div class="line">- **Level 0** (Initial): Monitor only, log diagnostics</div>
-<div class="line">- **Level 1** (2+ consecutive faults): Soft reset - cycle charging off/on</div>
-<div class="line">- **Level 2** (3+ consecutive faults): Power cycle with watchdog supervision</div>
-<div class="line">- **Cooldown**: 1 hour minimum between remediation attempts</div>
-<div class="line">- **Auto-Clear**: Resets counters when charging returns to healthy state</div>
-<div class="line"> </div>
-<div class="line">**Escalation Example:**</div>
-<div class="line">1. First fault detected → Alert raised, monitor only (wait for cooldown)</div>
-<div class="line">2. Second fault after cooldown → Level 1: Cycle charging (disable 500ms, re-enable)</div>
-<div class="line">3. Third fault after cooldown → Level 2: Power cycle with watchdog reset</div>
-<div class="line">4. Charging recovers → Clear alert, reset remediation level</div>
-<div class="line"> </div>
-<div class="line">**Benefits:**</div>
-<div class="line">- Automatic recovery from common &quot;1Hz amber LED&quot; charging faults</div>
-<div class="line">- Prevents thrashing (repeated fix attempts)</div>
-<div class="line">- Detailed diagnostic logs for root cause analysis</div>
-<div class="line">- Alert webhooks notify monitoring systems before manual intervention needed</div>
-<div class="line"> </div>
-<div class="line">### Error Recovery Strategy</div>
-<div class="line"> </div>
-<div class="line">- Sensor failures → Connect and report (no reset loops)</div>
-<div class="line">- Configuration validation with range checking</div>
-<div class="line">- Graceful degradation for remote deployments</div>
-<div class="line">- Alerts automatically clear when underlying condition resolves</div>
-<div class="line"> </div>
-<div class="line">### Alert 41/44 Diagnostic Details</div>
-<div class="line"> </div>
-<div class="line">To aid field troubleshooting of configuration and ledger sync issues, the firmware provides enhanced diagnostics:</div>
-<div class="line"> </div>
-<div class="line">**Alert 41 - Configuration Apply Failure (CONNECT phase):**</div>
-<div class="line">- Logs ledger sync status at time of failure</div>
-<div class="line">- Reports connection duration</div>
-<div class="line">- Identifies which config section failed: sensor, timing, messaging, modes, or reporting</div>
-<div class="line">- Example log output:</div>
-</div><!-- fragment --><p> Configuration apply failed: sensor=OK timing=OK messaging=FAIL modes=OK reporting=OK Alert 41 context: ledgersSynced=true connectDuration=8234 ms </p><div class="fragment"><div class="line">**Alert 44 - Ledger Sync Timeout (SLEEP phase):**</div>
-<div class="line">- Logs timeout duration vs budget</div>
-<div class="line">- Shows which cloud operations completed: queue, ledgers, updates, webhook</div>
-<div class="line">- Example log output:</div>
-</div><!-- fragment --><p> SLEEP: Waiting for cloud operations - queue:Y ledgers:N updates:Y webhook:Y (8451/30000 ms) Alert 44 context: timeout after 30124 ms (budget=30000 ms) ```</p>
-<p><b>Platform-Specific Tuning:</b></p><ul>
-<li>WiFi devices: 5-second ledger sync timeout</li>
-<li>Cellular devices: 10-second ledger sync timeout (reduces false alerts on slower networks)</li>
-</ul>
-<p><b>Ledger Sync Logging:</b></p><ul>
-<li>Info-level logging shows sync timestamps for <span class="tt">default-settings</span> and <span class="tt">device-settings</span> ledgers</li>
-<li>Tracks elapsed time since connection for sync window progress</li>
-<li>Distinguishes partial sync (one ledger synced) from complete failure</li>
-</ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md38"></a>
-Battery-Aware Power Management</h1>
-<p>The firmware implements multi-tier battery conservation:</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md39"></a>
-Connection Interval Backoff (All Modes)</h2>
-<p><b>4-Tier System:</b></p><ul>
-<li><b>HEALTHY</b> (&gt;70% SoC): Normal intervals (1x multiplier)</li>
-<li><b>CONSERVING</b> (50-70% SoC): 2x interval (half connections/day)</li>
-<li><b>CRITICAL</b> (30-50% SoC): 4x interval (quarter connections/day)</li>
-<li><b>SURVIVAL</b> (&lt;30% SoC): 12x interval (e.g., hourly → every 12hrs)</li>
-</ul>
-<p><b>Hysteresis:</b> Requires 5% higher SoC to move to better tier, preventing rapid tier thrashing.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md40"></a>
-Occupancy Mode Battery Protection</h2>
-<p>For occupancy sensors using <span class="tt"><a class="el" href="_my_persistent_data_8h.html#a6ed5b36c9cd209c52088cb9029de61b3aee11d292bc1a043b66b0904732f75eef">INTERMITTENT_KEEP_ALIVE</a></span> mode:</p>
-<p><b>Above 70% (HEALTHY):</b></p><ul>
-<li>Maintains network standby for instant-on occupancy reporting</li>
-<li>Reports immediately on occupancy state changes</li>
-<li>No alignment delays</li>
-</ul>
-<p><b>Below 65% (CONSERVING or worse):</b></p><ul>
-<li><b>Automatically switches to INTERMITTENT mode</b></li>
-<li>Network standby disabled to save power</li>
-<li>Reports follow battery-tiered intervals (aligned boundaries)</li>
-<li>Occupancy changes still reported, but with connection overhead</li>
-</ul>
-<p><b>Recovery at 75%:</b></p><ul>
-<li>Switches back to KEEP_ALIVE mode</li>
-<li>Resumes instant occupancy change reporting</li>
-</ul>
-<p><b>Benefits:</b></p><ul>
-<li>Extends battery life during low charge</li>
-<li>Prevents deep discharge</li>
-<li>Automatic recovery when recharged</li>
-<li>User-transparent power management</li>
-</ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md41"></a>
-Dependencies</h1>
-<ul>
-<li>AB1805_RK: RTC and watchdog</li>
-<li>LocalTimeRK: Timezone support</li>
-<li>PublishQueuePosixRK: Reliable publishing</li>
-<li>StorageHelperRK: Persistent storage</li>
-<li>BackgroundPublishRK: Non-blocking publishes</li>
-<li>SequentialFileRK: File operations</li>
-</ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md42"></a>
-Contributing</h1>
-<p>When adding features:</p><ol type="1">
-<li><b>Maintain simplicity</b>: Keep core logic clean</li>
-<li><b>Comment thoroughly</b>: Explain non-obvious decisions</li>
-<li><b>Extend, don't modify</b>: Use factory pattern for new types</li>
-<li><b>Test remotely</b>: Ensure devices don't brick in field</li>
-</ol>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md43"></a>
-License</h1>
-<p>This project is licensed under the MIT License.</p>
-<p>You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of this software, subject to the conditions of the MIT License.</p>
-<p>See the top-level <span class="tt">LICENSE</span> file in this repository for the complete license text.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md44"></a>
-Support</h1>
-<p>For issues or questions, contact [Your Contact Info] </p>
+Current Release Status</h1>
+<p>v11.0.0 is the connectivity resiliency soak release. It is intended to validate the new long-duration recovery ladder under real deployment conditions without widening scope into post-soak refactors. </p>
 </div></div><!-- PageDoc -->
 <a href="doxygen_crawl.html"></a>
 </div><!-- contents -->

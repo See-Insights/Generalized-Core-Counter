@@ -16,6 +16,36 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [11.0.0] - 2026-05-22
+
+### Added
+
+- **Connectivity failsafe recovery ladder**: Added a persisted long-duration connectivity supervisor with bounded escalation from radio reset to system reset to AB1805 deep power-down after repeated stale-cloud episodes.
+- **Bench-only failsafe validation mode**: Added `CONNECTIVITY_FAILSAFE_TEST_MODE` with short stale and cooldown windows plus explicit diagnostics so the recovery ladder can be validated quickly without changing production thresholds.
+- **Recovery and soak documentation**: Added release notes, recovery architecture notes, and a soak plan covering the Photon 2 deployment in Singapore and the Boron deployment in North Carolina.
+
+### Changed
+
+- **Release metadata updated for v11 rollout**: Bumped Particle product version, firmware version string, README version header, Doxygen project number, and project Device OS metadata to `11.0.0` / `6.4.1`.
+- **Failsafe supervisor respects active connect ownership**: The long-duration supervisor now defers recovery while `CONNECTING_STATE` is actively using its in-budget connect attempt, preventing the supervisor from interrupting legitimate recovery work.
+- **Public documentation refreshed for operators and collaborators**: README now documents supported platforms, state flow, recovery model, build workflow, ledger usage, and production guardrails for soak deployments.
+
+### Fixed
+
+- **Battery-test harness removal from production path**: Removed the runtime battery override/test scenario behavior that could contaminate field or bench connectivity results while preserving persistent storage layout compatibility.
+- **Failsafe diagnostics clarity**: Closed-hours sleep deferrals are now reported separately from eligibility status, making it easier to tell when the supervisor is healthy but intentionally inactive.
+- **Stage-1 repeat behavior during a single stale episode**: Recovery stage tracking now prevents repeated radio-reset actions before the ladder escalates.
+
+### Validation
+
+- Bench-validated stage 1 radio reset, stage 2 system reset, and stage 3 deep power-down using `CONNECTIVITY_FAILSAFE_TEST_MODE=1`.
+- Revalidated production compiles for Boron, Photon 2, and Argon with `CONNECTIVITY_FAILSAFE_TEST_MODE=0`.
+
+### Known Limitations
+
+- `CONNECTIVITY_FAILSAFE_TEST_MODE` is for bench validation only and intentionally shortens recovery timing; it must remain disabled for soak and production releases.
+- Two source TODOs remain in `Generalized-Core-Counter.cpp` for future maintainability work, but they are not release blockers for v11.
+
 ## 10.00 - 2026-04-30
 
 ### Added

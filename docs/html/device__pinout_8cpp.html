@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;10.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -104,8 +104,6 @@ $(function(){initNavTree('device__pinout_8cpp.html','',''); });
 Functions</h2></td></tr>
 <tr class="memitem:a067c646f1e434ca48179948e715f76e4" id="r_a067c646f1e434ca48179948e715f76e4"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a067c646f1e434ca48179948e715f76e4">initializePinModes</a> ()</td></tr>
 <tr class="memdesc:a067c646f1e434ca48179948e715f76e4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Initialize carrier-board pin modes used by the firmware.  <br /></td></tr>
-<tr class="memitem:a862c8108b5b302aeec18d4795bf4f8be" id="r_a862c8108b5b302aeec18d4795bf4f8be"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a862c8108b5b302aeec18d4795bf4f8be">initializePowerCfg</a> ()</td></tr>
-<tr class="memdesc:a862c8108b5b302aeec18d4795bf4f8be"><td class="mdescLeft">&#160;</td><td class="mdescRight">Initialize platform power configuration.  <br /></td></tr>
 <tr class="memitem:ad63999ac220a78e60d4555051748e5b3" id="r_ad63999ac220a78e60d4555051748e5b3"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#ad63999ac220a78e60d4555051748e5b3">signalLED</a> (bool <a class="el" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a>, uint32_t durationMs)</td></tr>
 <tr class="memdesc:ad63999ac220a78e60d4555051748e5b3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set the on-module blue LED state with an optional auto-off duration.  <br /></td></tr>
 <tr class="memitem:ab375e3936269f4b236b7d91f75c494d7" id="r_ab375e3936269f4b236b7d91f75c494d7"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ab375e3936269f4b236b7d91f75c494d7">signalLEDStatus</a> ()</td></tr>
@@ -156,30 +154,7 @@ Variables</h2></td></tr>
 
 <p class="reference">References <a class="el" href="device__pinout_8cpp_source.html#l00043">BLUE_LED</a>, <a class="el" href="device__pinout_8cpp_source.html#l00042">BUTTON_PIN</a>, and <a class="el" href="device__pinout_8cpp_source.html#l00044">WAKEUP_PIN</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00194">setup()</a>.</p>
-
-</div>
-</div>
-<a id="a862c8108b5b302aeec18d4795bf4f8be" name="a862c8108b5b302aeec18d4795bf4f8be"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a862c8108b5b302aeec18d4795bf4f8be">&#9670;&#160;</a></span>initializePowerCfg()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">bool initializePowerCfg </td>
-          <td>(</td>
-          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Initialize platform power configuration. </p>
-<p>The active implementation currently leaves the system power profile unchanged, but this hook remains as the single place to enable a board-specific power configuration in the future.</p>
-<dl class="section return"><dt>Returns</dt><dd>true when power-configuration initialization completes. </dd></dl>
-
-<p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00092">92</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>.</p>
 
 </div>
 </div>
@@ -205,17 +180,17 @@ Variables</h2></td></tr>
 <p>Set the on-module blue LED state with an optional auto-off duration. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname"><a class="el" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79">state</a></td><td><span class="tt">true</span> turns the LED on and <span class="tt">false</span> turns it off. </td></tr>
+    <tr><td class="paramname"><a class="el" href="_generalized-_core-_counter_8cpp.html#a876b486d3a5241a126bd5751c5f70f79" title="Global state variables defined in Generalized-Core-Counter.cpp.">state</a></td><td><span class="tt">true</span> turns the LED on and <span class="tt">false</span> turns it off. </td></tr>
     <tr><td class="paramname">durationMs</td><td>Optional on-time in milliseconds. A value of <span class="tt">0</span> leaves the LED on indefinitely until another caller changes it. </td></tr>
   </table>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00122">122</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00097">97</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="device__pinout_8cpp_source.html#l00043">BLUE_LED</a>, <a class="el" href="device__pinout_8cpp_source.html#l00120">ledOffTime</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00114">state</a>.</p>
+<p class="reference">References <a class="el" href="device__pinout_8cpp_source.html#l00043">BLUE_LED</a>, <a class="el" href="device__pinout_8cpp_source.html#l00095">ledOffTime</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00124">state</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___modes_8cpp_source.html#l00024">handleCountingMode()</a>, <a class="el" href="_state___idle_8cpp_source.html#l00031">handleIdleState()</a>, <a class="el" href="_state___modes_8cpp_source.html#l00052">handleOccupancyMode()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00052">handleSleepingState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00194">setup()</a>, and <a class="el" href="_state___modes_8cpp_source.html#l00117">updateOccupancyState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___modes_8cpp_source.html#l00024">handleCountingMode()</a>, <a class="el" href="_state___idle_8cpp_source.html#l00031">handleIdleState()</a>, <a class="el" href="_state___modes_8cpp_source.html#l00052">handleOccupancyMode()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>, and <a class="el" href="_state___modes_8cpp_source.html#l00116">updateOccupancyState()</a>.</p>
 
 </div>
 </div>
@@ -237,11 +212,11 @@ Variables</h2></td></tr>
 <p>Report whether the blue status LED is currently on. </p>
 <dl class="section return"><dt>Returns</dt><dd>true if the LED output is currently driven high. </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00166">166</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00141">141</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="device__pinout_8cpp_source.html#l00043">BLUE_LED</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___idle_8cpp_source.html#l00031">handleIdleState()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00052">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___idle_8cpp_source.html#l00031">handleIdleState()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>.</p>
 
 </div>
 </div>
@@ -263,11 +238,11 @@ Variables</h2></td></tr>
 <p>Get the remaining LED timeout in seconds. </p>
 <dl class="section return"><dt>Returns</dt><dd>Seconds remaining until the LED should be turned off, or <span class="tt">0</span> if the LED is off, indefinite, expired, or time is not valid. </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00149">149</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00124">124</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="device__pinout_8cpp_source.html#l00120">ledOffTime</a>.</p>
+<p class="reference">References <a class="el" href="device__pinout_8cpp_source.html#l00095">ledOffTime</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___idle_8cpp_source.html#l00031">handleIdleState()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00052">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___idle_8cpp_source.html#l00031">handleIdleState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00059">anonymous_namespace{State_Sleep.cpp}::logWakeSummary()</a>.</p>
 
 </div>
 </div>
@@ -289,9 +264,9 @@ Variables</h2></td></tr>
 <p>Process any pending automatic LED timeout. </p>
 <p>Call from the main loop to turn the LED off once the retained RTC deadline has expired. </p>
 
-<p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00140">140</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00115">115</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="device__pinout_8cpp_source.html#l00043">BLUE_LED</a>, and <a class="el" href="device__pinout_8cpp_source.html#l00120">ledOffTime</a>.</p>
+<p class="reference">References <a class="el" href="device__pinout_8cpp_source.html#l00043">BLUE_LED</a>, and <a class="el" href="device__pinout_8cpp_source.html#l00095">ledOffTime</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="_state___idle_8cpp_source.html#l00031">handleIdleState()</a>.</p>
 
@@ -312,7 +287,7 @@ Variables</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00043">43</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="device__pinout_8cpp_source.html#l00081">initializePinModes()</a>, <a class="el" href="device__pinout_8cpp_source.html#l00122">signalLED()</a>, <a class="el" href="device__pinout_8cpp_source.html#l00166">signalLEDStatus()</a>, and <a class="el" href="device__pinout_8cpp_source.html#l00140">signalLEDUpdate()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="device__pinout_8cpp_source.html#l00081">initializePinModes()</a>, <a class="el" href="device__pinout_8cpp_source.html#l00097">signalLED()</a>, <a class="el" href="device__pinout_8cpp_source.html#l00141">signalLEDStatus()</a>, and <a class="el" href="device__pinout_8cpp_source.html#l00115">signalLEDUpdate()</a>.</p>
 
 </div>
 </div>
@@ -330,7 +305,7 @@ Variables</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00042">42</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00280">handleFirmwareUpdateState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00052">handleSleepingState()</a>, <a class="el" href="device__pinout_8cpp_source.html#l00081">initializePinModes()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00194">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00394">handleFirmwareUpdateState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>, <a class="el" href="device__pinout_8cpp_source.html#l00081">initializePinModes()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>.</p>
 
 </div>
 </div>
@@ -348,7 +323,7 @@ Variables</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00064">64</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00145">SensorManager::onEnterSleep()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00131">PIRSensor::onSleep()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00146">PIRSensor::onWake()</a>, and <a class="el" href="_p_i_r_sensor_8h_source.html#l00040">PIRSensor::setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00297">SensorManager::onEnterSleep()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00131">PIRSensor::onSleep()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00145">PIRSensor::onWake()</a>, and <a class="el" href="_p_i_r_sensor_8h_source.html#l00040">PIRSensor::setup()</a>.</p>
 
 </div>
 </div>
@@ -366,7 +341,7 @@ Variables</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00063">63</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00052">handleSleepingState()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00131">PIRSensor::onSleep()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00146">PIRSensor::onWake()</a>, and <a class="el" href="_p_i_r_sensor_8h_source.html#l00040">PIRSensor::setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00131">PIRSensor::onSleep()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00145">PIRSensor::onWake()</a>, and <a class="el" href="_p_i_r_sensor_8h_source.html#l00040">PIRSensor::setup()</a>.</p>
 
 </div>
 </div>
@@ -382,9 +357,9 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00120">120</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00095">95</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="device__pinout_8cpp_source.html#l00122">signalLED()</a>, <a class="el" href="device__pinout_8cpp_source.html#l00149">signalLEDTimeRemaining()</a>, and <a class="el" href="device__pinout_8cpp_source.html#l00140">signalLEDUpdate()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="device__pinout_8cpp_source.html#l00097">signalLED()</a>, <a class="el" href="device__pinout_8cpp_source.html#l00124">signalLEDTimeRemaining()</a>, and <a class="el" href="device__pinout_8cpp_source.html#l00115">signalLEDUpdate()</a>.</p>
 
 </div>
 </div>
@@ -402,7 +377,7 @@ Variables</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00065">65</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00145">SensorManager::onEnterSleep()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00131">PIRSensor::onSleep()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00146">PIRSensor::onWake()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00040">PIRSensor::setup()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00194">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00297">SensorManager::onEnterSleep()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00131">PIRSensor::onSleep()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00145">PIRSensor::onWake()</a>, <a class="el" href="_p_i_r_sensor_8h_source.html#l00040">PIRSensor::setup()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>.</p>
 
 </div>
 </div>
@@ -420,7 +395,7 @@ Variables</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="device__pinout_8cpp_source.html#l00037">37</a> of file <a class="el" href="device__pinout_8cpp_source.html">device_pinout.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00258">SensorManager::batteryState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">SensorManager::batteryState()</a>.</p>
 
 </div>
 </div>

@@ -1,5 +1,30 @@
 var searchData=
 [
-  ['maxonlineworkms_0',['maxOnlineWorkMs',['../_state_machine_8h.html#ae6b11a059587dd45cfba4c3633790ca3',1,'StateMachine.h']]],
-  ['modemoffbudgetsec_1',['modemOffBudgetSec',['../classsys_status_data_1_1_sys_data.html#a0bbf6577468e7f05f9101582d2ac0c61',1,'sysStatusData::SysData']]]
+  ['last_5fsuccess_5fepoch_0',['last_success_epoch',['../struct_observability_1_1_wake_cycle_stats.html#a8171a64cc0ec588fbaf9b6ddd140188e',1,'Observability::WakeCycleStats']]],
+  ['lastalerttime_1',['lastAlertTime',['../classcurrent_status_data_1_1_current_data.html#adfa54b53041cfa6fc1f1afe38e265f33',1,'currentStatusData::CurrentData']]],
+  ['lastclouddisconnectelapsedms_2',['lastCloudDisconnectElapsedMs',['../struct_session_state.html#ae0bcfaae63262ccee6e4aec733e6f7e1',1,'SessionState']]],
+  ['lastconnection_3',['lastConnection',['../classsys_status_data_1_1_sys_data.html#a88fef61bce4b028910de1441dc020c9c',1,'sysStatusData::SysData']]],
+  ['lastconnectionduration_4',['lastConnectionDuration',['../classsys_status_data_1_1_sys_data.html#a00dd45aa7796876b69f20b29ec4c54a6',1,'sysStatusData::SysData']]],
+  ['lastconnectivityrecoveryaction_5',['lastConnectivityRecoveryAction',['../classsys_status_data_1_1_sys_data.html#a495659bf0a0c4977701f03f73640bb57',1,'sysStatusData::SysData']]],
+  ['lastcounttime_6',['lastCountTime',['../classcurrent_status_data_1_1_current_data.html#aa1da4ab28a54f3d10e3c7763fbd7f5ff',1,'currentStatusData::CurrentData']]],
+  ['lastdailycleanup_7',['lastDailyCleanup',['../classsys_status_data_1_1_sys_data.html#aa1598555fa6d88811493a867d908d771',1,'sysStatusData::SysData']]],
+  ['lasthookresponse_8',['lastHookResponse',['../classsys_status_data_1_1_sys_data.html#ad3f38ef14a6418b0dfaf9656e4e84152',1,'sysStatusData::SysData']]],
+  ['lastmodemoffelapsedms_9',['lastModemOffElapsedMs',['../struct_session_state.html#a188ce8c87fd5d1552bf32dad760dd134',1,'SessionState']]],
+  ['lastobservedpowersource_10',['lastObservedPowerSource',['../namespace_power_platform_1_1anonymous__namespace_02_power_platform_8cpp_03.html#ad269901b3c32bf14a0c928ce19815387',1,'PowerPlatform::anonymous_namespace{PowerPlatform.cpp}']]],
+  ['lastoccupancyevent_11',['lastOccupancyEvent',['../classcurrent_status_data_1_1_current_data.html#afe240cd92edbff9de386ca262af08a43',1,'currentStatusData::CurrentData']]],
+  ['lastreport_12',['lastReport',['../classsys_status_data_1_1_sys_data.html#a553a7a26ab8760a9d912476e1dfd837f',1,'sysStatusData::SysData']]],
+  ['lastteardownendms_13',['lastTeardownEndMs',['../struct_session_state.html#a9d579456bf2f6d67475fdfcea16e30db',1,'SessionState']]],
+  ['lastthrashreason_14',['lastThrashReason',['../_thrash_guard_8cpp.html#a248d05cd249c3781ae19ac85e8c9ebd8',1,'lastThrashReason:&#160;ThrashGuard.cpp'],['../_thrash_guard_8h.html#a248d05cd249c3781ae19ac85e8c9ebd8',1,'lastThrashReason:&#160;ThrashGuard.cpp']]],
+  ['lasttimesync_15',['lastTimeSync',['../classsys_status_data_1_1_sys_data.html#afafd4b77d084a2e9f2e425bd7dc6868d',1,'sysStatusData::SysData']]],
+  ['lasttotalteardownelapsedms_16',['lastTotalTeardownElapsedMs',['../struct_session_state.html#aca10590c2b3dbbe1c2aa6d1e46d0e6b6',1,'SessionState']]],
+  ['leddefaulton_17',['ledDefaultOn',['../struct_sensor_definition.html#a605061cb2e0f2517a393c6452b45c733',1,'SensorDefinition']]],
+  ['ledger_5fsync_5ftimeout_5fms_18',['LEDGER_SYNC_TIMEOUT_MS',['../namespace_connectivity_policy.html#a514e3eeaa0000e932f68cba30657176e',1,'ConnectivityPolicy']]],
+  ['ledofftime_19',['ledOffTime',['../device__pinout_8cpp.html#a5da8aad32460f76191dfdc104f686d86',1,'device_pinout.cpp']]],
+  ['ledpower_20',['ledPower',['../device__pinout_8cpp.html#acd13ce86cf516466e21e068ed7306716',1,'ledPower:&#160;device_pinout.cpp'],['../device__pinout_8h.html#acd13ce86cf516466e21e068ed7306716',1,'ledPower:&#160;device_pinout.cpp']]],
+  ['localhour_21',['localHour',['../struct_local_time_cache_1_1_local_time_snapshot.html#a01e4cfe14a6e3cf4710365d32952e795',1,'LocalTimeCache::LocalTimeSnapshot']]],
+  ['localsecondsofday_22',['localSecondsOfDay',['../struct_local_time_cache_1_1_local_time_snapshot.html#aad6546edd2c360e5dea2c03b162b5703',1,'LocalTimeCache::LocalTimeSnapshot']]],
+  ['localymd_23',['localYmd',['../struct_local_time_cache_1_1_local_time_snapshot.html#a87264f17fb07874b4cebd8c3f9f99759',1,'LocalTimeCache::LocalTimeSnapshot']]],
+  ['lowbatterymode_24',['lowBatteryMode',['../classsys_status_data_1_1_sys_data.html#a585c498d8e5c329844bee07dc696aa58',1,'sysStatusData::SysData']]],
+  ['lowpowermode_25',['lowPowerMode',['../classsys_status_data_1_1_sys_data.html#aebaa91e1d0c5b5a892a4d5d93e8914f3',1,'sysStatusData::SysData']]],
+  ['lowpowersuggested_26',['lowPowerSuggested',['../struct_power_policy.html#a08c445998668a72032263d87330db74d',1,'PowerPolicy']]]
 ];

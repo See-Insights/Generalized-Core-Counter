@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['ledger_20architecture_0',['Ledger Architecture',['../index.html#autotoc_md14',1,'']]],
-  ['license_1',['License',['../index.html#autotoc_md43',1,'']]]
+  ['layout_0',['Repository Layout',['../index.html#autotoc_md14',1,'']]],
+  ['ledger_20configuration_20model_1',['Ledger Configuration Model',['../index.html#autotoc_md9',1,'']]]
 ];

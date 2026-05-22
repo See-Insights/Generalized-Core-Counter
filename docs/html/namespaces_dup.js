@@ -17,21 +17,69 @@ var namespaces_dup =
         [ "BREADCRUMB_REPORTING", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba33dd0d4d32b37a6c112bbf29509fe843", null ],
         [ "BREADCRUMB_CONNECT_REQUESTED", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baa3bab554e3e3a8d82a72b835225229f1", null ],
         [ "BREADCRUMB_CLOUD_CONNECTED", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba1a124c01a209149458f63420e9d07f8e", null ],
-        [ "BREADCRUMB_APP_WATCHDOG_RESET", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba4437fa49e9455b2ca7a6ad393dd2ad00", null ]
+        [ "BREADCRUMB_APP_WATCHDOG_RESET", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba4437fa49e9455b2ca7a6ad393dd2ad00", null ],
+        [ "BREADCRUMB_CONNECTIVITY_FAILSAFE", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baf1ea3bf33035cb6ea625a7474ba43aa0", null ],
+        [ "BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baf870bcc4e02cbbc31405c09bf7d9d8b6", null ]
       ] ],
-      [ "appBreadcrumbName", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a555d15a7ec243d93b6d9be9c1b6f1fa8", null ]
+      [ "appBreadcrumbName", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a555d15a7ec243d93b6d9be9c1b6f1fa8", null ],
+      [ "batteryTierShortName", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a898666f89a1c8e56926acc9d223bc0e1", null ],
+      [ "claimFailsafeDeferLogLocal", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a4d1e08710e0c28d588c316cd3c87f2ca", null ],
+      [ "connectivityFailsafeHasExternalPower", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a2df8466dd8f6e58e55b0188a0d70801a", null ],
+      [ "connectivityFailsafeJitterSec", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#aadf909718434fec908fa6f01dc0cd9e2", null ],
+      [ "currentBatteryTierForFailsafe", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a22ab13086577aee3158b407d7f87be7b", null ],
+      [ "failsafeDeferReasonNameLocal", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a71eeb42ec83455b053d5ae4e83fc5558", null ],
+      [ "persistConnectivityFailsafeState", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a650cc13442db2bb2b127ed466d7acb35", null ],
+      [ "stateShortName", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a12b2b29836fbe05e1de3b987f678777f", null ]
     ] ],
     [ "anonymous_namespace{LedgerClient.cpp}", "namespaceanonymous__namespace_02_ledger_client_8cpp_03.html", [
-      [ "ledgerHasConfigContent", "namespaceanonymous__namespace_02_ledger_client_8cpp_03.html#adb973634933ef1036e1092ad24f20248", null ]
+      [ "ledgerHasConfigContent", "namespaceanonymous__namespace_02_ledger_client_8cpp_03.html#adb973634933ef1036e1092ad24f20248", null ],
+      [ "ledgerHasUnsyncedWrite", "namespaceanonymous__namespace_02_ledger_client_8cpp_03.html#a6304fb1de356aeaa0bf1aaba985d5d61", null ]
     ] ],
     [ "anonymous_namespace{LocalTimeCache.cpp}", "namespaceanonymous__namespace_02_local_time_cache_8cpp_03.html", null ],
+    [ "anonymous_namespace{PowerManager.cpp}", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html", [
+      [ "compactProfileLabel", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#a4b41efac56e70a8707ad53c066ad8ea5", null ],
+      [ "configuredFallbackProfile", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#a9c7b27719e9a0067176aea9df8651605", null ],
+      [ "selectInputProfile", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#aca3326c72903ef9d6c1e4a9038cfba37", null ],
+      [ "shouldLogProfileDecision", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#ad8df3828526fad5c70b88814b780545b", null ],
+      [ "kPowerSourceBattery", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#a0649531c40a00582eb236b61b94cbfd0", null ],
+      [ "kPowerSourceUsbAdapter", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#a9b6fcf260b856133e8d4c037ef7de8f4", null ],
+      [ "kPowerSourceUsbHost", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#afc46f5c480c833b661bb9f93c0fab7bd", null ],
+      [ "kPowerSourceUsbOtg", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#a08da3b34ec7eb2b7b4bee254e2c9fb14", null ],
+      [ "kPowerSourceVin", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#aac2ac6a88a5a0f338c72161e86cc8755", null ]
+    ] ],
     [ "anonymous_namespace{SensorManager.cpp}", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html", [
-      [ "batterySampleLooksSuspicious", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#ab5a3fd276944117f8d63d688914a47d4", null ],
+      [ "batteryExtremeSocLooksSuspicious", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a6f3702b47017ba5c4baffb7e7e6c9756", null ],
+      [ "batterySampleContextPrefix", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a0b48157f62ff282d11ece5ad5a4557de", null ],
+      [ "batterySampleDelta", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a79e30a0046081ff90bf1df4836869b4e", null ],
+      [ "batterySampleHasUnrealisticDelta", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a6022a07ce4ea00db21cb64ba18ec706b", null ],
+      [ "batterySampleLooksSuspicious", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a638d0d8bd9e4465b597c6c3c7af7dbeb", null ],
+      [ "batterySocIsValid", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#aef9d79e90e7350c976ca68e6908dfece", null ],
+      [ "batteryVoltageLooksUsable", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#af0d235864131aeeba640193efb977e4e", null ],
+      [ "boundedBatterySettleDelay", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#afa775b9bbc1b9a7f4007b9b2be366f1f", null ],
       [ "estimateSocFromVoltage", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a5e3e975006a3ea6d5ce637eef262bc84", null ],
-      [ "probeTmp112Present", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a452bb1633016be3c71fffc2fe5d5a0d7", null ]
+      [ "probeTmp112Present", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a452bb1633016be3c71fffc2fe5d5a0d7", null ],
+      [ "shouldLogBatterySample", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#ac35b035463e7a7aecdfbca21700963da", null ],
+      [ "AUTHORITATIVE_POST_CONNECT_DELTA_THRESHOLD", "namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a50d7e96994354eb92f9a78fd8264c3f9", null ]
+    ] ],
+    [ "anonymous_namespace{State_Connect.cpp}", "namespaceanonymous__namespace_02_state___connect_8cpp_03.html", "namespaceanonymous__namespace_02_state___connect_8cpp_03" ],
+    [ "anonymous_namespace{State_Report.cpp}", "namespaceanonymous__namespace_02_state___report_8cpp_03.html", [
+      [ "MODEM_UNSTABLE_RECONNECT_DEFER_MS", "namespaceanonymous__namespace_02_state___report_8cpp_03.html#a4d2c2631e9c66502144fed143ca95aef", null ]
     ] ],
     [ "anonymous_namespace{State_Sleep.cpp}", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html", [
-      [ "computeCloudSyncTimeoutMs", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a13e9915406af72c4d32f922a088d826d", null ]
+      [ "ModemUnstableReason", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#afb8230f5c47a27c78b095f28b4d35d9d", [
+        [ "MODEM_UNSTABLE_REASON_NONE", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#afb8230f5c47a27c78b095f28b4d35d9daefeebf5c0136bc643038dbc47dc929d7", null ],
+        [ "MODEM_UNSTABLE_REASON_SLOW_TEARDOWN", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#afb8230f5c47a27c78b095f28b4d35d9da25e10d5458b292a0d35e0c5c616518a8", null ],
+        [ "MODEM_UNSTABLE_REASON_CONNECT_TIMEOUT", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#afb8230f5c47a27c78b095f28b4d35d9da6fcd616236c8108757d5b7ea3cfeb39d", null ]
+      ] ],
+      [ "batteryTierLabel", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a852e47d7206383563dcb1e7e301c6e98", null ],
+      [ "computeCloudSyncTimeoutMs", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a13e9915406af72c4d32f922a088d826d", null ],
+      [ "connectionModeLabel", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#aa507bd767963a02cf16d555d7431c3da", null ],
+      [ "logTeardownContext", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#abad9bf1b7f805aea7c5db5b119e27761", null ],
+      [ "logWakeSummary", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a78bb128d7c04dccc8b98b740dc79d3d2", null ],
+      [ "markModemUnstable", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#ad1d08f76587dad375020db5655229ae6", null ],
+      [ "maybeClearModemUnstable", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a0e57a1cbfacc48cf8f124e62fb425d5f", null ],
+      [ "MODEM_UNSTABLE_RECOVERY_TEARDOWN_MS", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a9cd27f05d6bb0e4b58c9b5779a2b4165", null ],
+      [ "MODEM_UNSTABLE_SLOW_TEARDOWN_MS", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a96c86262c74f9ef5b1ad5c27294e238d", null ]
     ] ],
     [ "anonymous_namespace{ThrashGuard.cpp}", "namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html", [
       [ "BACKOFF_MS", "namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a7051561c04cc971e71f1db9dbc2a9b8f", null ],
@@ -58,6 +106,11 @@ var namespaces_dup =
       [ "CONNECT_BUDGET_DEEP_MS", "namespace_connectivity_policy.html#a87b91a8af5b73e7fb4c2915c17473d93", null ],
       [ "CONNECT_BUDGET_DEFAULT_MS", "namespace_connectivity_policy.html#ab4e13d08abe16b232ee9d8a6be91f426", null ],
       [ "CONNECT_BUDGET_DEFAULT_SEC", "namespace_connectivity_policy.html#a72970a4a15bbfd3af3dc9812753eec18", null ],
+      [ "CONNECTIVITY_FAILSAFE_ALERT", "namespace_connectivity_policy.html#a409fdb5536dd4b97b9b54901eb01277f", null ],
+      [ "CONNECTIVITY_FAILSAFE_COOLDOWN_SEC", "namespace_connectivity_policy.html#ad0ae50a997155478a431ed6a33885e7a", null ],
+      [ "CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC", "namespace_connectivity_policy.html#af0e815c633aba2fed1405214fcac02e2", null ],
+      [ "CONNECTIVITY_FAILSAFE_STALE_SEC", "namespace_connectivity_policy.html#a1d096fe0764bf077cc9b835e746f4ab9", null ],
+      [ "CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC", "namespace_connectivity_policy.html#a5ae7c7494b3d1c4c6699efa520ee6b9f", null ],
       [ "DEBUG_SERIAL_POST_CONNECT_DELAY_MS", "namespace_connectivity_policy.html#ac4e9c849bfed8fdef2386743a31f0533", null ],
       [ "DEBUG_SERIAL_REENUM_DELAY_MS", "namespace_connectivity_policy.html#aab29f49018a33279dba763fecd9c4a7d", null ],
       [ "DEBUG_SERIAL_WAIT_POLL_DELAY_MS", "namespace_connectivity_policy.html#a2a3ed6467a209cf111e1dbf81233b2a8", null ],
@@ -73,6 +126,7 @@ var namespaces_dup =
       [ "LEDGER_SYNC_TIMEOUT_MS", "namespace_connectivity_policy.html#a514e3eeaa0000e932f68cba30657176e", null ],
       [ "NIGHTLY_HEAP_RESET_THRESHOLD_BYTES", "namespace_connectivity_policy.html#ae00914c08bf3eaaa5d8e412d63d07078", null ],
       [ "NIGHTLY_HEAP_WARN_THRESHOLD_BYTES", "namespace_connectivity_policy.html#a264374785dc6d61fd971454e4c9a0e7e", null ],
+      [ "OUTPUT_LEDGER_SYNC_TIMEOUT_MS", "namespace_connectivity_policy.html#ad47b260425d095887cb05615ea6321fc", null ],
       [ "WEBHOOK_LONGTERM_ALERT40_SEC", "namespace_connectivity_policy.html#a2bf83afe32c0f44b32a6cb4d48e6a402", null ],
       [ "WEBHOOK_LONGTERM_CONNECTED_RECENTLY_SEC", "namespace_connectivity_policy.html#aec173e6da0225c588ff07235628b1b16", null ],
       [ "WEBHOOK_LONGTERM_ESCALATE_TO_ERROR_SEC", "namespace_connectivity_policy.html#a8c2c9ae6d7ba0414db36943cd01d78a4", null ],
@@ -81,6 +135,8 @@ var namespaces_dup =
     ] ],
     [ "LocalTimeCache", "namespace_local_time_cache.html", "namespace_local_time_cache" ],
     [ "Observability", "namespace_observability.html", "namespace_observability" ],
+    [ "PowerDiagnostics", "namespace_power_diagnostics.html", "namespace_power_diagnostics" ],
+    [ "PowerPlatform", "namespace_power_platform.html", "namespace_power_platform" ],
     [ "ProjectConfig", "namespace_project_config.html", null ],
     [ "SensorDefinitions", "namespace_sensor_definitions.html", [
       [ "getDefinition", "namespace_sensor_definitions.html#a34fb19e38eb53ee26d2002be38be6ef2", null ]

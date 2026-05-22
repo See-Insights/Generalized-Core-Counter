@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;10.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -106,10 +106,7 @@ $(function(){initNavTree('_settings_8h.html','',''); });
 <p>Build profile settings:</p><ul>
 <li><span class="tt"><a class="el" href="_build_profile_8h.html#a1c8895ff02f86bdd856ef0110a1a7a47" title="Set to 1 for developer builds.">DEV_BUILD</a></span>: Set to <span class="tt">1</span> for a developer build and <span class="tt">0</span> for a field build.</li>
 <li><span class="tt"><a class="el" href="_build_profile_8h.html#ad4ad87bab679b526e350864dcf54b49b" title="Derived flag for field builds (true when DEV_BUILD=0).">FIELD_BUILD</a></span>: Derived convenience flag that becomes true when <span class="tt"><a class="el" href="_build_profile_8h.html#a1c8895ff02f86bdd856ef0110a1a7a47" title="Set to 1 for developer builds.">DEV_BUILD</a>=0</span>.</li>
-<li><span class="tt"><a class="el" href="_build_profile_8h.html#a862e5c5913487ba4049590c35342976c" title="Allow explicit blocking waits for USB serial attachment.">ALLOW_BLOCKING_SERIAL_WAITS</a></span>: Allows explicit blocking waits for USB serial. This should remain <span class="tt">0</span> for field deployments.</li>
-<li><span class="tt"><a class="el" href="_build_profile_8h.html#a514aaf0b3362e1c52cab3da5f36439dc" title="Enable temporary ledger-sync helper diagnostics for Alert 44 soak validation.">ALERT44_DIAG_ENABLED</a></span>: Enables the temporary ledger-sync helper diagnostics used to validate the Alert 44 semantic fix during soak testing.</li>
-</ul>
-<p>Optional hardware override settings:</p><ul>
+<li><span class="tt"><a class="el" href="_build_profile_8h.html#a862e5c5913487ba4049590c35342976c" title="Allow explicit blocking waits for USB serial attachment.">ALLOW_BLOCKING_SERIAL_WAITS</a></span>: Allows explicit blocking waits for USB serial. This should remain <span class="tt">0</span> for field deployments. Optional hardware override settings:</li>
 <li><span class="tt">MUON_TMP36_SENSE_PIN</span>: Overrides which analog-capable pin is used for the TMP36 carrier temperature sensor.</li>
 <li><span class="tt">MUON_HAS_TMP36</span>: Force-enables the TMP36 sampling path for carriers that provide the sensor even when the platform default does not.</li>
 <li><span class="tt">MUON_HAS_TMP112</span>: Force-enables the TMP112A I2C temperature path.</li>

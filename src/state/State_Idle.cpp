@@ -56,25 +56,20 @@ void handleIdleState() {
         // Debounce timeout expired - space is now unoccupied
         uint32_t sessionDuration = Time.now() - current.get_occupancyStartTime();
         uint32_t totalOccupied = current.get_totalOccupiedSeconds() + sessionDuration;
+        const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
         current.set_totalOccupiedSeconds(totalOccupied);
         current.set_occupied(false);
         current.set_occupancyStartTime(0);
         signalLED(false);  // Turn off LED
-        
-        Log.info("Space now UNOCCUPIED (debounce timeout in IDLE) - Session: %lu sec, Total today: %lu sec",
-                 sessionDuration, totalOccupied);
+        logUnoccupiedEvent("debounce", sessionDuration, totalOccupied, reportNow);
         
         // In INTERMITTENT_KEEP_ALIVE mode (connectionMode 3), report immediately
         // on occupancy transitions. In other modes, occupancy transitions are
         // still tracked, but do not force an immediate report/connect.
-        if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
-          Log.info("Occupancy change detected (occupied->unoccupied) - triggering immediate report");
+        if (reportNow) {
           session.occupancyChangeTriggered = true;
           state = REPORTING_STATE;
           return;
-        } else {
-          Log.info("Occupancy change detected (occupied->unoccupied) - no immediate report (connectionMode=%d)",
-                   (int)sysStatus.get_connectionMode());
         }
       }
     }
@@ -157,7 +152,6 @@ void handleIdleState() {
   if (session.firstConnectionObserved && !session.firstConnectionQueueDrainedLogged && Particle.connected()) {
     if (PublishQueuePosix::instance().getCanSleep() &&
         PublishQueuePosix::instance().getNumEvents() == 0) {
-      Log.info("First connection queue drained - all pending events flushed");
       session.firstConnectionQueueDrainedLogged = true;
     }
   }

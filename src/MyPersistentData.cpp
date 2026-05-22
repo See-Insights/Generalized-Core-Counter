@@ -33,6 +33,7 @@
  */
 
 #include "MyPersistentData.h"
+#include "BuildProfile.h"
 
 // Forward declaration for safe diagnostic publishing (defined in Generalized-Core-Counter.cpp)
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE);
@@ -95,8 +96,15 @@ bool sysStatusData::validate(size_t dataSize) {
             Log.info("data not valid last connection duration =%d", sysStatus.get_lastConnectionDuration());
             valid = false;
         }
+
+        if (sysStatus.get_connectivityRecoveryStage() > 3) {
+            Log.info("data not valid connectivity recovery stage =%d", sysStatus.get_connectivityRecoveryStage());
+            valid = false;
+        }
     }
-    Log.info("sysStatus data is %s",(valid) ? "valid": "not valid");
+    if (!valid) {
+        Log.warn("sysStatus data is not valid");
+    }
     return valid;
 }
 
@@ -107,10 +115,10 @@ void sysStatusData::initialize() {
     Log.info(message);
     if (Particle.connected()) publishDiagnosticSafe("Mode", message, PRIVATE);
     Log.info("Loading system defaults");
-    sysStatus.set_structuresVersion(1);
+    sysStatus.set_structuresVersion(2);
     sysStatus.set_verboseMode(false);
     sysStatus.set_lowBatteryMode(false);
-    sysStatus.set_solarPowerMode(true);
+    sysStatus.set_solarPowerMode(FIELD_BUILD ? true : false);
     sysStatus.set_lowPowerMode(false);          // Legacy flag - kept for storage compatibility
     sysStatus.set_timeZoneStr("SGT-8");        // Default to Singapore Time (POSIX TZ string for UTC+8, no DST)
     sysStatus.set_sensorType(1);                // PIR sensor
@@ -129,6 +137,9 @@ void sysStatusData::initialize() {
     sysStatus.set_connectAttemptBudgetSec(300);                            // Default 300s (5 minutes) max connect attempt per wake
     sysStatus.set_cloudDisconnectBudgetSec(15);                            // Default 15s max wait for cloud disconnect
     sysStatus.set_modemOffBudgetSec(30);                                   // Default 30s max wait for modem power-down
+    sysStatus.set_connectivityRecoveryStage(0);
+    sysStatus.set_lastConnectivityRecoveryAction(0);
+    sysStatus.set_connectivityRecoveryCount(0);
 }
 
 uint8_t sysStatusData::get_structuresVersion() const {
@@ -359,25 +370,11 @@ void sysStatusData::set_connectionAttemptCounter(uint8_t value) {
     setValue<uint8_t>(offsetof(SysData,connectionAttemptCounter), value);
 }
 
-float sysStatusData::get_testBatteryOverride() const {
-    return getValue<float>(offsetof(SysData,testBatteryOverride));
-}
-void sysStatusData::set_testBatteryOverride(float value) {
-    setValue<float>(offsetof(SysData,testBatteryOverride), value);
-}
-
 uint16_t sysStatusData::get_testConnectionDurationOverride() const {
     return getValue<uint16_t>(offsetof(SysData,testConnectionDurationOverride));
 }
 void sysStatusData::set_testConnectionDurationOverride(uint16_t value) {
     setValue<uint16_t>(offsetof(SysData,testConnectionDurationOverride), value);
-}
-
-uint8_t sysStatusData::get_testScenarioIndex() const {
-    return getValue<uint8_t>(offsetof(SysData,testScenarioIndex));
-}
-void sysStatusData::set_testScenarioIndex(uint8_t value) {
-    setValue<uint8_t>(offsetof(SysData,testScenarioIndex), value);
 }
 
 String sysStatusData::get_webhookName() const {
@@ -406,6 +403,27 @@ uint32_t sysStatusData::get_webhookTimeoutMs() const {
 }
 void sysStatusData::set_webhookTimeoutMs(uint32_t value) {
     setValue<uint32_t>(offsetof(SysData,webhookTimeoutMs), value);
+}
+
+uint8_t sysStatusData::get_connectivityRecoveryStage() const {
+    return getValue<uint8_t>(offsetof(SysData,connectivityRecoveryStage));
+}
+void sysStatusData::set_connectivityRecoveryStage(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,connectivityRecoveryStage), value);
+}
+
+time_t sysStatusData::get_lastConnectivityRecoveryAction() const {
+    return getValue<time_t>(offsetof(SysData,lastConnectivityRecoveryAction));
+}
+void sysStatusData::set_lastConnectivityRecoveryAction(time_t value) {
+    setValue<time_t>(offsetof(SysData,lastConnectivityRecoveryAction), value);
+}
+
+uint8_t sysStatusData::get_connectivityRecoveryCount() const {
+    return getValue<uint8_t>(offsetof(SysData,connectivityRecoveryCount));
+}
+void sysStatusData::set_connectivityRecoveryCount(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,connectivityRecoveryCount), value);
 }
 
 // End of sysStatusData class
@@ -445,7 +463,9 @@ void sensorConfigData::loop() {
 
 bool sensorConfigData::validate(size_t dataSize) {
     bool valid = PersistentDataFile::validate(dataSize);
-    Log.info("Sensor config is %s", (valid) ? "valid" : "not valid");
+    if (!valid) {
+        Log.warn("Sensor config is not valid");
+    }
     return valid;
 }
 
@@ -592,7 +612,9 @@ bool currentStatusData::validate(size_t dataSize) {
             }
         }
     }
-    Log.info("Current data is %s", (valid) ? "valid" : "not valid");
+    if (!valid) {
+        Log.warn("Current data is not valid");
+    }
     return valid;
 }
 

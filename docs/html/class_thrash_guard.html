@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;10.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -98,9 +98,13 @@ $(function(){initNavTree('class_thrash_guard.html','','class_thrash_guard-member
 <tr class="heading"><td colspan="2"><h2 id="header-pub-methods" class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:a560149abb82cc5c42e3c7ebd2bec7b5c" id="r_a560149abb82cc5c42e3c7ebd2bec7b5c"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a560149abb82cc5c42e3c7ebd2bec7b5c">loop</a> (int currentState, uint32_t nowMs)</td></tr>
+<tr class="memdesc:a560149abb82cc5c42e3c7ebd2bec7b5c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Evaluates the current state for no-progress timeout escalation.  <br /></td></tr>
 <tr class="memitem:a1b21cfe6c83e702a23427e3ae2450d98" id="r_a1b21cfe6c83e702a23427e3ae2450d98"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a1b21cfe6c83e702a23427e3ae2450d98">markProgress</a> (const char *tag)</td></tr>
+<tr class="memdesc:a1b21cfe6c83e702a23427e3ae2450d98"><td class="mdescLeft">&#160;</td><td class="mdescRight">Marks forward progress within the current state.  <br /></td></tr>
 <tr class="memitem:a363e2fac16a9fad4bdebc0f54bea80a0" id="r_a363e2fac16a9fad4bdebc0f54bea80a0"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a363e2fac16a9fad4bdebc0f54bea80a0">recordStateTransition</a> (int <a class="el" href="_generalized-_core-_counter_8cpp.html#a0840b91aed028ae09ab1d7a4238569ec">oldState</a>, int newState)</td></tr>
+<tr class="memdesc:a363e2fac16a9fad4bdebc0f54bea80a0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Records a state transition and resets internal progress tracking as needed.  <br /></td></tr>
 <tr class="memitem:a01d31120b6c3584fdb7fb652a6efa2ac" id="r_a01d31120b6c3584fdb7fb652a6efa2ac"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a01d31120b6c3584fdb7fb652a6efa2ac">setLogCooldownMs</a> (uint32_t cooldownMs)</td></tr>
+<tr class="memdesc:a01d31120b6c3584fdb7fb652a6efa2ac"><td class="mdescLeft">&#160;</td><td class="mdescRight">Adjusts the cooldown between repeated thrash log messages.  <br /></td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock">
@@ -125,9 +129,18 @@ Public Member Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
+<p>Evaluates the current state for no-progress timeout escalation. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">currentState</td><td>Active top-level state </td></tr>
+    <tr><td class="paramname">nowMs</td><td>Current <span class="tt">millis()</span> value </td></tr>
+  </table>
+  </dd>
+</dl>
+
 <p class="definition">Definition at line <a class="el" href="_thrash_guard_8cpp_source.html#l00091">91</a> of file <a class="el" href="_thrash_guard_8cpp_source.html">ThrashGuard.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_thrash_guard_8cpp_source.html#l00029">lastThrashReason</a>, <a class="el" href="_connectivity_8h_source.html#l00027">Connectivity::requestFullDisconnectAndRadioOff()</a>, <a class="el" href="_state_machine_8h_source.html#l00011">SLEEPING_STATE</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00114">state</a>, <a class="el" href="_thrash_guard_8cpp_source.html#l00028">thrashResetCount</a>, and <a class="el" href="_thrash_guard_8cpp_source.html#l00027">thrashTripCount</a>.</p>
+<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_thrash_guard_8cpp_source.html#l00029">lastThrashReason</a>, <a class="el" href="_connectivity_8h_source.html#l00038">Connectivity::requestFullDisconnectAndRadioOff()</a>, <a class="el" href="_state_machine_8h_source.html#l00018">SLEEPING_STATE</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00124">state</a>, <a class="el" href="_thrash_guard_8cpp_source.html#l00028">thrashResetCount</a>, and <a class="el" href="_thrash_guard_8cpp_source.html#l00027">thrashTripCount</a>.</p>
 
 </div>
 </div>
@@ -145,6 +158,14 @@ Public Member Functions</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+
+<p>Marks forward progress within the current state. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">tag</td><td>Short label describing the progress milestone </td></tr>
+  </table>
+  </dd>
+</dl>
 
 <p class="definition">Definition at line <a class="el" href="_thrash_guard_8cpp_source.html#l00043">43</a> of file <a class="el" href="_thrash_guard_8cpp_source.html">ThrashGuard.cpp</a>.</p>
 
@@ -169,9 +190,18 @@ Public Member Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
+<p>Records a state transition and resets internal progress tracking as needed. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname"><a class="el" href="_generalized-_core-_counter_8cpp.html#a0840b91aed028ae09ab1d7a4238569ec">oldState</a></td><td>Prior top-level state </td></tr>
+    <tr><td class="paramname">newState</td><td>New top-level state </td></tr>
+  </table>
+  </dd>
+</dl>
+
 <p class="definition">Definition at line <a class="el" href="_thrash_guard_8cpp_source.html#l00051">51</a> of file <a class="el" href="_thrash_guard_8cpp_source.html">ThrashGuard.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00115">oldState</a>.</p>
+<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00125">oldState</a>.</p>
 
 </div>
 </div>
@@ -189,6 +219,14 @@ Public Member Functions</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+
+<p>Adjusts the cooldown between repeated thrash log messages. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">cooldownMs</td><td>Minimum interval between repeated log lines </td></tr>
+  </table>
+  </dd>
+</dl>
 
 <p class="definition">Definition at line <a class="el" href="_thrash_guard_8cpp_source.html#l00039">39</a> of file <a class="el" href="_thrash_guard_8cpp_source.html">ThrashGuard.cpp</a>.</p>
 

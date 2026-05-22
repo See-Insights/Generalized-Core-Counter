@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;10.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -122,8 +122,8 @@ Public Member Functions</h2></td></tr>
 <tr class="memdesc:a049e5cf771c954f3b4d0702f2ac1c412"><td class="mdescLeft">&#160;</td><td class="mdescRight">Convert TMP36 ADC reading to degrees Celsius.  <br /></td></tr>
 <tr class="memitem:a87645f59d0a2fe8c6644b386f24b7692" id="r_a87645f59d0a2fe8c6644b386f24b7692"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a87645f59d0a2fe8c6644b386f24b7692">readTmp112TemperatureC</a> (float &amp;tempC)</td></tr>
 <tr class="memdesc:a87645f59d0a2fe8c6644b386f24b7692"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read TMP112A temperature (I2C) in degrees Celsius.  <br /></td></tr>
-<tr class="memitem:adabba3bce18318e591c43645fadf833c" id="r_adabba3bce18318e591c43645fadf833c"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#adabba3bce18318e591c43645fadf833c">batteryState</a> ()</td></tr>
-<tr class="memdesc:adabba3bce18318e591c43645fadf833c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Determine whether the battery is present and not critically low.  <br /></td></tr>
+<tr class="memitem:a6ce3d8cd17a10ae1322fed2a6ed264cf" id="r_a6ce3d8cd17a10ae1322fed2a6ed264cf"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a6ce3d8cd17a10ae1322fed2a6ed264cf">batteryState</a> (<a class="el" href="_sensor_manager_8h.html#acd8eeb965a21d464f1d6ed3ded01cc3e">BatterySampleContext</a> sampleContext=<a class="el" href="_sensor_manager_8h.html#acd8eeb965a21d464f1d6ed3ded01cc3ea0db377921f4ce762c62526131097968f">BatterySampleContext::General</a>)</td></tr>
+<tr class="memdesc:a6ce3d8cd17a10ae1322fed2a6ed264cf"><td class="mdescLeft">&#160;</td><td class="mdescRight">Determine whether the battery is present and not critically low.  <br /></td></tr>
 <tr class="memitem:ad7031fd4e8dbe8bb106ebf4406d608ca" id="r_ad7031fd4e8dbe8bb106ebf4406d608ca"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ad7031fd4e8dbe8bb106ebf4406d608ca">isItSafeToCharge</a> ()</td></tr>
 <tr class="memdesc:ad7031fd4e8dbe8bb106ebf4406d608ca"><td class="mdescLeft">&#160;</td><td class="mdescRight">Determine whether it is safe to charge the battery.  <br /></td></tr>
 <tr class="memitem:af17971a45b63d6963a2e3c64da520f2c" id="r_af17971a45b63d6963a2e3c64da520f2c"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#af17971a45b63d6963a2e3c64da520f2c">getSignalStrength</a> ()</td></tr>
@@ -143,6 +143,14 @@ Protected Member Functions</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pro-attribs" class="groupheader"><a id="pro-attribs" name="pro-attribs"></a>
 Protected Attributes</h2></td></tr>
+<tr class="memitem:a5106fb0bd76d68ab62cce0f1cb28c4f9" id="r_a5106fb0bd76d68ab62cce0f1cb28c4f9"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a5106fb0bd76d68ab62cce0f1cb28c4f9">_authoritativeBatteryFallbackUsed</a></td></tr>
+<tr class="memdesc:a5106fb0bd76d68ab62cce0f1cb28c4f9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Whether the trusted pre-radio sample used voltage fallback.  <br /></td></tr>
+<tr class="memitem:a9a21f1911a82a38ef5b9408dd6792877" id="r_a9a21f1911a82a38ef5b9408dd6792877"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a9a21f1911a82a38ef5b9408dd6792877">_authoritativeBatterySampleActive</a></td></tr>
+<tr class="memdesc:a9a21f1911a82a38ef5b9408dd6792877"><td class="mdescLeft">&#160;</td><td class="mdescRight">Whether this wake cycle has a trusted pre-radio battery sample.  <br /></td></tr>
+<tr class="memitem:a9d7e735bca8295f95632b5976c01fc63" id="r_a9d7e735bca8295f95632b5976c01fc63"><td class="memItemLeft">float&#160;</td><td class="memItemRight"><a class="el" href="#a9d7e735bca8295f95632b5976c01fc63">_authoritativeBatterySoc</a></td></tr>
+<tr class="memdesc:a9d7e735bca8295f95632b5976c01fc63"><td class="mdescLeft">&#160;</td><td class="mdescRight">Cached SoC from the trusted pre-radio battery sample.  <br /></td></tr>
+<tr class="memitem:a361320e3202a76b1fbe2cac8ec79e04a" id="r_a361320e3202a76b1fbe2cac8ec79e04a"><td class="memItemLeft">uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#a361320e3202a76b1fbe2cac8ec79e04a">_authoritativeBatteryState</a></td></tr>
+<tr class="memdesc:a361320e3202a76b1fbe2cac8ec79e04a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Cached battery state from the trusted pre-radio battery sample.  <br /></td></tr>
 <tr class="memitem:af5fb59cde27c9232777c2f9542dc7ef1" id="r_af5fb59cde27c9232777c2f9542dc7ef1"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#af5fb59cde27c9232777c2f9542dc7ef1">_batteryStabilizationPending</a></td></tr>
 <tr class="memdesc:af5fb59cde27c9232777c2f9542dc7ef1"><td class="mdescLeft">&#160;</td><td class="mdescRight">One-shot flag to stabilize battery measurement after low-power wake.  <br /></td></tr>
 <tr class="memitem:aec34633aca7cdbfe123488d5c539da10" id="r_aec34633aca7cdbfe123488d5c539da10"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#aec34633aca7cdbfe123488d5c539da10">_firstBatterySampleTaken</a></td></tr>
@@ -159,7 +167,7 @@ Static Protected Attributes</h2></td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock">
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8h_source.html#l00035">35</a> of file <a class="el" href="_sensor_manager_8h_source.html">SensorManager.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8h_source.html#l00042">42</a> of file <a class="el" href="_sensor_manager_8h_source.html">SensorManager.h</a>.</p>
 </div><a name="doc-constructors" id="doc-constructors"></a><h2 id="header-doc-constructors" class="groupheader">Constructor &amp; Destructor Documentation</h2>
 <a id="ac2bea3e22536f101970bd20fc72fa5d1" name="ac2bea3e22536f101970bd20fc72fa5d1"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ac2bea3e22536f101970bd20fc72fa5d1">&#9670;&#160;</a></span>SensorManager() <span class="overload">[1/2]</span></h2>
@@ -184,11 +192,11 @@ Static Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00046">46</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00199">199</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00150">_batteryStabilizationPending</a>, <a class="el" href="_sensor_manager_8h_source.html#l00153">_firstBatterySampleTaken</a>, <a class="el" href="_sensor_manager_8h_source.html#l00147">_lastPollTime</a>, and <a class="el" href="_sensor_manager_8h_source.html#l00144">_sensor</a>.</p>
+<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00172">_authoritativeBatteryFallbackUsed</a>, <a class="el" href="_sensor_manager_8h_source.html#l00163">_authoritativeBatterySampleActive</a>, <a class="el" href="_sensor_manager_8h_source.html#l00166">_authoritativeBatterySoc</a>, <a class="el" href="_sensor_manager_8h_source.html#l00169">_authoritativeBatteryState</a>, <a class="el" href="_sensor_manager_8h_source.html#l00157">_batteryStabilizationPending</a>, <a class="el" href="_sensor_manager_8h_source.html#l00160">_firstBatterySampleTaken</a>, <a class="el" href="_sensor_manager_8h_source.html#l00154">_lastPollTime</a>, and <a class="el" href="_sensor_manager_8h_source.html#l00151">_sensor</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00040">instance()</a>, <a class="el" href="#a27577f963c22e4249ea73d0961d7cba3">operator=()</a>, and <a class="el" href="#a3caa244323f9a9851b1097baeaec7736">SensorManager()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00193">instance()</a>, <a class="el" href="#a27577f963c22e4249ea73d0961d7cba3">operator=()</a>, and <a class="el" href="#a3caa244323f9a9851b1097baeaec7736">SensorManager()</a>.</p>
 
 </div>
 </div>
@@ -215,7 +223,7 @@ Static Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00052">52</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00209">209</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
 </div>
 </div>
@@ -242,13 +250,13 @@ Static Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="reference">References <a class="el" href="_sensor_manager_8cpp_source.html#l00046">SensorManager()</a>.</p>
+<p class="reference">References <a class="el" href="_sensor_manager_8cpp_source.html#l00199">SensorManager()</a>.</p>
 
 </div>
 </div>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
-<a id="adabba3bce18318e591c43645fadf833c" name="adabba3bce18318e591c43645fadf833c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#adabba3bce18318e591c43645fadf833c">&#9670;&#160;</a></span>batteryState()</h2>
+<a id="a6ce3d8cd17a10ae1322fed2a6ed264cf" name="a6ce3d8cd17a10ae1322fed2a6ed264cf"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6ce3d8cd17a10ae1322fed2a6ed264cf">&#9670;&#160;</a></span>batteryState()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -256,7 +264,7 @@ Static Protected Attributes</h2></td></tr>
         <tr>
           <td class="memname">bool SensorManager::batteryState </td>
           <td>(</td>
-          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td class="paramtype"><a class="el" href="_sensor_manager_8h.html#acd8eeb965a21d464f1d6ed3ded01cc3e">BatterySampleContext</a></td>          <td class="paramname"><span class="paramname"><em>sampleContext</em></span><span class="paramdefsep"> = </span><span class="paramdefval"><a class="el" href="_sensor_manager_8h.html#acd8eeb965a21d464f1d6ed3ded01cc3ea0db377921f4ce762c62526131097968f">BatterySampleContext::General</a></span></td><td>)</td>
           <td></td>
         </tr>
       </table>
@@ -264,9 +272,9 @@ Static Protected Attributes</h2></td></tr>
 
 <p>Determine whether the battery is present and not critically low. </p>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00258">258</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00432">432</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00150">_batteryStabilizationPending</a>, <a class="el" href="_sensor_manager_8h_source.html#l00153">_firstBatterySampleTaken</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00166">ConnectivityPolicy::BATTERY_WAKE_MAX_RETRIES</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00164">ConnectivityPolicy::BATTERY_WAKE_QUICKSTART_DELAY_MS</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00165">ConnectivityPolicy::BATTERY_WAKE_RETRY_DELAY_MS</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00003">batteryContext</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00017">fuelGauge</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00760">isItSafeToCharge()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00198">readTmp112TemperatureC()</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, <a class="el" href="device__pinout_8cpp_source.html#l00037">TMP36_SENSE_PIN</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00177">tmp36TemperatureC()</a>.</p>
+<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00172">_authoritativeBatteryFallbackUsed</a>, <a class="el" href="_sensor_manager_8h_source.html#l00163">_authoritativeBatterySampleActive</a>, <a class="el" href="_sensor_manager_8h_source.html#l00166">_authoritativeBatterySoc</a>, <a class="el" href="_sensor_manager_8h_source.html#l00169">_authoritativeBatteryState</a>, <a class="el" href="_sensor_manager_8h_source.html#l00157">_batteryStabilizationPending</a>, <a class="el" href="_sensor_manager_8h_source.html#l00160">_firstBatterySampleTaken</a>, <a class="el" href="_power_manager_8h_source.html#l00134">PowerReport::activeInputProfile</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00206">ConnectivityPolicy::BATTERY_WAKE_MAX_RETRIES</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00204">ConnectivityPolicy::BATTERY_WAKE_QUICKSTART_DELAY_MS</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00205">ConnectivityPolicy::BATTERY_WAKE_RETRY_DELAY_MS</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00003">batteryContext</a>, <a class="el" href="_wake_cycle_stats_8h_source.html#l00048">Observability::WakeCycleStats::connect_duration_ms</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_wake_cycle_stats_8cpp_source.html#l00012">Observability::cycleStats()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00021">fuelGauge</a>, <a class="el" href="_power_manager_8cpp_source.html#l00082">PowerManager::instance()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l01282">isItSafeToCharge()</a>, <a class="el" href="_connectivity_8h_source.html#l00012">Connectivity::isRadioPoweredOn()</a>, <a class="el" href="_power_manager_8cpp_source.html#l00173">PowerManager::latestReport()</a>, <a class="el" href="_power_manager_8h_source.html#l00052">NotApplicable</a>, <a class="el" href="_power_platform_8cpp_source.html#l00137">PowerPlatform::noteObservedPowerSource()</a>, <a class="el" href="_power_manager_8h_source.html#l00096">PowerReading::powerSource</a>, <a class="el" href="_power_manager_8cpp_source.html#l00205">PowerManager::powerSourceLabel()</a>, <a class="el" href="_power_manager_8h_source.html#l00131">PowerReport::reading</a>, <a class="el" href="_power_platform_8cpp_source.html#l00143">PowerPlatform::readPowerSource()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00348">readTmp112TemperatureC()</a>, <a class="el" href="_sensor_manager_8h_source.html#l00024">Setup</a>, <a class="el" href="_power_manager_8h_source.html#l00050">Solar35W</a>, <a class="el" href="_power_platform_8h_source.html#l00011">PowerPlatform::PowerSourceSnapshot::source</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, <a class="el" href="_wake_cycle_stats_8h_source.html#l00055">Observability::WakeCycleStats::teardown_duration_ms</a>, <a class="el" href="device__pinout_8cpp_source.html#l00037">TMP36_SENSE_PIN</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00327">tmp36TemperatureC()</a>, and <a class="el" href="_power_manager_8h_source.html#l00049">UsbBench</a>.</p>
 
 </div>
 </div>
@@ -287,9 +295,9 @@ Static Protected Attributes</h2></td></tr>
 
 <p>Get the latest sensor data from the active sensor. </p>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00134">134</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00286">286</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00144">_sensor</a>.</p>
+<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00151">_sensor</a>.</p>
 
 </div>
 </div>
@@ -310,7 +318,7 @@ Static Protected Attributes</h2></td></tr>
 
 <p>Update global signal strength strings for logging/telemetry. </p>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00812">812</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l01338">1338</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_sensor_manager_8h.html#a84ebd72a65f97fd1c2abf69b7414794c">signalStr</a>.</p>
 
@@ -334,11 +342,11 @@ Static Protected Attributes</h2></td></tr>
 <p>Create and initialize the active sensor based on configuration. </p>
 <p>Uses sysStatus.get_sensorType() and <a class="el" href="class_sensor_factory.html" title="Factory for creating sensor instances.">SensorFactory</a> to select the concrete implementation, then calls the sensor's initializeHardware(). </p>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00078">78</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00230">230</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00144">_sensor</a>, <a class="el" href="_sensor_factory_8h_source.html#l00071">SensorFactory::createSensor()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00069">setSensor()</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
+<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00151">_sensor</a>, <a class="el" href="_sensor_factory_8h_source.html#l00071">SensorFactory::createSensor()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00222">setSensor()</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___idle_8cpp_source.html#l00017">ensureSensorEnabled()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00052">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00194">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___idle_8cpp_source.html#l00017">ensureSensorEnabled()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>.</p>
 
 </div>
 </div>
@@ -367,11 +375,11 @@ Static Protected Attributes</h2></td></tr>
 
 <p>Get the <a class="el" href="class_sensor_manager.html">SensorManager</a> singleton instance. </p>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00040">40</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00193">193</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00141">_instance</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00046">SensorManager()</a>.</p>
+<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00148">_instance</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00199">SensorManager()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___idle_8cpp_source.html#l00017">ensureSensorEnabled()</a>, <a class="el" href="_state___modes_8cpp_source.html#l00024">handleCountingMode()</a>, <a class="el" href="_state___idle_8cpp_source.html#l00031">handleIdleState()</a>, <a class="el" href="_state___modes_8cpp_source.html#l00052">handleOccupancyMode()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00052">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00194">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___idle_8cpp_source.html#l00017">ensureSensorEnabled()</a>, <a class="el" href="_state___modes_8cpp_source.html#l00024">handleCountingMode()</a>, <a class="el" href="_state___idle_8cpp_source.html#l00031">handleIdleState()</a>, <a class="el" href="_state___modes_8cpp_source.html#l00052">handleOccupancyMode()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00059">anonymous_namespace{State_Sleep.cpp}::logWakeSummary()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>.</p>
 
 </div>
 </div>
@@ -392,11 +400,11 @@ Static Protected Attributes</h2></td></tr>
 
 <p>Determine whether it is safe to charge the battery. </p>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00760">760</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l01282">1282</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00258">batteryState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">batteryState()</a>.</p>
 
 </div>
 </div>
@@ -417,9 +425,9 @@ Static Protected Attributes</h2></td></tr>
 
 <p>Check whether the active sensor is initialized and ready. </p>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00141">141</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00293">293</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00144">_sensor</a>.</p>
+<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00151">_sensor</a>.</p>
 
 </div>
 </div>
@@ -441,9 +449,9 @@ Static Protected Attributes</h2></td></tr>
 <p>Poll the active sensor; call from the main loop. </p>
 <dl class="section return"><dt>Returns</dt><dd>true if new sensor data is available. </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00100">100</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00252">252</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00147">_lastPollTime</a>, <a class="el" href="_sensor_manager_8h_source.html#l00144">_sensor</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00043">sensorConfig</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
+<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00154">_lastPollTime</a>, <a class="el" href="_sensor_manager_8h_source.html#l00151">_sensor</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00043">sensorConfig</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
 </div>
 </div>
@@ -464,9 +472,9 @@ Static Protected Attributes</h2></td></tr>
 
 <p>Mark that the next battery sample occurs immediately after low-power wake. </p>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00173">173</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00319">319</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00150">_batteryStabilizationPending</a>.</p>
+<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00172">_authoritativeBatteryFallbackUsed</a>, <a class="el" href="_sensor_manager_8h_source.html#l00163">_authoritativeBatterySampleActive</a>, <a class="el" href="_sensor_manager_8h_source.html#l00166">_authoritativeBatterySoc</a>, <a class="el" href="_sensor_manager_8h_source.html#l00169">_authoritativeBatteryState</a>, and <a class="el" href="_sensor_manager_8h_source.html#l00157">_batteryStabilizationPending</a>.</p>
 
 </div>
 </div>
@@ -487,11 +495,11 @@ Static Protected Attributes</h2></td></tr>
 
 <p>Notify the sensor that the device is entering deep sleep. </p>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00145">145</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00297">297</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00144">_sensor</a>, <a class="el" href="device__pinout_8cpp_source.html#l00064">disableModule</a>, and <a class="el" href="device__pinout_8cpp_source.html#l00065">ledPower</a>.</p>
+<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00151">_sensor</a>, <a class="el" href="device__pinout_8cpp_source.html#l00064">disableModule</a>, and <a class="el" href="device__pinout_8cpp_source.html#l00065">ledPower</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00052">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00194">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>.</p>
 
 </div>
 </div>
@@ -512,11 +520,11 @@ Static Protected Attributes</h2></td></tr>
 
 <p>Notify the sensor that the device has woken from deep sleep. </p>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00161">161</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00311">311</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00144">_sensor</a>.</p>
+<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00151">_sensor</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___idle_8cpp_source.html#l00017">ensureSensorEnabled()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00052">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___idle_8cpp_source.html#l00017">ensureSensorEnabled()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>.</p>
 
 </div>
 </div>
@@ -543,7 +551,7 @@ Static Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="reference">References <a class="el" href="_sensor_manager_8cpp_source.html#l00046">SensorManager()</a>.</p>
+<p class="reference">References <a class="el" href="_sensor_manager_8cpp_source.html#l00199">SensorManager()</a>.</p>
 
 </div>
 </div>
@@ -572,9 +580,9 @@ Static Protected Attributes</h2></td></tr>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>true on success, false on I2C error or missing device. </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00198">198</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00348">348</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00258">batteryState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">batteryState()</a>.</p>
 
 </div>
 </div>
@@ -601,11 +609,11 @@ Static Protected Attributes</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00069">69</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00222">222</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00144">_sensor</a>, and <a class="el" href="class_i_sensor.html#aba7ac442af61a32230cabca4a8b1bc05">ISensor::getSensorType()</a>.</p>
+<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00151">_sensor</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00078">initializeFromConfig()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00230">initializeFromConfig()</a>.</p>
 
 </div>
 </div>
@@ -626,9 +634,9 @@ Static Protected Attributes</h2></td></tr>
 
 <p>Initialize the active sensor and any manager state. </p>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00054">54</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00211">211</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00144">_sensor</a>.</p>
+<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00151">_sensor</a>.</p>
 
 </div>
 </div>
@@ -656,13 +664,125 @@ Static Protected Attributes</h2></td></tr>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>Temperature in degrees Celsius. </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00177">177</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00327">327</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00258">batteryState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">batteryState()</a>.</p>
 
 </div>
 </div>
 <a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
+<a id="a5106fb0bd76d68ab62cce0f1cb28c4f9" name="a5106fb0bd76d68ab62cce0f1cb28c4f9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5106fb0bd76d68ab62cce0f1cb28c4f9">&#9670;&#160;</a></span>_authoritativeBatteryFallbackUsed</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool SensorManager::_authoritativeBatteryFallbackUsed</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel protected">protected</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Whether the trusted pre-radio sample used voltage fallback. </p>
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8h_source.html#l00172">172</a> of file <a class="el" href="_sensor_manager_8h_source.html">SensorManager.h</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">batteryState()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00319">noteWakeFromLowPowerSleep()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00199">SensorManager()</a>.</p>
+
+</div>
+</div>
+<a id="a9a21f1911a82a38ef5b9408dd6792877" name="a9a21f1911a82a38ef5b9408dd6792877"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9a21f1911a82a38ef5b9408dd6792877">&#9670;&#160;</a></span>_authoritativeBatterySampleActive</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool SensorManager::_authoritativeBatterySampleActive</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel protected">protected</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Whether this wake cycle has a trusted pre-radio battery sample. </p>
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8h_source.html#l00163">163</a> of file <a class="el" href="_sensor_manager_8h_source.html">SensorManager.h</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">batteryState()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00319">noteWakeFromLowPowerSleep()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00199">SensorManager()</a>.</p>
+
+</div>
+</div>
+<a id="a9d7e735bca8295f95632b5976c01fc63" name="a9d7e735bca8295f95632b5976c01fc63"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9d7e735bca8295f95632b5976c01fc63">&#9670;&#160;</a></span>_authoritativeBatterySoc</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">float SensorManager::_authoritativeBatterySoc</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel protected">protected</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Cached SoC from the trusted pre-radio battery sample. </p>
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8h_source.html#l00166">166</a> of file <a class="el" href="_sensor_manager_8h_source.html">SensorManager.h</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">batteryState()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00319">noteWakeFromLowPowerSleep()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00199">SensorManager()</a>.</p>
+
+</div>
+</div>
+<a id="a361320e3202a76b1fbe2cac8ec79e04a" name="a361320e3202a76b1fbe2cac8ec79e04a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a361320e3202a76b1fbe2cac8ec79e04a">&#9670;&#160;</a></span>_authoritativeBatteryState</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint8_t SensorManager::_authoritativeBatteryState</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel protected">protected</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Cached battery state from the trusted pre-radio battery sample. </p>
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8h_source.html#l00169">169</a> of file <a class="el" href="_sensor_manager_8h_source.html">SensorManager.h</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">batteryState()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00319">noteWakeFromLowPowerSleep()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00199">SensorManager()</a>.</p>
+
+</div>
+</div>
 <a id="af5fb59cde27c9232777c2f9542dc7ef1" name="af5fb59cde27c9232777c2f9542dc7ef1"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#af5fb59cde27c9232777c2f9542dc7ef1">&#9670;&#160;</a></span>_batteryStabilizationPending</h2>
 
@@ -685,9 +805,9 @@ Static Protected Attributes</h2></td></tr>
 
 <p>One-shot flag to stabilize battery measurement after low-power wake. </p>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8h_source.html#l00150">150</a> of file <a class="el" href="_sensor_manager_8h_source.html">SensorManager.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8h_source.html#l00157">157</a> of file <a class="el" href="_sensor_manager_8h_source.html">SensorManager.h</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00258">batteryState()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00173">noteWakeFromLowPowerSleep()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00046">SensorManager()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">batteryState()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00319">noteWakeFromLowPowerSleep()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00199">SensorManager()</a>.</p>
 
 </div>
 </div>
@@ -713,9 +833,9 @@ Static Protected Attributes</h2></td></tr>
 
 <p>Track whether the first post-boot battery sample has already run. </p>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8h_source.html#l00153">153</a> of file <a class="el" href="_sensor_manager_8h_source.html">SensorManager.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8h_source.html#l00160">160</a> of file <a class="el" href="_sensor_manager_8h_source.html">SensorManager.h</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00258">batteryState()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00046">SensorManager()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">batteryState()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00199">SensorManager()</a>.</p>
 
 </div>
 </div>
@@ -741,9 +861,9 @@ Static Protected Attributes</h2></td></tr>
 
 <p>Pointer to the singleton instance. </p>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8h_source.html#l00141">141</a> of file <a class="el" href="_sensor_manager_8h_source.html">SensorManager.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8h_source.html#l00148">148</a> of file <a class="el" href="_sensor_manager_8h_source.html">SensorManager.h</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00040">instance()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00193">instance()</a>.</p>
 
 </div>
 </div>
@@ -769,9 +889,9 @@ Static Protected Attributes</h2></td></tr>
 
 <p>Timestamp of the last sensor poll (millis). </p>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8h_source.html#l00147">147</a> of file <a class="el" href="_sensor_manager_8h_source.html">SensorManager.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8h_source.html#l00154">154</a> of file <a class="el" href="_sensor_manager_8h_source.html">SensorManager.h</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00100">loop()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00046">SensorManager()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00252">loop()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00199">SensorManager()</a>.</p>
 
 </div>
 </div>
@@ -797,9 +917,9 @@ Static Protected Attributes</h2></td></tr>
 
 <p>Currently active sensor implementation (not owned). </p>
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8h_source.html#l00144">144</a> of file <a class="el" href="_sensor_manager_8h_source.html">SensorManager.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8h_source.html#l00151">151</a> of file <a class="el" href="_sensor_manager_8h_source.html">SensorManager.h</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00134">getSensorData()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00078">initializeFromConfig()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00141">isSensorReady()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00100">loop()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00145">onEnterSleep()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00161">onExitSleep()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00046">SensorManager()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00069">setSensor()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00054">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00286">getSensorData()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00230">initializeFromConfig()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00293">isSensorReady()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00252">loop()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00297">onEnterSleep()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00311">onExitSleep()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00199">SensorManager()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00222">setSensor()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00211">setup()</a>.</p>
 
 </div>
 </div>

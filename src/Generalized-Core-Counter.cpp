@@ -17,14 +17,17 @@
 
 // Global configuration (includes DEBUG_SERIAL define)
 #include "Config.h"
+#include "state/State_Common.h"
 #include "power/Connectivity.h"
 #include "power/ConnectivityPolicy.h"
+#include "power/PowerManager.h"
+#include "power/PowerPlatform.h"
 #include "observability/WakeCycleStats.h"
 #include "ThrashGuard.h"
 
 // Firmware version recognized by Particle Product firmware management
 // Bump this integer whenever you cut a new production release.
-PRODUCT_VERSION(10);
+PRODUCT_VERSION(11);
 
 // Hardware abstraction and device-specific pinouts
 #include "device_pinout.h"           // Platform-specific pin definitions
@@ -32,16 +35,6 @@ PRODUCT_VERSION(10);
 #include "LocalTimeRK.h"             // Timezone conversion (UTC to local)
 #include "time/LocalTimeCache.h"          // Cached LocalTimeRK conversions
 
-/**
- * @brief Returns true for alerts that are safe to auto-clear after a queued report.
- *
- * @details These alerts represent transient operational failures that are
- *          re-evaluated frequently enough to be raised again if the underlying
- *          condition persists on later cycles.
- *
- * @param alertCode The current alert code.
- * @return true if the alert may be auto-cleared after successful queueing.
- */
 // Persistent data and configuration
 #include "MyPersistentData.h"        // FRAM-backed sysStatus, current, sensorConfig
 
@@ -63,8 +56,13 @@ PRODUCT_VERSION(10);
 #include "Version.h"                 // FIRMWARE_VERSION and FIRMWARE_RELEASE_NOTES
 #include "ProjectConfig.h"           // Webhook event name and project constants
 
-// Forward declarations in case Version.h is not picked up correctly
-// by the build system in this translation unit.
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+#warning "CONNECTIVITY_FAILSAFE_TEST_MODE=1 (bench timings enabled)"
+#else
+#warning "CONNECTIVITY_FAILSAFE_TEST_MODE=0 (production timings enabled)"
+#endif
+
+// Forward declarations for firmware metadata referenced from this translation unit.
 extern const char* FIRMWARE_VERSION;
 extern const char* FIRMWARE_RELEASE_NOTES;
 
@@ -85,6 +83,14 @@ extern const char* FIRMWARE_RELEASE_NOTES;
  * - Connectivity: compile-time macros (Wiring_WiFi / Wiring_Cellular)
  *   select WiFi vs. cellular for radio control; Particle.connect() is
  *   used to bring up the cloud session on both.
+ *
+ * File navigation
+ * ---------------
+ * 1) Includes, globals, retained state, and small formatting helpers
+ * 2) setup()/loop() and top-level lifecycle wiring
+ * 3) policy helpers for battery tier, open hours, and report publishing
+ * 4) startup status, webhook supervision, diagnostics, and state logging
+ * 5) connectivity failsafe, ISRs, and daily maintenance
  */
 
 // Forward declarations
@@ -97,14 +103,18 @@ void UbidotsHandler(const char *event, const char *data); // Webhook response ha
 void publishStartupStatus();  // One-time status summary at boot
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE); // Safe diagnostic publish with queue guard
 BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC);
+void clearConnectivityFailsafeRecovery(const char *reason);
+void connectivityFailsafeSupervisor();
+void logConnectivityFailsafeBootDiagnostics();
 
-// Instantiate needed libraries / APIs
+// ===== Global runtime objects =====
+
 SystemSleepConfiguration config; // Sleep 2.0 configuration
 void outOfMemoryHandler(system_event_t event, int param);
 LocalTimeConvert conv; // For converting UTC time to local time
 AB1805 ab1805(Wire);   // AB1805 RTC / Watchdog
 
-// System Health Variables
+// System health flag set from the out-of-memory callback.
 int outOfMemory = -1; // Set by outOfMemoryHandler when heap is exhausted
 
 // ********** State Machine **********
@@ -136,35 +146,336 @@ enum AppBreadcrumb : uint8_t {
   BREADCRUMB_CONNECT_REQUESTED = 6,
   BREADCRUMB_CLOUD_CONNECTED = 7,
   BREADCRUMB_APP_WATCHDOG_RESET = 8,
+  BREADCRUMB_CONNECTIVITY_FAILSAFE = 9,
+  BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD = 10,
 };
 
 const char *appBreadcrumbName(uint8_t code) {
   switch (code) {
   case BREADCRUMB_SETUP_START:
-    return "SETUP_START";
+    return "SETUP";
   case BREADCRUMB_SETUP_COMPLETE:
-    return "SETUP_COMPLETE";
+    return "READY";
   case BREADCRUMB_SLEEP_ENTRY:
-    return "SLEEP_ENTRY";
+    return "SLEEP";
   case BREADCRUMB_WAKE:
     return "WAKE";
   case BREADCRUMB_REPORTING:
-    return "REPORTING";
+    return "REPORT";
   case BREADCRUMB_CONNECT_REQUESTED:
-    return "CONNECT_REQUESTED";
+    return "CONN";
   case BREADCRUMB_CLOUD_CONNECTED:
-    return "CLOUD_CONNECTED";
+    return "CLOUD";
   case BREADCRUMB_APP_WATCHDOG_RESET:
-    return "APP_WATCHDOG_RESET";
+    return "WDT";
+  case BREADCRUMB_CONNECTIVITY_FAILSAFE:
+    return "CONN_FAILSAFE";
+  case BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD:
+    return "CONN_FAILSAFE_HARD";
   default:
     return "NONE";
   }
 }
 
+const char *stateShortName(State value) {
+  switch (value) {
+  case INITIALIZATION_STATE:
+    return "Init";
+  case ERROR_STATE:
+    return "Error";
+  case IDLE_STATE:
+    return "Idle";
+  case SLEEPING_STATE:
+    return "Sleep";
+  case CONNECTING_STATE:
+    return "Connect";
+  case REPORTING_STATE:
+    return "Report";
+  case FIRMWARE_UPDATE_STATE:
+    return "FW";
+  default:
+    return "?";
+  }
+}
+
+const char *batteryTierShortName(BatteryTier tier) {
+  switch (tier) {
+  case TIER_HEALTHY:
+    return "H";
+  case TIER_CONSERVING:
+    return "C";
+  case TIER_CRITICAL:
+    return "CR";
+  case TIER_SURVIVAL:
+    return "S";
+  default:
+    return "?";
+  }
+}
+
+BatteryTier currentBatteryTierForFailsafe() {
+  const uint8_t tierValue = sysStatus.get_currentBatteryTier();
+  if (tierValue <= TIER_SURVIVAL) {
+    return static_cast<BatteryTier>(tierValue);
+  }
+  return Cloud::calculateBatteryTier(current.get_stateOfCharge());
+}
+
+bool connectivityFailsafeHasExternalPower() {
+  const PowerPlatform::PowerSourceSnapshot snapshot = PowerPlatform::readPowerSource();
+  if (snapshot.status == PowerAvailability::NotAvailable) {
+    return false;
+  }
+
+  switch (snapshot.source) {
+  case 1:
+  case 2:
+  case 3:
+  case 4:
+    return true;
+  default:
+    return false;
+  }
+}
+
+uint32_t connectivityFailsafeJitterSec(uint8_t stage) {
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+  (void)stage;
+  return 0;
+#else
+  if (ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC <= 0) {
+    return 0;
+  }
+
+  String deviceId = System.deviceID();
+  uint32_t hash = 5381u;
+  for (size_t index = 0; index < deviceId.length(); ++index) {
+    hash = ((hash << 5) + hash) ^ (uint8_t)deviceId.charAt(index);
+  }
+  hash ^= (uint32_t)stage * 2654435761u;
+  return hash % (uint32_t)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC;
+#endif
+}
+
+void persistConnectivityFailsafeState(uint8_t stage, time_t actionTime, bool incrementCount) {
+  sysStatus.set_connectivityRecoveryStage(stage);
+  sysStatus.set_lastConnectivityRecoveryAction(actionTime);
+  if (incrementCount) {
+    uint8_t count = sysStatus.get_connectivityRecoveryCount();
+    if (count < 0xFF) {
+      sysStatus.set_connectivityRecoveryCount(count + 1);
+    }
+  }
+  sysStatus.flush(true);
+}
+
+const char *failsafeDeferReasonNameLocal(FailsafeDeferReason reason) {
+  switch (reason) {
+  case FAILSAFE_DEFER_INVALID_TIME:
+    return "invalid-time";
+  case FAILSAFE_DEFER_NO_LAST_CONNECTION:
+    return "no-last-connection";
+  case FAILSAFE_DEFER_DISCONNECTED_MODE:
+    return "disconnected-mode";
+  case FAILSAFE_DEFER_UPDATE_PENDING:
+    return "update-pending";
+  case FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED:
+    return "low-battery-hard-stage-suppressed";
+  case FAILSAFE_DEFER_CLOSED_HOURS_LONG_SLEEP:
+    return "closed-hours-long-sleep";
+  default:
+    return "none";
+  }
+}
+
+bool claimFailsafeDeferLogLocal(FailsafeDeferReason reason) {
+  if (reason == FAILSAFE_DEFER_NONE) {
+    return false;
+  }
+
+  const uint8_t shift = (uint8_t)reason - 1;
+  const uint32_t bit = (shift < 32) ? (1UL << shift) : 0UL;
+  if (bit == 0UL) {
+    return false;
+  }
+  if (session.failsafeDeferLogMask & bit) {
+    return false;
+  }
+  session.failsafeDeferLogMask |= bit;
+  return true;
+}
+
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+long connectivityFailsafeAgeSecOrNegative(time_t timestamp) {
+  if (!Time.isValid() || timestamp == 0) {
+    return -1L;
+  }
+
+  const time_t now = Time.now();
+  if (now <= timestamp) {
+    return -1L;
+  }
+  return (long)(now - timestamp);
+}
+
+void formatFailsafeAgeField(char *buffer, size_t bufferSize, time_t timestamp) {
+  const long ageSec = connectivityFailsafeAgeSecOrNegative(timestamp);
+  if (timestamp == 0) {
+    snprintf(buffer, bufferSize, "0");
+  } else if (ageSec >= 0) {
+    snprintf(buffer, bufferSize, "%lds", ageSec);
+  } else {
+    snprintf(buffer, bufferSize, "%ld", (long)timestamp);
+  }
+}
+
+void formatFailsafeConnectionAgeField(char *buffer, size_t bufferSize, time_t lastConnection) {
+  const long ageSec = connectivityFailsafeAgeSecOrNegative(lastConnection);
+  if (ageSec >= 0) {
+    snprintf(buffer, bufferSize, "%lds", ageSec);
+  } else {
+    snprintf(buffer, bufferSize, "na");
+  }
+}
+
+int plannedClosedHoursSleepSec() {
+  if (!Time.isValid() || isWithinOpenHours()) {
+    return -1;
+  }
+
+  int nightSleepSec = secondsUntilNextOpen();
+  if (nightSleepSec <= 0) {
+    nightSleepSec = 3600;
+  }
+
+  const int maxSleepSec = 546 * 60;
+  if (nightSleepSec > maxSleepSec) {
+    nightSleepSec = maxSleepSec;
+  }
+  return nightSleepSec;
+}
+
+FailsafeDeferReason currentFailsafeEligibilityReason() {
+  if (sysStatus.get_connectionMode() == DISCONNECTED) {
+    return FAILSAFE_DEFER_DISCONNECTED_MODE;
+  }
+
+  if (state == FIRMWARE_UPDATE_STATE || System.updatesPending()) {
+    return FAILSAFE_DEFER_UPDATE_PENDING;
+  }
+
+  if (!Time.isValid()) {
+    return FAILSAFE_DEFER_INVALID_TIME;
+  }
+
+  const time_t lastConnection = sysStatus.get_lastConnection();
+  if (lastConnection == 0) {
+    return FAILSAFE_DEFER_NO_LAST_CONNECTION;
+  }
+
+  const time_t now = Time.now();
+  if (now > lastConnection) {
+    const time_t connectionAgeSec = now - lastConnection;
+    uint8_t currentStage = sysStatus.get_connectivityRecoveryStage();
+    if (currentStage > 3) {
+      currentStage = 0;
+    }
+
+    if (connectionAgeSec >= ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC && currentStage < 3) {
+      time_t lastAction = sysStatus.get_lastConnectivityRecoveryAction();
+      if (lastAction > now) {
+        lastAction = 0;
+      }
+
+      const uint8_t nextStage = currentStage + 1;
+      time_t requiredDelay = ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC;
+      if (nextStage >= 2) {
+        requiredDelay += (time_t)connectivityFailsafeJitterSec(nextStage);
+      }
+
+      const bool cooldownComplete =
+          (currentStage == 0 || lastAction == 0 || (now - lastAction) >= requiredDelay);
+
+      if (cooldownComplete) {
+        const BatteryTier tier = currentBatteryTierForFailsafe();
+        const bool externalPowerPresent = connectivityFailsafeHasExternalPower();
+        const bool lowBatteryHardActionBlocked =
+            nextStage >= 2 && !externalPowerPresent &&
+            (sysStatus.get_lowBatteryMode() || tier == TIER_SURVIVAL);
+
+        if (lowBatteryHardActionBlocked) {
+          return FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED;
+        }
+      }
+    }
+  }
+
+  return FAILSAFE_DEFER_NONE;
+}
+
+void logConnectivityFailsafeBootTestContextLocal() {
+  const int closedSleepSec = plannedClosedHoursSleepSec();
+  if (closedSleepSec >
+      (int)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC) {
+    Log.info("FailsafeTest: closed-hours sleep cap active planned=%ds cap=%lds",
+             closedSleepSec,
+             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC);
+  }
+}
+
+void logConnectivityFailsafeBootDiagnosticsLocal() {
+  char lastActionField[24];
+  char connectionAgeField[24];
+  formatFailsafeAgeField(lastActionField, sizeof(lastActionField),
+                         sysStatus.get_lastConnectivityRecoveryAction());
+  formatFailsafeConnectionAgeField(connectionAgeField, sizeof(connectionAgeField),
+                                   sysStatus.get_lastConnection());
+
+  const FailsafeDeferReason reason = currentFailsafeEligibilityReason();
+  if (reason == FAILSAFE_DEFER_NONE) {
+    Log.info("FailsafeBoot: test=1 stale=%lds cd=%lds jit=%lds stage=%u cnt=%u lastAct=%s connAge=%s eligible=1",
+             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC,
+             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC,
+             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC,
+             (unsigned)sysStatus.get_connectivityRecoveryStage(),
+             (unsigned)sysStatus.get_connectivityRecoveryCount(),
+             lastActionField,
+             connectionAgeField);
+  } else {
+    Log.info("FailsafeBoot: test=1 stale=%lds cd=%lds jit=%lds stage=%u cnt=%u lastAct=%s connAge=%s eligible=0 reason=%s",
+             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC,
+             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC,
+             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC,
+             (unsigned)sysStatus.get_connectivityRecoveryStage(),
+             (unsigned)sysStatus.get_connectivityRecoveryCount(),
+             lastActionField,
+             connectionAgeField,
+             failsafeDeferReasonNameLocal(reason));
+  }
+}
+#endif
+
 } // namespace
 
-// Boot-storm guard retained state. This protects against repeated resets that
-// occur before setup completes and therefore bypass ERROR_STATE protections.
+const char *failsafeDeferReasonName(FailsafeDeferReason reason) {
+  return failsafeDeferReasonNameLocal(reason);
+}
+
+bool claimFailsafeDeferLog(FailsafeDeferReason reason) {
+  return claimFailsafeDeferLogLocal(reason);
+}
+
+void logConnectivityFailsafeBootDiagnostics() {
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+  logConnectivityFailsafeBootDiagnosticsLocal();
+  logConnectivityFailsafeBootTestContextLocal();
+#endif
+}
+
+// ===== Retained boot and breadcrumb state =====
+
+// Boot-storm guard retained state protects against repeated resets that occur
+// before setup completes and therefore bypass ERROR_STATE protections.
 retained uint8_t bootStormCount = 0;
 retained bool bootInProgress = false;
 retained time_t bootStormWindowStart = 0;
@@ -182,12 +493,11 @@ void setAppBreadcrumb(uint8_t code) {
   appBreadcrumbMs = millis();
 }
 
-// Webhook response supervision
-// Short-term monitoring is a simple 20s window that starts only when the
-// device is successfully cloud-connected (Particle.connected()). We arm the
-// expectation when we queue a webhook publish.
+// Short-term webhook monitoring starts only after a successful cloud
+// connection. The expectation is armed when a webhook publish is queued.
 
-// ********** Timing **********
+// ===== Application lifecycle =====
+
 const unsigned long resetWait = 30000;      // Error state dwell before reset
 
 
@@ -266,13 +576,6 @@ void setup() {
   delay(1000);
 #endif
 
-  Log.info("===== Firmware Version %s =====", FIRMWARE_VERSION);
-  Log.info("===== Release Notes: %s =====", FIRMWARE_RELEASE_NOTES);
-  Log.info("Previous app breadcrumb: %s (%u) at %lu ms",
-           appBreadcrumbName(previousBreadcrumb),
-           (unsigned)previousBreadcrumb,
-           (unsigned long)previousBreadcrumbMs);
-
   // Observability: start a new wake cycle on cold boot.
   Observability::cycleStats().resetOnWake(millis());
   
@@ -286,7 +589,6 @@ void setup() {
   // stalls that exceed our non-blocking design intent. The AB1805 hardware
   // watchdog (124s) provides ultimate backstop if this software watchdog fails.
   static ApplicationWatchdog appWatchdog(60000, appWatchdogHandler, 1536);
-  Log.info("Application watchdog enabled: 60s timeout");
 
   // Subscribe to the Ubidots integration response event so we can track
   // successful webhook deliveries and update lastHookResponse.
@@ -304,16 +606,10 @@ void setup() {
     Particle.subscribe("hook-response/", UbidotsHandler);
   }
 
-  // Configure network stack but keep radio OFF at startup.
-  // In SEMI_AUTOMATIC mode we explicitly control when the radio is turned on
-  // by calling Particle.connect() from CONNECTING_STATE.
-#if Wiring_WiFi
-  Log.info("Platform connectivity: WiFi (radio off until CONNECTING_STATE)");
-#elif Wiring_Cellular
-  Log.info("Platform connectivity: Cellular (radio off until CONNECTING_STATE)");
-#else
-  Log.info("Platform connectivity: default (Particle.connect only)");
-  // Fallback: rely on Particle.connect() in CONNECTING_STATE
+  // Configure startup with the radio left off. CONNECTING_STATE owns
+  // Particle.connect() and all subsequent network bring-up.
+#if !Wiring_WiFi && !Wiring_Cellular
+  // Platforms without explicit Wiring_* radio macros still connect through CONNECTING_STATE.
 #endif
 
   initializePinModes(); // Initialize the pin modes
@@ -330,6 +626,7 @@ void setup() {
   sysStatus.setup();    // Initialize persistent storage
   sensorConfig.setup(); // Initialize the sensor configuration
   current.setup();      // Initialize the current status data
+  PowerManager::instance().setup();
 
   // If a boot storm holdoff was triggered on this or the prior boot, surface
   // it as an alert now that persistent current status storage is initialized.
@@ -359,33 +656,11 @@ void setup() {
     if (Serial.isConnected()) {
       delay(ConnectivityPolicy::DEBUG_SERIAL_POST_CONNECT_DELAY_MS);
     }
-
-    Log.info("Serial logging enabled");
   }
 
-  // Guard: detect and clear stale test-mode overrides left from bench testing.
-  // FIELD builds unconditionally clear active overrides; DEV builds retain them.
-  {
-    float testBatOvr = sysStatus.get_testBatteryOverride();
-    if (testBatOvr < -1.0f || testBatOvr > 100.0f) {
-      sysStatus.set_testBatteryOverride(-1.0f);  // Sanitize corrupt value
-    } else if (testBatOvr >= 0.0f) {
-      Log.warn("TEST OVERRIDE: testBatteryOverride=%.2f detected at boot", (double)testBatOvr);
-#if FIELD_BUILD
-      sysStatus.set_testBatteryOverride(-1.0f);
-      Log.warn("TEST OVERRIDE: cleared for FIELD build");
-#else
-      Log.warn("TEST OVERRIDE: retained (DEV build)");
-#endif
-    }
-  }
   if (sysStatus.get_testConnectionDurationOverride() == 0) {
     sysStatus.set_testConnectionDurationOverride(0xFFFF);  // Disabled (max uint16_t)
   }
-  
-  // Auto-cycling test mode: uncomment to enable automatic tier testing
-  // Will cycle through HEALTHY(80%) → CONSERVING(60%) → CRITICAL(40%) → SURVIVAL(25%) → Real battery
-  // sysStatus.set_testScenarioIndex(0);  // Start from scenario 0
   
   // Uncomment the following line to run unit tests on boot
   // Cloud::testBatteryBackoffLogic();
@@ -477,10 +752,12 @@ void setup() {
   const bool timeValidAfterRtc = Time.isValid();
   if (!timeValidBeforeRtc && timeValidAfterRtc) {
     if (rtcReadOk) {
-      Log.info("RTC restored system time: %s (rtc=%s)",
-               Time.timeStr().c_str(),
-               Time.format(rtcTime, TIME_FORMAT_DEFAULT).c_str());
-    } else {
+      if (sysStatus.get_verboseMode()) {
+        Log.info("RTC restored system time: %s (rtc=%s)",
+                 Time.timeStr().c_str(),
+                 Time.format(rtcTime, TIME_FORMAT_DEFAULT).c_str());
+      }
+    } else if (sysStatus.get_verboseMode()) {
       Log.info("RTC restored system time: %s (rtc read failed)",
                Time.timeStr().c_str());
     }
@@ -519,17 +796,10 @@ void setup() {
 
   // Validate time and configure local time converter
   if (!Time.isValid()) {
-    Log.info("Time is invalid - %s so connecting", Time.timeStr().c_str());
     state = CONNECTING_STATE;
   } else {
-    Log.info("Time is valid - %s", Time.timeStr().c_str());
-    
     // Now that time is valid, configure local time converter for timezone-aware operations
     conv.withCurrentTime().convert();
-    Log.info("Timezone: %s, Local time: %s", tz, conv.format(TIME_FORMAT_DEFAULT).c_str());
-    Log.info("Open hours %02u:00-%02u:00, currently: %s",
-             sysStatus.get_openTime(), sysStatus.get_closeTime(),
-             isWithinOpenHours() ? "OPEN" : "CLOSED");
 
     // Check if waking from overnight hibernate - suppress alert 40 since
     // 8+ hours without webhook during closed hours is expected, not an error.
@@ -542,30 +812,28 @@ void setup() {
     }
   }
 
-  // Refresh battery and PMIC telemetry before the first post-boot state
-  // decision so boot->sleep cycles still emit a battery sample. If a prior
-  // low-battery downgrade is active, re-evaluate it immediately on boot.
-  if (System.resetReason() == RESET_REASON_POWER_MANAGEMENT) {
-    measure.noteWakeFromLowPowerSleep();
-  }
-  measure.batteryState();
-  if (sysStatus.get_lowBatteryMode()) {
-    applyBatteryAwareConnectionModePolicy(current.get_stateOfCharge());
-  }
+  Log.info("Boot: v=%s reset=%d heap=%lu prev=%s open=%d FailsafeTest=%d",
+           FIRMWARE_VERSION,
+           reason,
+           (unsigned long)System.freeMemory(),
+           appBreadcrumbName(startupPreviousBreadcrumb),
+           Time.isValid() ? (isWithinOpenHours() ? 1 : 0) : -1,
+           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0);
 
-  Log.info("Sensor ready at startup: %s", SensorManager::instance().isSensorReady() ? "true" : "false");
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+  Log.info("Failsafe: test=%d stale=%lds cooldown=%lds jitter=%lds",
+           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
+           (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC,
+           (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC,
+           (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC);
+  logConnectivityFailsafeBootDiagnostics();
+#endif
 
   // ===== SENSOR ABSTRACTION LAYER =====
   // Initialize the sensor based on configuration using *local* time. This
   // runs after timezone configuration so open/close checks are correct.
-  Log.info("Initial connectionMode: %d (%s)", sysStatus.get_connectionMode(),
-           sysStatus.get_connectionMode() == 0 ? "CONNECTED" :
-           sysStatus.get_connectionMode() == 1 ? "INTERMITTENT" :
-           sysStatus.get_connectionMode() == 2 ? "DISCONNECTED" : "INTERMITTENT_KEEP_ALIVE");
-
   if (!SensorManager::instance().isSensorReady()) {
     if (isWithinOpenHours()) {
-      Log.info("Initializing sensor after timezone setup");
       SensorManager::instance().initializeFromConfig();
 
       if (!SensorManager::instance().isSensorReady()) {
@@ -573,13 +841,22 @@ void setup() {
         state = CONNECTING_STATE;
       }
     } else {
-      Log.info("Outside opening hours at startup; sensor will remain powered down");
       // Ensure carrier sensor power rails are actually turned off even if
       // we skipped sensor initialization while closed.
-      Log.info("Startup CLOSED: forcing sensor power down before sleep");
       SensorManager::instance().onEnterSleep();
-      Log.info("Sensor ready after startup power-down: %s", SensorManager::instance().isSensorReady() ? "true" : "false");
     }
+  }
+
+  // Defer the first startup battery sample until setup tail so RTC/time,
+  // cloud/ledger setup, timezone config, connection-mode logging, and sensor
+  // initialization have completed while the radio is still off.
+  if (System.resetReason() == RESET_REASON_POWER_MANAGEMENT) {
+    measure.noteWakeFromLowPowerSleep();
+  }
+  measure.batteryState(BatterySampleContext::Setup);
+  PowerManager::instance().refreshInputProfile();
+  if (sysStatus.get_lowBatteryMode()) {
+    applyBatteryAwareConnectionModePolicy(current.get_stateOfCharge());
   }
   // ===================================
 
@@ -593,7 +870,6 @@ void setup() {
   // setup reached stable completion; clear early-boot in-progress marker.
   bootInProgress = false;
   setAppBreadcrumb(BREADCRUMB_SETUP_COMPLETE);
-  Log.info("Startup complete");
   signalLED(false);  // Turn off startup indicator
 }
 
@@ -603,6 +879,8 @@ void loop() {
     bootStormCount = 0;
     bootStormWindowStart = 0;
   }
+
+  connectivityFailsafeSupervisor();
 
   // Main state machine driving sensing, reporting, power management
   switch (state) {
@@ -704,6 +982,8 @@ static void appWatchdogHandler() {
   System.reset();
 }
 
+// ===== Policy and publishing helpers =====
+
 BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC) {
   BatteryTier newTier = Cloud::calculateBatteryTier(currentSoC);
   uint8_t prevTierValue = sysStatus.get_currentBatteryTier();
@@ -726,14 +1006,22 @@ BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC) {
       sysStatus.set_connectionMode(INTERMITTENT);
       sysStatus.set_lowBatteryMode(true);
     } else if (currentMode == INTERMITTENT && lowBatteryDowngradeActive && newTier == TIER_HEALTHY) {
-      Log.info("Battery recovery: Restoring KEEP_ALIVE mode (tier=HEALTHY, SoC=%.1f%%)",
+      Log.info("Battery recovery: clearing lowBatteryMode (tier=HEALTHY, SoC=%.1f%%)",
+               (double)currentSoC);
+      Log.info("Battery recovery: restoring INTERMITTENT_KEEP_ALIVE (tier=HEALTHY, SoC=%.1f%%)",
                (double)currentSoC);
       sysStatus.set_connectionMode(INTERMITTENT_KEEP_ALIVE);
       sysStatus.set_lowBatteryMode(false);
     } else if (currentMode != INTERMITTENT && lowBatteryDowngradeActive) {
+      Log.info("Battery recovery: clearing lowBatteryMode (tier=%s, SoC=%.1f%%)",
+               tierNames[newTier],
+               (double)currentSoC);
       sysStatus.set_lowBatteryMode(false);
     }
   } else if (sysStatus.get_lowBatteryMode()) {
+    Log.info("Battery recovery: clearing lowBatteryMode (tier=%s, SoC=%.1f%%)",
+             tierNames[newTier],
+             (double)currentSoC);
     sysStatus.set_lowBatteryMode(false);
   }
 
@@ -827,17 +1115,12 @@ int secondsUntilNextOpen() {
 }
 
 /**
- * @brief Publish sensor data to Ubidots webhook and device-data ledger.
+ * @brief Shared notes for report payload construction.
  *
  * @details
- * 1) Builds a compact JSON payload expected by the Ubidots webhook template
- *    and enqueues it via PublishQueuePosix to the "Ubidots-Parking-Hook-v1" event.
- * 2) Updates the Particle Ledger "device-data" with a richer JSON snapshot
- *    via Cloud::publishDataToLedger() for Console visibility.
- *
- * Occupancy reporting note:
- * - dailyoccupancy is reported in whole minutes (derived from total seconds).
- * - device-data uses totalOccupiedSec but it is also in minutes for consistency.
+ * - Webhook payloads are compact and follow the legacy Ubidots field contract.
+ * - Device-data ledger publishes carry a richer structured snapshot for Console visibility.
+ * - Occupancy totals are reported in whole minutes for both webhook and ledger paths.
  */
 /**
  * @brief Returns true for transient alerts that may auto-clear after reporting.
@@ -867,7 +1150,7 @@ void publishData() {
   static const char *batteryContext[7] = {
     "Unknown", "Not Charging", "Charging",
     "Charged", "Discharging", "Fault",
-    "Diconnected"
+    "Disconnected"
   };
 
   char data[256];
@@ -915,11 +1198,6 @@ void publishData() {
              sysStatus.get_lastConnectionDuration(),
              timeStampValue);
 
-    // Log occupancy state and total minutes
-    Log.info("Report payload: occupancy=%d totalMinutes=%lu alert=%d",
-             current.get_occupied() ? 1 : 0,
-             totalOccupiedMinutes,
-             (int)reportedAlertCode);
   } else {
     const unsigned long timeStampValue = endOfPrevHourStampSec;
 
@@ -936,18 +1214,15 @@ void publishData() {
              sysStatus.get_lastConnectionDuration(),
              timeStampValue);
 
-    // Explicitly log the counts and alert code used in this report
-    Log.info("Report payload: hourly=%d daily=%d alert=%d",
-             (int)current.get_hourlyCount(),
-             (int)current.get_dailyCount(),
-             (int)reportedAlertCode);
   }
 
   // Get webhook name from cloud configuration (with fallback to convention)
   const char *webhookName = Cloud::instance().getWebhookName();
 
   bool queued = PublishQueuePosix::instance().publish(webhookName, data, PRIVATE);
-  Log.info("Publishing to webhook '%s': %s", webhookName, data);
+  if (!queued) {
+    Log.warn("Report webhook queue rejected name=%s", webhookName);
+  }
 
   // General alert lifecycle rule: once an alert has been included in a report
   // and that report is accepted by the publish queue, clear it locally.
@@ -956,7 +1231,9 @@ void publishData() {
       reportedAlertCode > 0 &&
       isAutoClearAfterReportAlert(reportedAlertCode) &&
       current.get_alertCode() == reportedAlertCode) {
-    Log.info("Clearing alert %d after queueing report payload", (int)reportedAlertCode);
+    if (sysStatus.get_verboseMode()) {
+      Log.info("Clearing alert %d after queueing report payload", (int)reportedAlertCode);
+    }
     current.set_alertCode(0);
     current.set_lastAlertTime(0);
   }
@@ -969,16 +1246,35 @@ void publishData() {
     session.webhookExpectedOnConnect = false;
     session.awaitingWebhookResponse = true;
     session.webhookAwaitStartMs = millis();
-    Log.info("Webhook queued while connected - awaiting response (short-term window started)");
   }
 
   // Also update device-data ledger with structured JSON snapshot
-  if (!Cloud::instance().publishDataToLedger()) {
+  const bool ledgerOk = Cloud::instance().publishDataToLedger();
+  const char *ledgerState = ledgerOk ? "req" : "err";
+  if (!ledgerOk) {
     // Data ledger publish failure; escalate via alert so the error
     // supervisor can decide on corrective action.
     current.raiseAlert(42);
   }
+
+  if (sensorMode == OCCUPANCY) {
+    Log.info("Report: occ=%d totalMin=%lu alert=%d q=%d ledger=%s",
+             current.get_occupied() ? 1 : 0,
+             (unsigned long)(current.get_totalOccupiedSeconds() / 60UL),
+             (int)reportedAlertCode,
+             queued ? 1 : 0,
+             ledgerState);
+  } else {
+    Log.info("Report: hourly=%d daily=%d alert=%d q=%d ledger=%s",
+             (int)current.get_hourlyCount(),
+             (int)current.get_dailyCount(),
+             (int)reportedAlertCode,
+             queued ? 1 : 0,
+             ledgerState);
+  }
 }
+
+// ===== Startup status and webhook supervision =====
 
 /**
  * @brief Enqueue a one-time startup status event summarizing
@@ -989,16 +1285,24 @@ void publishData() {
  * before the radio is brought up.
  */
 void publishStartupStatus() {
-  char status[320];
+  char status[416];
 
   int resetReason = System.resetReason();
   uint32_t resetReasonData = System.resetReasonData();
   int8_t alertCode = current.get_alertCode();
   time_t lastAlert = current.get_lastAlertTime();
   unsigned long freeHeap = System.freeMemory();
+  const uint8_t failsafeStage = sysStatus.get_connectivityRecoveryStage();
+  const uint8_t failsafeCount = sysStatus.get_connectivityRecoveryCount();
+  const time_t failsafeLastAction = sysStatus.get_lastConnectivityRecoveryAction();
+  const time_t lastConnection = sysStatus.get_lastConnection();
+  const long lastConnectionAgeSec =
+      (Time.isValid() && lastConnection != 0 && Time.now() > lastConnection)
+          ? (long)(Time.now() - lastConnection)
+          : -1L;
 
   snprintf(status, sizeof(status),
-           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu}",
+           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d}",
            FIRMWARE_VERSION,
            resetReason,
            (unsigned long)resetReasonData,
@@ -1006,10 +1310,15 @@ void publishStartupStatus() {
            (long)lastAlert,
            freeHeap,
            (unsigned)startupPreviousBreadcrumb,
-           (unsigned long)startupPreviousBreadcrumbMs);
+           (unsigned long)startupPreviousBreadcrumbMs,
+           (unsigned)failsafeStage,
+           (unsigned)failsafeCount,
+           (long)failsafeLastAction,
+           lastConnectionAgeSec,
+           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
+           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0);
 
   PublishQueuePosix::instance().publish("status", status, PRIVATE);
-  Log.info("Startup status: %s", status);
 }
 
 /**
@@ -1035,10 +1344,13 @@ void publishStartupStatus() {
 void UbidotsHandler(const char *event, const char *data) {
   // Handle response from Ubidots webhook (legacy integration)
   char responseString[64];
+  bool responseOk = true;
   // Response is expected to be a single numeric code from the Particle
   // integration response template (e.g. "200" or "201").
   if (!data || !strlen(data)) {
     snprintf(responseString, sizeof(responseString), "No Data");
+    responseOk = false;
+    Log.warn("Webhook response empty");
   } else {
     // Any webhook response indicates the integration path is alive.
     // Update lastHookResponse even if it arrived after our short-term window.
@@ -1063,6 +1375,8 @@ void UbidotsHandler(const char *event, const char *data) {
         snprintf(responseString, sizeof(responseString), "Response Received");
       } else {
         snprintf(responseString, sizeof(responseString), "Hook response %d", code);
+        responseOk = false;
+        Log.warn("%s", responseString);
       }
     } else {
       snprintf(responseString, sizeof(responseString), "Response Received");
@@ -1071,7 +1385,9 @@ void UbidotsHandler(const char *event, const char *data) {
   if (sysStatus.get_verboseMode() && Particle.connected() && PublishQueuePosix::instance().getCanSleep()) {
     publishDiagnosticSafe("Ubidots Hook", responseString, PRIVATE);
   }
-  Log.info("%s", responseString);
+  if (sysStatus.get_verboseMode() && responseOk) {
+    Log.info("%s", responseString);
+  }
 }
 
 
@@ -1113,27 +1429,175 @@ bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags
  *          when entering IDLE_STATE. Updates oldState to current state.
  */
 void publishStateTransition() {
-  char stateTransitionString[256];
   thrashGuard.recordStateTransition(oldState, state);
   thrashGuard.markProgress("STATE_TRANSITION");
-  if (state == IDLE_STATE) {
-    if (!Time.isValid())
-      snprintf(stateTransitionString, sizeof(stateTransitionString),
-               "From %s to %s with invalid time", stateNames[oldState],
-               stateNames[state]);
-    else
-      snprintf(stateTransitionString, sizeof(stateTransitionString),
-               "From %s to %s", stateNames[oldState], stateNames[state]);
-  } else
-    snprintf(stateTransitionString, sizeof(stateTransitionString),
-             "From %s to %s", stateNames[oldState], stateNames[state]);
+  Log.info("State: %s->%s",
+           stateShortName(oldState),
+           stateShortName(state));
   oldState = state;
-  Log.info(stateTransitionString);
 }
 
-// ********** Interrupt Service Routines **********
+// ===== Recovery, failsafe, and maintenance helpers =====
+
 void outOfMemoryHandler(system_event_t event, int param) {
   outOfMemory = param;
+}
+
+void clearConnectivityFailsafeRecovery(const char *reason) {
+  const bool hadRecoveryState =
+      sysStatus.get_connectivityRecoveryStage() != 0 ||
+      sysStatus.get_lastConnectivityRecoveryAction() != 0 ||
+      sysStatus.get_connectivityRecoveryCount() != 0;
+  const bool hadAlert = (current.get_alertCode() == ConnectivityPolicy::CONNECTIVITY_FAILSAFE_ALERT);
+
+  if (!hadRecoveryState && !hadAlert) {
+    return;
+  }
+
+  sysStatus.set_connectivityRecoveryStage(0);
+  sysStatus.set_lastConnectivityRecoveryAction(0);
+  sysStatus.set_connectivityRecoveryCount(0);
+  sysStatus.flush(true);
+
+  if (hadAlert) {
+    current.set_alertCode(0);
+    current.set_lastAlertTime(0);
+  }
+
+  Log.info("Failsafe: cleared reason=%s", reason ? reason : "unknown");
+}
+
+void connectivityFailsafeSupervisor() {
+  if (sysStatus.get_connectionMode() == DISCONNECTED) {
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+    if (claimFailsafeDeferLog(FAILSAFE_DEFER_DISCONNECTED_MODE)) {
+      Log.info("FailsafeDefer: reason=%s mode=%u",
+               failsafeDeferReasonName(FAILSAFE_DEFER_DISCONNECTED_MODE),
+               (unsigned)sysStatus.get_connectionMode());
+    }
+#endif
+    return;
+  }
+
+  if (state == FIRMWARE_UPDATE_STATE || System.updatesPending()) {
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+    if (claimFailsafeDeferLog(FAILSAFE_DEFER_UPDATE_PENDING)) {
+      Log.info("FailsafeDefer: reason=%s state=%s pending=%d",
+               failsafeDeferReasonName(FAILSAFE_DEFER_UPDATE_PENDING),
+               stateShortName(state),
+               System.updatesPending() ? 1 : 0);
+    }
+#endif
+    return;
+  }
+
+  if (!Time.isValid()) {
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+    if (claimFailsafeDeferLog(FAILSAFE_DEFER_INVALID_TIME)) {
+      Log.info("FailsafeDefer: reason=%s",
+               failsafeDeferReasonName(FAILSAFE_DEFER_INVALID_TIME));
+    }
+#endif
+    return;
+  }
+
+  const time_t lastConnection = sysStatus.get_lastConnection();
+  if (lastConnection == 0) {
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+    if (claimFailsafeDeferLog(FAILSAFE_DEFER_NO_LAST_CONNECTION)) {
+      Log.info("FailsafeDefer: reason=%s",
+               failsafeDeferReasonName(FAILSAFE_DEFER_NO_LAST_CONNECTION));
+    }
+#endif
+    return;
+  }
+
+  const time_t now = Time.now();
+  if (now <= lastConnection) {
+    return;
+  }
+
+  const time_t connectionAgeSec = now - lastConnection;
+  if (connectionAgeSec < ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC) {
+    return;
+  }
+
+  uint8_t currentStage = sysStatus.get_connectivityRecoveryStage();
+  if (currentStage > 3) {
+    currentStage = 0;
+  }
+  if (currentStage >= 3) {
+    return;
+  }
+
+  time_t lastAction = sysStatus.get_lastConnectivityRecoveryAction();
+  if (lastAction > now) {
+    lastAction = 0;
+  }
+
+  const uint8_t nextStage = currentStage + 1;
+  time_t requiredDelay = ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC;
+  if (nextStage >= 2) {
+    requiredDelay += (time_t)connectivityFailsafeJitterSec(nextStage);
+  }
+
+  if (currentStage != 0 && lastAction != 0 && (now - lastAction) < requiredDelay) {
+    return;
+  }
+
+  if (activeConnectAttemptWithinBudget()) {
+    return;
+  }
+
+  const BatteryTier tier = currentBatteryTierForFailsafe();
+  const bool externalPowerPresent = connectivityFailsafeHasExternalPower();
+  const bool lowBatteryHardActionBlocked =
+      nextStage >= 2 &&
+      !externalPowerPresent &&
+      (sysStatus.get_lowBatteryMode() || tier == TIER_SURVIVAL);
+
+  if (lowBatteryHardActionBlocked) {
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+    if (claimFailsafeDeferLog(FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED)) {
+      Log.info("FailsafeDefer: reason=%s stage=%u tier=%s",
+               failsafeDeferReasonName(FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED),
+               (unsigned)nextStage,
+               batteryTierShortName(tier));
+    }
+#else
+    Log.info("Failsafe: defer reason=low-battery stage=%u tier=%s",
+             (unsigned)nextStage,
+             batteryTierShortName(tier));
+#endif
+    persistConnectivityFailsafeState(currentStage, now, false);
+    return;
+  }
+
+  if (nextStage == 1) {
+    current.raiseAlert(ConnectivityPolicy::CONNECTIVITY_FAILSAFE_ALERT);
+    setAppBreadcrumb(BREADCRUMB_CONNECTIVITY_FAILSAFE);
+    persistConnectivityFailsafeState(1, now, true);
+    Log.info("Failsafe: stage=1 action=radio-reset age=%lds",
+             (long)connectionAgeSec);
+    Connectivity::requestFullDisconnectAndRadioOff();
+    state = CONNECTING_STATE;
+    return;
+  }
+
+  if (nextStage == 2) {
+    setAppBreadcrumb(BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD);
+    persistConnectivityFailsafeState(2, now, true);
+    Log.info("Failsafe: stage=2 action=system-reset age=%lds",
+             (long)connectionAgeSec);
+    System.reset();
+    return;
+  }
+
+  setAppBreadcrumb(BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD);
+  persistConnectivityFailsafeState(3, now, true);
+  Log.info("Failsafe: stage=3 action=deep-powerdown age=%lds",
+           (long)connectionAgeSec);
+  ab1805.deepPowerDown();
 }
 
 void userSwitchISR() { userSwitchDetected = true; }
@@ -1147,14 +1611,12 @@ void sensorISR() {
     frontTireFlag = true;
 }
 
-// countSignalTimerISR removed - signalLED() now handles timed LED control automatically
-
 /**
  * @brief Cleanup function that is run at the beginning of the day.
  *
- * @details May or may not be in connected state.  Syncs time with remote
- * service and sets low power mode. Called from Reporting State ONLY. Cleans
- * house at the beginning of a new day.
+ * @details Called from REPORTING_STATE once per local day. If connected, it
+ *          requests a time sync and records lastTimeSync, then resets daily
+ *          counters and related housekeeping state.
  */
 void dailyCleanup() {
   if (Particle.connected()) {
@@ -1192,3 +1654,4 @@ void dailyCleanup() {
   
   current.resetEverything(); // Zero the counts for the new day
 }
+

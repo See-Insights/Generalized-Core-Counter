@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;10.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -92,6 +92,9 @@ $(function(){initNavTree('_state___common_8h.html','',''); });
   <div class="headertitle"><div class="title">State_Common.h File Reference</div></div>
 </div><!--header-->
 <div class="contents">
+
+<p>Shared helper declarations used by multiple state handlers.  
+<a href="#details">More...</a></p>
 <div class="textblock"><code>#include &quot;Particle.h&quot;</code><br />
 <code>#include &quot;<a class="el" href="_my_persistent_data_8h_source.html">MyPersistentData.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="_state_handlers_8h_source.html">state/StateHandlers.h</a>&quot;</code><br />
@@ -99,18 +102,107 @@ $(function(){initNavTree('_state___common_8h.html','',''); });
 </div>
 <p><a href="_state___common_8h_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 id="header-enum-members" class="groupheader"><a id="enum-members" name="enum-members"></a>
+Enumerations</h2></td></tr>
+<tr class="memitem:ab615e291ed6fc3b056a35a52d90c2ef5" id="r_ab615e291ed6fc3b056a35a52d90c2ef5"><td class="memItemLeft">enum &#160;</td><td class="memItemRight"><a class="el" href="#ab615e291ed6fc3b056a35a52d90c2ef5">FailsafeDeferReason</a> : uint8_t { <br />
+&#160;&#160;<a class="el" href="#ab615e291ed6fc3b056a35a52d90c2ef5a60c39b9dae1eb7d38bf1d37272acf672">FAILSAFE_DEFER_NONE</a> = 0
+, <a class="el" href="#ab615e291ed6fc3b056a35a52d90c2ef5a8fc6a2f1a88655b8ae175927c877ac3c">FAILSAFE_DEFER_INVALID_TIME</a> = 1
+, <a class="el" href="#ab615e291ed6fc3b056a35a52d90c2ef5af171957d6aca79437cb0f062c4b06e3c">FAILSAFE_DEFER_NO_LAST_CONNECTION</a> = 2
+, <a class="el" href="#ab615e291ed6fc3b056a35a52d90c2ef5a8e6185dedb967cfb0690eeee8bb0ed79">FAILSAFE_DEFER_DISCONNECTED_MODE</a> = 3
+, <br />
+&#160;&#160;<a class="el" href="#ab615e291ed6fc3b056a35a52d90c2ef5a8a395c72b0fd8d632461cd1834011618">FAILSAFE_DEFER_UPDATE_PENDING</a> = 4
+, <a class="el" href="#ab615e291ed6fc3b056a35a52d90c2ef5a1d03a1138c92a392727a1d7b010e2df7">FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED</a> = 5
+, <a class="el" href="#ab615e291ed6fc3b056a35a52d90c2ef5ad4190f567d0c3390186ef280df4391b6">FAILSAFE_DEFER_CLOSED_HOURS_LONG_SLEEP</a> = 6
+<br />
+ }</td></tr>
+<tr class="memdesc:ab615e291ed6fc3b056a35a52d90c2ef5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reasons the long-duration connectivity failsafe intentionally deferred action.  <a href="#ab615e291ed6fc3b056a35a52d90c2ef5">More...</a><br /></td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
+<tr class="memitem:a59ff02acc1674a4de1aab8cad308dd53" id="r_a59ff02acc1674a4de1aab8cad308dd53"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a59ff02acc1674a4de1aab8cad308dd53">activeConnectAttemptWithinBudget</a> ()</td></tr>
+<tr class="memdesc:a59ff02acc1674a4de1aab8cad308dd53"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true when CONNECTING_STATE still owns an in-budget connect attempt.  <br /></td></tr>
 <tr class="memitem:a41a544e4d6539b3b90c9cdbd3420de83" id="r_a41a544e4d6539b3b90c9cdbd3420de83"><td class="memItemLeft"><a class="el" href="_my_persistent_data_8h.html#a426866053adc87a6b48f04938146e0ff">BatteryTier</a>&#160;</td><td class="memItemRight"><a class="el" href="#a41a544e4d6539b3b90c9cdbd3420de83">applyBatteryAwareConnectionModePolicy</a> (float currentSoC)</td></tr>
+<tr class="memdesc:a41a544e4d6539b3b90c9cdbd3420de83"><td class="mdescLeft">&#160;</td><td class="mdescRight">Applies battery-aware policy overrides to the current connection mode.  <br /></td></tr>
+<tr class="memitem:a4f03886ca8de88b6acd699592b4a21dd" id="r_a4f03886ca8de88b6acd699592b4a21dd"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a4f03886ca8de88b6acd699592b4a21dd">claimFailsafeDeferLog</a> (<a class="el" href="#ab615e291ed6fc3b056a35a52d90c2ef5">FailsafeDeferReason</a> reason)</td></tr>
+<tr class="memdesc:a4f03886ca8de88b6acd699592b4a21dd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Claims a one-shot defer reason log slot for the current boot.  <br /></td></tr>
+<tr class="memitem:adfdc96a561bfc48d07fd89fa97b22d67" id="r_adfdc96a561bfc48d07fd89fa97b22d67"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#adfdc96a561bfc48d07fd89fa97b22d67">clearConnectivityFailsafeRecovery</a> (const char *reason)</td></tr>
+<tr class="memdesc:adfdc96a561bfc48d07fd89fa97b22d67"><td class="mdescLeft">&#160;</td><td class="mdescRight">Clears persisted connectivity failsafe state after successful recovery.  <br /></td></tr>
 <tr class="memitem:a496510658b21d252547ca67ae1035445" id="r_a496510658b21d252547ca67ae1035445"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a496510658b21d252547ca67ae1035445">dailyCleanup</a> ()</td></tr>
-<tr class="memdesc:a496510658b21d252547ca67ae1035445"><td class="mdescLeft">&#160;</td><td class="mdescRight">Cleanup function that is run at the beginning of the day.  <br /></td></tr>
+<tr class="memdesc:a496510658b21d252547ca67ae1035445"><td class="mdescLeft">&#160;</td><td class="mdescRight">Runs once-per-day cleanup work.  <br /></td></tr>
 <tr class="memitem:a26af5a78d8cca160ca913b5e91a224d6" id="r_a26af5a78d8cca160ca913b5e91a224d6"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a26af5a78d8cca160ca913b5e91a224d6">ensureSensorEnabled</a> (const char *context)</td></tr>
+<tr class="memdesc:a26af5a78d8cca160ca913b5e91a224d6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Enables or re-enables the active sensor when a state requires it.  <br /></td></tr>
+<tr class="memitem:ad43cc0046dda7f743c7e22b116b88f17" id="r_ad43cc0046dda7f743c7e22b116b88f17"><td class="memItemLeft">const char *&#160;</td><td class="memItemRight"><a class="el" href="#ad43cc0046dda7f743c7e22b116b88f17">failsafeDeferReasonName</a> (<a class="el" href="#ab615e291ed6fc3b056a35a52d90c2ef5">FailsafeDeferReason</a> reason)</td></tr>
+<tr class="memdesc:ad43cc0046dda7f743c7e22b116b88f17"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts a defer reason enum to a stable log label.  <br /></td></tr>
+<tr class="memitem:afbe3db679f15b8c6ca6b4774dfb6e66f" id="r_afbe3db679f15b8c6ca6b4774dfb6e66f"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#afbe3db679f15b8c6ca6b4774dfb6e66f">logOccupiedEvent</a> (const char *reason, uint32_t ledSeconds, bool report, bool reset=false)</td></tr>
+<tr class="memdesc:afbe3db679f15b8c6ca6b4774dfb6e66f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Logs an occupied-state transition or refresh in a consistent format.  <br /></td></tr>
+<tr class="memitem:a3891aaf3a866003a6cb520753f738a32" id="r_a3891aaf3a866003a6cb520753f738a32"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a3891aaf3a866003a6cb520753f738a32">logUnoccupiedEvent</a> (const char *reason, uint32_t sessionSeconds, uint32_t totalSeconds, bool report)</td></tr>
+<tr class="memdesc:a3891aaf3a866003a6cb520753f738a32"><td class="mdescLeft">&#160;</td><td class="mdescRight">Logs an unoccupied-state transition in a consistent format.  <br /></td></tr>
 <tr class="memitem:a6e8d6c80794e3a266d4ef6b976e9c27c" id="r_a6e8d6c80794e3a266d4ef6b976e9c27c"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a6e8d6c80794e3a266d4ef6b976e9c27c">publishData</a> ()</td></tr>
+<tr class="memdesc:a6e8d6c80794e3a266d4ef6b976e9c27c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Publishes the current report payload.  <br /></td></tr>
 <tr class="memitem:a5b6d4035a9304bc53863ee513f708b0d" id="r_a5b6d4035a9304bc53863ee513f708b0d"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a5b6d4035a9304bc53863ee513f708b0d">publishDiagnosticSafe</a> (const char *eventName, const char *data, PublishFlags flags)</td></tr>
-<tr class="memdesc:a5b6d4035a9304bc53863ee513f708b0d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Safely publish diagnostic message through queue with depth guard.  <br /></td></tr>
+<tr class="memdesc:a5b6d4035a9304bc53863ee513f708b0d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Publishes a diagnostic event only when the current state allows it safely.  <br /></td></tr>
 <tr class="memitem:ae8d84ddf273ffd2dad8fa8fa39191914" id="r_ae8d84ddf273ffd2dad8fa8fa39191914"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#ae8d84ddf273ffd2dad8fa8fa39191914">setAppBreadcrumb</a> (uint8_t code)</td></tr>
+<tr class="memdesc:ae8d84ddf273ffd2dad8fa8fa39191914"><td class="mdescLeft">&#160;</td><td class="mdescRight">Stores an application breadcrumb for the next boot.  <br /></td></tr>
 </table>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Shared helper declarations used by multiple state handlers. </p>
+
+<p class="definition">Definition in file <a class="el" href="_state___common_8h_source.html">State_Common.h</a>.</p>
+</div><a name="doc-enum-members" id="doc-enum-members"></a><h2 id="header-doc-enum-members" class="groupheader">Enumeration Type Documentation</h2>
+<a id="ab615e291ed6fc3b056a35a52d90c2ef5" name="ab615e291ed6fc3b056a35a52d90c2ef5"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab615e291ed6fc3b056a35a52d90c2ef5">&#9670;&#160;</a></span>FailsafeDeferReason</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum <a class="el" href="#ab615e291ed6fc3b056a35a52d90c2ef5">FailsafeDeferReason</a> : uint8_t</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Reasons the long-duration connectivity failsafe intentionally deferred action. </p>
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="ab615e291ed6fc3b056a35a52d90c2ef5a60c39b9dae1eb7d38bf1d37272acf672" name="ab615e291ed6fc3b056a35a52d90c2ef5a60c39b9dae1eb7d38bf1d37272acf672"></a>FAILSAFE_DEFER_NONE&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="ab615e291ed6fc3b056a35a52d90c2ef5a8fc6a2f1a88655b8ae175927c877ac3c" name="ab615e291ed6fc3b056a35a52d90c2ef5a8fc6a2f1a88655b8ae175927c877ac3c"></a>FAILSAFE_DEFER_INVALID_TIME&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="ab615e291ed6fc3b056a35a52d90c2ef5af171957d6aca79437cb0f062c4b06e3c" name="ab615e291ed6fc3b056a35a52d90c2ef5af171957d6aca79437cb0f062c4b06e3c"></a>FAILSAFE_DEFER_NO_LAST_CONNECTION&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="ab615e291ed6fc3b056a35a52d90c2ef5a8e6185dedb967cfb0690eeee8bb0ed79" name="ab615e291ed6fc3b056a35a52d90c2ef5a8e6185dedb967cfb0690eeee8bb0ed79"></a>FAILSAFE_DEFER_DISCONNECTED_MODE&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="ab615e291ed6fc3b056a35a52d90c2ef5a8a395c72b0fd8d632461cd1834011618" name="ab615e291ed6fc3b056a35a52d90c2ef5a8a395c72b0fd8d632461cd1834011618"></a>FAILSAFE_DEFER_UPDATE_PENDING&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="ab615e291ed6fc3b056a35a52d90c2ef5a1d03a1138c92a392727a1d7b010e2df7" name="ab615e291ed6fc3b056a35a52d90c2ef5a1d03a1138c92a392727a1d7b010e2df7"></a>FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="ab615e291ed6fc3b056a35a52d90c2ef5ad4190f567d0c3390186ef280df4391b6" name="ab615e291ed6fc3b056a35a52d90c2ef5ad4190f567d0c3390186ef280df4391b6"></a>FAILSAFE_DEFER_CLOSED_HOURS_LONG_SLEEP&#160;</td><td class="fielddoc"></td></tr>
+</table>
+
+<p class="definition">Definition at line <a class="el" href="_state___common_8h_source.html#l00016">16</a> of file <a class="el" href="_state___common_8h_source.html">State_Common.h</a>.</p>
+
+</div>
+</div>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
+<a id="a59ff02acc1674a4de1aab8cad308dd53" name="a59ff02acc1674a4de1aab8cad308dd53"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a59ff02acc1674a4de1aab8cad308dd53">&#9670;&#160;</a></span>activeConnectAttemptWithinBudget()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool activeConnectAttemptWithinBudget </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns true when CONNECTING_STATE still owns an in-budget connect attempt. </p>
+<dl class="section return"><dt>Returns</dt><dd>true when long-duration failsafe actions should defer to CONNECTING_STATE </dd></dl>
+
+<p class="definition">Definition at line <a class="el" href="_state___connect_8cpp_source.html#l00088">88</a> of file <a class="el" href="_state___connect_8cpp_source.html">State_Connect.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_state_machine_8h_source.html#l00019">CONNECTING_STATE</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00125">oldState</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00132">session</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00124">state</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01470">connectivityFailsafeSupervisor()</a>.</p>
+
+</div>
+</div>
 <a id="a41a544e4d6539b3b90c9cdbd3420de83" name="a41a544e4d6539b3b90c9cdbd3420de83"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a41a544e4d6539b3b90c9cdbd3420de83">&#9670;&#160;</a></span>applyBatteryAwareConnectionModePolicy()</h2>
 
@@ -126,11 +218,83 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00707">707</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p>Applies battery-aware policy overrides to the current connection mode. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">currentSoC</td><td>Latest battery state of charge </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Resulting battery tier used for the policy decision </dd></dl>
+
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00987">987</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_battery_backoff_8cpp_source.html#l00006">Cloud::calculateBatteryTier()</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00072">INTERMITTENT</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00074">INTERMITTENT_KEEP_ALIVE</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00055">OCCUPANCY</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00113">TIER_CONSERVING</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00112">TIER_HEALTHY</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___report_8cpp_source.html#l00018">handleReportingState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00052">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00194">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___report_8cpp_source.html#l00024">handleReportingState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>.</p>
+
+</div>
+</div>
+<a id="a4f03886ca8de88b6acd699592b4a21dd" name="a4f03886ca8de88b6acd699592b4a21dd"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4f03886ca8de88b6acd699592b4a21dd">&#9670;&#160;</a></span>claimFailsafeDeferLog()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool claimFailsafeDeferLog </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="#ab615e291ed6fc3b056a35a52d90c2ef5">FailsafeDeferReason</a></td>          <td class="paramname"><span class="paramname"><em>reason</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Claims a one-shot defer reason log slot for the current boot. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">reason</td><td>Reason to record </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>true when the caller should emit the corresponding log line </dd></dl>
+
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00464">464</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00291">anonymous_namespace{Generalized-Core-Counter.cpp}::claimFailsafeDeferLogLocal()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01470">connectivityFailsafeSupervisor()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>.</p>
+
+</div>
+</div>
+<a id="adfdc96a561bfc48d07fd89fa97b22d67" name="adfdc96a561bfc48d07fd89fa97b22d67"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#adfdc96a561bfc48d07fd89fa97b22d67">&#9670;&#160;</a></span>clearConnectivityFailsafeRecovery()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void clearConnectivityFailsafeRecovery </td>
+          <td>(</td>
+          <td class="paramtype">const char *</td>          <td class="paramname"><span class="paramname"><em>reason</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Clears persisted connectivity failsafe state after successful recovery. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">reason</td><td>Short log label describing why recovery state was cleared </td></tr>
+  </table>
+  </dd>
+</dl>
+
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01446">1446</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_connectivity_policy_8h_source.html#l00116">ConnectivityPolicy::CONNECTIVITY_FAILSAFE_ALERT</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00139">handleConnectingState()</a>.</p>
 
 </div>
 </div>
@@ -149,10 +313,11 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Cleanup function that is run at the beginning of the day. </p>
-<p>May or may not be in connected state. Syncs time with remote service and sets low power mode. Called from Reporting <a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8">State</a> ONLY. Cleans house at the beginning of a new day. </p>
+<p>Runs once-per-day cleanup work. </p>
+<p>Runs once-per-day cleanup work.</p>
+<p>Called from REPORTING_STATE once per local day. If connected, it requests a time sync and records lastTimeSync, then resets daily counters and related housekeeping state. </p>
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01159">1159</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01621">1621</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
 </div>
 </div>
@@ -171,11 +336,159 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
+<p>Enables or re-enables the active sensor when a state requires it. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">context</td><td>Short logging label for the caller </td></tr>
+  </table>
+  </dd>
+</dl>
+
 <p class="definition">Definition at line <a class="el" href="_state___idle_8cpp_source.html#l00017">17</a> of file <a class="el" href="_state___idle_8cpp_source.html">State_Idle.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_sensor_manager_8cpp_source.html#l00078">SensorManager::initializeFromConfig()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00040">SensorManager::instance()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00161">SensorManager::onExitSleep()</a>.</p>
+<p class="reference">References <a class="el" href="_sensor_manager_8cpp_source.html#l00230">SensorManager::initializeFromConfig()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00193">SensorManager::instance()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00311">SensorManager::onExitSleep()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___idle_8cpp_source.html#l00031">handleIdleState()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00052">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___idle_8cpp_source.html#l00031">handleIdleState()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>.</p>
+
+</div>
+</div>
+<a id="ad43cc0046dda7f743c7e22b116b88f17" name="ad43cc0046dda7f743c7e22b116b88f17"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad43cc0046dda7f743c7e22b116b88f17">&#9670;&#160;</a></span>failsafeDeferReasonName()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const char * failsafeDeferReasonName </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="#ab615e291ed6fc3b056a35a52d90c2ef5">FailsafeDeferReason</a></td>          <td class="paramname"><span class="paramname"><em>reason</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Converts a defer reason enum to a stable log label. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">reason</td><td>Failsafe defer reason to stringify </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Stable C string describing the reason </dd></dl>
+
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00460">460</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00272">anonymous_namespace{Generalized-Core-Counter.cpp}::failsafeDeferReasonNameLocal()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01470">connectivityFailsafeSupervisor()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>.</p>
+
+</div>
+</div>
+<a id="afbe3db679f15b8c6ca6b4774dfb6e66f" name="afbe3db679f15b8c6ca6b4774dfb6e66f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#afbe3db679f15b8c6ca6b4774dfb6e66f">&#9670;&#160;</a></span>logOccupiedEvent()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void logOccupiedEvent </td>
+          <td>(</td>
+          <td class="paramtype">const char *</td>          <td class="paramname"><span class="paramname"><em>reason</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint32_t</td>          <td class="paramname"><span class="paramname"><em>ledSeconds</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool</td>          <td class="paramname"><span class="paramname"><em>report</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool</td>          <td class="paramname"><span class="paramname"><em>reset</em></span><span class="paramdefsep"> = </span><span class="paramdefval">false</span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Logs an occupied-state transition or refresh in a consistent format. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">reason</td><td>Short reason label </td></tr>
+    <tr><td class="paramname">ledSeconds</td><td>Configured LED hold time in seconds </td></tr>
+    <tr><td class="paramname">report</td><td>true when the event triggered a report </td></tr>
+    <tr><td class="paramname">reset</td><td>true when the log reflects a reset or refresh of the occupied timer </td></tr>
+  </table>
+  </dd>
+</dl>
+
+<p class="definition">Definition at line <a class="el" href="_state___common_8h_source.html#l00110">110</a> of file <a class="el" href="_state___common_8h_source.html">State_Common.h</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___modes_8cpp_source.html#l00052">handleOccupancyMode()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>.</p>
+
+</div>
+</div>
+<a id="a3891aaf3a866003a6cb520753f738a32" name="a3891aaf3a866003a6cb520753f738a32"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3891aaf3a866003a6cb520753f738a32">&#9670;&#160;</a></span>logUnoccupiedEvent()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void logUnoccupiedEvent </td>
+          <td>(</td>
+          <td class="paramtype">const char *</td>          <td class="paramname"><span class="paramname"><em>reason</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint32_t</td>          <td class="paramname"><span class="paramname"><em>sessionSeconds</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint32_t</td>          <td class="paramname"><span class="paramname"><em>totalSeconds</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool</td>          <td class="paramname"><span class="paramname"><em>report</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Logs an unoccupied-state transition in a consistent format. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">reason</td><td>Short reason label </td></tr>
+    <tr><td class="paramname">sessionSeconds</td><td>Occupied duration for the just-ended session </td></tr>
+    <tr><td class="paramname">totalSeconds</td><td>Total occupied seconds accumulated for the day </td></tr>
+    <tr><td class="paramname">report</td><td>true when the transition triggered a report </td></tr>
+  </table>
+  </dd>
+</dl>
+
+<p class="definition">Definition at line <a class="el" href="_state___common_8h_source.html#l00135">135</a> of file <a class="el" href="_state___common_8h_source.html">State_Common.h</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___idle_8cpp_source.html#l00031">handleIdleState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>, and <a class="el" href="_state___modes_8cpp_source.html#l00116">updateOccupancyState()</a>.</p>
 
 </div>
 </div>
@@ -194,7 +507,9 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00865">865</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p>Publishes the current report payload. </p>
+
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01148">1148</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
 </div>
 </div>
@@ -230,7 +545,17 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p>Safely publish diagnostic message through queue with depth guard. </p>
+<p>Publishes a diagnostic event only when the current state allows it safely. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">eventName</td><td>Particle event name </td></tr>
+    <tr><td class="paramname">data</td><td>Event payload </td></tr>
+    <tr><td class="paramname">flags</td><td>Particle publish flags </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>true when the publish was accepted</dd></dl>
+<p>Publishes a diagnostic event only when the current state allows it safely.</p>
 <p>Routes low-priority diagnostic messages through PublishQueuePosix only when queue depth is below threshold, preventing displacement of critical telemetry data during tight loops or error conditions.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -242,9 +567,9 @@ Functions</h2></td></tr>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>true if message was queued or published, false if queue was too full. </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01091">1091</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01407">1407</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01159">dailyCleanup()</a>, <a class="el" href="_state___connect_8cpp_source.html#l00047">handleConnectingState()</a>, <a class="el" href="_my_persistent_data_8cpp_source.html#l00103">sysStatusData::initialize()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01035">UbidotsHandler()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01621">dailyCleanup()</a>, <a class="el" href="_state___connect_8cpp_source.html#l00139">handleConnectingState()</a>, <a class="el" href="_my_persistent_data_8cpp_source.html#l00111">sysStatusData::initialize()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01344">UbidotsHandler()</a>.</p>
 
 </div>
 </div>
@@ -263,11 +588,19 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00180">180</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p>Stores an application breadcrumb for the next boot. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">code</td><td>Retained breadcrumb code </td></tr>
+  </table>
+  </dd>
+</dl>
 
-<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00175">appBreadcrumb</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00176">appBreadcrumbMs</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00491">491</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00047">handleConnectingState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00052">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00194">setup()</a>.</p>
+<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00486">appBreadcrumb</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00487">appBreadcrumbMs</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01470">connectivityFailsafeSupervisor()</a>, <a class="el" href="_state___connect_8cpp_source.html#l00139">handleConnectingState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>.</p>
 
 </div>
 </div>

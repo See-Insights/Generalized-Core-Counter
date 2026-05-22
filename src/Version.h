@@ -11,7 +11,7 @@
 #define VERSION_H
 
 /**
- * @brief Current firmware release string (e.g. "3.01").
+ * @brief Current firmware release string (for example, "11.0.0").
  */
 extern const char* FIRMWARE_VERSION;
 

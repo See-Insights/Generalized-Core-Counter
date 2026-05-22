@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;10.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -93,6 +93,7 @@ $(function(){initNavTree('_connectivity_policy_8h.html','',''); });
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><code>#include &quot;Particle.h&quot;</code><br />
+<code>#include &quot;<a class="el" href="_build_profile_8h_source.html">BuildProfile.h</a>&quot;</code><br />
 </div>
 <p><a href="_connectivity_policy_8h_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
@@ -113,6 +114,11 @@ Variables</h2></td></tr>
 <tr class="memitem:a87b91a8af5b73e7fb4c2915c17473d93" id="r_a87b91a8af5b73e7fb4c2915c17473d93"><td class="memItemLeft">constexpr unsigned long&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#a87b91a8af5b73e7fb4c2915c17473d93">ConnectivityPolicy::CONNECT_BUDGET_DEEP_MS</a> = 11UL * 60UL * 1000UL</td></tr>
 <tr class="memitem:ab4e13d08abe16b232ee9d8a6be91f426" id="r_ab4e13d08abe16b232ee9d8a6be91f426"><td class="memItemLeft">constexpr unsigned long&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#ab4e13d08abe16b232ee9d8a6be91f426">ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS</a> = 5UL * 60UL * 1000UL</td></tr>
 <tr class="memitem:a72970a4a15bbfd3af3dc9812753eec18" id="r_a72970a4a15bbfd3af3dc9812753eec18"><td class="memItemLeft">constexpr unsigned int&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#a72970a4a15bbfd3af3dc9812753eec18">ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_SEC</a> = 300U</td></tr>
+<tr class="memitem:a409fdb5536dd4b97b9b54901eb01277f" id="r_a409fdb5536dd4b97b9b54901eb01277f"><td class="memItemLeft">constexpr int8_t&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#a409fdb5536dd4b97b9b54901eb01277f">ConnectivityPolicy::CONNECTIVITY_FAILSAFE_ALERT</a> = 45</td></tr>
+<tr class="memitem:ad0ae50a997155478a431ed6a33885e7a" id="r_ad0ae50a997155478a431ed6a33885e7a"><td class="memItemLeft">constexpr time_t&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#ad0ae50a997155478a431ed6a33885e7a">ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC</a> = 6L * 3600L</td></tr>
+<tr class="memitem:af0e815c633aba2fed1405214fcac02e2" id="r_af0e815c633aba2fed1405214fcac02e2"><td class="memItemLeft">constexpr time_t&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#af0e815c633aba2fed1405214fcac02e2">ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC</a> = 30L * 60L</td></tr>
+<tr class="memitem:a1d096fe0764bf077cc9b835e746f4ab9" id="r_a1d096fe0764bf077cc9b835e746f4ab9"><td class="memItemLeft">constexpr time_t&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#a1d096fe0764bf077cc9b835e746f4ab9">ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC</a> = 12L * 3600L</td></tr>
+<tr class="memitem:a5ae7c7494b3d1c4c6699efa520ee6b9f" id="r_a5ae7c7494b3d1c4c6699efa520ee6b9f"><td class="memItemLeft">constexpr time_t&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#a5ae7c7494b3d1c4c6699efa520ee6b9f">ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC</a> = 0L</td></tr>
 <tr class="memitem:ac4e9c849bfed8fdef2386743a31f0533" id="r_ac4e9c849bfed8fdef2386743a31f0533"><td class="memItemLeft">constexpr unsigned long&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#ac4e9c849bfed8fdef2386743a31f0533">ConnectivityPolicy::DEBUG_SERIAL_POST_CONNECT_DELAY_MS</a> = 500UL</td></tr>
 <tr class="memitem:aab29f49018a33279dba763fecd9c4a7d" id="r_aab29f49018a33279dba763fecd9c4a7d"><td class="memItemLeft">constexpr unsigned long&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#aab29f49018a33279dba763fecd9c4a7d">ConnectivityPolicy::DEBUG_SERIAL_REENUM_DELAY_MS</a> = 500UL</td></tr>
 <tr class="memitem:a2a3ed6467a209cf111e1dbf81233b2a8" id="r_a2a3ed6467a209cf111e1dbf81233b2a8"><td class="memItemLeft">constexpr unsigned long&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#a2a3ed6467a209cf111e1dbf81233b2a8">ConnectivityPolicy::DEBUG_SERIAL_WAIT_POLL_DELAY_MS</a> = 100UL</td></tr>
@@ -128,6 +134,7 @@ Variables</h2></td></tr>
 <tr class="memitem:a514e3eeaa0000e932f68cba30657176e" id="r_a514e3eeaa0000e932f68cba30657176e"><td class="memItemLeft">constexpr unsigned long&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#a514e3eeaa0000e932f68cba30657176e">ConnectivityPolicy::LEDGER_SYNC_TIMEOUT_MS</a> = 5000UL</td></tr>
 <tr class="memitem:ae00914c08bf3eaaa5d8e412d63d07078" id="r_ae00914c08bf3eaaa5d8e412d63d07078"><td class="memItemLeft">constexpr unsigned long&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#ae00914c08bf3eaaa5d8e412d63d07078">ConnectivityPolicy::NIGHTLY_HEAP_RESET_THRESHOLD_BYTES</a> = 45UL * 1024UL</td></tr>
 <tr class="memitem:a264374785dc6d61fd971454e4c9a0e7e" id="r_a264374785dc6d61fd971454e4c9a0e7e"><td class="memItemLeft">constexpr unsigned long&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#a264374785dc6d61fd971454e4c9a0e7e">ConnectivityPolicy::NIGHTLY_HEAP_WARN_THRESHOLD_BYTES</a> = 50UL * 1024UL</td></tr>
+<tr class="memitem:ad47b260425d095887cb05615ea6321fc" id="r_ad47b260425d095887cb05615ea6321fc"><td class="memItemLeft">constexpr unsigned long&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#ad47b260425d095887cb05615ea6321fc">ConnectivityPolicy::OUTPUT_LEDGER_SYNC_TIMEOUT_MS</a> = 30000UL</td></tr>
 <tr class="memitem:a2bf83afe32c0f44b32a6cb4d48e6a402" id="r_a2bf83afe32c0f44b32a6cb4d48e6a402"><td class="memItemLeft">constexpr long&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#a2bf83afe32c0f44b32a6cb4d48e6a402">ConnectivityPolicy::WEBHOOK_LONGTERM_ALERT40_SEC</a> = 3L * 3600L</td></tr>
 <tr class="memitem:aec173e6da0225c588ff07235628b1b16" id="r_aec173e6da0225c588ff07235628b1b16"><td class="memItemLeft">constexpr long&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#aec173e6da0225c588ff07235628b1b16">ConnectivityPolicy::WEBHOOK_LONGTERM_CONNECTED_RECENTLY_SEC</a> = 2L * 3600L</td></tr>
 <tr class="memitem:a8c2c9ae6d7ba0414db36943cd01d78a4" id="r_a8c2c9ae6d7ba0414db36943cd01d78a4"><td class="memItemLeft">constexpr long&#160;</td><td class="memItemRight"><a class="el" href="namespace_connectivity_policy.html#a8c2c9ae6d7ba0414db36943cd01d78a4">ConnectivityPolicy::WEBHOOK_LONGTERM_ESCALATE_TO_ERROR_SEC</a> = 6L * 3600L</td></tr>

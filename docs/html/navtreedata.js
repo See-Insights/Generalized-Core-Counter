@@ -25,57 +25,32 @@
 var NAVTREE =
 [
   [ "Generalized-Core-Counter", "index.html", [
-    [ "Overview", "index.html#autotoc_md2", null ],
-    [ "Features", "index.html#autotoc_md3", null ],
-    [ "Hardware", "index.html#autotoc_md4", null ],
-    [ "Occupancy Mode Details", "index.html#autotoc_md5", null ],
-    [ "Documentation", "index.html#autotoc_md6", null ],
-    [ "Architecture", "index.html#autotoc_md7", [
-      [ "Sensor Interface Pattern", "index.html#autotoc_md8", null ],
-      [ "State Machine", "index.html#autotoc_md9", null ],
-      [ "Application State Machine &amp; Handlers", "index.html#autotoc_md10", null ],
-      [ "Wake-Cycle Observability (Field Diagnostics)", "index.html#autotoc_md11", null ],
-      [ "Persistent Storage", "index.html#autotoc_md12", null ]
+    [ "Release Focus", "index.html#autotoc_md2", null ],
+    [ "Supported Platforms", "index.html#autotoc_md3", null ],
+    [ "Supported Sensor Patterns", "index.html#autotoc_md4", null ],
+    [ "Core Architecture", "index.html#autotoc_md5", null ],
+    [ "Recovery Architecture", "index.html#autotoc_md6", null ],
+    [ "Power And Connectivity Model", "index.html#autotoc_md7", null ],
+    [ "<span class=\"tt\">CONNECTIVITY_FAILSAFE_TEST_MODE</span>", "index.html#autotoc_md8", null ],
+    [ "Ledger Configuration Model", "index.html#autotoc_md9", [
+      [ "Configuration Shape", "index.html#autotoc_md10", null ]
     ] ],
-    [ "Configuration Management", "index.html#autotoc_md13", [
-      [ "Ledger Architecture", "index.html#autotoc_md14", null ],
-      [ "Configuration Structure", "index.html#autotoc_md15", null ],
-      [ "Mode Values", "index.html#autotoc_md16", null ]
+    [ "Build And Validation", "index.html#autotoc_md11", null ],
+    [ "Observability", "index.html#autotoc_md12", null ],
+    [ "Documentation Index", "index.html#autotoc_md13", null ],
+    [ "Repository Layout", "index.html#autotoc_md14", null ],
+    [ "Deployment Workflow", "index.html#autotoc_md15", null ],
+    [ "Contributor Notes", "index.html#autotoc_md16", null ],
+    [ "Current Release Status", "index.html#autotoc_md17", null ],
+    [ "Release Notes: v11.0.0", "md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html", [
+      [ "Intent", "md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md19", null ],
+      [ "Highlights", "md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md20", null ],
+      [ "Production Behavior", "md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md21", null ],
+      [ "Bench Validation Summary", "md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md22", null ],
+      [ "Deployment Scope", "md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md23", null ],
+      [ "Rollback Guidance", "md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md24", null ],
+      [ "Post-Soak Follow-Up", "md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md25", null ]
     ] ],
-    [ "Device Commissioning Workflow", "index.html#autotoc_md17", [
-      [ "Configuration Management Flow", "index.html#autotoc_md18", null ]
-    ] ],
-    [ "Offline Device Management", "index.html#autotoc_md19", null ],
-    [ "Data Reporting", "index.html#autotoc_md20", [
-      [ "Counting Mode Payload", "index.html#autotoc_md21", null ],
-      [ "Occupancy Mode Payload", "index.html#autotoc_md22", null ]
-    ] ],
-    [ "Webhook Configuration", "index.html#autotoc_md23", [
-      [ "Overview", "index.html#autotoc_md24", null ],
-      [ "Configuration Method", "index.html#autotoc_md25", null ],
-      [ "Webhook Resolution Examples", "index.html#autotoc_md26", null ],
-      [ "Setting Up Webhooks in Particle Console", "index.html#autotoc_md27", null ],
-      [ "Multiple Products Example", "index.html#autotoc_md28", null ],
-      [ "Monitoring Webhook Activity", "index.html#autotoc_md29", null ],
-      [ "Troubleshooting", "index.html#autotoc_md30", null ]
-    ] ],
-    [ "Getting Started", "index.html#autotoc_md31", [
-      [ "Setup in Particle Console", "index.html#autotoc_md32", null ],
-      [ "Flash Firmware", "index.html#autotoc_md33", null ],
-      [ "Monitor Operation", "index.html#autotoc_md34", null ]
-    ] ],
-    [ "How-To: Common Configuration Tasks", "index.html#autotoc_md35", [
-      [ "Creating Device-Specific Settings", "index.html#autotoc_md36", null ],
-      [ "Common Customizations", "index.html#autotoc_md37", null ]
-    ] ],
-    [ "Battery-Aware Power Management", "index.html#autotoc_md38", [
-      [ "Connection Interval Backoff (All Modes)", "index.html#autotoc_md39", null ],
-      [ "Occupancy Mode Battery Protection", "index.html#autotoc_md40", null ]
-    ] ],
-    [ "Dependencies", "index.html#autotoc_md41", null ],
-    [ "Contributing", "index.html#autotoc_md42", null ],
-    [ "License", "index.html#autotoc_md43", null ],
-    [ "Support", "index.html#autotoc_md44", null ],
     [ "Namespaces", "namespaces.html", [
       [ "Namespace List", "namespaces.html", "namespaces_dup" ],
       [ "Namespace Members", "namespacemembers.html", [
@@ -93,14 +68,14 @@ var NAVTREE =
       [ "Class Members", "functions.html", [
         [ "All", "functions.html", "functions_dup" ],
         [ "Functions", "functions_func.html", "functions_func" ],
-        [ "Variables", "functions_vars.html", null ],
+        [ "Variables", "functions_vars.html", "functions_vars" ],
         [ "Enumerations", "functions_enum.html", null ]
       ] ]
     ] ],
     [ "Files", "files.html", [
       [ "File List", "files.html", "files_dup" ],
       [ "File Members", "globals.html", [
-        [ "All", "globals.html", null ],
+        [ "All", "globals.html", "globals_dup" ],
         [ "Functions", "globals_func.html", null ],
         [ "Variables", "globals_vars.html", null ],
         [ "Enumerations", "globals_enum.html", null ],
@@ -114,9 +89,10 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "_battery_backoff_8cpp.html",
-"_wake_cycle_stats_8h.html",
-"classsys_status_data.html#adfd6ac7370e5ce3a86d48ab0763d44ae",
-"namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a452bb1633016be3c71fffc2fe5d5a0d7"
+"_state___report_8cpp.html#a1ef85fec9be65d21b46ebd2b1a57294a",
+"classsensor_config_data_1_1_sensor_data.html#ac6a0b2b9a438a42cec029c3d5d8ee043",
+"globals_f.html",
+"struct_observability_1_1_wake_cycle_stats.html#a327ce298dfe7873cea5a4f044d72a6f9"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronization';

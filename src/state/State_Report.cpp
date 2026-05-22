@@ -14,6 +14,12 @@
 // This file was split from StateHandlers.cpp as a mechanical refactor.
 // No behavioral changes were made.
 
+namespace {
+
+constexpr unsigned long MODEM_UNSTABLE_RECONNECT_DEFER_MS = 30000UL;
+
+} // namespace
+
 // REPORTING_STATE: Build and send periodic report
 void handleReportingState() {
   if (state != oldState) {
@@ -53,13 +59,11 @@ void handleReportingState() {
   measure.loop();         // Take sensor measurements for reporting
   measure.batteryState(); // Update battery SoC/state and enclosure temperature
 
-  Log.info("Enclosure temperature at report: %4.2f C", (double)current.get_internalTempC());
   publishData(); // Queue hourly report; actual send depends on connectivity policy
 
   // After each hourly report, reset the hourly counter so
   // the next report contains only the counts for that hour.
   if (sysStatus.get_sensorMode() == COUNTING) {
-    Log.info("Resetting hourlyCount after report (was %d)", current.get_hourlyCount());
     current.set_hourlyCount(0);
   }
 
@@ -123,37 +127,8 @@ void handleReportingState() {
   }
   
   if (!Particle.connected()) {
-    // ********** Auto-Cycling Test Mode **********
-    // Automatically cycle through test scenarios on each report:
-    // 0: 80% (HEALTHY), 1: 60% (CONSERVING), 2: 40% (CRITICAL), 3: 25% (SURVIVAL), 4: Real battery
-    uint8_t scenarioIndex = sysStatus.get_testScenarioIndex();
-    if (scenarioIndex != 0xFF) {
-      const float testBatteryValues[] = {80.0f, 60.0f, 40.0f, 25.0f, -1.0f};
-      const char* scenarioNames[] = {"HEALTHY tier test", "CONSERVING tier test", "CRITICAL tier test", "SURVIVAL tier test", "Real battery"};
-      
-      if (scenarioIndex < 5) {
-        float batteryOverride = testBatteryValues[scenarioIndex];
-        sysStatus.set_testBatteryOverride(batteryOverride);
-        Log.info("AUTO-TEST: Scenario %d - %s (battery=%.1f%%)", scenarioIndex, scenarioNames[scenarioIndex], (double)batteryOverride);
-        
-        // Advance to next scenario for next cycle
-        scenarioIndex++;
-        if (scenarioIndex >= 5) {
-          scenarioIndex = 0xFF;  // Done with all scenarios
-          Log.info("AUTO-TEST: Completed all scenarios - disabling auto-test mode");
-        }
-        sysStatus.set_testScenarioIndex(scenarioIndex);
-      }
-    }
-    
     // Calculate current battery tier with hysteresis to prevent thrashing
-    // Use test override if set (>= 0), otherwise use actual battery level
-    float testBatteryOverride = sysStatus.get_testBatteryOverride();
-    float currentSoC = (testBatteryOverride >= 0.0f) ? testBatteryOverride : current.get_stateOfCharge();
-    
-    if (testBatteryOverride >= 0.0f && sysStatus.get_testScenarioIndex() == 0xFF) {
-      Log.info("TEST MODE: Using battery override = %.1f%%", (double)testBatteryOverride);
-    }
+    float currentSoC = current.get_stateOfCharge();
     
     BatteryTier newTier = applyBatteryAwareConnectionModePolicy(currentSoC);
     
@@ -172,6 +147,15 @@ void handleReportingState() {
     const char* tierName = (newTier == TIER_HEALTHY ? "HEALTHY" : 
                             newTier == TIER_CONSERVING ? "CONSERVING" :
                             newTier == TIER_CRITICAL ? "CRITICAL" : "SURVIVAL");
+    bool deferAutoConnectForUnstableModem = false;
+    unsigned long reconnectDeferRemainingMs = 0;
+    if (session.modemUnstable && session.lastTeardownEndMs != 0) {
+      unsigned long sinceTeardownMs = millis() - session.lastTeardownEndMs;
+      if (sinceTeardownMs < MODEM_UNSTABLE_RECONNECT_DEFER_MS) {
+        deferAutoConnectForUnstableModem = true;
+        reconnectDeferRemainingMs = MODEM_UNSTABLE_RECONNECT_DEFER_MS - sinceTeardownMs;
+      }
+    }
     
     // Check if occupied in low-power mode - need to return to sleep after reporting
     // to wake periodically and check debounce timeout
@@ -196,17 +180,29 @@ void handleReportingState() {
       state = CONNECTING_STATE;
     } else if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
       // In INTERMITTENT_KEEP_ALIVE mode, connect immediately for all reports
-      Log.info("REPORTING: Immediate connection (KEEP_ALIVE mode) - bypassing alignment tier=%s",
-               tierName);
-      state = CONNECTING_STATE;
+      if (deferAutoConnectForUnstableModem) {
+        Log.warn("MODEM_POLICY: reconnect deferred reason=unstable_modem remaining=%lu ms trigger=keep_alive",
+                 reconnectDeferRemainingMs);
+        state = IDLE_STATE;
+      } else {
+        Log.info("REPORTING: Immediate connection (KEEP_ALIVE mode) - bypassing alignment tier=%s",
+                 tierName);
+        state = CONNECTING_STATE;
+      }
     } else if (isAligned) {
-      Log.info("REPORTING: Connection due - boundary aligned tier=%s interval=%us (base=%u x %u) offset=%lus",
-               tierName,
-               (unsigned)effectiveInterval,
-               (unsigned)baseInterval,
-               (unsigned)tierMultiplier,
-               (unsigned long)offset);
-      state = CONNECTING_STATE;
+      if (deferAutoConnectForUnstableModem) {
+        Log.warn("MODEM_POLICY: reconnect deferred reason=unstable_modem remaining=%lu ms trigger=aligned",
+                 reconnectDeferRemainingMs);
+        state = IDLE_STATE;
+      } else {
+        Log.info("REPORTING: Connection due - boundary aligned tier=%s interval=%us (base=%u x %u) offset=%lus",
+                 tierName,
+                 (unsigned)effectiveInterval,
+                 (unsigned)baseInterval,
+                 (unsigned)tierMultiplier,
+                 (unsigned long)offset);
+        state = CONNECTING_STATE;
+      }
     } else {
       time_t nextBoundary = effectiveInterval - offset;
       Log.info("REPORTING: Connection deferred - not aligned tier=%s interval=%us offset=%lus next_in=%lus",

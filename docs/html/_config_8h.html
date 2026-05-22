@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;10.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -100,7 +100,11 @@ $(function(){initNavTree('_config_8h.html','',''); });
 <p><a href="_config_8h_source.html">Go to the source code of this file.</a></p>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Backward-compatible wrapper for shared project settings. </p>
-<p>New code should include <a class="el" href="_settings_8h.html" title="Central catalog of shared build, hardware-override, and project settings.">Settings.h</a> directly when it needs shared build or project settings. This wrapper remains so existing includes do not need to change all at once. </p>
+<p>New code should include <a class="el" href="_settings_8h.html" title="Central catalog of shared build, hardware-override, and project settings.">Settings.h</a> directly when it needs shared build or project settings. This wrapper remains so existing includes do not need to change all at once.</p>
+<p>Safety note:</p><ul>
+<li>CONNECTIVITY_FAILSAFE_TEST_MODE is a compile-time build-profile flag.</li>
+<li>It must not be sourced from cloud config and should not be toggled in this wrapper header. </li>
+</ul>
 
 <p class="definition">Definition in file <a class="el" href="_config_8h_source.html">Config.h</a>.</p>
 </div></div><!-- contents -->

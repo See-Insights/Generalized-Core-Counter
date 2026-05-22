@@ -134,6 +134,14 @@ enum BatteryTier {
 class sysStatusData : public StorageHelperRK::PersistentDataFile {
 public:
 
+	/**
+	 * @brief Persistent system configuration and runtime recovery state.
+	 *
+	 * This store is the authoritative persisted home for configuration applied
+	 * from Particle Ledger and for long-lived operational state such as the
+	 * connectivity failsafe stage counters.
+	 */
+
     /**
      * @brief Gets the singleton instance of this class, allocating it if necessary
      * 
@@ -217,14 +225,17 @@ public:
 		uint8_t connectionAttemptCounter;                 // Counter for periodic deep connection attempts (0-3, resets to 0 after reaching 3)
 		
 		// ********** Test Mode Overrides **********
-		float testBatteryOverride;                        // Test mode: battery percentage override (-1.0 = disabled, 0-100 = override value)
+		float reservedFloat0;                             // Reserved to preserve persistent layout after battery test removal
 		uint16_t testConnectionDurationOverride;          // Test mode: connection duration override (0xFFFF = disabled, 0-999 = override value in seconds)
-		uint8_t testScenarioIndex;                        // Auto-cycle test mode: scenario index (0xFF = disabled, 0-4 = active scenario)
+		uint8_t reservedByte0;                            // Reserved to preserve persistent layout after battery test removal
 
 		// ********** Webhook Configuration **********
 		char webhookName[64];                             // Webhook event name from cloud config
 		bool webhookEnabled;                              // Enable/disable webhook publishing
 		uint32_t webhookTimeoutMs;                        // Webhook response timeout in milliseconds
+		uint8_t connectivityRecoveryStage;               // 0=none, 1=radio reset, 2=system reset, 3=deep power down
+		time_t lastConnectivityRecoveryAction;           // Last time the connectivity failsafe acted or deferred
+		uint8_t connectivityRecoveryCount;               // Count of connectivity failsafe recovery actions since last good connect
 
 	};
 
@@ -355,12 +366,8 @@ public:
 
 	uint8_t get_connectionAttemptCounter() const;
 	void set_connectionAttemptCounter(uint8_t value);
-    float get_testBatteryOverride() const;
-    void set_testBatteryOverride(float value);
     uint16_t get_testConnectionDurationOverride() const;
     void set_testConnectionDurationOverride(uint16_t value);
-    uint8_t get_testScenarioIndex() const;
-    void set_testScenarioIndex(uint8_t value);
 
 	String get_webhookName() const;
 	const char *get_webhookNameCStr() const;
@@ -369,6 +376,42 @@ public:
 	void set_webhookEnabled(bool value);
 	uint32_t get_webhookTimeoutMs() const;
 	void set_webhookTimeoutMs(uint32_t value);
+	/**
+	 * @brief Returns the persisted connectivity recovery stage.
+	 *
+	 * @return 0 for none, 1 for radio reset, 2 for system reset, 3 for deep power-down
+	 */
+	uint8_t get_connectivityRecoveryStage() const;
+	/**
+	 * @brief Persists the current connectivity recovery stage.
+	 *
+	 * @param value Recovery stage to store
+	 */
+	void set_connectivityRecoveryStage(uint8_t value);
+	/**
+	 * @brief Returns the last timestamp when the connectivity failsafe acted or deferred.
+	 *
+	 * @return Unix time of the last recovery action or defer decision
+	 */
+	time_t get_lastConnectivityRecoveryAction() const;
+	/**
+	 * @brief Persists the timestamp of the last connectivity failsafe action or defer.
+	 *
+	 * @param value Unix time to store
+	 */
+	void set_lastConnectivityRecoveryAction(time_t value);
+	/**
+	 * @brief Returns how many recovery actions have occurred since the last good cloud session.
+	 *
+	 * @return Recovery action count for the current stale episode
+	 */
+	uint8_t get_connectivityRecoveryCount() const;
+	/**
+	 * @brief Persists the current recovery action count.
+	 *
+	 * @param value Recovery action count to store
+	 */
+	void set_connectivityRecoveryCount(uint8_t value);
 
 	//Members here are internal only and therefore protected
 protected:
@@ -403,7 +446,7 @@ protected:
 
     //Since these variables are only used internally - They can be private. 
 	static const uint32_t SYS_DATA_MAGIC = 0x20a15e75;
-	static const uint16_t SYS_DATA_VERSION = 3;
+	static const uint16_t SYS_DATA_VERSION = 4;
 
 };  // End of sysStatusData class
 

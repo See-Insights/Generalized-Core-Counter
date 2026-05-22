@@ -25,9 +25,34 @@
 
 class ThrashGuard {
 public:
+  /**
+   * @brief Marks forward progress within the current state.
+   *
+   * @param tag Short label describing the progress milestone
+   */
   void markProgress(const char *tag);
+
+  /**
+   * @brief Records a state transition and resets internal progress tracking as needed.
+   *
+   * @param oldState Prior top-level state
+   * @param newState New top-level state
+   */
   void recordStateTransition(int oldState, int newState);
+
+  /**
+   * @brief Evaluates the current state for no-progress timeout escalation.
+   *
+   * @param currentState Active top-level state
+   * @param nowMs Current `millis()` value
+   */
   void loop(int currentState, uint32_t nowMs);
+
+  /**
+   * @brief Adjusts the cooldown between repeated thrash log messages.
+   *
+   * @param cooldownMs Minimum interval between repeated log lines
+   */
   void setLogCooldownMs(uint32_t cooldownMs);
 
 private:

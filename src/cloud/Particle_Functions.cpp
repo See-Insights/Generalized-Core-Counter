@@ -22,18 +22,14 @@ SerialLogHandler logHandler(LOG_LEVEL_WARN);
 #elif SERIAL_LOG_LEVEL == 3
 SerialLogHandler logHandler(LOG_LEVEL_INFO,
                             {// Logging level for non-application messages
-                             {"app.pubq", LOG_LEVEL_ERROR},
-                             {"app.seqfile", LOG_LEVEL_ERROR},
-                             {"comm.dtls", LOG_LEVEL_ERROR},
-                             {"comm", LOG_LEVEL_ERROR},
-                             {"hal", LOG_LEVEL_ERROR},
-                             {"comm.protocol", LOG_LEVEL_ERROR},
-                             {"ncp.rltk.client", LOG_LEVEL_ERROR},
-                             {"app.device", LOG_LEVEL_ERROR},
-                             {"system", LOG_LEVEL_ERROR},
-                             {"net.ifapi", LOG_LEVEL_ERROR},
-                             {"app.system.reset", LOG_LEVEL_ERROR},
-                             {"app.ab1805", LOG_LEVEL_ERROR}});
+                             {"mux", LOG_LEVEL_WARN},
+                             {"system.nm", LOG_LEVEL_WARN},
+                             {"system", LOG_LEVEL_WARN},
+                             {"comm.dtls", LOG_LEVEL_WARN},
+                             {"comm.protocol", LOG_LEVEL_WARN},
+                             {"comm.protocol.handshake", LOG_LEVEL_WARN},
+                             {"net.pppncp", LOG_LEVEL_WARN},
+                             {"app.ab1805", LOG_LEVEL_WARN}});
 #elif SERIAL_LOG_LEVEL == 4
 SerialLogHandler logHandler(LOG_LEVEL_ALL);
 #endif

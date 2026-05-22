@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;10.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -93,7 +93,7 @@ $(function(){initNavTree('_thrash_guard_8h.html','',''); });
 </div><!--header-->
 <div class="contents">
 
-<p><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8">State</a> machine watchdog - prevents infinite loops and thrashing.  
+<p><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8" title="Top-level firmware lifecycle states driven from the main loop.">State</a> machine watchdog - prevents infinite loops and thrashing.  
 <a href="#details">More...</a></p>
 <div class="textblock"><code>#include &quot;Particle.h&quot;</code><br />
 </div>
@@ -111,7 +111,7 @@ Variables</h2></td></tr>
 <tr class="memitem:aa27b7d360b53e8706dfe92aab25b5aa5" id="r_aa27b7d360b53e8706dfe92aab25b5aa5"><td class="memItemLeft">retained uint16_t&#160;</td><td class="memItemRight"><a class="el" href="#aa27b7d360b53e8706dfe92aab25b5aa5">thrashTripCount</a></td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
-<div class="textblock"><p><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8">State</a> machine watchdog - prevents infinite loops and thrashing. </p>
+<div class="textblock"><p><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8" title="Top-level firmware lifecycle states driven from the main loop.">State</a> machine watchdog - prevents infinite loops and thrashing. </p>
 <p><a class="el" href="class_thrash_guard.html">ThrashGuard</a> provides timeout protection for each state in the state machine. If a state doesn't show forward progress within its timeout window, escalating corrective actions are taken:</p>
 <p>Tier 1: Backoff only (transient issue) Tier 2: Force sleep + disconnect (stuck in waiting state) + alert 18 Tier 3: System.reset() (repeated failures within 1 hour) + alert 18</p>
 <p>State-specific timeouts (seconds):</p><ul>
@@ -173,7 +173,7 @@ Variables</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_thrash_guard_8cpp_source.html#l00025">25</a> of file <a class="el" href="_thrash_guard_8cpp_source.html">ThrashGuard.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00047">handleConnectingState()</a>, <a class="el" href="_state___idle_8cpp_source.html#l00031">handleIdleState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00052">handleSleepingState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00600">loop()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01115">publishStateTransition()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00139">handleConnectingState()</a>, <a class="el" href="_state___idle_8cpp_source.html#l00031">handleIdleState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00876">loop()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01431">publishStateTransition()</a>.</p>
 
 </div>
 </div>
@@ -199,7 +199,7 @@ Variables</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_thrash_guard_8cpp_source.html#l00028">28</a> of file <a class="el" href="_thrash_guard_8cpp_source.html">ThrashGuard.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_thrash_guard_8cpp_source.html#l00091">ThrashGuard::loop()</a>, and <a class="el" href="_particle___functions_8cpp_source.html#l00055">Particle_Functions::setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_thrash_guard_8cpp_source.html#l00091">ThrashGuard::loop()</a>, and <a class="el" href="_particle___functions_8cpp_source.html#l00051">Particle_Functions::setup()</a>.</p>
 
 </div>
 </div>
@@ -225,7 +225,7 @@ Variables</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_thrash_guard_8cpp_source.html#l00027">27</a> of file <a class="el" href="_thrash_guard_8cpp_source.html">ThrashGuard.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_thrash_guard_8cpp_source.html#l00091">ThrashGuard::loop()</a>, and <a class="el" href="_particle___functions_8cpp_source.html#l00055">Particle_Functions::setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_thrash_guard_8cpp_source.html#l00091">ThrashGuard::loop()</a>, and <a class="el" href="_particle___functions_8cpp_source.html#l00051">Particle_Functions::setup()</a>.</p>
 
 </div>
 </div>

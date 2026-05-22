@@ -17,6 +17,117 @@
 
 namespace {
 
+constexpr unsigned long MODEM_UNSTABLE_SLOW_TEARDOWN_MS = 10000UL;
+constexpr unsigned long MODEM_UNSTABLE_RECOVERY_TEARDOWN_MS = 5000UL;
+
+enum ModemUnstableReason : uint8_t {
+  MODEM_UNSTABLE_REASON_NONE = 0,
+  MODEM_UNSTABLE_REASON_SLOW_TEARDOWN = 1,
+  MODEM_UNSTABLE_REASON_CONNECT_TIMEOUT = 2,
+};
+
+const char *connectionModeLabel(ConnectionMode mode) {
+  switch (mode) {
+  case CONNECTED:
+    return "CONN";
+  case INTERMITTENT:
+    return "INT";
+  case DISCONNECTED:
+    return "DISC";
+  case INTERMITTENT_KEEP_ALIVE:
+    return "IKA";
+  default:
+    return "?";
+  }
+}
+
+const char *batteryTierLabel(uint8_t tier) {
+  switch (tier) {
+  case TIER_HEALTHY:
+    return "H";
+  case TIER_CONSERVING:
+    return "C";
+  case TIER_CRITICAL:
+    return "CR";
+  case TIER_SURVIVAL:
+    return "S";
+  default:
+    return "?";
+  }
+}
+
+void logWakeSummary(const char *reason) {
+  Log.info("Wake: reason=%s open=%d ready=%d occ=%d led=%lus",
+           reason,
+           isWithinOpenHours() ? 1 : 0,
+           SensorManager::instance().isSensorReady() ? 1 : 0,
+           current.get_occupied() ? 1 : 0,
+           (unsigned long)(signalLEDTimeRemaining() / 1000UL));
+}
+
+void logTeardownContext(const char *prefix,
+                       bool standbyRequested,
+                       bool standbyEffective) {
+  if (!sysStatus.get_verboseMode()) {
+    return;
+  }
+
+  Log.info("%s mode=%s standby=%d/%d tier=%s occ=%d",
+           prefix,
+           connectionModeLabel(static_cast<ConnectionMode>(sysStatus.get_connectionMode())),
+           standbyRequested ? 1 : 0,
+           standbyEffective ? 1 : 0,
+           batteryTierLabel(sysStatus.get_currentBatteryTier()),
+           current.get_occupied() ? 1 : 0);
+}
+
+void markModemUnstable(ModemUnstableReason reason, unsigned long elapsedMs) {
+  const bool reasonChanged = !session.modemUnstable ||
+                             session.modemUnstableReason != (uint8_t)reason;
+  session.modemUnstable = true;
+  session.modemUnstableReason = (uint8_t)reason;
+
+  if (reasonChanged) {
+    switch (reason) {
+    case MODEM_UNSTABLE_REASON_SLOW_TEARDOWN:
+      Log.warn("MODEM_HEALTH: unstable reason=slow_teardown elapsed=%lu", elapsedMs);
+      break;
+    case MODEM_UNSTABLE_REASON_CONNECT_TIMEOUT:
+      Log.warn("MODEM_HEALTH: unstable reason=connect_timeout count=%u",
+               (unsigned)session.modemConnectTimeoutCount);
+      break;
+    default:
+      break;
+    }
+  }
+
+  if (!session.modemStandbySuppressed) {
+    Log.warn("MODEM_POLICY: standby temporarily disabled reason=unstable_modem");
+    session.modemStandbySuppressed = true;
+  }
+}
+
+void maybeClearModemUnstable(unsigned long teardownElapsedMs) {
+  if (!session.modemUnstable) {
+    return;
+  }
+
+  if (Observability::cycleStats().connect_result !=
+          Observability::WakeCycleStats::ConnectResult::SUCCESS ||
+      teardownElapsedMs > MODEM_UNSTABLE_RECOVERY_TEARDOWN_MS) {
+    return;
+  }
+
+  session.modemUnstable = false;
+  session.modemUnstableReason = MODEM_UNSTABLE_REASON_NONE;
+  session.modemConnectTimeoutCount = 0;
+  Log.info("MODEM_HEALTH: recovered");
+  if (session.modemStandbySuppressed) {
+    session.modemStandbySuppressed = false;
+    Log.info("MODEM_POLICY: standby restored");
+  }
+}
+
 unsigned long computeCloudSyncTimeoutMs(uint16_t queueDepth) {
   const unsigned long baseTimeoutMs = ConnectivityPolicy::CLOUD_OPS_GATE_TIMEOUT_MS;
   if (queueDepth == 0) {
@@ -52,22 +163,31 @@ unsigned long computeCloudSyncTimeoutMs(uint16_t queueDepth) {
 void handleSleepingState() {
   bool enteredState = (state != oldState);
   static bool operationsCompleteLogged = false;  // Track if we've logged completion message
+  static bool gateWasBlocking = false;
+  static unsigned long lastGateStatusLogMs = 0;
+  static bool cloudDisconnectCompleteLogged = false;
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+  bool hibernateFallbackThisPass = false;
+#endif
+#if HAL_PLATFORM_CELLULAR
+  static bool preserveStandbyAfterNormalReturn = false;
+  static bool forceModemOffAfterStandbyFailure = false;
+  static int standbySleepFailureError = SYSTEM_ERROR_NONE;
+#endif
+#if Wiring_Cellular
+  static bool radioOffCompleteLogged = false;
+#endif
 
   if (enteredState) {
     setAppBreadcrumb(3);
     publishStateTransition();
     operationsCompleteLogged = false;  // Reset flag on state entry
-    // One-time diagnostic on entry so logs clearly show the device's view of park hours.
-    if (Time.isValid()) {
-      const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
-      uint8_t hour = snapshot.localHour;
-      Log.info("SLEEP entry: parkHours %02u-%02u localHour=%02u => %s",
-               sysStatus.get_openTime(), sysStatus.get_closeTime(), hour,
-               isWithinOpenHours() ? "OPEN" : "CLOSED");
-    } else {
-      Log.info("SLEEP entry: Time invalid => treating as OPEN (per policy)");
-    }
-    Log.info("SLEEP entry: sensorReady=%s", SensorManager::instance().isSensorReady() ? "true" : "false");
+    gateWasBlocking = false;
+    lastGateStatusLogMs = 0;
+    cloudDisconnectCompleteLogged = false;
+  #if Wiring_Cellular
+    radioOffCompleteLogged = false;
+  #endif
   }
 
   // Determine if we will use *effective* network standby for the upcoming sleep.
@@ -76,11 +196,27 @@ void handleSleepingState() {
   // Standby is only useful after a successful cloud session in the current
   // wake cycle; if connect never succeeded, preserving the modem state buys
   // nothing and can carry a bad NCP state into the next wake.
-  bool useNetworkStandbyEffective = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) &&
-                                   isWithinOpenHours() &&
-                                   Observability::cycleStats().connect_result == Observability::WakeCycleStats::ConnectResult::SUCCESS;
+  bool useNetworkStandbyRequested =
+      (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) &&
+      isWithinOpenHours();
+  bool preserveStandbyForThisPass = false;
+#if HAL_PLATFORM_CELLULAR
+  if (preserveStandbyAfterNormalReturn &&
+      (!useNetworkStandbyRequested || session.modemUnstable || Cellular.isOff())) {
+    preserveStandbyAfterNormalReturn = false;
+  }
+  preserveStandbyForThisPass = preserveStandbyAfterNormalReturn;
+#endif
+  bool useNetworkStandbyEffective =
+      useNetworkStandbyRequested &&
+      (preserveStandbyForThisPass ||
+       Observability::cycleStats().connect_result ==
+           Observability::WakeCycleStats::ConnectResult::SUCCESS);
 #if HAL_PLATFORM_CELLULAR
   useNetworkStandbyEffective = useNetworkStandbyEffective && !Cellular.isOff();
+  if (session.modemUnstable || forceModemOffAfterStandbyFailure) {
+    useNetworkStandbyEffective = false;
+  }
 #else
   useNetworkStandbyEffective = false;
 #endif
@@ -119,6 +255,9 @@ void handleSleepingState() {
   // (bounded) until both cloud and modem are actually off before sleeping.
   static bool disconnectRequested = false;
   static unsigned long disconnectRequestStartMs = 0;
+  static unsigned long cloudDisconnectStartMs = 0;
+  static unsigned long cloudDisconnectElapsedMs = 0;
+  static unsigned long modemOffElapsedMs = 0;
 #if Wiring_WiFi
   static bool wifiOffGuardActive = false;
   static unsigned long wifiOffGuardStartMs = 0;
@@ -129,6 +268,9 @@ void handleSleepingState() {
   if (enteredState) {
     disconnectRequested = false;
     disconnectRequestStartMs = 0;
+    cloudDisconnectStartMs = 0;
+    cloudDisconnectElapsedMs = 0;
+    modemOffElapsedMs = 0;
     cloudSyncBudgetMs = 0;
     cloudSyncMaxQueueDepth = 0;
 #if Wiring_WiFi
@@ -145,6 +287,9 @@ void handleSleepingState() {
   if (disconnectRequested && disconnectRequestStartMs == 0) {
     Log.warn("SLEEP: disconnectRequested latched without timestamp - resetting");
     disconnectRequested = false;
+    cloudDisconnectStartMs = 0;
+    cloudDisconnectElapsedMs = 0;
+    modemOffElapsedMs = 0;
   }
 
   // Only wait for cloud operations *before* requesting disconnect.
@@ -155,7 +300,9 @@ void handleSleepingState() {
     }
     // Check prerequisite completion
     bool queueEmpty = PublishQueuePosix::instance().getCanSleep();
-    bool ledgersSynced = Cloud::instance().areLedgersSynced();
+    bool configLedgersSynced = Cloud::instance().areLedgersSynced();
+    bool outputLedgersSynced = !Cloud::instance().hasPendingOutputLedgerSync();
+    bool ledgersSynced = configLedgersSynced && outputLedgersSynced;
     bool updatesChecked = !System.updatesPending();
     bool webhookConfirmed = !session.awaitingWebhookResponse;
     uint16_t queueDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
@@ -165,6 +312,10 @@ void handleSleepingState() {
     unsigned long queueAwareBudgetMs = computeCloudSyncTimeoutMs(cloudSyncMaxQueueDepth);
     if (queueAwareBudgetMs > cloudSyncBudgetMs) {
       cloudSyncBudgetMs = queueAwareBudgetMs;
+    }
+    if (!outputLedgersSynced &&
+        ConnectivityPolicy::OUTPUT_LEDGER_SYNC_TIMEOUT_MS > cloudSyncBudgetMs) {
+      cloudSyncBudgetMs = ConnectivityPolicy::OUTPUT_LEDGER_SYNC_TIMEOUT_MS;
     }
 
     {
@@ -179,19 +330,23 @@ void handleSleepingState() {
 
     if (!allComplete) {
       unsigned long elapsedMs = millis() - cloudSyncStartMs;
+      const int queuePending = queueEmpty ? 0 : 1;
+      const int ledgerPending = ledgersSynced ? 0 : 1;
+      const int webhookPending = webhookConfirmed ? 0 : 1;
+      const int updatePending = updatesChecked ? 0 : 1;
 
       if (elapsedMs < cloudSyncBudgetMs) {
-        // Still within budget - log status every 5 seconds
-        static unsigned long lastStatusLogMs = 0;
-        if ((millis() - lastStatusLogMs) > ConnectivityPolicy::CLOUD_OPS_STATUS_LOG_INTERVAL_MS) {
-          Log.info("SLEEP: Waiting for cloud operations - queue:%s(%u) ledgers:%s updates:%s webhook:%s (%lu/%lu ms)",
-                   queueEmpty ? "Y" : "N",
-                   (unsigned)queueDepth,
-                   ledgersSynced ? "Y" : "N",
-                   updatesChecked ? "Y" : "N",
-                   webhookConfirmed ? "Y" : "N",
-                   elapsedMs, cloudSyncBudgetMs);
-          lastStatusLogMs = millis();
+        if (!gateWasBlocking ||
+            (millis() - lastGateStatusLogMs) >= ConnectivityPolicy::CLOUD_OPS_STATUS_LOG_INTERVAL_MS) {
+          Log.info("Gate: q=%d ledger=%d webhook=%d update=%d wait=%lu/%lu",
+                   queuePending,
+                   ledgerPending,
+                   webhookPending,
+                   updatePending,
+                   elapsedMs,
+                   cloudSyncBudgetMs);
+          gateWasBlocking = true;
+          lastGateStatusLogMs = millis();
         }
         // Mark progress to prevent ThrashGuard timeout during legitimate cloud operations wait
         thrashGuard.markProgress("CLOUD_OPS_WAIT");
@@ -200,23 +355,26 @@ void handleSleepingState() {
       }
 
       // Budget exceeded - log incomplete operations and raise ONE alert (priority order)
-      Log.warn("SLEEP: Cloud sync timeout after %lu ms (budget=%lu ms, queueDepth=%u maxQueueDepth=%u)",
-           elapsedMs,
-           cloudSyncBudgetMs,
-           (unsigned)queueDepth,
-           (unsigned)cloudSyncMaxQueueDepth);
-      Log.warn("SLEEP: State at timeout - queueEmpty=%d queueDepth=%u ledgers=%d updates=%d webhook=%d",
-           queueEmpty, (unsigned)queueDepth, ledgersSynced, updatesChecked, webhookConfirmed);
+       const char *gateFailReason = !queueEmpty ? "queue" :
+        (!ledgersSynced ? "ledger" : (!webhookConfirmed ? "webhook" : "update"));
+       Log.warn("GateFail: reason=%s timeout=%lu q=%d ledger=%d webhook=%d update=%d",
+          gateFailReason,
+          cloudSyncBudgetMs,
+          queuePending,
+          ledgerPending,
+          webhookPending,
+          updatePending);
+       gateWasBlocking = false;
+       lastGateStatusLogMs = 0;
 
       // Only raise one alert - check in priority order (queue > ledger > updates > webhook)
       if (!queueEmpty) {
         Log.warn("SLEEP: Publish queue not empty - raising alert 43");
         current.raiseAlert(43); // Queue drainage failure (highest priority)
       } else if (!ledgersSynced) {
-        // Enhanced diagnostics for Alert 44 troubleshooting
-        Log.warn("SLEEP: Ledger sync incomplete - raising alert 44");
-        Log.warn("Alert 44 context: timeout after %lu ms (budget=%lu ms)",
-                 elapsedMs, cloudSyncBudgetMs);
+        Log.warn("SLEEP: ledger sync incomplete after %lu ms (budget=%lu ms) - raising alert 44",
+                 elapsedMs,
+                 cloudSyncBudgetMs);
         current.raiseAlert(44); // Ledger sync timeout before sleep (minor - config already applied)
       } else if (!updatesChecked) {
         Log.warn("SLEEP: OTA updates pending - raising alert 42");
@@ -231,6 +389,11 @@ void handleSleepingState() {
       cloudSyncBudgetMs = 0;
       cloudSyncMaxQueueDepth = 0;
     } else {
+      if (gateWasBlocking) {
+        Log.info("Gate: ok wait=%lu", millis() - cloudSyncStartMs);
+      }
+      gateWasBlocking = false;
+      lastGateStatusLogMs = 0;
       // All operations complete - reset timer and proceed
       cloudSyncStartMs = 0;
       cloudSyncBudgetMs = 0;
@@ -238,11 +401,11 @@ void handleSleepingState() {
     }
 
     if (!operationsCompleteLogged) {
-      Log.info("SLEEP: Cloud operations gate passed - ready to disconnect");
-      // One-time diagnostic to explain disconnect decisions; helps catch
-      // cases where disconnect is skipped due to connectivity state.
-      Log.info("SLEEP: disconnect context connected=%d radioOn=%d standbyEffective=%d occupied=%d",
-               Particle.connected(), Connectivity::isRadioPoweredOn(), useNetworkStandbyEffective, current.get_occupied());
+      if (sysStatus.get_verboseMode()) {
+        Log.info("SLEEP: Cloud operations gate passed - ready to disconnect");
+        Log.info("SLEEP: disconnect context connected=%d radioOn=%d standbyEffective=%d occupied=%d",
+                 Particle.connected(), Connectivity::isRadioPoweredOn(), useNetworkStandbyEffective, current.get_occupied());
+      }
 
       // Observability: end of service window (ledger sync + queue drain + OTA check + webhook).
       Observability::cycleStats().markServiceEnd(millis());
@@ -265,18 +428,6 @@ void handleSleepingState() {
   // On WiFi platforms, waiting for WiFi.isOn() to flip false can take a long
   // time and is not required for safe low-power sleep. Only gate on cloud.
   stillOn = Particle.connected();
-#endif
-
-  // If cloud is already offline but the radio is still on (common after a transient
-  // cloud drop), power down the radio before sleeping (unless using standby).
-#if Wiring_Cellular
-  if (!disconnectRequested && !useNetworkStandbyEffective && !Particle.connected() && Connectivity::isRadioPoweredOn()) {
-    Log.info("SLEEP: cloud offline but radio still on - powering down radio");
-    Connectivity::requestRadioPowerOff();
-    disconnectRequested = true;
-    disconnectRequestStartMs = millis();
-    return;
-  }
 #endif
 
   // Compute disconnect budget once per loop to avoid duplicated logic.
@@ -309,17 +460,48 @@ void handleSleepingState() {
 
   unsigned long disconnectBudgetMs = computeDisconnectBudgetMs();
 
+  // If cloud is already offline but the radio is still on (common after a transient
+  // cloud drop), power down the radio before sleeping (unless using standby).
+#if Wiring_Cellular
+  if (!disconnectRequested && !useNetworkStandbyEffective && !Particle.connected() && Connectivity::isRadioPoweredOn()) {
+    unsigned long requestMs = millis();
+    cloudDisconnectCompleteLogged = true;
+    cloudDisconnectElapsedMs = 0;
+    if (sysStatus.get_verboseMode()) {
+      Log.info("SLEEP: cloud disconnect complete elapsed=0 ms");
+    }
+  #if HAL_PLATFORM_CELLULAR
+    if (forceModemOffAfterStandbyFailure) {
+      Log.warn("SLEEP: standby sleep failed; forcing modem-off reason=sleep_error err=%d",
+               standbySleepFailureError);
+      forceModemOffAfterStandbyFailure = false;
+      standbySleepFailureError = SYSTEM_ERROR_NONE;
+    }
+  #endif
+    logTeardownContext("SLEEP: modem-off start", useNetworkStandbyRequested, useNetworkStandbyEffective);
+    Connectivity::requestRadioPowerOff();
+    disconnectRequested = true;
+    disconnectRequestStartMs = requestMs;
+    Observability::cycleStats().markTeardownStart((uint32_t)disconnectRequestStartMs, useNetworkStandbyEffective);
+    return;
+  }
+#endif
+
   // Once cloud operations are satisfied (or timed out), initiate disconnect exactly once.
   if (Particle.connected() && !disconnectRequested) {
+    unsigned long requestMs = millis();
+    logTeardownContext("SLEEP: cloud disconnect start", useNetworkStandbyRequested, useNetworkStandbyEffective);
+    cloudDisconnectStartMs = requestMs;
+    cloudDisconnectElapsedMs = 0;
     if (useNetworkStandbyEffective) {
-      Log.info("SLEEP: requesting cloud disconnect (network standby enabled)");
       Connectivity::requestCloudDisconnectOnly();
     } else {
-      Log.info("SLEEP: requesting cloud disconnect + modem off");
+      logTeardownContext("SLEEP: modem-off start", useNetworkStandbyRequested, useNetworkStandbyEffective);
+      modemOffElapsedMs = 0;
       Connectivity::requestFullDisconnectAndRadioOff();
     }
     disconnectRequested = true;
-    disconnectRequestStartMs = millis();
+    disconnectRequestStartMs = requestMs;
 
     // Observability: teardown window start.
     Observability::cycleStats().markTeardownStart((uint32_t)disconnectRequestStartMs, useNetworkStandbyEffective);
@@ -328,14 +510,46 @@ void handleSleepingState() {
   }
 
   // If disconnect was requested, wait (bounded) for it to take effect before sleeping.
+  if (disconnectRequested && !cloudDisconnectCompleteLogged && !Particle.connected()) {
+    cloudDisconnectElapsedMs = (cloudDisconnectStartMs == 0) ? 0UL : (millis() - cloudDisconnectStartMs);
+    if (sysStatus.get_verboseMode()) {
+      Log.info("SLEEP: cloud disconnect complete elapsed=%lu ms standby=%d",
+               cloudDisconnectElapsedMs,
+               useNetworkStandbyEffective ? 1 : 0);
+    }
+    cloudDisconnectCompleteLogged = true;
+  }
+#if Wiring_Cellular
+  if (disconnectRequested && !useNetworkStandbyEffective &&
+      !radioOffCompleteLogged && !Connectivity::isRadioPoweredOn()) {
+    modemOffElapsedMs = (disconnectRequestStartMs == 0) ? 0UL : (millis() - disconnectRequestStartMs);
+    if (sysStatus.get_verboseMode()) {
+      Log.info("SLEEP: modem-off complete elapsed=%lu ms", modemOffElapsedMs);
+    }
+    radioOffCompleteLogged = true;
+  }
+#endif
+
   if (disconnectRequested && stillOn) {
     if (disconnectRequestStartMs != 0 && (millis() - disconnectRequestStartMs) > disconnectBudgetMs) {
-      Log.warn("SLEEP: disconnect/modem-off exceeded budget (%lu ms) - raising alert 15",
-               (unsigned long)(millis() - disconnectRequestStartMs));
+      Log.warn("SLEEP: disconnect/modem-off exceeded budget (%lu ms, cloud=%d radioOn=%d standby=%d) - raising alert 15",
+               (unsigned long)(millis() - disconnectRequestStartMs),
+               (int)Particle.connected(),
+               (int)Connectivity::isRadioPoweredOn(),
+               useNetworkStandbyEffective ? 1 : 0);
+      markModemUnstable(MODEM_UNSTABLE_REASON_SLOW_TEARDOWN,
+                        (unsigned long)(millis() - disconnectRequestStartMs));
       current.raiseAlert(15);
       state = ERROR_STATE;
       disconnectRequested = false;
       disconnectRequestStartMs = 0;
+      cloudDisconnectStartMs = 0;
+      cloudDisconnectElapsedMs = 0;
+      modemOffElapsedMs = 0;
+      cloudDisconnectCompleteLogged = false;
+    #if Wiring_Cellular
+      radioOffCompleteLogged = false;
+    #endif
       return;
     }
 
@@ -353,7 +567,32 @@ void handleSleepingState() {
 
   // Observability: teardown completed (bounded wait finished and we are proceeding to sleep).
   if (disconnectRequested && !stillOn) {
+    const unsigned long teardownElapsedMs =
+        (disconnectRequestStartMs == 0) ? 0UL : (millis() - disconnectRequestStartMs);
+    Log.info("Sleep: td=%lums cloud=%lums modem=%lums standby=%d/%d mode=%s tier=%s occ=%d",
+             teardownElapsedMs,
+             cloudDisconnectElapsedMs,
+             modemOffElapsedMs,
+             useNetworkStandbyRequested ? 1 : 0,
+             useNetworkStandbyEffective ? 1 : 0,
+         connectionModeLabel(static_cast<ConnectionMode>(sysStatus.get_connectionMode())),
+             batteryTierLabel(sysStatus.get_currentBatteryTier()),
+             current.get_occupied() ? 1 : 0);
+    session.lastCloudDisconnectElapsedMs = cloudDisconnectElapsedMs;
+    session.lastModemOffElapsedMs = modemOffElapsedMs;
+    session.lastTotalTeardownElapsedMs = teardownElapsedMs;
+    session.lastTeardownEndMs = millis();
+    if (teardownElapsedMs > MODEM_UNSTABLE_SLOW_TEARDOWN_MS) {
+      markModemUnstable(MODEM_UNSTABLE_REASON_SLOW_TEARDOWN, teardownElapsedMs);
+    } else {
+      maybeClearModemUnstable(teardownElapsedMs);
+    }
     Observability::cycleStats().markTeardownEnd(millis());
+    disconnectRequested = false;
+    disconnectRequestStartMs = 0;
+    cloudDisconnectStartMs = 0;
+    cloudDisconnectElapsedMs = 0;
+    modemOffElapsedMs = 0;
   }
 
   // Enforce sleep preconditions before any final sleep call in this state.
@@ -374,14 +613,29 @@ void handleSleepingState() {
     // Request teardown exactly once, then wait with existing budget handling.
     if (!disconnectRequested) {
       if (useNetworkStandbyEffective) {
-        Log.warn("SLEEP: pre-sleep gate blocked (cloud=%d standby=1) - requesting cloud disconnect",
+        Log.warn("SLEEP: pre-sleep gate blocked (cloud=%d standby=1) - requesting disconnect",
                  (int)cloudConnected);
+        logTeardownContext("SLEEP: cloud disconnect start", useNetworkStandbyRequested, useNetworkStandbyEffective);
+        cloudDisconnectStartMs = millis();
+        cloudDisconnectElapsedMs = 0;
         Connectivity::requestCloudDisconnectOnly();
       } else if (cloudConnected) {
-        Log.warn("SLEEP: pre-sleep gate blocked (cloud=1 standby=0) - requesting cloud disconnect + modem off");
+        Log.warn("SLEEP: pre-sleep gate blocked (cloud=1 standby=0) - requesting disconnect + modem off");
+        logTeardownContext("SLEEP: cloud disconnect start", useNetworkStandbyRequested, useNetworkStandbyEffective);
+        logTeardownContext("SLEEP: modem-off start", useNetworkStandbyRequested, useNetworkStandbyEffective);
+        cloudDisconnectStartMs = millis();
+        cloudDisconnectElapsedMs = 0;
+        modemOffElapsedMs = 0;
         Connectivity::requestFullDisconnectAndRadioOff();
       } else {
         Log.warn("SLEEP: pre-sleep gate blocked (cloud=0 radioOn=1 standby=0) - requesting modem off");
+        cloudDisconnectCompleteLogged = true;
+        cloudDisconnectElapsedMs = 0;
+        if (sysStatus.get_verboseMode()) {
+          Log.info("SLEEP: cloud disconnect complete elapsed=0 ms");
+        }
+        logTeardownContext("SLEEP: modem-off start", useNetworkStandbyRequested, useNetworkStandbyEffective);
+        modemOffElapsedMs = 0;
         Connectivity::requestRadioPowerOff();
       }
 
@@ -397,11 +651,23 @@ void handleSleepingState() {
 
     unsigned long elapsedMs = millis() - disconnectRequestStartMs;
     if (elapsedMs > disconnectBudgetMs) {
-      Log.warn("SLEEP: pre-sleep teardown exceeded budget (%lu ms) - raising alert 15", elapsedMs);
+      Log.warn("SLEEP: pre-sleep teardown exceeded budget (%lu ms, cloud=%d radioOn=%d standby=%d) - raising alert 15",
+               elapsedMs,
+               (int)Particle.connected(),
+               (int)Connectivity::isRadioPoweredOn(),
+               useNetworkStandbyEffective ? 1 : 0);
+      markModemUnstable(MODEM_UNSTABLE_REASON_SLOW_TEARDOWN, elapsedMs);
       current.raiseAlert(15);
       state = ERROR_STATE;
       disconnectRequested = false;
       disconnectRequestStartMs = 0;
+      cloudDisconnectStartMs = 0;
+      cloudDisconnectElapsedMs = 0;
+      modemOffElapsedMs = 0;
+      cloudDisconnectCompleteLogged = false;
+    #if Wiring_Cellular
+      radioOffCompleteLogged = false;
+    #endif
       return;
     }
 
@@ -421,9 +687,7 @@ void handleSleepingState() {
     // indicator LEDs can be powered down. During daytime naps we keep
     // interrupt-driven sensors (like PIR) powered so they can wake the
     // device from ULTRA_LOW_POWER sleep.
-    Log.info("CLOSED-hours deep sleep: disabling sensor (onEnterSleep)");
     SensorManager::instance().onEnterSleep();
-    Log.info("CLOSED-hours deep sleep: sensorReady after disable=%s", SensorManager::instance().isSensorReady() ? "true" : "false");
 
     // ********** Night sleep (outside opening hours) **********
     nightSleepSec = secondsUntilNextOpen();
@@ -440,15 +704,36 @@ void handleSleepingState() {
       nightSleepSec = MAX_SLEEP_SEC;
     }
 
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+    const int requestedNightSleepSec = nightSleepSec;
+    if (claimFailsafeDeferLog(FAILSAFE_DEFER_CLOSED_HOURS_LONG_SLEEP)) {
+      Log.info("FailsafeDefer: reason=%s open=0 sleep=%ds",
+               failsafeDeferReasonName(FAILSAFE_DEFER_CLOSED_HOURS_LONG_SLEEP),
+               requestedNightSleepSec);
+    }
+    if (nightSleepSec > (int)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC) {
+      Log.info("FailsafeTest: cap closed sleep %ds->%lds",
+               requestedNightSleepSec,
+               (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC);
+      nightSleepSec = (int)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC;
+    }
+#endif
+
     // First attempt a true HIBERNATE so platforms that support it
     // still get a cold boot at next opening time.
     if (!session.hibernateDisabledForSession) {
       // Diagnostic logging to help debug alert 16 issues
       const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
       uint8_t currentHour = snapshot.localHour;
-      Log.info("Entering HIBERNATE: Time.isValid=%d localHour=%d openTime=%d closeTime=%d",
-               Time.isValid(), currentHour, sysStatus.get_openTime(), sysStatus.get_closeTime());
-      Log.info("Outside opening hours - entering NIGHT HIBERNATE sleep for %d seconds", nightSleepSec);
+      if (sysStatus.get_verboseMode()) {
+        Log.info("Sleep: HIB ctx valid=%d hr=%d open=%d close=%d",
+                 Time.isValid(), currentHour, sysStatus.get_openTime(), sysStatus.get_closeTime());
+      }
+    #if CONNECTIVITY_FAILSAFE_TEST_MODE
+      Log.info("Sleep: HIB dur=%ds open=0 test=1", nightSleepSec);
+    #else
+      Log.info("Sleep: HIB dur=%ds open=0", nightSleepSec);
+    #endif
 
       ab1805.stopWDT();
       // Reset sleep configuration so prior ULTRA_LOW_POWER GPIOs do not
@@ -467,11 +752,17 @@ void handleSleepingState() {
       // permanently disable HIBERNATE for the remainder of this boot so
       // we can fall back to ULTRA_LOW_POWER instead of thrashing.
       ab1805.resumeWDT();
+    #if CONNECTIVITY_FAILSAFE_TEST_MODE
+      Log.warn("SleepWarn: HIB returned fallback=ULP test=1");
+    #endif
       Log.error("HIBERNATE sleep returned unexpectedly (platform does not support or HIBERNATE woke early)");
       Log.error("Park hours context: Time.isValid=%d localHour=%d openTime=%d closeTime=%d",
                 Time.isValid(), currentHour, sysStatus.get_openTime(), sysStatus.get_closeTime());
       current.raiseAlert(16); // Alert: unexpected return from HIBERNATE
       session.hibernateDisabledForSession = true;
+    #if CONNECTIVITY_FAILSAFE_TEST_MODE
+      hibernateFallbackThisPass = true;
+    #endif
       // Clear alert immediately since we've handled the failure by disabling HIBERNATE
       // Without a reset, the setup() alert clearing code won't run
       current.set_alertCode(0);
@@ -490,11 +781,12 @@ void handleSleepingState() {
     intervalSec = 1 * 3600; // Preserve 1 hour default if unset
   }
 
+  const char *sleepReason = "scheduled";
   int wakeInSeconds;
   const bool overnightFallbackSleep = (!isWithinOpenHours() && nightSleepSec > 0);
   if (overnightFallbackSleep) {
     wakeInSeconds = nightSleepSec;
-    Log.info("Outside opening hours - using ULTRA_LOW_POWER fallback sleep for %d seconds", wakeInSeconds);
+    sleepReason = "closed";
   } else {
     // Within opening hours, align wake to the reporting boundary.
     // Add 1 second margin to ensure we wake slightly after the boundary.
@@ -509,8 +801,6 @@ void handleSleepingState() {
         aligned = boundary;
       }
       wakeInSeconds = aligned + 1;
-      Log.info("Sleep alignment: now=%lu boundary=%d offset=%d aligned=%d (+1 for margin)",
-               (unsigned long)now, boundary, offset, aligned);
     } else {
       wakeInSeconds = (int)intervalSec;
     }
@@ -540,10 +830,10 @@ void handleSleepingState() {
       if (debounceSeconds < (uint32_t)wakeInSeconds) {
         wakeInSeconds = (int)debounceSeconds;
       }
-      Log.info("OCCUPANCY: Sleeping for debounce check: %d sec (occupied)", wakeInSeconds);
+      sleepReason = "debounce";
     } else {
       // Unoccupied - use scheduled wake time
-      Log.info("OCCUPANCY: Sleeping for scheduled wake: %d sec (unoccupied)", wakeInSeconds);
+      sleepReason = "scheduled";
     }
   }
 
@@ -582,17 +872,12 @@ void handleSleepingState() {
   // use network standby to avoid rapid reconnects that could trigger carrier
   // blacklisting. On WiFi devices, standby is not applied.
   bool useNetworkStandby = useNetworkStandbyEffective;
-  
-  if (useNetworkStandby) {
-    Log.info("Entering ULTRA_LOW_POWER sleep with NETWORK STANDBY for %d seconds (occupancy mode)", wakeInSeconds);
-  } else {
-    Log.info("Entering ULTRA_LOW_POWER sleep for %d seconds (wakes at boundary or on GPIO)", wakeInSeconds);
-  }
 
   // -----------------------------------------------------------------------
   // Minimal end-of-cycle observability (one compact line per wake cycle)
   // -----------------------------------------------------------------------
   {
+    measure.batteryState(BatterySampleContext::PreSleep);
     const uint16_t qDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
     const float soc = current.get_stateOfCharge();
     const uint16_t socTenths = (soc >= 0.0f && soc <= 100.0f) ? (uint16_t)(soc * 10.0f + 0.5f) : 0xFFFF;
@@ -613,7 +898,7 @@ void handleSleepingState() {
     const unsigned long awakeCeilingMs =
         (unsigned long)ConnectivityPolicy::CONNECT_BUDGET_DEEP_MS +
         (unsigned long)ConnectivityPolicy::FIRMWARE_UPDATE_MAX_MS +
-        (unsigned long)ConnectivityPolicy::CLOUD_OPS_GATE_TIMEOUT_MS +
+      (unsigned long)ConnectivityPolicy::OUTPUT_LEDGER_SYNC_TIMEOUT_MS +
         (unsigned long)ConnectivityPolicy::DISCONNECT_MODEM_DEFAULT_SEC * 1000UL +
         30000UL; // slack
 
@@ -644,20 +929,22 @@ void handleSleepingState() {
     }
 
     // One compact line for field parsing.
-    Log.info(
-      "CYCLE end awake=%lums conn=%s/%s/%lums svc=%lums td=%lums q=%d/%d/%d soc=%.1f%% chg=%d lastOk=%ld",
-        (unsigned long)Observability::cycleStats().total_awake_ms,
-        Observability::toString(Observability::cycleStats().connect_attempt_type),
-        Observability::toString(Observability::cycleStats().connect_result),
-        (unsigned long)Observability::cycleStats().connect_duration_ms,
-        (unsigned long)Observability::cycleStats().service_duration_ms,
-        (unsigned long)Observability::cycleStats().teardown_duration_ms,
-      (int)(Observability::cycleStats().publish_queue_depth_before_connect == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_before_connect),
-      (int)(Observability::cycleStats().publish_queue_depth_after_connect == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_after_connect),
-      (int)(Observability::cycleStats().publish_queue_depth_before_sleep == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_before_sleep),
-        (double)(Observability::cycleStats().battery_soc_tenths == 0xFFFF ? -1.0 : ((double)Observability::cycleStats().battery_soc_tenths / 10.0)),
-      (int)(Observability::cycleStats().is_charging == 0xFF ? -1 : (int)Observability::cycleStats().is_charging),
-        (long)Observability::cycleStats().last_success_epoch);
+    if (sysStatus.get_verboseMode()) {
+      Log.info(
+        "CYCLE end awake=%lums conn=%s/%s/%lums svc=%lums td=%lums q=%d/%d/%d soc=%.1f%% chg=%d lastOk=%ld",
+          (unsigned long)Observability::cycleStats().total_awake_ms,
+          Observability::toString(Observability::cycleStats().connect_attempt_type),
+          Observability::toString(Observability::cycleStats().connect_result),
+          (unsigned long)Observability::cycleStats().connect_duration_ms,
+          (unsigned long)Observability::cycleStats().service_duration_ms,
+          (unsigned long)Observability::cycleStats().teardown_duration_ms,
+        (int)(Observability::cycleStats().publish_queue_depth_before_connect == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_before_connect),
+        (int)(Observability::cycleStats().publish_queue_depth_after_connect == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_after_connect),
+        (int)(Observability::cycleStats().publish_queue_depth_before_sleep == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_before_sleep),
+          (double)(Observability::cycleStats().battery_soc_tenths == 0xFFFF ? -1.0 : ((double)Observability::cycleStats().battery_soc_tenths / 10.0)),
+        (int)(Observability::cycleStats().is_charging == 0xFF ? -1 : (int)Observability::cycleStats().is_charging),
+          (long)Observability::cycleStats().last_success_epoch);
+    }
   }
 
   // On WiFi platforms, ensure the radio is actually OFF before entering
@@ -705,7 +992,9 @@ void handleSleepingState() {
       wifiOffGuardRetries = 0;
     } else if (wifiOffGuardActive) {
       unsigned long guardElapsedMs = millis() - wifiOffGuardStartMs;
-      Log.info("SLEEP: WiFi radio powered off before sleep (%lu ms)", guardElapsedMs);
+      if (sysStatus.get_verboseMode()) {
+        Log.info("SLEEP: WiFi radio powered off before sleep (%lu ms)", guardElapsedMs);
+      }
       wifiOffGuardActive = false;
       wifiOffGuardStartMs = 0;
       wifiOffGuardLastRetryMs = 0;
@@ -734,10 +1023,58 @@ void handleSleepingState() {
 
   // Stop watchdog immediately before sleep (after config is fully built)
   // to minimize time between I2C transaction and sleep entry
-  ab1805.stopWDT();
+  const bool watchdogStopped = ab1805.stopWDT();
+  Log.info("SleepCall: standby=%d dur=%d wdt=%s gate=ok",
+           useNetworkStandby ? 1 : 0,
+           wakeInSeconds,
+           watchdogStopped ? "off" : "err");
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+  Log.info("Sleep: ULP standby=%d reason=%s dur=%ds occ=%d soc=%.1f hibFallback=%d test=1",
+           useNetworkStandby ? 1 : 0,
+           sleepReason,
+           wakeInSeconds,
+           current.get_occupied() ? 1 : 0,
+           (double)current.get_stateOfCharge(),
+           hibernateFallbackThisPass ? 1 : 0);
+#else
+  Log.info("Sleep: ULP standby=%d reason=%s dur=%ds occ=%d soc=%.1f",
+           useNetworkStandby ? 1 : 0,
+           sleepReason,
+           wakeInSeconds,
+           current.get_occupied() ? 1 : 0,
+           (double)current.get_stateOfCharge());
+#endif
 
   thrashGuard.markProgress("SLEEP_ATTEMPT");
+  const unsigned long sleepCallStartMs = millis();
   SystemSleepResult result = System.sleep(config);
+  const unsigned long sleepElapsedMs = millis() - sleepCallStartMs;
+  pin_t wakePin = result.wakeupPin();
+  const char *wakeReturnReason = (result.error() != SYSTEM_ERROR_NONE) ? "ERROR" :
+      ((wakePin == BUTTON_PIN) ? "BUTTON" : ((wakePin == intPin) ? "PIR" : "TIMER"));
+
+#if HAL_PLATFORM_CELLULAR
+  if (useNetworkStandby) {
+    if (result.error() == SYSTEM_ERROR_NONE) {
+      preserveStandbyAfterNormalReturn = true;
+      forceModemOffAfterStandbyFailure = false;
+      standbySleepFailureError = SYSTEM_ERROR_NONE;
+      if (sysStatus.get_verboseMode()) {
+        Log.info("SLEEP: standby sleep returned normally; preserving modem standby");
+      }
+    } else {
+      preserveStandbyAfterNormalReturn = false;
+      forceModemOffAfterStandbyFailure = true;
+      standbySleepFailureError = (int)result.error();
+      Log.warn("SLEEP: standby sleep failed; forcing modem-off reason=sleep_error err=%d",
+               standbySleepFailureError);
+    }
+  } else {
+    preserveStandbyAfterNormalReturn = false;
+    forceModemOffAfterStandbyFailure = false;
+    standbySleepFailureError = SYSTEM_ERROR_NONE;
+  }
+#endif
 
   // If Device OS rejects the sleep configuration, System.sleep() returns
   // immediately and the wake pin will be invalid (65535). Without handling
@@ -810,11 +1147,14 @@ void handleSleepingState() {
 
     if (Serial.isConnected()) {
       delay(ConnectivityPolicy::DEBUG_SERIAL_POST_CONNECT_DELAY_MS);
-      Log.info("Serial reconnected after %lu ms", (millis() - serialWaitStart));
     } else {
       Log.warn("Serial did not reconnect within 30s - continuing without serial");
     }
   }
+
+  Log.info("WakeReturn: elapsed=%lu reason=%s",
+           sleepElapsedMs,
+           wakeReturnReason);
 
   // Re-attach user button interrupt after sleep (sleep may have detached it)
   attachInterrupt(BUTTON_PIN, userSwitchISR, FALLING);
@@ -822,15 +1162,10 @@ void handleSleepingState() {
 
   // When both GPIO and timer wake are configured, the wake source detection can be
   // ambiguous. The explicit approach: if neither GPIO pin woke us, it's the timer.
-  pin_t wakePin = result.wakeupPin();
   bool pirWake = (wakePin == intPin);
   bool buttonWake = (wakePin == BUTTON_PIN);
   bool timerWake = !pirWake && !buttonWake;  // If no GPIO woke us, it's the timer
-  
-  // Wake diagnostics - include raw wakeupReason() for debugging
-  SystemSleepWakeupReason reason = result.wakeupReason();
-  Log.info("Woke from ULTRA_LOW_POWER: wakeupReason=%d pin=%d (pir=%d button=%d timer=%d)",
-           (int)reason, (int)wakePin, pirWake, buttonWake, timerWake);
+  const char *wakeReasonLabel = buttonWake ? "BUTTON" : (pirWake ? "PIR" : "TIMER");
 
   // Observability: start of a new wake cycle (ULP return path).
   Observability::cycleStats().resetOnWake(millis());
@@ -842,23 +1177,12 @@ void handleSleepingState() {
   // LED will be turned on with proper timeout by PIR wake processing below
   // Don't turn it on here without timeout as it causes false LED timeout detection
 
-  // Diagnostic: confirm open/closed decision at wake.
-  if (Time.isValid()) {
-    const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
-    uint8_t hour = snapshot.localHour;
-    Log.info("Wake eval: parkHours %02u-%02u localHour=%02u => %s",
-             sysStatus.get_openTime(), sysStatus.get_closeTime(), hour,
-             isWithinOpenHours() ? "OPEN" : "CLOSED");
-  } else {
-    Log.info("Wake eval: Time invalid => treating as OPEN (per policy)");
-  }
-
   if (buttonWake) {
     // User button wake: queue a fresh service report, then force immediate connect.
     SensorManager::instance().onExitSleep();
-    measure.batteryState();
+    measure.batteryState(BatterySampleContext::PostWake);
+    logWakeSummary(wakeReasonLabel);
     session.serviceRequestTriggered = true;
-    Log.info("WAKE: Button pressed - reason=SERVICE_REQUEST transitioning to REPORTING_STATE");
     state = REPORTING_STATE;
     return;
   } else {
@@ -869,60 +1193,50 @@ void handleSleepingState() {
       // If the sensor stack was never initialized (for example, device booted
       // while closed and remained asleep), onExitSleep() will be a no-op.
       // Ensure we (re)initialize the active sensor when entering open hours.
-      Log.info("Wake: OPEN hours - enabling sensor (onExitSleep)");
       SensorManager::instance().onExitSleep();
       if (!SensorManager::instance().isSensorReady()) {
-        Log.info("Wake: sensorReady=false - initializing from config");
         SensorManager::instance().initializeFromConfig();
       }
-      Log.info("Wake: sensorReady=%s", SensorManager::instance().isSensorReady() ? "true" : "false");
 
       // Refresh battery state immediately after wake while the radio is still off.
-      measure.batteryState();
+      measure.batteryState(BatterySampleContext::PostWake);
+
+      // If KEEP_ALIVE was previously disabled due to low battery, re-evaluate
+      // battery policy immediately after the post-wake sample so this wake's
+      // occupancy and sleep decisions do not use a stale downgraded mode.
+      if (sysStatus.get_lowBatteryMode()) {
+        applyBatteryAwareConnectionModePolicy(current.get_stateOfCharge());
+      }
 
       // In CONNECTED operating mode, the device should reconnect at the
       // start of open hours so it can resume normal connected behavior.
       if (sysStatus.get_connectionMode() == CONNECTED && !Particle.connected()) {
-        Log.info("WAKE: CONNECTED mode + OPEN hours - reason=MAINTAIN_CONNECTION transitioning to CONNECTING_STATE");
+        logWakeSummary(wakeReasonLabel);
         state = CONNECTING_STATE;
         return;
       }
-    } else {
-      Log.info("Woke outside opening hours; keeping sensors powered down");
     }
 
     // Check if LED timeout expired FIRST (before processing new PIR wake)
     // This ensures we don't immediately undo state changes from PIR processing
-    Log.info("[WAKE CHECK] Mode=%d, LED status=%s, LED time remaining=%lu sec, occupied=%s",
-             sysStatus.get_sensorMode(),
-             signalLEDStatus() ? "ON" : "OFF",
-             (unsigned long)signalLEDTimeRemaining(),
-             current.get_occupied() ? "true" : "false");
-    
     if (sysStatus.get_sensorMode() == OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
       // LED timeout expired - debounce period elapsed without motion
-      Log.info("[LED TIMEOUT] Detected on wake - processing unoccupied transition");
       uint32_t sessionDuration = Time.now() - current.get_occupancyStartTime();
       uint32_t totalOccupied = current.get_totalOccupiedSeconds() + sessionDuration;
+      const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
       current.set_totalOccupiedSeconds(totalOccupied);
       current.set_occupied(false);
       current.set_occupancyStartTime(0);
       signalLED(false);  // Turn off LED
-
-      Log.info("Space now UNOCCUPIED (LED timeout on wake) - Session: %lu sec, Total today: %lu sec",
-               sessionDuration, totalOccupied);
+      logUnoccupiedEvent("debounce", sessionDuration, totalOccupied, reportNow);
       
       // Match the rest of the occupancy state machine: only KEEP_ALIVE mode
       // forces an immediate report/connect on occupancy transitions.
-      if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
-        Log.info("Occupancy change detected (occupied->unoccupied) - triggering immediate report");
+      if (reportNow) {
         session.occupancyChangeTriggered = true;
         state = REPORTING_STATE;
         return;
       }
-
-      Log.info("Occupancy change detected (occupied->unoccupied) - no immediate report (connectionMode=%d)",
-               (int)sysStatus.get_connectionMode());
     }
 
     // Process PIR wake events (after checking LED timeout above)
@@ -930,7 +1244,6 @@ void handleSleepingState() {
     // detection event so that the motion that woke the device is counted
     // even if the ISR flag did not survive ULTRA_LOW_POWER sleep.
     if (pirWake) {
-      Log.info("[PIR WAKE] Processing PIR wake event (mode=%d)", sysStatus.get_sensorMode());
       if (sysStatus.get_sensorMode() == COUNTING) {
         current.set_hourlyCount(current.get_hourlyCount() + 1);
         current.set_dailyCount(current.get_dailyCount() + 1);
@@ -946,7 +1259,6 @@ void handleSleepingState() {
         // battery policy on wake so recovered power can restore the intended
         // occupancy behavior before we decide whether to report or sleep again.
         if (sysStatus.get_lowBatteryMode()) {
-          measure.batteryState();
           applyBatteryAwareConnectionModePolicy(current.get_stateOfCharge());
         }
         
@@ -964,22 +1276,18 @@ void handleSleepingState() {
             debounceMs = 60000; // default 60s
           }
           signalLED(true, debounceMs);
-          Log.info("Space now OCCUPIED from PIR wake at %s",
-                   Time.timeStr().c_str());
+          const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
+          logOccupiedEvent("pir-wake", debounceMs / 1000UL, reportNow);
           
           // Match the rest of the occupancy state machine: only KEEP_ALIVE mode
           // forces an immediate report/connect on occupancy transitions.
-          if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
-            Log.info("Occupancy change detected (unoccupied->occupied) - triggering immediate report");
+          if (reportNow) {
             session.occupancyChangeTriggered = true;
             setAppBreadcrumb(5);
             setAppBreadcrumb(5);
             state = REPORTING_STATE;
             return;
           }
-
-          Log.info("Occupancy change detected (unoccupied->occupied) - no immediate report (connectionMode=%d)",
-                   (int)sysStatus.get_connectionMode());
         } else {
           // Already occupied - motion detected during debounce, restart timer
           uint32_t debounceMs = sensorConfig.get_sensorSetting1();
@@ -987,11 +1295,13 @@ void handleSleepingState() {
             debounceMs = 60000; // default 60s
           }
           signalLED(true, debounceMs);  // Restart LED timer
-          Log.info("Motion from PIR wake - space remains occupied (timer reset to %lu sec)", debounceMs/1000);
+          logOccupiedEvent("pir-wake", debounceMs / 1000UL, false, true);
         }
         current.set_lastOccupancyEvent(millis());
       }
     }
+
+    logWakeSummary(wakeReasonLabel);
 
     // For COUNTING mode: Turn off LED if flash completed during sleep
     if (sysStatus.get_sensorMode() == COUNTING && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
@@ -1005,12 +1315,10 @@ void handleSleepingState() {
       // while occupied so occupancy=1 is only reported on 0->1 transition.
       if (sysStatus.get_sensorMode() == OCCUPANCY && current.get_occupied() &&
           sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
-        Log.info("WAKE: Timer wake while OCCUPIED (KEEP_ALIVE) - suppressing scheduled report");
         state = SLEEPING_STATE;
         return;
       }
 
-      Log.info("WAKE: Timer wake - reason=SCHEDULED_REPORT transitioning to REPORTING_STATE");
       state = REPORTING_STATE;
       return;
     }
@@ -1029,8 +1337,6 @@ void handleSleepingState() {
       time_t now = Time.now();
       time_t lastReport = sysStatus.get_lastReport();
       if (lastReport > 0 && (now - lastReport) >= intervalSec) {
-        int overdue = (int)(now - lastReport - intervalSec);
-        Log.info("WAKE: PIR + report overdue (%d sec) - transitioning to REPORTING_STATE", overdue);
         state = REPORTING_STATE;
         return;
       }
@@ -1045,7 +1351,6 @@ void handleSleepingState() {
       return;
     }
 
-    Log.info("WAKE: No immediate action needed - transitioning to IDLE_STATE");
     state = IDLE_STATE;
   }
 }

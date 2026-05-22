@@ -19,6 +19,13 @@
 extern char internalTempStr[16];
 extern char signalStr[64];
 
+enum class BatterySampleContext : uint8_t {
+    General = 0,
+    Setup,
+    PreSleep,
+    PostWake,
+};
+
 /**
  * @brief Convenience macro for accessing the SensorManager singleton.
  *
@@ -117,7 +124,7 @@ public:
     /**
      * @brief Determine whether the battery is present and not critically low.
      */
-    bool batteryState();
+    bool batteryState(BatterySampleContext sampleContext = BatterySampleContext::General);
 
     /**
      * @brief Determine whether it is safe to charge the battery.
@@ -151,6 +158,18 @@ protected:
 
     /** @brief Track whether the first post-boot battery sample has already run. */
     bool _firstBatterySampleTaken;
+
+    /** @brief Whether this wake cycle has a trusted pre-radio battery sample. */
+    bool _authoritativeBatterySampleActive;
+
+    /** @brief Cached SoC from the trusted pre-radio battery sample. */
+    float _authoritativeBatterySoc;
+
+    /** @brief Cached battery state from the trusted pre-radio battery sample. */
+    uint8_t _authoritativeBatteryState;
+
+    /** @brief Whether the trusted pre-radio sample used voltage fallback. */
+    bool _authoritativeBatteryFallbackUsed;
 };
 
 #endif /* SENSORMANAGER_H */

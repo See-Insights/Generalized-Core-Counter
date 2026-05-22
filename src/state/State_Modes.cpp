@@ -69,15 +69,14 @@ void handleOccupancyMode() {
         debounceSeconds = 60;  // Minimum 60 second debounce for occupancy
       }
       signalLED(true, debounceSeconds * 1000UL);  // Turn on LED until debounce expires
-
-      Log.info("Space now OCCUPIED at %s (LED timeout in %lu sec)", Time.timeStr().c_str(), debounceSeconds);
+      const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
+      logOccupiedEvent("pir", debounceSeconds, reportNow);
       
       // In INTERMITTENT_KEEP_ALIVE mode, report immediately on occupancy state changes
       // This allows dashboard to show real-time occupancy transitions
-      if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
+      if (reportNow) {
         session.occupancyChangeTriggered = true;
         if (state == IDLE_STATE) {
-          Log.info("Occupancy change detected - triggering immediate report");
           state = REPORTING_STATE;
         }
       }
@@ -89,7 +88,7 @@ void handleOccupancyMode() {
       }
       signalLED(true, debounceSeconds * 1000UL);  // Reset LED timeout
       if (sysStatus.get_verboseMode()) {
-        Log.info("Motion detected - LED timeout reset to %lu sec", debounceSeconds);
+        logOccupiedEvent("pir", debounceSeconds, false, true);
       }
     }
 
@@ -146,18 +145,16 @@ void updateOccupancyState() {
     // Mark as unoccupied
     current.set_occupied(false);
     current.set_occupancyStartTime(0);
-
-    Log.info("Space now UNOCCUPIED - Session duration: %lu seconds, Total today: %lu seconds",
-             sessionDuration, totalOccupied);
+    const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
+    logUnoccupiedEvent("debounce", sessionDuration, totalOccupied, reportNow);
 
     signalLED(false);  // Turn off LED
     
     // In INTERMITTENT_KEEP_ALIVE mode, report immediately on occupancy state changes
     // This allows dashboard to show real-time occupancy transitions
-    if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
+    if (reportNow) {
       session.occupancyChangeTriggered = true;
       if (state == IDLE_STATE) {
-        Log.info("Occupancy change detected - triggering immediate report");
         state = REPORTING_STATE;
       }
     }

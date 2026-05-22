@@ -16,6 +16,98 @@
 // This file was split from StateHandlers.cpp as a mechanical refactor.
 // No behavioral changes were made.
 
+namespace {
+
+constexpr uint8_t MODEM_UNSTABLE_CONNECT_TIMEOUT_THRESHOLD = 2;
+
+struct ConnectBudgetContext {
+  unsigned long budgetMs = ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS;
+  uint16_t configuredBudgetSec = 0;
+  uint8_t attemptCounter = 0;
+  float currentSoC = 0.0f;
+  bool allowDeepAttempt = false;
+  bool configuredBudgetBelowMinimum = false;
+};
+
+ConnectBudgetContext evaluateConnectBudget() {
+  ConnectBudgetContext context;
+  context.configuredBudgetSec = sysStatus.get_connectAttemptBudgetSec();
+  if (context.configuredBudgetSec >= ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MIN_SEC &&
+      context.configuredBudgetSec <= ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MAX_SEC) {
+    context.budgetMs = (unsigned long)context.configuredBudgetSec * 1000UL;
+  } else if (context.configuredBudgetSec > 0 &&
+             context.configuredBudgetSec < ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MIN_SEC) {
+    context.configuredBudgetBelowMinimum = true;
+    context.budgetMs = ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS;
+  }
+
+  context.attemptCounter = sysStatus.get_connectionAttemptCounter();
+  context.currentSoC = current.get_stateOfCharge();
+  context.allowDeepAttempt =
+      (context.attemptCounter >= ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD) ||
+      (context.currentSoC > ConnectivityPolicy::DEEP_ATTEMPT_SOC_THRESHOLD);
+  if (context.allowDeepAttempt) {
+    context.budgetMs = ConnectivityPolicy::CONNECT_BUDGET_DEEP_MS;
+  }
+
+  return context;
+}
+
+void armActiveConnectAttempt(unsigned long budgetMs) {
+  session.connectAttemptActive = true;
+  session.connectAttemptBudgetMs = budgetMs;
+}
+
+void clearActiveConnectAttempt() {
+  session.connectAttemptActive = false;
+  session.connectAttemptBudgetMs = 0;
+}
+
+void markModemUnstableFromConnectTimeout() {
+  if (session.modemConnectTimeoutCount < 0xFF) {
+    session.modemConnectTimeoutCount++;
+  }
+
+  if (session.modemConnectTimeoutCount >= MODEM_UNSTABLE_CONNECT_TIMEOUT_THRESHOLD) {
+    const bool reasonChanged = !session.modemUnstable || session.modemUnstableReason != 2;
+    session.modemUnstable = true;
+    session.modemUnstableReason = 2;
+    if (reasonChanged) {
+      Log.warn("MODEM_HEALTH: unstable reason=connect_timeout count=%u",
+               (unsigned)session.modemConnectTimeoutCount);
+    }
+    if (!session.modemStandbySuppressed) {
+      Log.warn("MODEM_POLICY: standby temporarily disabled reason=unstable_modem");
+      session.modemStandbySuppressed = true;
+    }
+  }
+}
+
+} // namespace
+
+bool activeConnectAttemptWithinBudget() {
+  if (state != CONNECTING_STATE) {
+    return false;
+  }
+
+  if (oldState != CONNECTING_STATE) {
+    return true;
+  }
+
+  if (!session.connectAttemptActive) {
+    return false;
+  }
+
+  const unsigned long budgetMs = session.connectAttemptBudgetMs;
+  if (budgetMs == 0UL) {
+    return true;
+  }
+
+  const unsigned long elapsedMs =
+      (unsigned long)sysStatus.get_lastConnectionDuration() * 1000UL;
+  return elapsedMs <= budgetMs;
+}
+
 // Maximum amount of time to remain in FIRMWARE_UPDATE_STATE before
 // giving up and returning to normal low-power operation. Mirrors the
 // Wake-Publish-Sleep Cellular example, which uses a 5 minute budget
@@ -71,44 +163,38 @@ void handleConnectingState() {
     // Base budget: 300s (5 minutes) - adequate for normal connection + IMSI cycling
     // Deep budget: 660s (11 minutes) - allows full modem reset periodically
     
-    budgetMs = ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS; // Default 5 minutes
-    uint16_t configuredBudgetSec = sysStatus.get_connectAttemptBudgetSec();
-    
-    // Use ledger-configured budget if valid, ensuring minimum 120s per Particle docs
-    if (configuredBudgetSec >= ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MIN_SEC &&
-        configuredBudgetSec <= ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MAX_SEC) {
-      budgetMs = (unsigned long)configuredBudgetSec * 1000UL;
-    } else if (configuredBudgetSec > 0 && configuredBudgetSec < ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MIN_SEC) {
-      Log.warn("Configured budget %us below 120s minimum, using 300s default", configuredBudgetSec);
-      budgetMs = ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS;
+    const ConnectBudgetContext budgetContext = evaluateConnectBudget();
+    budgetMs = budgetContext.budgetMs;
+    if (budgetContext.configuredBudgetBelowMinimum) {
+      Log.warn("Configured budget %us below 120s minimum, using 300s default",
+               budgetContext.configuredBudgetSec);
     }
-    
-    // Implement periodic deep attempts for full modem reset capability
-    uint8_t attemptCounter = sysStatus.get_connectionAttemptCounter();
-    float currentSoC = current.get_stateOfCharge();
-    bool allowDeepAttempt = (attemptCounter >= ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD) ||
-                (currentSoC > ConnectivityPolicy::DEEP_ATTEMPT_SOC_THRESHOLD);
 
-    if (allowDeepAttempt) {
+    if (budgetContext.allowDeepAttempt) {
       // Every 4th attempt (counter 0-3, resets at 3) OR when battery >50%,
       // allow 11 minutes for full modem reset
-      budgetMs = ConnectivityPolicy::CONNECT_BUDGET_DEEP_MS;
-      if (attemptCounter >= ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD) {
-        Log.info("Deep connection attempt #%d - allowing 11 min for modem reset", attemptCounter + 1);
+      if (budgetContext.attemptCounter >= ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD) {
+        Log.info("Deep connection attempt #%d - allowing 11 min for modem reset",
+                 budgetContext.attemptCounter + 1);
         sysStatus.set_connectionAttemptCounter(0);  // Reset counter after deep attempt
       } else {
-        Log.info("Healthy battery (%.1f%%) - allowing 11 min connection budget", (double)currentSoC);
+        Log.info("Healthy battery (%.1f%%) - allowing 11 min connection budget",
+                 (double)budgetContext.currentSoC);
       }
     } else {
-      Log.trace("Normal connection attempt #%d - 5 min budget", attemptCounter + 1);
+      Log.trace("Normal connection attempt #%d - 5 min budget",
+                budgetContext.attemptCounter + 1);
     }
+
+    armActiveConnectAttempt(budgetMs);
 
     // Observability: record connect attempt type + final effective budget.
     {
       const uint16_t pending = (uint16_t)PublishQueuePosix::instance().getNumEvents();
       Observability::cycleStats().markConnectAttempt(
-          allowDeepAttempt ? Observability::WakeCycleStats::ConnectAttemptType::DEEP
-                           : Observability::WakeCycleStats::ConnectAttemptType::NORMAL,
+          budgetContext.allowDeepAttempt
+              ? Observability::WakeCycleStats::ConnectAttemptType::DEEP
+              : Observability::WakeCycleStats::ConnectAttemptType::NORMAL,
           (uint32_t)budgetMs,
           pending);
     }
@@ -126,11 +212,13 @@ void handleConnectingState() {
     CellularSignal sig = Cellular.RSSI();
     float strengthPct = sig.getStrength();
     float qualityPct = sig.getQuality();
-    Log.info("Starting connection attempt - Signal: S=%2.0f%% Q=%2.0f%%",
-             (double)strengthPct, (double)qualityPct);
+    (void)strengthPct;
+    (void)qualityPct;
+#else
 #endif
-  Log.info("Requesting Particle cloud connection (freeHeap=%lu)",
-       (unsigned long)System.freeMemory());
+    Log.info("Connect: start budget=%lus heap=%lu",
+         (unsigned long)(budgetMs / 1000UL),
+         (unsigned long)System.freeMemory());
     setAppBreadcrumb(6);
     Particle.connect();
     connectRequested = true;
@@ -149,7 +237,8 @@ void handleConnectingState() {
       thrashGuard.markProgress("CONNECT_WAIT");
       lastConnectHeartbeatMs = nowMs;
     }
-    if (lastConnectStatusLogMs == 0 || (nowMs - lastConnectStatusLogMs) >= CONNECT_STATUS_LOG_MS) {
+    if (elapsedMs >= CONNECT_STATUS_LOG_MS &&
+      (lastConnectStatusLogMs == 0 || (nowMs - lastConnectStatusLogMs) >= CONNECT_STATUS_LOG_MS)) {
       Log.info("CONNECTING: waiting for cloud (%lu/%lu ms)",
                (unsigned long)elapsedMs,
                (unsigned long)budgetMs);
@@ -163,6 +252,7 @@ void handleConnectingState() {
       setAppBreadcrumb(7);
       connectedStartMs = millis();
       sysStatus.set_lastConnection(Time.now());
+      clearConnectivityFailsafeRecovery("cloud-ok");
 
       // Observability: connect succeeded + begin service window.
       Observability::cycleStats().markConnectSuccess(
@@ -177,7 +267,6 @@ void handleConnectingState() {
         session.webhookExpectedOnConnect = false;
         session.awaitingWebhookResponse = true;
         session.webhookAwaitStartMs = millis();
-        Log.info("Cloud connected - awaiting webhook response (short-term window started)");
       }
       
       // Increment connection attempt counter for periodic deep attempts
@@ -189,13 +278,9 @@ void handleConnectingState() {
       }
       
       if (current.get_alertCode() == 31) {
-        Log.info("Connection successful - clearing alert 31");
         current.set_alertCode(0);
       }
-      Log.info("Cloud connected (freeHeap=%lu)", (unsigned long)System.freeMemory());
-      measure.getSignalStrength();
       measure.batteryState();
-      Log.info("Enclosure temperature at connect: %4.2f C", (double)current.get_internalTempC());
       if (sysStatus.get_verboseMode()) {
         char data[64];
         snprintf(data, sizeof(data), "Connected in %i secs", sysStatus.get_lastConnectionDuration());
@@ -203,9 +288,6 @@ void handleConnectingState() {
       }
 
       bool configOk = Cloud::instance().loadConfigurationFromCloud();
-      Log.info("Configuration load complete success=%d freeHeap=%lu",
-               configOk,
-               (unsigned long)System.freeMemory());
       if (!configOk) {
         // Enhanced diagnostics for Alert 41 troubleshooting
         bool ledgersSynced = Cloud::instance().areLedgersSynced();
@@ -236,7 +318,32 @@ void handleConnectingState() {
       }
 
       size_t pending = PublishQueuePosix::instance().getNumEvents();
-      Log.info("Publish queue depth after connect: %u event(s)", (unsigned)pending);
+    #if Wiring_Cellular
+      {
+        CellularSignal sig = Cellular.RSSI();
+        Log.info("Connect: ok elapsed=%lums sig=%.0f/%.0f q=%u heap=%lu",
+             (unsigned long)(connectedStartMs - connectionStartTimeStamp),
+             (double)sig.getStrength(),
+             (double)sig.getQuality(),
+             (unsigned)pending,
+             (unsigned long)System.freeMemory());
+      }
+    #elif Wiring_WiFi
+      {
+        WiFiSignal sig = WiFi.RSSI();
+        Log.info("Connect: ok elapsed=%lums sig=%.0f/%.0f q=%u heap=%lu",
+             (unsigned long)(connectedStartMs - connectionStartTimeStamp),
+             (double)sig.getStrength(),
+             (double)sig.getQuality(),
+             (unsigned)pending,
+             (unsigned long)System.freeMemory());
+      }
+    #else
+      Log.info("Connect: ok elapsed=%lums q=%u heap=%lu",
+           (unsigned long)(connectedStartMs - connectionStartTimeStamp),
+           (unsigned)pending,
+           (unsigned long)System.freeMemory());
+    #endif
 
       if (!session.firstConnectionObserved) {
         session.firstConnectionObserved = true;
@@ -244,15 +351,19 @@ void handleConnectingState() {
       }
 
       postConnectDone = true;
+
+      if (session.modemConnectTimeoutCount != 0) {
+        session.modemConnectTimeoutCount = 0;
+      }
     }
 
     thrashGuard.markProgress("OTA_CHECKED");
+    clearActiveConnectAttempt();
+
     if (System.updatesPending()) {
-      Log.info("Updates pending after connect - transitioning to FIRMWARE_UPDATE_STATE");
       state = FIRMWARE_UPDATE_STATE;
     } else if (session.returnToSleepAfterReport) {
       // After reporting occupied state in low-power mode, return to sleep to check debounce timeout
-      Log.info("Connection complete - returning to SLEEPING_STATE (occupied, low-power mode)");
       session.returnToSleepAfterReport = false;
       state = SLEEPING_STATE;
     } else {
@@ -262,7 +373,7 @@ void handleConnectingState() {
   }
 
   if (elapsedMs > budgetMs) {
-    Log.warn("Connection attempt exceeded budget (%lu ms > %lu ms freeHeap=%lu) - raising alert 31",
+    Log.warn("Connect: fail elapsed=%lums budget=%lums heap=%lu",
              (unsigned long)elapsedMs,
              (unsigned long)budgetMs,
              (unsigned long)System.freeMemory());
@@ -270,8 +381,11 @@ void handleConnectingState() {
     // Observability: connect attempt timed out.
     Observability::cycleStats().markConnectTimeout((uint32_t)elapsedMs);
 
+    markModemUnstableFromConnectTimeout();
+
     current.raiseAlert(31);
     Connectivity::requestFullDisconnectAndRadioOff();
+    clearActiveConnectAttempt();
     state = SLEEPING_STATE;
   }
 }

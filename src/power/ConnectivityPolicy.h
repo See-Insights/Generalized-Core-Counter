@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Particle.h"
+#include "BuildProfile.h"
 
 /*
  * ConnectivityPolicy.h
@@ -93,6 +94,27 @@ constexpr float DEEP_ATTEMPT_SOC_THRESHOLD = 50.0f;   // deep when SoC > 50%
 //   making it shorter can cause updates to fail more often.
 constexpr unsigned long FIRMWARE_UPDATE_MAX_MS = 5UL * 60UL * 1000UL;
 
+// ===== Long-duration connectivity failsafe =====
+// Purpose:
+// - Recover devices that keep running but have not successfully connected to
+//   the Particle cloud for many hours.
+//
+// Rationale / tradeoffs:
+// - This acts as a last-resort supervisor above normal connect budgets and
+//   modem/radio recovery logic.
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+constexpr time_t CONNECTIVITY_FAILSAFE_STALE_SEC = 5L * 60L;
+constexpr time_t CONNECTIVITY_FAILSAFE_COOLDOWN_SEC = 15L * 60L;
+constexpr time_t CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC = 0L;
+constexpr time_t CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC = 60L;
+#else
+constexpr time_t CONNECTIVITY_FAILSAFE_STALE_SEC = 12L * 3600L;
+constexpr time_t CONNECTIVITY_FAILSAFE_COOLDOWN_SEC = 6L * 3600L;
+constexpr time_t CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC = 30L * 60L;
+constexpr time_t CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC = 0L;
+#endif
+constexpr int8_t CONNECTIVITY_FAILSAFE_ALERT = 45;
+
 // ===== Service gate (queue + ledgers + OTA + webhook) before disconnect =====
 // Purpose:
 // - Before tearing down the cloud session for sleep, give critical cloud-related
@@ -110,6 +132,24 @@ constexpr unsigned long FIRMWARE_UPDATE_MAX_MS = 5UL * 60UL * 1000UL;
 //   application-level wait that never completes.
 constexpr unsigned long CLOUD_OPS_GATE_TIMEOUT_MS = 30000UL;
 constexpr unsigned long CLOUD_OPS_STATUS_LOG_INTERVAL_MS = 5000UL;
+
+// ===== Device-to-cloud ledger egress gate =====
+// Purpose:
+// - Allow device-data/device-status ledger writes extra time to finish syncing
+//   before a low-power disconnect tears down the cloud session.
+//
+// Rationale / tradeoffs:
+// - Device-to-cloud ledger writes are accepted locally first, then synchronized
+//   asynchronously. On cellular, the first request can run close to 30s before
+//   the ledger layer retries, so a 30s sleep gate can disconnect at exactly the
+//   wrong moment and force Request failed: -1001.
+// - This budget is longer than the generic cloud-ops gate, but still well below
+//   connect budgets and only applies while an output ledger write is pending.
+#if Wiring_Cellular
+constexpr unsigned long OUTPUT_LEDGER_SYNC_TIMEOUT_MS = 70000UL;
+#else
+constexpr unsigned long OUTPUT_LEDGER_SYNC_TIMEOUT_MS = 30000UL;
+#endif
 
 // ===== Ledger Sync Timeout =====
 // Purpose:

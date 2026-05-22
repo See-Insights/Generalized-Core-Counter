@@ -137,7 +137,6 @@ public:
         digitalWrite(disableModule, HIGH); // Disable sensor module
         digitalWrite(ledPower, HIGH);      // Active-LOW: bring high to turn LED OFF
         _isReady = false;
-        Log.info("PIR sensor powered down for sleep");
     }
 
     /**
@@ -160,7 +159,6 @@ public:
         attachInterrupt(intPin, pirISR, RISING);
 
         _isReady = true;
-        Log.info("PIR sensor powered up after wake (interrupt attached)");
         return true;
     }
 

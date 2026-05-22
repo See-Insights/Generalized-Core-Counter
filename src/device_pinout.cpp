@@ -79,7 +79,6 @@ const pin_t ledPower      = MISO;
 #endif
 
 bool initializePinModes() {
-    Log.info("Initializing the pin modes");
     // Keep carrier inputs passive here; any pull-ups/drive assumptions are
     // owned by the carrier hardware and the AB1805 wiring.
     pinMode(BUTTON_PIN, INPUT);    // User button on the carrier board - external pull-up on carrier
@@ -88,30 +87,6 @@ bool initializePinModes() {
     return true;
 }
 
-
-bool initializePowerCfg() {
-    // This stub remains as the single power-policy hook for future carrier or
-    // solar charging changes. Leaving it in place avoids scattering that setup
-    // later across startup code.
-    /*
-    Log.info("Initializing Power Config");
-    const int maxCurrentFromPanel = 900;            // Not currently used (100,150,500,900,1200,2000 - will pick closest) (550mA for 3.5W Panel, 340 for 2W panel)
-    SystemPowerConfiguration conf;
-    System.setPowerConfiguration(SystemPowerConfiguration());  // To restore the default configuration
-
-    conf.powerSourceMaxCurrent(maxCurrentFromPanel) // Set maximum current the power source can provide  3.5W Panel (applies only when powered through VIN)
-        .powerSourceMinVoltage(5080) // Set minimum voltage the power source can provide (applies only when powered through VIN)
-        .batteryChargeCurrent(maxCurrentFromPanel) // Set battery charge current
-        .batteryChargeVoltage(4208) // Set battery termination voltage
-        .feature(SystemPowerFeature::USE_VIN_SETTINGS_WITH_USB_HOST); // For the cases where the device is powered through VIN
-                                                                     // but the USB cable is connected to a USB host, this feature flag
-                                                                     // enforces the voltage/current limits specified in the configuration
-                                                                     // (where by default the device would be thinking that it's powered by the USB Host)
-    int res = System.setPowerConfiguration(conf); // returns SYSTEM_ERROR_NONE (0) in case of success
-    return res;
-    */
-    return true;
-}
 
 // ---------------------------------------------------------------------------
 // Centralized LED management

@@ -1,7 +1,6 @@
 var device__pinout_8h =
 [
     [ "initializePinModes", "device__pinout_8h.html#a067c646f1e434ca48179948e715f76e4", null ],
-    [ "initializePowerCfg", "device__pinout_8h.html#a862c8108b5b302aeec18d4795bf4f8be", null ],
     [ "signalLED", "device__pinout_8h.html#a16375361a9346562cfb7754eaa39446c", null ],
     [ "signalLEDStatus", "device__pinout_8h.html#ab375e3936269f4b236b7d91f75c494d7", null ],
     [ "signalLEDTimeRemaining", "device__pinout_8h.html#aa5c84bc5bc9f73dc2c69e1f4bec97dff", null ],

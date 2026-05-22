@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;10.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -130,13 +130,14 @@ Functions</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Handle sensor events in COUNTING mode. </p>
+<p>Handles sensor processing when the device is configured for counting mode.</p>
 <p>In counting mode, each sensor detection increments counters. Counts are tracked hourly and daily. Used for: traffic counting, people counting, event tracking </p>
 
 <p class="definition">Definition at line <a class="el" href="_state___modes_8cpp_source.html#l00024">24</a> of file <a class="el" href="_state___modes_8cpp_source.html">State_Modes.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00040">SensorManager::instance()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00600">loop()</a>, and <a class="el" href="device__pinout_8cpp_source.html#l00122">signalLED()</a>.</p>
+<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00193">SensorManager::instance()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00876">loop()</a>, and <a class="el" href="device__pinout_8cpp_source.html#l00097">signalLED()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00600">loop()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00876">loop()</a>.</p>
 
 </div>
 </div>
@@ -156,13 +157,14 @@ Functions</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Handle sensor events in OCCUPANCY mode. </p>
+<p>Handles sensor processing when the device is configured for occupancy mode.</p>
 <p>In occupancy mode, first detection marks space as "occupied". Space remains occupied until debounce timeout expires without new detections. Tracks total occupied time for reporting. Used for: room occupancy, parking space detection, resource availability </p>
 
 <p class="definition">Definition at line <a class="el" href="_state___modes_8cpp_source.html#l00052">52</a> of file <a class="el" href="_state___modes_8cpp_source.html">State_Modes.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_state_machine_8h_source.html#l00010">IDLE_STATE</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00040">SensorManager::instance()</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00074">INTERMITTENT_KEEP_ALIVE</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00600">loop()</a>, <a class="el" href="_state_machine_8h_source.html#l00013">REPORTING_STATE</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00043">sensorConfig</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00122">session</a>, <a class="el" href="device__pinout_8cpp_source.html#l00122">signalLED()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00114">state</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, and <a class="el" href="_state___modes_8cpp_source.html#l00117">updateOccupancyState()</a>.</p>
+<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_state_machine_8h_source.html#l00017">IDLE_STATE</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00193">SensorManager::instance()</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00074">INTERMITTENT_KEEP_ALIVE</a>, <a class="el" href="_state___common_8h_source.html#l00110">logOccupiedEvent()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00876">loop()</a>, <a class="el" href="_state_machine_8h_source.html#l00020">REPORTING_STATE</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00043">sensorConfig</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00132">session</a>, <a class="el" href="device__pinout_8cpp_source.html#l00097">signalLED()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00124">state</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, and <a class="el" href="_state___modes_8cpp_source.html#l00116">updateOccupancyState()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00600">loop()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00876">loop()</a>.</p>
 
 </div>
 </div>
@@ -182,11 +184,12 @@ Functions</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Update occupancy state based on debounce timeout. </p>
+<p>Advances occupancy debounce and occupied or unoccupied transitions.</p>
 <p>If space is occupied and debounce timeout has expired without new sensor events, mark space as unoccupied. Accumulates total occupied time for daily reporting. Triggers immediate reporting on state change for DISCONNECTED_KEEP_ALIVE mode. </p>
 
-<p class="definition">Definition at line <a class="el" href="_state___modes_8cpp_source.html#l00117">117</a> of file <a class="el" href="_state___modes_8cpp_source.html">State_Modes.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state___modes_8cpp_source.html#l00116">116</a> of file <a class="el" href="_state___modes_8cpp_source.html">State_Modes.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_state_machine_8h_source.html#l00010">IDLE_STATE</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00074">INTERMITTENT_KEEP_ALIVE</a>, <a class="el" href="_state_machine_8h_source.html#l00013">REPORTING_STATE</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00043">sensorConfig</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00122">session</a>, <a class="el" href="device__pinout_8cpp_source.html#l00122">signalLED()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00114">state</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
+<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_state_machine_8h_source.html#l00017">IDLE_STATE</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00074">INTERMITTENT_KEEP_ALIVE</a>, <a class="el" href="_state___common_8h_source.html#l00135">logUnoccupiedEvent()</a>, <a class="el" href="_state_machine_8h_source.html#l00020">REPORTING_STATE</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00043">sensorConfig</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00132">session</a>, <a class="el" href="device__pinout_8cpp_source.html#l00097">signalLED()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00124">state</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="_state___modes_8cpp_source.html#l00052">handleOccupancyMode()</a>.</p>
 

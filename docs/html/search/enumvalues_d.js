@@ -1,8 +1,7 @@
 var searchData=
 [
-  ['scheduled_0',['SCHEDULED',['../_my_persistent_data_8h.html#a593379c5e4fb1c33353cf3d309d8bac7a6150558b8ffd89ca979df0856bc696d8',1,'MyPersistentData.h']]],
-  ['scheduled_5for_5fthreshold_1',['SCHEDULED_OR_THRESHOLD',['../_my_persistent_data_8h.html#a593379c5e4fb1c33353cf3d309d8bac7a917430732b5b05baf4a3d799d510bf69',1,'MyPersistentData.h']]],
-  ['sleeping_5fstate_2',['SLEEPING_STATE',['../_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24',1,'StateMachine.h']]],
-  ['soil_5fmoisture_3',['SOIL_MOISTURE',['../_sensor_factory_8h.html#a87ca7b4499ea761999a872674eba32afa8096497c62f43dc4606ebd65292b850d',1,'SensorFactory.h']]],
-  ['success_4',['SUCCESS',['../struct_observability_1_1_wake_cycle_stats.html#aba2be75384b01e768f8572821ec378b3ad0749aaba8b833466dfcbb0428e4f89c',1,'Observability::WakeCycleStats']]]
+  ['pir_0',['PIR',['../_sensor_factory_8h.html#a87ca7b4499ea761999a872674eba32afa3077413b0d7f456e821af5d0023daae7',1,'SensorFactory.h']]],
+  ['polling_1',['POLLING',['../_my_persistent_data_8h.html#afa73726fb0afdae0ad2eb26889e5d25caa7c47eb9b7d07b86cab435acb07f8d45',1,'MyPersistentData.h']]],
+  ['postwake_2',['PostWake',['../_sensor_manager_8h.html#acd8eeb965a21d464f1d6ed3ded01cc3ea103c5b0f1ea30c2a106a46ee13fc9f0f',1,'SensorManager.h']]],
+  ['presleep_3',['PreSleep',['../_sensor_manager_8h.html#acd8eeb965a21d464f1d6ed3ded01cc3ea02cf99cd29487d56bb098eebb1133963',1,'SensorManager.h']]]
 ];

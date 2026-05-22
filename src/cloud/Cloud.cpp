@@ -25,14 +25,14 @@ Cloud::Cloud() : ledgersSynced(false), lastApplySuccess(true) {
     lastPublishedStatus[0] = '\0';
     pendingStatusPublish = false;
     pendingConfigApply = false;
+    pendingDeviceStatusSync = false;
+    pendingDeviceDataSync = false;
 }
 
 Cloud::~Cloud() {
 }
 
 bool Cloud::loadConfigurationFromCloud() {
-    Log.info("Syncing configuration from cloud");
-
     LedgerData defaults = defaultSettingsLedger.get();
     LedgerData device = deviceSettingsLedger.get();
     lastApplySuccess = applyConfigurationFromLedger(defaults, device);
@@ -43,7 +43,6 @@ const char *Cloud::getWebhookName() const {
     // Priority 1: Cloud configuration (explicitly set)
     const char *cloudWebhookName = sysStatus.get_webhookNameCStr();
     if (cloudWebhookName && cloudWebhookName[0] != '\0') {
-        Log.info("Using cloud-configured webhook: %s", cloudWebhookName);
         return cloudWebhookName;
     }
 
@@ -65,7 +64,6 @@ const char *Cloud::getWebhookName() const {
             break;
     }
 
-    Log.info("Using convention-based webhook: %s", conventionName);
     return conventionName;
 }
 

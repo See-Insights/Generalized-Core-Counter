@@ -71,7 +71,6 @@ public:
     static ISensor* createSensor(SensorType type) {
         switch(type) {
             case SensorType::PIR:
-                Log.info("Creating PIR sensor");
                 return &PIRSensor::instance();
             
             // Add more sensors as they are implemented

@@ -96,7 +96,6 @@ bool Cloud::applyConfigurationFromLedger(const LedgerData &defaults, const Ledge
         // Defer device-status publishing to Cloud::loop() so it doesn't
         // execute inside CONNECTING_STATE or async callbacks.
         pendingStatusPublish = true;
-        Log.info("Configuration apply: all sections OK");
     } else {
         Log.warn("Configuration apply failed: sensor=%s timing=%s messaging=%s modes=%s reporting=%s",
                  sensorOk ? "OK" : "FAIL",
@@ -286,12 +285,14 @@ bool Cloud::applySensorConfig(const LedgerData &defaults, const LedgerData &devi
     // sensor.setting1-4 (generic settings)
     if (getMergedIntValue(defaultSensor, deviceSensor, "setting1", setting1)) {
         uint32_t currentValue = sensorConfig.get_sensorSetting1();
-        Log.info("Cloud config: setting1=%d (current EEPROM=%lu)", setting1, (unsigned long)currentValue);
+        if (sysStatus.get_verboseMode()) {
+            Log.info("Cloud config: setting1=%d (current EEPROM=%lu)", setting1, (unsigned long)currentValue);
+        }
         if (currentValue != (uint32_t)setting1) {
             sensorConfig.set_sensorSetting1((uint32_t)setting1);
             Log.info("Config: Sensor setting1 updated: %lu -> %d", (unsigned long)currentValue, setting1);
             changed = true;
-        } else {
+        } else if (sysStatus.get_verboseMode()) {
             Log.info("Config: Sensor setting1 unchanged at %d", setting1);
         }
     } else {
@@ -486,7 +487,8 @@ bool Cloud::applyReportingConfig(const LedgerData &defaults, const LedgerData &d
         }
     }
 
-    if (webhookName[0] != '\0' || getMergedBoolValue(defaultWebhook, deviceWebhook, "enabled", webhookEnabled)) {
+    if (sysStatus.get_verboseMode() &&
+        (webhookName[0] != '\0' || getMergedBoolValue(defaultWebhook, deviceWebhook, "enabled", webhookEnabled))) {
         Log.info("Merged webhook config: name=%s, enabled=%d",
                  webhookName[0] != '\0' ? webhookName : "none",
                  (int)webhookEnabled);

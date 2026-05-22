@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;10.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -93,14 +93,28 @@ $(function(){initNavTree('struct_session_state.html','','struct_session_state-me
 </div><!--header-->
 <div class="contents">
 
+<p>RAM-only session flags that coordinate behavior across state handlers.  
+ <a href="#details">More...</a></p>
+
 <p><code>#include &lt;<a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>&gt;</code></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-attribs" class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
 <tr class="memitem:af7dffe574bae3e71f15882288106f58c" id="r_af7dffe574bae3e71f15882288106f58c"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#af7dffe574bae3e71f15882288106f58c">awaitingWebhookResponse</a> = false</td></tr>
+<tr class="memitem:a998679741bc05ed61ae3bc6f7ee7f6b6" id="r_a998679741bc05ed61ae3bc6f7ee7f6b6"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a998679741bc05ed61ae3bc6f7ee7f6b6">connectAttemptActive</a> = false</td></tr>
+<tr class="memitem:ab6ffa48d10fbd8927ca80a96a195a086" id="r_ab6ffa48d10fbd8927ca80a96a195a086"><td class="memItemLeft">unsigned long&#160;</td><td class="memItemRight"><a class="el" href="#ab6ffa48d10fbd8927ca80a96a195a086">connectAttemptBudgetMs</a> = 0</td></tr>
+<tr class="memitem:af3394279a59294a89ada8607297649be" id="r_af3394279a59294a89ada8607297649be"><td class="memItemLeft">uint32_t&#160;</td><td class="memItemRight"><a class="el" href="#af3394279a59294a89ada8607297649be">failsafeDeferLogMask</a> = 0</td></tr>
 <tr class="memitem:a0088f8de1f1a228221012131953327cc" id="r_a0088f8de1f1a228221012131953327cc"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a0088f8de1f1a228221012131953327cc">firstConnectionObserved</a> = false</td></tr>
 <tr class="memitem:ab8e72d0a538b87295dfdf147c7a58e90" id="r_ab8e72d0a538b87295dfdf147c7a58e90"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ab8e72d0a538b87295dfdf147c7a58e90">firstConnectionQueueDrainedLogged</a> = false</td></tr>
 <tr class="memitem:ac03474741cb2abc800e6fcfedcba9939" id="r_ac03474741cb2abc800e6fcfedcba9939"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ac03474741cb2abc800e6fcfedcba9939">hibernateDisabledForSession</a> = false</td></tr>
+<tr class="memitem:ae0bcfaae63262ccee6e4aec733e6f7e1" id="r_ae0bcfaae63262ccee6e4aec733e6f7e1"><td class="memItemLeft">uint32_t&#160;</td><td class="memItemRight"><a class="el" href="#ae0bcfaae63262ccee6e4aec733e6f7e1">lastCloudDisconnectElapsedMs</a> = 0</td></tr>
+<tr class="memitem:a188ce8c87fd5d1552bf32dad760dd134" id="r_a188ce8c87fd5d1552bf32dad760dd134"><td class="memItemLeft">uint32_t&#160;</td><td class="memItemRight"><a class="el" href="#a188ce8c87fd5d1552bf32dad760dd134">lastModemOffElapsedMs</a> = 0</td></tr>
+<tr class="memitem:a9d579456bf2f6d67475fdfcea16e30db" id="r_a9d579456bf2f6d67475fdfcea16e30db"><td class="memItemLeft">unsigned long&#160;</td><td class="memItemRight"><a class="el" href="#a9d579456bf2f6d67475fdfcea16e30db">lastTeardownEndMs</a> = 0</td></tr>
+<tr class="memitem:aca10590c2b3dbbe1c2aa6d1e46d0e6b6" id="r_aca10590c2b3dbbe1c2aa6d1e46d0e6b6"><td class="memItemLeft">uint32_t&#160;</td><td class="memItemRight"><a class="el" href="#aca10590c2b3dbbe1c2aa6d1e46d0e6b6">lastTotalTeardownElapsedMs</a> = 0</td></tr>
+<tr class="memitem:a1a9fb0865b9aaf64f9674e0ec5f4d728" id="r_a1a9fb0865b9aaf64f9674e0ec5f4d728"><td class="memItemLeft">uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#a1a9fb0865b9aaf64f9674e0ec5f4d728">modemConnectTimeoutCount</a> = 0</td></tr>
+<tr class="memitem:a1cf7e7dd5c96ff85ce9c85faaf47bec2" id="r_a1cf7e7dd5c96ff85ce9c85faaf47bec2"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a1cf7e7dd5c96ff85ce9c85faaf47bec2">modemStandbySuppressed</a> = false</td></tr>
+<tr class="memitem:a853149a062c8a8bcea8e2d5f25b856ee" id="r_a853149a062c8a8bcea8e2d5f25b856ee"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a853149a062c8a8bcea8e2d5f25b856ee">modemUnstable</a> = false</td></tr>
+<tr class="memitem:aa32892d6f27bda4aa969bde26cd30a9e" id="r_aa32892d6f27bda4aa969bde26cd30a9e"><td class="memItemLeft">uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#aa32892d6f27bda4aa969bde26cd30a9e">modemUnstableReason</a> = 0</td></tr>
 <tr class="memitem:ab0391031ffb3a039c6db4e17f06ae93c" id="r_ab0391031ffb3a039c6db4e17f06ae93c"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ab0391031ffb3a039c6db4e17f06ae93c">occupancyChangeTriggered</a> = false</td></tr>
 <tr class="memitem:a3d3c38bdf541bbd8b95c9859a7afeb3a" id="r_a3d3c38bdf541bbd8b95c9859a7afeb3a"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a3d3c38bdf541bbd8b95c9859a7afeb3a">returnToSleepAfterReport</a> = false</td></tr>
 <tr class="memitem:a27334f9e6eb109ab31509aab4b7c3438" id="r_a27334f9e6eb109ab31509aab4b7c3438"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a27334f9e6eb109ab31509aab4b7c3438">serviceRequestTriggered</a> = false</td></tr>
@@ -109,8 +123,10 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:a9b23a9744750720b7ffca9823ca9cdf3" id="r_a9b23a9744750720b7ffca9823ca9cdf3"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a9b23a9744750720b7ffca9823ca9cdf3">webhookExpectedOnConnect</a> = false</td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
-<div class="textblock">
-<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00035">35</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+<div class="textblock"><p>RAM-only session flags that coordinate behavior across state handlers. </p>
+<p>These values are intentionally not persisted. They describe the current wake cycle, in-flight webhook expectations, modem teardown timing, and temporary suppression or diagnostic state. </p>
+
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00050">50</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
 </div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
 <a id="af7dffe574bae3e71f15882288106f58c" name="af7dffe574bae3e71f15882288106f58c"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#af7dffe574bae3e71f15882288106f58c">&#9670;&#160;</a></span>awaitingWebhookResponse</h2>
@@ -124,7 +140,55 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00040">40</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00055">55</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+
+</div>
+</div>
+<a id="a998679741bc05ed61ae3bc6f7ee7f6b6" name="a998679741bc05ed61ae3bc6f7ee7f6b6"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a998679741bc05ed61ae3bc6f7ee7f6b6">&#9670;&#160;</a></span>connectAttemptActive</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool SessionState::connectAttemptActive = false</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00061">61</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+
+</div>
+</div>
+<a id="ab6ffa48d10fbd8927ca80a96a195a086" name="ab6ffa48d10fbd8927ca80a96a195a086"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab6ffa48d10fbd8927ca80a96a195a086">&#9670;&#160;</a></span>connectAttemptBudgetMs</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">unsigned long SessionState::connectAttemptBudgetMs = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00062">62</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+
+</div>
+</div>
+<a id="af3394279a59294a89ada8607297649be" name="af3394279a59294a89ada8607297649be"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af3394279a59294a89ada8607297649be">&#9670;&#160;</a></span>failsafeDeferLogMask</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint32_t SessionState::failsafeDeferLogMask = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00071">71</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
 
 </div>
 </div>
@@ -140,7 +204,7 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00036">36</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00051">51</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
 
 </div>
 </div>
@@ -156,7 +220,7 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00037">37</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00052">52</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
 
 </div>
 </div>
@@ -172,7 +236,135 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00038">38</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00053">53</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+
+</div>
+</div>
+<a id="ae0bcfaae63262ccee6e4aec733e6f7e1" name="ae0bcfaae63262ccee6e4aec733e6f7e1"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae0bcfaae63262ccee6e4aec733e6f7e1">&#9670;&#160;</a></span>lastCloudDisconnectElapsedMs</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint32_t SessionState::lastCloudDisconnectElapsedMs = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00068">68</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+
+</div>
+</div>
+<a id="a188ce8c87fd5d1552bf32dad760dd134" name="a188ce8c87fd5d1552bf32dad760dd134"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a188ce8c87fd5d1552bf32dad760dd134">&#9670;&#160;</a></span>lastModemOffElapsedMs</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint32_t SessionState::lastModemOffElapsedMs = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00069">69</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+
+</div>
+</div>
+<a id="a9d579456bf2f6d67475fdfcea16e30db" name="a9d579456bf2f6d67475fdfcea16e30db"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9d579456bf2f6d67475fdfcea16e30db">&#9670;&#160;</a></span>lastTeardownEndMs</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">unsigned long SessionState::lastTeardownEndMs = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00067">67</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+
+</div>
+</div>
+<a id="aca10590c2b3dbbe1c2aa6d1e46d0e6b6" name="aca10590c2b3dbbe1c2aa6d1e46d0e6b6"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aca10590c2b3dbbe1c2aa6d1e46d0e6b6">&#9670;&#160;</a></span>lastTotalTeardownElapsedMs</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint32_t SessionState::lastTotalTeardownElapsedMs = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00070">70</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+
+</div>
+</div>
+<a id="a1a9fb0865b9aaf64f9674e0ec5f4d728" name="a1a9fb0865b9aaf64f9674e0ec5f4d728"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1a9fb0865b9aaf64f9674e0ec5f4d728">&#9670;&#160;</a></span>modemConnectTimeoutCount</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint8_t SessionState::modemConnectTimeoutCount = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00066">66</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+
+</div>
+</div>
+<a id="a1cf7e7dd5c96ff85ce9c85faaf47bec2" name="a1cf7e7dd5c96ff85ce9c85faaf47bec2"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1cf7e7dd5c96ff85ce9c85faaf47bec2">&#9670;&#160;</a></span>modemStandbySuppressed</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool SessionState::modemStandbySuppressed = false</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00064">64</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+
+</div>
+</div>
+<a id="a853149a062c8a8bcea8e2d5f25b856ee" name="a853149a062c8a8bcea8e2d5f25b856ee"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a853149a062c8a8bcea8e2d5f25b856ee">&#9670;&#160;</a></span>modemUnstable</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool SessionState::modemUnstable = false</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00063">63</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+
+</div>
+</div>
+<a id="aa32892d6f27bda4aa969bde26cd30a9e" name="aa32892d6f27bda4aa969bde26cd30a9e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa32892d6f27bda4aa969bde26cd30a9e">&#9670;&#160;</a></span>modemUnstableReason</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint8_t SessionState::modemUnstableReason = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00065">65</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
 
 </div>
 </div>
@@ -188,7 +380,7 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00044">44</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00059">59</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
 
 </div>
 </div>
@@ -204,7 +396,7 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00045">45</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00060">60</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
 
 </div>
 </div>
@@ -220,7 +412,7 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00043">43</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00058">58</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
 
 </div>
 </div>
@@ -236,7 +428,7 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00039">39</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00054">54</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
 
 </div>
 </div>
@@ -252,7 +444,7 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00042">42</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00057">57</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
 
 </div>
 </div>
@@ -268,7 +460,7 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00041">41</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state_machine_8h_source.html#l00056">56</a> of file <a class="el" href="_state_machine_8h_source.html">StateMachine.h</a>.</p>
 
 </div>
 </div>

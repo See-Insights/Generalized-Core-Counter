@@ -59,7 +59,6 @@ bool Cloud::writeDeviceStatusToCloud() {
 
     // Only publish if the configuration actually changed
     if (strcmp(lastPublishedStatus, bufferBase) == 0) {
-        Log.info("Device status unchanged; skipping device-status ledger update");
         return true; // Not an error; nothing to do
     }
 
@@ -133,11 +132,11 @@ bool Cloud::writeDeviceStatusToCloud() {
     int result = deviceStatusLedger.set(data);
 
     if (result == SYSTEM_ERROR_NONE) {
+        pendingDeviceStatusSync = true;
         // Preserve base-status change detection so per-cycle fields don't
         // force additional device-status publishes.
         strncpy(lastPublishedStatus, bufferBase, sizeof(lastPublishedStatus) - 1);
         lastPublishedStatus[sizeof(lastPublishedStatus) - 1] = '\0';
-        Log.info("Device status published to cloud (freeHeap=%lu)", (unsigned long)System.freeMemory());
         return true;
     } else {
         Log.warn("Failed to publish device status: %d", result);
@@ -146,8 +145,6 @@ bool Cloud::writeDeviceStatusToCloud() {
 }
 
 bool Cloud::publishDataToLedger() {
-    Log.info("Publishing sensor data to device-data ledger");
-    
     char buffer[512];
     JSONBufferWriter writer(buffer, sizeof(buffer));
     const unsigned long freeHeap = System.freeMemory();
@@ -195,27 +192,7 @@ bool Cloud::publishDataToLedger() {
     int result = deviceDataLedger.set(data);
     
     if (result == SYSTEM_ERROR_NONE) {
-        // Log the key counters and any active alert code so we
-        // can correlate what was actually written to device-data.
-        int mode = sysStatus.get_sensorMode();
-        if (mode == COUNTING || mode == MEASUREMENT) {
-            Log.info("Sensor data published to cloud - mode=%s hourly=%d daily=%d alert=%d freeHeap=%lu",
-                     (mode == COUNTING ? "counting" : "measurement"),
-                     (int)current.get_hourlyCount(),
-                     (int)current.get_dailyCount(),
-                     (int)current.get_alertCode(),
-                     freeHeap);
-        } else if (mode == OCCUPANCY) {
-            Log.info("Sensor data published to cloud - mode=occupancy occupied=%d totalMin=%lu alert=%d freeHeap=%lu",
-                     (int)current.get_occupied(),
-                     (unsigned long)(current.get_totalOccupiedSeconds() / 60UL),
-                     (int)current.get_alertCode(),
-                     freeHeap);
-        } else {
-            Log.info("Sensor data published to cloud - mode=unknown alert=%d freeHeap=%lu",
-                     (int)current.get_alertCode(),
-                     freeHeap);
-        }
+        pendingDeviceDataSync = true;
         return true;
     } else {
         Log.warn("Failed to publish sensor data: %d", result);

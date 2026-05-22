@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;10.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -104,6 +104,8 @@ $(function(){initNavTree('functions_func_s.html','',''); });
 <li>set_connectAttemptBudgetSec()&#160;:&#160;<a class="el" href="classsys_status_data.html#a295fcf94d453467a6610e7b2385aa551">sysStatusData</a></li>
 <li>set_connectionAttemptCounter()&#160;:&#160;<a class="el" href="classsys_status_data.html#a1cfb522bb1e42ff970d8a2318552c3b3">sysStatusData</a></li>
 <li>set_connectionMode()&#160;:&#160;<a class="el" href="classsys_status_data.html#a5528ba5c8930e8d8da2114ef2436691c">sysStatusData</a></li>
+<li>set_connectivityRecoveryCount()&#160;:&#160;<a class="el" href="classsys_status_data.html#a93362aea1c6a9e51197d6204dca64562">sysStatusData</a></li>
+<li>set_connectivityRecoveryStage()&#160;:&#160;<a class="el" href="classsys_status_data.html#aaad48f0ce434c09e6c667797fae0c294">sysStatusData</a></li>
 <li>set_currentBatteryTier()&#160;:&#160;<a class="el" href="classsys_status_data.html#a936d83d78ea0dd38351e3d80f8f178ed">sysStatusData</a></li>
 <li>set_dailyCount()&#160;:&#160;<a class="el" href="classcurrent_status_data.html#abe6d8926f1399f57b5feba451ab1c473">currentStatusData</a></li>
 <li>set_disconnectedMode()&#160;:&#160;<a class="el" href="classsys_status_data.html#a53383a5c695bd5b7b3d3a3c22019a91c">sysStatusData</a></li>
@@ -117,6 +119,7 @@ $(function(){initNavTree('functions_func_s.html','',''); });
 <li>set_lastAlertTime()&#160;:&#160;<a class="el" href="classcurrent_status_data.html#af6def25cadbbf2474f640f0167107056">currentStatusData</a></li>
 <li>set_lastConnection()&#160;:&#160;<a class="el" href="classsys_status_data.html#aed3d1e7562a74cd628165bde5f190bac">sysStatusData</a></li>
 <li>set_lastConnectionDuration()&#160;:&#160;<a class="el" href="classsys_status_data.html#a19283f06c1eae1637828ff4970585b4b">sysStatusData</a></li>
+<li>set_lastConnectivityRecoveryAction()&#160;:&#160;<a class="el" href="classsys_status_data.html#a3243ef01cd60a156e5def5a4fbfba5ec">sysStatusData</a></li>
 <li>set_lastCountTime()&#160;:&#160;<a class="el" href="classcurrent_status_data.html#aa409cae1c8a011942590bd1477bfc4b4">currentStatusData</a></li>
 <li>set_lastDailyCleanup()&#160;:&#160;<a class="el" href="classsys_status_data.html#ad6b5df92202dfe0c3315ad47bb093477">sysStatusData</a></li>
 <li>set_lastHookResponse()&#160;:&#160;<a class="el" href="classsys_status_data.html#a30ad30aa09c0c05b1446af5172f29797">sysStatusData</a></li>
@@ -143,9 +146,7 @@ $(function(){initNavTree('functions_func_s.html','',''); });
 <li>set_solarPowerMode()&#160;:&#160;<a class="el" href="classsys_status_data.html#a6063147793b609962e94794f51009734">sysStatusData</a></li>
 <li>set_stateOfCharge()&#160;:&#160;<a class="el" href="classcurrent_status_data.html#af16a39ecd5b6045663ec1885a0c5ad03">currentStatusData</a></li>
 <li>set_structuresVersion()&#160;:&#160;<a class="el" href="classsys_status_data.html#a99fac6aadc58712809f51b8d2287e9a7">sysStatusData</a></li>
-<li>set_testBatteryOverride()&#160;:&#160;<a class="el" href="classsys_status_data.html#abfca00e2af246f2e8a550459ae484e6f">sysStatusData</a></li>
 <li>set_testConnectionDurationOverride()&#160;:&#160;<a class="el" href="classsys_status_data.html#ad80cabcd6903cd663cb8f7972fc5721b">sysStatusData</a></li>
-<li>set_testScenarioIndex()&#160;:&#160;<a class="el" href="classsys_status_data.html#ad9da6a04470d37cc215734a24a9ac3d4">sysStatusData</a></li>
 <li>set_timeZoneStr()&#160;:&#160;<a class="el" href="classsys_status_data.html#a1b61216761fbf3eaa00304d5a1536e9a">sysStatusData</a></li>
 <li>set_totalOccupiedSeconds()&#160;:&#160;<a class="el" href="classcurrent_status_data.html#adff82a24b903b039fa0ec00868216280">currentStatusData</a></li>
 <li>set_updatesPending()&#160;:&#160;<a class="el" href="classsys_status_data.html#a73872c20cbe65a01a262b1cde5e112b0">sysStatusData</a></li>
@@ -157,7 +158,7 @@ $(function(){initNavTree('functions_func_s.html','',''); });
 <li>set_webhookTimeoutMs()&#160;:&#160;<a class="el" href="classsys_status_data.html#a76443331f049394cc4228fbbcc188920">sysStatusData</a></li>
 <li>setLogCooldownMs()&#160;:&#160;<a class="el" href="class_thrash_guard.html#a01d31120b6c3584fdb7fb652a6efa2ac">ThrashGuard</a></li>
 <li>setSensor()&#160;:&#160;<a class="el" href="class_sensor_manager.html#aaf00c40722d05d7fb5be18f47f18e94a">SensorManager</a></li>
-<li>setup()&#160;:&#160;<a class="el" href="class_cloud.html#a7f2f52213a6074b5829aa196ef2f3b15">Cloud</a>, <a class="el" href="classcurrent_status_data.html#a25335071cca42b8ce584726dbafe876e">currentStatusData</a>, <a class="el" href="class_i_sensor.html#a4a34b57999da9b9d6ab2522e83b743c8">ISensor</a>, <a class="el" href="class_particle___functions.html#ab384723af8c59983f1673a44354bfa77">Particle_Functions</a>, <a class="el" href="class_p_i_r_sensor.html#aa6febfe3e9bac43c89f32446cc05144a">PIRSensor</a>, <a class="el" href="classsensor_config_data.html#a69ada61de6013d12f3aea240c644a890">sensorConfigData</a>, <a class="el" href="class_sensor_manager.html#a24c47251bd3eb4e8962ce41783fa426e">SensorManager</a>, <a class="el" href="classsys_status_data.html#aaec0adcc45eeec01a06bcb0b24bccd36">sysStatusData</a></li>
+<li>setup()&#160;:&#160;<a class="el" href="class_cloud.html#a7f2f52213a6074b5829aa196ef2f3b15">Cloud</a>, <a class="el" href="classcurrent_status_data.html#a25335071cca42b8ce584726dbafe876e">currentStatusData</a>, <a class="el" href="class_i_sensor.html#a4a34b57999da9b9d6ab2522e83b743c8">ISensor</a>, <a class="el" href="class_particle___functions.html#ab384723af8c59983f1673a44354bfa77">Particle_Functions</a>, <a class="el" href="class_p_i_r_sensor.html#aa6febfe3e9bac43c89f32446cc05144a">PIRSensor</a>, <a class="el" href="class_power_manager.html#a8b6f9f5f261eb8b606acc7d30bad3b40">PowerManager</a>, <a class="el" href="classsensor_config_data.html#a69ada61de6013d12f3aea240c644a890">sensorConfigData</a>, <a class="el" href="class_sensor_manager.html#a24c47251bd3eb4e8962ce41783fa426e">SensorManager</a>, <a class="el" href="classsys_status_data.html#aaec0adcc45eeec01a06bcb0b24bccd36">sysStatusData</a></li>
 <li>sysStatusData()&#160;:&#160;<a class="el" href="classsys_status_data.html#a6facd6bef06626325661aa29a238c216">sysStatusData</a></li>
 </ul>
 </div><!-- contents -->

@@ -2,11 +2,15 @@
 // https://docs.particle.io/reference/device-os/firmware/boron/#batterystate-
 const char *batteryContext[7] = {"Unknown",    "Not Charging", "Charging",
                                  "Charged",    "Discharging",  "Fault",
-                                 "Diconnected"};
+                                 "Disconnected"};
 
 // Particle Functions
 #include "sensors/SensorManager.h"
 #include "MyPersistentData.h"  // Access sysStatus/sensorConfig
+#include "observability/WakeCycleStats.h"
+#include "power/Connectivity.h"
+#include "power/PowerManager.h"
+#include "power/PowerPlatform.h"
 #include "power/ConnectivityPolicy.h"
 #include "sensors/SensorFactory.h"
 #include "device_pinout.h"     // TMP36_SENSE_PIN for enclosure temperature
@@ -20,8 +24,59 @@ SensorManager *SensorManager::_instance;
 
 namespace {
 
-bool batterySampleLooksSuspicious(uint8_t battState, float soc) {
-  return !(soc == soc) || soc <= 0.0f || soc >= 100.0f || battState == 0;
+#if HAL_PLATFORM_CELLULAR || PLATFORM_ID == PLATFORM_ARGON
+void boundedBatterySettleDelay(unsigned long delayMs) {
+  const unsigned long startMs = millis();
+  while ((millis() - startMs) < delayMs) {
+    Particle.process();
+    const unsigned long elapsedMs = millis() - startMs;
+    const unsigned long remainingMs = (elapsedMs < delayMs) ? (delayMs - elapsedMs) : 0UL;
+    if (remainingMs == 0UL) {
+      break;
+    }
+    delay((remainingMs > 20UL) ? 20UL : remainingMs);
+  }
+}
+
+bool batterySocIsValid(float soc) {
+  return (soc == soc) && soc >= 0.0f && soc <= 100.0f;
+}
+
+bool batteryVoltageLooksUsable(float vcell) {
+  return (vcell == vcell) && vcell > 2.5f && vcell < 5.0f;
+}
+
+bool batteryExtremeSocLooksSuspicious(float soc, float vcell) {
+  if (!(vcell == vcell) || vcell <= 0.0f) {
+    return false;
+  }
+
+  if (soc <= 0.0f && vcell > 3.60f) {
+    return true;
+  }
+
+  if (soc >= 100.0f && vcell < 4.15f) {
+    return true;
+  }
+
+  return false;
+}
+
+bool batterySampleLooksSuspicious(uint8_t battState, float soc, float vcell,
+                                  bool ignoreUnknownBatteryState) {
+  if (!batterySocIsValid(soc)) {
+    return true;
+  }
+
+  if (batteryExtremeSocLooksSuspicious(soc, vcell)) {
+    return true;
+  }
+
+  if (!ignoreUnknownBatteryState && battState == 0) {
+    return true;
+  }
+
+  return false;
 }
 
 float estimateSocFromVoltage(float voltage) {
@@ -33,6 +88,104 @@ float estimateSocFromVoltage(float voltage) {
   }
   return soc;
 }
+
+#endif
+
+const char *batterySampleContextPrefix(BatterySampleContext sampleContext) {
+  switch (sampleContext) {
+    case BatterySampleContext::Setup:
+      return "Battery setup";
+    case BatterySampleContext::PreSleep:
+      return "Battery pre-sleep";
+    case BatterySampleContext::PostWake:
+      return "Battery post-wake";
+    case BatterySampleContext::General:
+    default:
+      return "Battery sample";
+  }
+}
+
+#if !(HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM))
+bool shouldLogBatterySample(BatterySampleContext sampleContext) {
+  return sampleContext != BatterySampleContext::General;
+}
+#endif
+#if HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
+constexpr unsigned long CHARGE_SUMMARY_INTERVAL_MS = 15UL * 60UL * 1000UL;
+
+unsigned long currentWakeAwakeMs() {
+  const Observability::WakeCycleStats &stats = Observability::cycleStats();
+  if (stats.total_awake_ms != 0) {
+    return stats.total_awake_ms;
+  }
+  if (stats.wake_start_ms != 0) {
+    const unsigned long nowMs = millis();
+    return (nowMs >= stats.wake_start_ms) ? (nowMs - stats.wake_start_ms) : 0UL;
+  }
+  return 0UL;
+}
+
+uint8_t batteryStateFromPmicStatus(uint8_t chargeStatus, byte faultReg) {
+  if (faultReg & 0x38) {
+    return (uint8_t)PowerBatteryContext::Fault;
+  }
+
+  switch (chargeStatus) {
+  case 1: // Pre-charge
+  case 2: // Fast charging
+    return (uint8_t)PowerBatteryContext::Charging;
+  case 3: // Charge done
+    return (uint8_t)PowerBatteryContext::Charged;
+  case 0: // Not charging
+  default:
+    return (uint8_t)PowerBatteryContext::NotCharging;
+  }
+}
+
+const char *compactPmicVbusLabel(uint8_t vbusStatus) {
+  switch (vbusStatus) {
+  case 1:
+    return "USB";
+  case 2:
+    return "ADAPT";
+  case 3:
+    return "OTG";
+  default:
+    return "NONE";
+  }
+}
+
+const char *compactPmicChargeLabel(uint8_t chargeStatus, byte faultReg) {
+  if (faultReg & 0x38) {
+    return "FAULT";
+  }
+
+  switch (chargeStatus) {
+  case 1:
+    return "PRE";
+  case 2:
+    return "FAST";
+  case 3:
+    return "DONE";
+  case 0:
+  default:
+    return "NOT";
+  }
+}
+
+const char *compactProfileLabel(PowerInputProfile profile) {
+  switch (profile) {
+  case PowerInputProfile::UsbBench:
+    return "USB";
+  case PowerInputProfile::Solar35W:
+    return "SOLAR";
+  case PowerInputProfile::NotApplicable:
+    return "NA";
+  default:
+    return "?";
+  }
+}
+#endif
 
 } // namespace
 
@@ -47,13 +200,15 @@ SensorManager::SensorManager()
     : _sensor(nullptr),
       _lastPollTime(0),
       _batteryStabilizationPending(false),
-      _firstBatterySampleTaken(false) {}
+  _firstBatterySampleTaken(false),
+  _authoritativeBatterySampleActive(false),
+  _authoritativeBatterySoc(0.0f),
+  _authoritativeBatteryState(0),
+  _authoritativeBatteryFallbackUsed(false) {}
 
 SensorManager::~SensorManager() {}
 
 void SensorManager::setup() {
-    Log.info("Initializing SensorManager");
-    
     if (!_sensor) {
         Log.error("No sensor assigned! Call setSensor() first.");
         return;
@@ -61,23 +216,18 @@ void SensorManager::setup() {
     
     if (!_sensor->setup()) {
         Log.error("Sensor setup failed");
-    } else {
-        Log.info("Sensor setup completed: %s", _sensor->getSensorType());
     }
 }
 
 void SensorManager::setSensor(ISensor* sensor) {
     if (sensor) {
         _sensor = sensor;
-        Log.info("Sensor set: %s", sensor->getSensorType());
     } else {
         Log.error("Attempted to set null sensor");
     }
 }
 
   void SensorManager::initializeFromConfig() {
-    Log.info("Initializing sensor from configuration");
-
     SensorType sensorType = static_cast<SensorType>(sysStatus.get_sensorType());
     ISensor* sensor = SensorFactory::createSensor(sensorType);
 
@@ -92,8 +242,10 @@ void SensorManager::setSensor(ISensor* sensor) {
     if (!_sensor->initializeHardware()) {
       Log.error("Sensor hardware initialization failed for type %d", (int)sensorType);
     } else {
-      Log.info("Sensor hardware initialized; type=%d, usesInterrupt=%s", (int)sensorType,
-               _sensor->usesInterrupt() ? "true" : "false");
+      Log.info("Sensor: %s ready=%d irq=%d",
+               _sensor->getSensorType(),
+               _sensor->isReady() ? 1 : 0,
+               _sensor->usesInterrupt() ? 1 : 0);
     }
   }
 
@@ -144,14 +296,12 @@ bool SensorManager::isSensorReady() const {
 
 void SensorManager::onEnterSleep() {
   if (_sensor) {
-    Log.info("SensorManager onEnterSleep: notifying sensor %s", _sensor->getSensorType());
     _sensor->onSleep();
     return;
   }
 
   // If a concrete sensor hasn't been initialized (common when booting while
   // outside open hours), still force the carrier sensor power rails off.
-  Log.info("SensorManager onEnterSleep: no sensor instance; forcing sensor power rails OFF");
   pinMode(disableModule, OUTPUT);
   pinMode(ledPower, OUTPUT);
   digitalWrite(disableModule, HIGH); // active-low enable
@@ -160,18 +310,18 @@ void SensorManager::onEnterSleep() {
 
 void SensorManager::onExitSleep() {
   if (_sensor) {
-    Log.info("SensorManager onExitSleep: waking sensor %s", _sensor->getSensorType());
     if (!_sensor->onWake()) {
       Log.error("Sensor %s failed to wake correctly", _sensor->getSensorType());
     }
-    Log.info("SensorManager onExitSleep: sensorReady=%s", _sensor->isReady() ? "true" : "false");
-  } else {
-    Log.info("SensorManager onExitSleep: no sensor instance (sensorReady=false)");
   }
 }
 
 void SensorManager::noteWakeFromLowPowerSleep() {
   _batteryStabilizationPending = true;
+  _authoritativeBatterySampleActive = false;
+  _authoritativeBatterySoc = 0.0f;
+  _authoritativeBatteryState = 0;
+  _authoritativeBatteryFallbackUsed = false;
 }
 
 float SensorManager::tmp36TemperatureC(int adcValue) {
@@ -255,90 +405,251 @@ bool probeTmp112Present(uint8_t addr) {
 
 } // namespace
 
-bool SensorManager::batteryState() {
+namespace {
 
 #if HAL_PLATFORM_CELLULAR || PLATFORM_ID == PLATFORM_ARGON
-  // Boron (cellular) and Argon (Wi-Fi) Gen 3 devices:
-  // Use built-in System battery APIs backed by the fuel gauge
-  // (and a BQ24195 PMIC on Boron only).
-  bool quickStartUsed = false;
-  bool fallbackUsed = false;
-  uint8_t retryCount = 0;
-  bool shouldStabilize = _batteryStabilizationPending;
-  if (!_firstBatterySampleTaken && System.resetReason() == RESET_REASON_POWER_MANAGEMENT) {
-    shouldStabilize = true;
-  }
+const float AUTHORITATIVE_POST_CONNECT_DELTA_THRESHOLD = 20.0f;
 
-  auto readBatterySample = [&](uint8_t &battState, float &soc, int &powerSource) {
+bool batterySampleHasUnrealisticDelta(float authoritativeSoc, float soc) {
+  float delta = soc - authoritativeSoc;
+  if (delta < 0.0f) {
+    delta = -delta;
+  }
+  return delta >= AUTHORITATIVE_POST_CONNECT_DELTA_THRESHOLD;
+}
+
+float batterySampleDelta(float authoritativeSoc, float soc) {
+  float delta = soc - authoritativeSoc;
+  if (delta < 0.0f) {
+    delta = -delta;
+  }
+  return delta;
+}
+#endif
+
+} // namespace
+
+bool SensorManager::batteryState(BatterySampleContext sampleContext) {
+
+#if HAL_PLATFORM_CELLULAR || PLATFORM_ID == PLATFORM_ARGON
+  // Boron (cellular) and Argon (Wi-Fi) Gen 3 devices.
+  bool fallbackUsed = false;
+  bool previousKnownGoodUsed = false;
+  uint8_t retryCount = 0;
+  bool shouldConsiderStabilization =
+      (sampleContext == BatterySampleContext::Setup) || _batteryStabilizationPending;
+  if (!_firstBatterySampleTaken && System.resetReason() == RESET_REASON_POWER_MANAGEMENT) {
+    shouldConsiderStabilization = true;
+  }
+  const float previousKnownGoodSoc = current.get_stateOfCharge();
+  const bool previousKnownGoodSocValid = batterySocIsValid(previousKnownGoodSoc);
+
+  auto readBatterySample = [&](uint8_t &battState,
+                               float &rawFuelGaugeSoc,
+                               float &normalizedSoc,
+                               float &soc,
+                               float &vcell,
+                               int &powerSource,
+                               const char *&socAuthorityTag,
+                               bool &ignoreUnknownBatteryState) {
+                #if HAL_PLATFORM_CELLULAR
     battState = System.batteryState();
-    soc = System.batteryCharge();
+                #else
+                  battState = 0;
+                #endif
+
+  #if HAL_PLATFORM_CELLULAR
     powerSource = System.powerSource();
+    PowerPlatform::noteObservedPowerSource(powerSource);
+  #else
+    powerSource = PowerPlatform::readPowerSource().source;
+  #endif
+
+#if HAL_PLATFORM_FUELGAUGE_MAX17043
+    rawFuelGaugeSoc = fuelGauge.getSoC();
+    normalizedSoc = fuelGauge.getNormalizedSoC();
+    vcell = fuelGauge.getVCell();
+    ignoreUnknownBatteryState = true;
+
+    if (batterySocIsValid(rawFuelGaugeSoc)) {
+      soc = rawFuelGaugeSoc;
+      socAuthorityTag = "fuelgauge-raw";
+    } else if (batterySocIsValid(normalizedSoc)) {
+      soc = normalizedSoc;
+      socAuthorityTag = "fuelgauge-normalized";
+    } else {
+      soc = rawFuelGaugeSoc;
+      socAuthorityTag = "fuelgauge-raw";
+    }
+#else
+    normalizedSoc = -1.0f;
+
+  #if HAL_PLATFORM_CELLULAR
+    rawFuelGaugeSoc = System.batteryCharge();
+  #else
+    rawFuelGaugeSoc = fuelGauge.getSoC();
+  #endif
+
+    soc = rawFuelGaugeSoc;
+    vcell = fuelGauge.getVCell();
+    socAuthorityTag = "system-batterycharge";
+    ignoreUnknownBatteryState = false;
+#endif
   };
 
   uint8_t battState = 0;
+  float normalizedSoc = -1.0f;
+  float rawFuelGaugeSoc = -1.0f;
   float soc = 0.0f;
+  float vcell = 0.0f;
   int powerSource = 0;
+  const char *socAuthorityTag = "system-batterycharge";
+  bool ignoreUnknownBatteryState = false;
+
+  readBatterySample(battState, rawFuelGaugeSoc, normalizedSoc, soc, vcell, powerSource,
+                    socAuthorityTag, ignoreUnknownBatteryState);
+
+  const float beforeStabilizationSoc = soc;
+  bool shouldStabilize = false;
+  const char *stabilizationReason = "none";
+
+#if HAL_PLATFORM_FUELGAUGE_MAX17043
+  if (shouldConsiderStabilization) {
+    if (!batterySocIsValid(rawFuelGaugeSoc)) {
+      shouldStabilize = true;
+      stabilizationReason = "raw-invalid";
+    } else if (batterySampleLooksSuspicious(battState, soc, vcell, ignoreUnknownBatteryState)) {
+      shouldStabilize = true;
+      stabilizationReason = "selected-suspicious";
+    }
+  }
+#else
+  if (shouldConsiderStabilization &&
+      batterySampleLooksSuspicious(battState, soc, vcell, ignoreUnknownBatteryState)) {
+    shouldStabilize = true;
+    stabilizationReason = "selected-suspicious";
+  }
+#endif
 
   if (shouldStabilize) {
+    fuelGauge.wakeup();
+    boundedBatterySettleDelay(ConnectivityPolicy::BATTERY_WAKE_QUICKSTART_DELAY_MS);
     fuelGauge.quickStart();
-    quickStartUsed = true;
-    delay(ConnectivityPolicy::BATTERY_WAKE_QUICKSTART_DELAY_MS);
+    boundedBatterySettleDelay(ConnectivityPolicy::BATTERY_WAKE_QUICKSTART_DELAY_MS);
+
+    readBatterySample(battState, rawFuelGaugeSoc, normalizedSoc, soc, vcell, powerSource,
+                      socAuthorityTag, ignoreUnknownBatteryState);
+
+    while (batterySampleLooksSuspicious(battState, soc, vcell, ignoreUnknownBatteryState) &&
+           retryCount < ConnectivityPolicy::BATTERY_WAKE_MAX_RETRIES) {
+      retryCount++;
+      delay(ConnectivityPolicy::BATTERY_WAKE_RETRY_DELAY_MS);
+      readBatterySample(battState, rawFuelGaugeSoc, normalizedSoc, soc, vcell, powerSource,
+                        socAuthorityTag, ignoreUnknownBatteryState);
+    }
   }
 
-  readBatterySample(battState, soc, powerSource);
-
-  if (shouldStabilize) {
-    Log.info("Battery stabilization: initial SoC=%.2f%% state=%s (%d) powerSource=%d quickStart=%s",
-             (double)soc,
-             batteryContext[(battState <= 6) ? battState : 0],
-             battState,
-             powerSource,
-             quickStartUsed ? "true" : "false");
-  }
-
-  while (batterySampleLooksSuspicious(battState, soc) &&
-         retryCount < ConnectivityPolicy::BATTERY_WAKE_MAX_RETRIES) {
-    retryCount++;
-    Log.warn("Battery stabilization: suspicious sample SoC=%.2f%% state=%s (%d) - retry %u/%u",
-             (double)soc,
-             batteryContext[(battState <= 6) ? battState : 0],
-             battState,
-             (unsigned)retryCount,
-             (unsigned)ConnectivityPolicy::BATTERY_WAKE_MAX_RETRIES);
-    delay(ConnectivityPolicy::BATTERY_WAKE_RETRY_DELAY_MS);
-    readBatterySample(battState, soc, powerSource);
-  }
-
-  if (batterySampleLooksSuspicious(battState, soc)) {
-    float vcell = fuelGauge.getVCell();
-    if (vcell > 2.5f && vcell < 5.0f) {
+  if (batterySampleLooksSuspicious(battState, soc, vcell, ignoreUnknownBatteryState)) {
+    if (batteryVoltageLooksUsable(vcell)) {
+      socAuthorityTag = "voltage-fallback";
       soc = estimateSocFromVoltage(vcell);
       fallbackUsed = true;
-      Log.warn("Battery stabilization: falling back to voltage-estimated SoC=%.2f%% from VCell=%.3fV",
-               (double)soc,
-               (double)vcell);
+    } else if (previousKnownGoodSocValid) {
+      soc = previousKnownGoodSoc;
+      previousKnownGoodUsed = true;
+      socAuthorityTag = "previous-known-good";
     }
+  }
+
+  if (shouldStabilize) {
+    Log.info("Battery stabilization: reason=%s before=%.2f after=%.2f raw=%.2f norm=%.2f vcell=%.3f",
+             stabilizationReason,
+             (double)beforeStabilizationSoc,
+             (double)soc,
+             (double)rawFuelGaugeSoc,
+             (double)normalizedSoc,
+             (double)vcell);
   }
 
   _batteryStabilizationPending = false;
   _firstBatterySampleTaken = true;
 
-  if (shouldStabilize) {
-    Log.info("Battery stabilization: final SoC=%.2f%% state=%s (%d) powerSource=%d retries=%u fallback=%s",
-             (double)soc,
-             batteryContext[(battState <= 6) ? battState : 0],
-             battState,
-             powerSource,
-             (unsigned)retryCount,
-             fallbackUsed ? "true" : "false");
+  const bool sampleIsPreRadio = !Particle.connected() && !Connectivity::isRadioPoweredOn();
+  const bool sampleCanBeAuthoritative = sampleIsPreRadio &&
+      (fallbackUsed || previousKnownGoodUsed ||
+       !batterySampleLooksSuspicious(battState, soc, vcell, ignoreUnknownBatteryState));
+
+  if (sampleCanBeAuthoritative) {
+    _authoritativeBatterySampleActive = true;
+    _authoritativeBatterySoc = soc;
+    _authoritativeBatteryState = battState;
+    _authoritativeBatteryFallbackUsed = fallbackUsed || previousKnownGoodUsed;
   }
-  
-  // Log battery diagnostics to help identify charging state issues
-  Log.info("Battery: state=%s (%d), SoC=%.2f%%, powerSource=%d", 
-           batteryContext[battState], battState, (double)soc, powerSource);
-  
-  current.set_batteryState(battState);
-  current.set_stateOfCharge(soc);
+
+  bool rejectAuthoritativeOverwrite = false;
+  float authoritativeDelta = 0.0f;
+  if (!shouldStabilize &&
+      _authoritativeBatterySampleActive &&
+      Particle.connected()) {
+    const bool suspiciousCandidate = batterySampleLooksSuspicious(battState, soc, vcell, ignoreUnknownBatteryState);
+    authoritativeDelta = batterySampleDelta(_authoritativeBatterySoc, soc);
+    const bool unrealisticDelta = batterySampleHasUnrealisticDelta(_authoritativeBatterySoc, soc);
+    const bool authoritativeFallbackLock = _authoritativeBatteryFallbackUsed;
+    if (authoritativeFallbackLock || suspiciousCandidate || unrealisticDelta) {
+      rejectAuthoritativeOverwrite = true;
+      Log.warn("Battery post-connect sample ignored: preRadio=%.1f postConnect=%.1f delta=%.1f",
+               (double)_authoritativeBatterySoc,
+               (double)soc,
+               (double)authoritativeDelta);
+      Log.warn("Battery authority: keeping pre-radio sample SoC=%.2f%% state=%s (%d)%s; rejecting later sample SoC=%.2f%% state=%s (%d) powerSource=%d suspicious=%s fallbackLock=%s delta=%.2f",
+               (double)_authoritativeBatterySoc,
+               batteryContext[(_authoritativeBatteryState <= 6) ? _authoritativeBatteryState : 0],
+               _authoritativeBatteryState,
+               _authoritativeBatteryFallbackUsed ? " fallback=true" : "",
+               (double)soc,
+               batteryContext[(battState <= 6) ? battState : 0],
+               battState,
+               powerSource,
+               suspiciousCandidate ? "true" : "false",
+               authoritativeFallbackLock ? "true" : "false",
+               (double)authoritativeDelta);
+    }
+  }
+
+  const char *authorityTag = socAuthorityTag;
+  if (rejectAuthoritativeOverwrite) {
+    authorityTag = "ignored-post-connect";
+  }
+
+  const bool logBatteryDetail = sysStatus.get_verboseMode() || shouldStabilize ||
+      fallbackUsed || previousKnownGoodUsed || rejectAuthoritativeOverwrite;
+  const float loggedSoc = rejectAuthoritativeOverwrite ? _authoritativeBatterySoc : soc;
+
+#if !(HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM))
+  const uint8_t loggedBattState = rejectAuthoritativeOverwrite ? _authoritativeBatteryState : battState;
+  if (logBatteryDetail) {
+    Log.info("%s: soc=%.2f raw=%.2f norm=%.2f vcell=%.3f authority=%s state=%s(%d) power=%d%s",
+             batterySampleContextPrefix(sampleContext),
+             (double)loggedSoc,
+             (double)rawFuelGaugeSoc,
+             (double)normalizedSoc,
+             (double)vcell,
+             authorityTag,
+             batteryContext[(loggedBattState <= 6) ? loggedBattState : 0],
+             loggedBattState,
+             powerSource,
+             rejectAuthoritativeOverwrite ? " candidateRejected=true" : "");
+  }
+
+  if (!rejectAuthoritativeOverwrite) {
+    current.set_batteryState(battState);
+    current.set_stateOfCharge(soc);
+  }
+#else
+  if (!rejectAuthoritativeOverwrite) {
+    current.set_stateOfCharge(soc);
+  }
+#endif
 
 #if HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
   // =========================================================================
@@ -383,6 +694,8 @@ bool SensorManager::batteryState() {
   static uint8_t remediationActiveLevel = 0; // 0=none, 1=soft, 2=aggressive
   static uint8_t remediationPhase = 0;       // 0=start, 1=wait
   static unsigned long remediationPhaseStartMs = 0;
+  static bool immediateChargeFaultResetConsumed = false;
+  static byte immediateChargeFaultResetFaultReg = 0;
   
   // Check if charging is intentionally disabled due to temperature BEFORE attempting remediation
   bool safeToCharge = isItSafeToCharge();
@@ -392,6 +705,87 @@ bool SensorManager::batteryState() {
   // Read REG09 (Fault Register)
   // NOTE: Use public API; PMIC::readRegister() is private in DeviceOS 6.3.4.
   byte faultReg = pmic.getFault();
+  byte systemStatus = pmic.getSystemStatus();
+  uint8_t vbusStatus = (systemStatus >> 6) & 0x03;
+  uint8_t chargeStatus = (systemStatus >> 4) & 0x03;
+  bool powerGood = (systemStatus & 0x04) != 0;
+  bool thermalRegulation = (systemStatus & 0x02) != 0;
+  bool inVsysMin = (systemStatus & 0x01) != 0;
+
+  const char* chargeStatusStr[] = {"Off", "Pre", "Fast", "Done"};
+  const PowerReport &powerReport = PowerManager::instance().latestReport();
+
+  auto isUsbBackedSource = [](int source) {
+    return source == 2 || source == 3 || source == 4;
+  };
+
+  bool persistentAfterImmediateChargeFaultReset = false;
+  if (faultReg & 0x38) {
+    const bool usbInputPresent = (vbusStatus == 1 || vbusStatus == 2 || vbusStatus == 3);
+    const bool usbBackedFaultContext =
+        powerReport.activeInputProfile == PowerInputProfile::UsbBench ||
+        isUsbBackedSource(powerReport.reading.powerSource) ||
+        isUsbBackedSource(powerSource) ||
+        usbInputPresent;
+    const bool severeBatteryState = (battState == 5 || battState == 6);
+    const uint8_t initialChargeFault = (faultReg >> 3) & 0x07;
+    const bool alreadyAttemptedForActiveFault =
+        immediateChargeFaultResetConsumed &&
+        immediateChargeFaultResetFaultReg == faultReg;
+    const bool canAttemptImmediateChargeFaultReset =
+        !alreadyAttemptedForActiveFault &&
+        safeToCharge &&
+        powerGood &&
+        usbInputPresent &&
+        usbBackedFaultContext &&
+        !thermalRegulation &&
+        !severeBatteryState &&
+        initialChargeFault != 0x02;
+
+    if (canAttemptImmediateChargeFaultReset) {
+      Log.warn("PMIC: charge fault active; attempting charging reset");
+      pmic.disableCharging();
+      Log.warn("PMIC: charging disabled for fault reset");
+      boundedBatterySettleDelay(500UL);
+      pmic.enableCharging();
+      Log.warn("PMIC: charging re-enabled after fault reset");
+      boundedBatterySettleDelay(500UL);
+
+      faultReg = pmic.getFault();
+      systemStatus = pmic.getSystemStatus();
+      vbusStatus = (systemStatus >> 6) & 0x03;
+      chargeStatus = (systemStatus >> 4) & 0x03;
+      powerGood = (systemStatus & 0x04) != 0;
+      thermalRegulation = (systemStatus & 0x02) != 0;
+      inVsysMin = (systemStatus & 0x01) != 0;
+      immediateChargeFaultResetConsumed = true;
+      immediateChargeFaultResetFaultReg = (byte)(faultReg & 0x38 ? faultReg : initialChargeFault << 3);
+      lastRemediationAttempt = millis();
+
+      Log.info("PMIC: fault reset result faultReg=0x%02x charge=%s",
+               faultReg,
+               chargeStatusStr[chargeStatus]);
+
+      if (!(faultReg & 0x38)) {
+        Log.info("PMIC: charge fault cleared");
+        consecutiveFaults = 0;
+        remediationLevel = 0;
+        remediationInProgress = false;
+        remediationActiveLevel = 0;
+        remediationPhase = 0;
+        immediateChargeFaultResetConsumed = false;
+        immediateChargeFaultResetFaultReg = 0;
+
+        int8_t currentAlert = current.get_alertCode();
+        if (currentAlert == 21 || currentAlert == 23) {
+          current.set_alertCode(0);
+          current.set_lastAlertTime(0);
+        }
+      } else {
+        persistentAfterImmediateChargeFaultReset = true;
+      }
+    }
+  }
   
   // Check for charging faults (bits 3-5: CHRG_FAULT)
   if (faultReg & 0x38) {
@@ -405,18 +799,31 @@ bool SensorManager::batteryState() {
         // LOG ONLY - transient voltage dips are normal (clouds, trees, dawn/dusk)
         // Backend detects sustained panel failures via multi-day SoC decline
         Log.info("PMIC: Input fault - VBUS out of range (likely solar variation)");
+        if (persistentAfterImmediateChargeFaultReset) {
+          Log.error("PMIC: charge fault persists after reset - alert 21");
+          current.raiseAlert(21);
+        }
         break;
       case 0x02: // Thermal shutdown
         Log.error("PMIC: Thermal shutdown - charging stopped due to temperature");
         current.raiseAlert(20); // Alert code 20: PMIC Thermal (critical)
         break;
       case 0x03: // Charge safety timer expired
-        Log.error("PMIC: Charge safety timer expired - charging timeout (common stuck charging indicator)");
+        if (persistentAfterImmediateChargeFaultReset) {
+          Log.error("PMIC: charge fault persists after reset - alert 21");
+        } else {
+          Log.error("PMIC: Charge safety timer expired - charging timeout (common stuck charging indicator)");
+        }
         current.raiseAlert(21); // Alert code 21: PMIC Charge Timeout (critical)
         break;
       default:
-        Log.warn("PMIC: Charge fault detected (code=0x%02x)", chargeFault);
-        current.raiseAlert(23); // Alert code 23: PMIC Battery Fault
+        if (persistentAfterImmediateChargeFaultReset) {
+          Log.error("PMIC: charge fault persists after reset - alert 21");
+          current.raiseAlert(21);
+        } else {
+          Log.warn("PMIC: Charge fault detected (code=0x%02x)", chargeFault);
+          current.raiseAlert(23); // Alert code 23: PMIC Battery Fault
+        }
         break;
     }
     
@@ -513,6 +920,8 @@ bool SensorManager::batteryState() {
     }
   } else {
     // No faults detected - clear counters if charging is healthy
+    immediateChargeFaultResetConsumed = false;
+    immediateChargeFaultResetFaultReg = 0;
     if (consecutiveFaults > 0) {
       Log.info("PMIC: Charging healthy - clearing fault counters");
       consecutiveFaults = 0;
@@ -532,53 +941,161 @@ bool SensorManager::batteryState() {
       }
     }
   }
-  
-  // Read REG08 (System Status Register) for additional diagnostics
-  byte systemStatus = pmic.getSystemStatus();
-  uint8_t vbusStatus = (systemStatus >> 6) & 0x03;
-  uint8_t chargeStatus = (systemStatus >> 4) & 0x03;
-  bool powerGood = (systemStatus & 0x04) != 0;
-  bool thermalRegulation = (systemStatus & 0x02) != 0;
-  bool inVsysMin = (systemStatus & 0x01) != 0;
 
-  const char* vbusStatusStr[] = {"Unknown", "USB Host", "Adapter", "OTG"};
-  const char* chargeStatusStr[] = {"Not Charging", "Pre-charge", "Fast Charging", "Charge Done"};
+  static byte lastLoggedPmicSystemStatus = 0xFF;
+  static byte lastLoggedPmicFaultReg = 0xFF;
+  static int lastLoggedPmicPowerSource = -999;
+  static PowerInputProfile lastLoggedPmicProfile = PowerInputProfile::NotApplicable;
+  const uint8_t systemBattState = battState;
+  const uint8_t pmicBattState = batteryStateFromPmicStatus(chargeStatus, faultReg);
+  if (sampleCanBeAuthoritative) {
+    _authoritativeBatteryState = pmicBattState;
+  }
+  current.set_batteryState(pmicBattState);
 
-  Log.info("PMIC Status: vbus=%s, powerGood=%s, charge=%s, thermal=%s, vsysMin=%s, faultReg=0x%02x",
-           vbusStatusStr[vbusStatus],
-           powerGood ? "Yes" : "No",
-           chargeStatusStr[chargeStatus],
-           thermalRegulation ? "Regulating" : "Normal",
-           inVsysMin ? "Yes" : "No",
-           faultReg);
-  
+  const uint8_t finalLoggedBattState = pmicBattState;
+  const bool pmicStatusChanged =
+      systemStatus != lastLoggedPmicSystemStatus || faultReg != lastLoggedPmicFaultReg;
+  const bool pmicRouteChanged =
+      powerSource != lastLoggedPmicPowerSource ||
+      powerReport.activeInputProfile != lastLoggedPmicProfile;
+  if (sysStatus.get_verboseMode() || pmicStatusChanged || pmicRouteChanged) {
+    Log.info("PMIC: vbus=%s chg=%s fault=%02x pg=%d th=%s vsys=%d prof=%s src=%s",
+             compactPmicVbusLabel(vbusStatus),
+             compactPmicChargeLabel(chargeStatus, faultReg),
+             faultReg,
+             powerGood ? 1 : 0,
+             thermalRegulation ? "REG" : "OK",
+             inVsysMin ? 1 : 0,
+             compactProfileLabel(powerReport.activeInputProfile),
+             PowerManager::powerSourceLabel(powerSource));
+    lastLoggedPmicSystemStatus = systemStatus;
+    lastLoggedPmicFaultReg = faultReg;
+    lastLoggedPmicPowerSource = powerSource;
+    lastLoggedPmicProfile = powerReport.activeInputProfile;
+  }
+  if (powerReport.activeInputProfile == PowerInputProfile::Solar35W && vbusStatus == 1) {
+    Log.warn("Power mismatch: prof=SOLAR vbus=USB");
+  }
+
+  if (logBatteryDetail) {
+    Log.info("%s: soc=%.2f raw=%.2f norm=%.2f vcell=%.3f authority=%s state=%s(%d) systemState=%s(%d) power=%s(%d)%s",
+             batterySampleContextPrefix(sampleContext),
+             (double)loggedSoc,
+             (double)rawFuelGaugeSoc,
+             (double)normalizedSoc,
+             (double)vcell,
+             authorityTag,
+             batteryContext[(finalLoggedBattState <= 6) ? finalLoggedBattState : 0],
+             finalLoggedBattState,
+             batteryContext[(systemBattState <= 6) ? systemBattState : 0],
+             systemBattState,
+             PowerManager::powerSourceLabel(powerSource),
+             powerSource,
+             rejectAuthoritativeOverwrite ? " candidateRejected=true" : "");
+  }
+
+  {
+    static bool chargeSummaryBaselineValid = false;
+    static unsigned long chargeSummaryBaselineMs = 0;
+    static float chargeSummaryBaselineSoc = 0.0f;
+    static float chargeSummaryBaselineVcell = 0.0f;
+    static int chargeSummaryBaselineSource = -1;
+    static PowerInputProfile chargeSummaryBaselineProfile = PowerInputProfile::NotApplicable;
+
+    const unsigned long nowMs = millis();
+    const bool sourceOrProfileChanged =
+        chargeSummaryBaselineValid &&
+        (chargeSummaryBaselineSource != powerSource ||
+         chargeSummaryBaselineProfile != powerReport.activeInputProfile);
+
+    if (!chargeSummaryBaselineValid || sourceOrProfileChanged) {
+      chargeSummaryBaselineValid = true;
+      chargeSummaryBaselineMs = nowMs;
+      chargeSummaryBaselineSoc = soc;
+      chargeSummaryBaselineVcell = vcell;
+      chargeSummaryBaselineSource = powerSource;
+      chargeSummaryBaselineProfile = powerReport.activeInputProfile;
+      if (sysStatus.get_verboseMode()) {
+        Log.info("Charge: base soc=%.2f v=%.3f",
+                 (double)soc,
+                 (double)vcell);
+      }
+    } else if ((nowMs - chargeSummaryBaselineMs) >= CHARGE_SUMMARY_INTERVAL_MS) {
+      const Observability::WakeCycleStats &stats = Observability::cycleStats();
+      Log.info("Charge: soc=%.1f d15=%+.2f v=%.3f dv=%+.3f chg=%s src=%s prof=%s a=%lus c=%lus t=%lus",
+               (double)soc,
+               (double)(soc - chargeSummaryBaselineSoc),
+               (double)vcell,
+               (double)(vcell - chargeSummaryBaselineVcell),
+               compactPmicChargeLabel(chargeStatus, faultReg),
+               PowerManager::powerSourceLabel(powerSource),
+               compactProfileLabel(powerReport.activeInputProfile),
+               (unsigned long)(currentWakeAwakeMs() / 1000UL),
+               (unsigned long)(stats.connect_duration_ms / 1000UL),
+               (unsigned long)(stats.teardown_duration_ms / 1000UL));
+      chargeSummaryBaselineMs = nowMs;
+      chargeSummaryBaselineSoc = soc;
+      chargeSummaryBaselineVcell = vcell;
+      chargeSummaryBaselineSource = powerSource;
+      chargeSummaryBaselineProfile = powerReport.activeInputProfile;
+    }
+  }
+
   // Detect stuck charging state (charging for >6 hours at same SoC)
   static uint8_t lastChargeStatus = 0xFF;
-  static float lastSoC = -1.0f;
   static unsigned long chargeStateStartTime = 0;
-  
+  static float fastChargeStartSoc = -1.0f;
+  static float fastChargeStartVcell = -1.0f;
+
   if (chargeStatus == 2) { // Fast Charging
-    if (lastChargeStatus == 2) {
-      // Still in fast charging
-      if (abs(soc - lastSoC) < 1.0f) { // SoC not increasing
-        if (chargeStateStartTime == 0) {
+    if (lastChargeStatus != 2) {
+      chargeStateStartTime = millis(); // Just entered fast charging
+      fastChargeStartSoc = soc;
+      fastChargeStartVcell = vcell;
+    } else if (chargeStateStartTime != 0) {
+      const float socGain = batterySocIsValid(fastChargeStartSoc) ? (soc - fastChargeStartSoc) : 0.0f;
+      const float vcellGain = batteryVoltageLooksUsable(fastChargeStartVcell) ? (vcell - fastChargeStartVcell) : 0.0f;
+      const bool meaningfulChargeProgress = (socGain >= 0.5f) || (vcellGain >= 0.015f);
+      if (meaningfulChargeProgress) {
+        chargeStateStartTime = millis();
+        fastChargeStartSoc = soc;
+        fastChargeStartVcell = vcell;
+      } else if (millis() - chargeStateStartTime > 6UL * 3600000UL) { // 6 hours
+        const unsigned long awakeMs = currentWakeAwakeMs();
+        const unsigned long connectMs = Observability::cycleStats().connect_duration_ms;
+        const unsigned long teardownMs = Observability::cycleStats().teardown_duration_ms;
+        const bool ambiguousHighLoad = inVsysMin || thermalRegulation || awakeMs > 300000UL ||
+                                       connectMs > 120000UL || teardownMs > 10000UL;
+        if (ambiguousHighLoad) {
+          Log.warn("PMIC: Fast Charging 6+ hours with limited gain under load socGain=%.2f vcellGain=%.3f awake=%lu conn=%lu td=%lu vsysMin=%d thermal=%d",
+                   (double)socGain,
+                   (double)vcellGain,
+                   awakeMs,
+                   connectMs,
+                   teardownMs,
+                   inVsysMin ? 1 : 0,
+                   thermalRegulation ? 1 : 0);
           chargeStateStartTime = millis();
-        } else if (millis() - chargeStateStartTime > 6UL * 3600000UL) { // 6 hours
-          Log.error("PMIC: Stuck in Fast Charging for 6+ hours with no SoC increase (%.1f%%) - possible fault", (double)soc);
+          fastChargeStartSoc = soc;
+          fastChargeStartVcell = vcell;
+        } else {
+          Log.error("PMIC: Stuck in Fast Charging for 6+ hours with no material gain soc=%.1f socGain=%.2f vcell=%.3f vcellGain=%.3f",
+                    (double)soc,
+                    (double)socGain,
+                    (double)vcell,
+                    (double)vcellGain);
           current.raiseAlert(21); // Charge timeout alert
         }
-      } else {
-        chargeStateStartTime = 0; // SoC increasing, reset timer
       }
-    } else {
-      chargeStateStartTime = millis(); // Just entered fast charging
     }
   } else {
     chargeStateStartTime = 0; // Not charging or charge done
+    fastChargeStartSoc = -1.0f;
+    fastChargeStartVcell = -1.0f;
   }
-  
+
   lastChargeStatus = chargeStatus;
-  lastSoC = soc;
 #endif // HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
 
 #elif PLATFORM_ID == 32 || PLATFORM_ID == 34
@@ -604,9 +1121,14 @@ bool SensorManager::batteryState() {
   // charging and discharging at the same voltage level.
   uint8_t battState = 0; // Unknown
   
-  // Log battery diagnostics (Photon 2/P2 voltage-based estimation)
-  Log.info("Battery: voltage=%.2fV, state=%s (%d), SoC=%.2f%% (estimated from voltage)", 
-           (double)voltage, batteryContext[battState], battState, (double)soc);
+  if (shouldLogBatterySample(sampleContext) || sysStatus.get_verboseMode()) {
+    Log.info("%s: soc=%.2f raw=-1.00 norm=-1.00 vcell=%.3f authority=voltage-estimated state=%s(%d) power=-1",
+             batterySampleContextPrefix(sampleContext),
+             (double)soc,
+             (double)voltage,
+             batteryContext[battState],
+             battState);
+  }
   
   current.set_batteryState(battState);
 
@@ -768,6 +1290,9 @@ bool SensorManager::isItSafeToCharge() // Returns a true or false if the battery
   // When charging is currently disallowed, we only re-enable once
   // temp has returned to a tighter 2C-43C window.
   static bool lastSafe = true;
+#if HAL_PLATFORM_CELLULAR
+  const bool previousSafe = lastSafe;
+#endif
 
   bool safe;
   if (lastSafe) {
@@ -781,6 +1306,7 @@ bool SensorManager::isItSafeToCharge() // Returns a true or false if the battery
   // On Boron (cellular Gen 3), a BQ24195 PMIC is available so we
   // actually enable/disable charging based on the enclosure
   // temperature.
+  const bool safeStateChanged = (safe != previousSafe);
   PMIC pmic(true);
 
   if (!safe) {
@@ -791,7 +1317,7 @@ bool SensorManager::isItSafeToCharge() // Returns a true or false if the battery
   } else {
     pmic.enableCharging();
 
-    if (sysStatus.get_verboseMode()) {
+    if (safeStateChanged || sysStatus.get_verboseMode()) {
       Log.info("Charging enabled; enclosure temperature: %4.2f C", (double)temp);
     }
   }

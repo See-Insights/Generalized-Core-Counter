@@ -13,9 +13,6 @@
  * - `FIELD_BUILD`: Derived convenience flag that becomes true when `DEV_BUILD=0`.
  * - `ALLOW_BLOCKING_SERIAL_WAITS`: Allows explicit blocking waits for USB serial.
  *   This should remain `0` for field deployments.
- * - `ALERT44_DIAG_ENABLED`: Enables the temporary ledger-sync helper diagnostics
- *   used to validate the Alert 44 semantic fix during soak testing.
- *
  * Optional hardware override settings:
  * - `MUON_TMP36_SENSE_PIN`: Overrides which analog-capable pin is used for the
  *   TMP36 carrier temperature sensor.

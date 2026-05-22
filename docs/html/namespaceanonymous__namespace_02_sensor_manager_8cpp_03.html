@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;10.00</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -95,13 +95,119 @@ $(function(){initNavTree('namespaceanonymous__namespace_02_sensor_manager_8cpp_0
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:ab5a3fd276944117f8d63d688914a47d4" id="r_ab5a3fd276944117f8d63d688914a47d4"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ab5a3fd276944117f8d63d688914a47d4">batterySampleLooksSuspicious</a> (uint8_t battState, float soc)</td></tr>
+<tr class="memitem:a6f3702b47017ba5c4baffb7e7e6c9756" id="r_a6f3702b47017ba5c4baffb7e7e6c9756"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a6f3702b47017ba5c4baffb7e7e6c9756">batteryExtremeSocLooksSuspicious</a> (float soc, float vcell)</td></tr>
+<tr class="memitem:a0b48157f62ff282d11ece5ad5a4557de" id="r_a0b48157f62ff282d11ece5ad5a4557de"><td class="memItemLeft">const char *&#160;</td><td class="memItemRight"><a class="el" href="#a0b48157f62ff282d11ece5ad5a4557de">batterySampleContextPrefix</a> (<a class="el" href="_sensor_manager_8h.html#acd8eeb965a21d464f1d6ed3ded01cc3e">BatterySampleContext</a> sampleContext)</td></tr>
+<tr class="memitem:a79e30a0046081ff90bf1df4836869b4e" id="r_a79e30a0046081ff90bf1df4836869b4e"><td class="memItemLeft">float&#160;</td><td class="memItemRight"><a class="el" href="#a79e30a0046081ff90bf1df4836869b4e">batterySampleDelta</a> (float authoritativeSoc, float soc)</td></tr>
+<tr class="memitem:a6022a07ce4ea00db21cb64ba18ec706b" id="r_a6022a07ce4ea00db21cb64ba18ec706b"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a6022a07ce4ea00db21cb64ba18ec706b">batterySampleHasUnrealisticDelta</a> (float authoritativeSoc, float soc)</td></tr>
+<tr class="memitem:a638d0d8bd9e4465b597c6c3c7af7dbeb" id="r_a638d0d8bd9e4465b597c6c3c7af7dbeb"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a638d0d8bd9e4465b597c6c3c7af7dbeb">batterySampleLooksSuspicious</a> (uint8_t battState, float soc, float vcell, bool ignoreUnknownBatteryState)</td></tr>
+<tr class="memitem:aef9d79e90e7350c976ca68e6908dfece" id="r_aef9d79e90e7350c976ca68e6908dfece"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#aef9d79e90e7350c976ca68e6908dfece">batterySocIsValid</a> (float soc)</td></tr>
+<tr class="memitem:af0d235864131aeeba640193efb977e4e" id="r_af0d235864131aeeba640193efb977e4e"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#af0d235864131aeeba640193efb977e4e">batteryVoltageLooksUsable</a> (float vcell)</td></tr>
+<tr class="memitem:afa775b9bbc1b9a7f4007b9b2be366f1f" id="r_afa775b9bbc1b9a7f4007b9b2be366f1f"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#afa775b9bbc1b9a7f4007b9b2be366f1f">boundedBatterySettleDelay</a> (unsigned long delayMs)</td></tr>
 <tr class="memitem:a5e3e975006a3ea6d5ce637eef262bc84" id="r_a5e3e975006a3ea6d5ce637eef262bc84"><td class="memItemLeft">float&#160;</td><td class="memItemRight"><a class="el" href="#a5e3e975006a3ea6d5ce637eef262bc84">estimateSocFromVoltage</a> (float voltage)</td></tr>
 <tr class="memitem:a452bb1633016be3c71fffc2fe5d5a0d7" id="r_a452bb1633016be3c71fffc2fe5d5a0d7"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a452bb1633016be3c71fffc2fe5d5a0d7">probeTmp112Present</a> (uint8_t addr)</td></tr>
+<tr class="memitem:ac35b035463e7a7aecdfbca21700963da" id="r_ac35b035463e7a7aecdfbca21700963da"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ac35b035463e7a7aecdfbca21700963da">shouldLogBatterySample</a> (<a class="el" href="_sensor_manager_8h.html#acd8eeb965a21d464f1d6ed3ded01cc3e">BatterySampleContext</a> sampleContext)</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 id="header-var-members" class="groupheader"><a id="var-members" name="var-members"></a>
+Variables</h2></td></tr>
+<tr class="memitem:a50d7e96994354eb92f9a78fd8264c3f9" id="r_a50d7e96994354eb92f9a78fd8264c3f9"><td class="memItemLeft">const float&#160;</td><td class="memItemRight"><a class="el" href="#a50d7e96994354eb92f9a78fd8264c3f9">AUTHORITATIVE_POST_CONNECT_DELTA_THRESHOLD</a> = 20.0f</td></tr>
 </table>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
-<a id="ab5a3fd276944117f8d63d688914a47d4" name="ab5a3fd276944117f8d63d688914a47d4"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ab5a3fd276944117f8d63d688914a47d4">&#9670;&#160;</a></span>batterySampleLooksSuspicious()</h2>
+<a id="a6f3702b47017ba5c4baffb7e7e6c9756" name="a6f3702b47017ba5c4baffb7e7e6c9756"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6f3702b47017ba5c4baffb7e7e6c9756">&#9670;&#160;</a></span>batteryExtremeSocLooksSuspicious()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool anonymous_namespace{SensorManager.cpp}::batteryExtremeSocLooksSuspicious </td>
+          <td>(</td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>soc</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>vcell</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00049">49</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00065">batterySampleLooksSuspicious()</a>.</p>
+
+</div>
+</div>
+<a id="a0b48157f62ff282d11ece5ad5a4557de" name="a0b48157f62ff282d11ece5ad5a4557de"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0b48157f62ff282d11ece5ad5a4557de">&#9670;&#160;</a></span>batterySampleContextPrefix()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const char * anonymous_namespace{SensorManager.cpp}::batterySampleContextPrefix </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="_sensor_manager_8h.html#acd8eeb965a21d464f1d6ed3ded01cc3e">BatterySampleContext</a></td>          <td class="paramname"><span class="paramname"><em>sampleContext</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00094">94</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00023">General</a>, <a class="el" href="_sensor_manager_8h_source.html#l00026">PostWake</a>, <a class="el" href="_sensor_manager_8h_source.html#l00025">PreSleep</a>, and <a class="el" href="_sensor_manager_8h_source.html#l00024">Setup</a>.</p>
+
+</div>
+</div>
+<a id="a79e30a0046081ff90bf1df4836869b4e" name="a79e30a0046081ff90bf1df4836869b4e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a79e30a0046081ff90bf1df4836869b4e">&#9670;&#160;</a></span>batterySampleDelta()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float anonymous_namespace{SensorManager.cpp}::batterySampleDelta </td>
+          <td>(</td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>authoritativeSoc</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>soc</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00421">421</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+</div>
+</div>
+<a id="a6022a07ce4ea00db21cb64ba18ec706b" name="a6022a07ce4ea00db21cb64ba18ec706b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6022a07ce4ea00db21cb64ba18ec706b">&#9670;&#160;</a></span>batterySampleHasUnrealisticDelta()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool anonymous_namespace{SensorManager.cpp}::batterySampleHasUnrealisticDelta </td>
+          <td>(</td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>authoritativeSoc</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>soc</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00413">413</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_sensor_manager_8cpp_source.html#l00411">AUTHORITATIVE_POST_CONNECT_DELTA_THRESHOLD</a>.</p>
+
+</div>
+</div>
+<a id="a638d0d8bd9e4465b597c6c3c7af7dbeb" name="a638d0d8bd9e4465b597c6c3c7af7dbeb"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a638d0d8bd9e4465b597c6c3c7af7dbeb">&#9670;&#160;</a></span>batterySampleLooksSuspicious()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -114,12 +220,83 @@ Functions</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>soc</em></span>&#160;)</td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>soc</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>vcell</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool</td>          <td class="paramname"><span class="paramname"><em>ignoreUnknownBatteryState</em></span>&#160;)</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00023">23</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00065">65</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_sensor_manager_8cpp_source.html#l00049">batteryExtremeSocLooksSuspicious()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00041">batterySocIsValid()</a>.</p>
+
+</div>
+</div>
+<a id="aef9d79e90e7350c976ca68e6908dfece" name="aef9d79e90e7350c976ca68e6908dfece"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aef9d79e90e7350c976ca68e6908dfece">&#9670;&#160;</a></span>batterySocIsValid()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool anonymous_namespace{SensorManager.cpp}::batterySocIsValid </td>
+          <td>(</td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>soc</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00041">41</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00065">batterySampleLooksSuspicious()</a>.</p>
+
+</div>
+</div>
+<a id="af0d235864131aeeba640193efb977e4e" name="af0d235864131aeeba640193efb977e4e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af0d235864131aeeba640193efb977e4e">&#9670;&#160;</a></span>batteryVoltageLooksUsable()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool anonymous_namespace{SensorManager.cpp}::batteryVoltageLooksUsable </td>
+          <td>(</td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>vcell</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00045">45</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+</div>
+</div>
+<a id="afa775b9bbc1b9a7f4007b9b2be366f1f" name="afa775b9bbc1b9a7f4007b9b2be366f1f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#afa775b9bbc1b9a7f4007b9b2be366f1f">&#9670;&#160;</a></span>boundedBatterySettleDelay()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void anonymous_namespace{SensorManager.cpp}::boundedBatterySettleDelay </td>
+          <td>(</td>
+          <td class="paramtype">unsigned long</td>          <td class="paramname"><span class="paramname"><em>delayMs</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00028">28</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
 </div>
 </div>
@@ -138,7 +315,7 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00027">27</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00082">82</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
 </div>
 </div>
@@ -157,7 +334,47 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00247">247</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00397">397</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+</div>
+</div>
+<a id="ac35b035463e7a7aecdfbca21700963da" name="ac35b035463e7a7aecdfbca21700963da"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac35b035463e7a7aecdfbca21700963da">&#9670;&#160;</a></span>shouldLogBatterySample()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool anonymous_namespace{SensorManager.cpp}::shouldLogBatterySample </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="_sensor_manager_8h.html#acd8eeb965a21d464f1d6ed3ded01cc3e">BatterySampleContext</a></td>          <td class="paramname"><span class="paramname"><em>sampleContext</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00109">109</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_sensor_manager_8h_source.html#l00023">General</a>.</p>
+
+</div>
+</div>
+<a name="doc-var-members" id="doc-var-members"></a><h2 id="header-doc-var-members" class="groupheader">Variable Documentation</h2>
+<a id="a50d7e96994354eb92f9a78fd8264c3f9" name="a50d7e96994354eb92f9a78fd8264c3f9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a50d7e96994354eb92f9a78fd8264c3f9">&#9670;&#160;</a></span>AUTHORITATIVE_POST_CONNECT_DELTA_THRESHOLD</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const float anonymous_namespace{SensorManager.cpp}::AUTHORITATIVE_POST_CONNECT_DELTA_THRESHOLD = 20.0f</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00411">411</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00413">batterySampleHasUnrealisticDelta()</a>.</p>
 
 </div>
 </div>

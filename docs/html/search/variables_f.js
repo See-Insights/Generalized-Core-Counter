@@ -1,10 +1,14 @@
 var searchData=
 [
-  ['radio_5fon_5fbefore_5fsleep_0',['radio_on_before_sleep',['../struct_observability_1_1_wake_cycle_stats.html#ab7896103414826bd3d8cf98cdb87a3d2',1,'Observability::WakeCycleStats']]],
-  ['reason_5fnoprogress_1',['REASON_NOPROGRESS',['../namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#a520e89c249eda26c28608a22b7e620dc',1,'anonymous_namespace{ThrashGuard.cpp}']]],
-  ['reportinginterval_2',['reportingInterval',['../classsys_status_data_1_1_sys_data.html#a4f202b9573570e16bf24003a86571c55',1,'sysStatusData::SysData']]],
-  ['reportingmode_3',['reportingMode',['../classsys_status_data_1_1_sys_data.html#a4adcaff310ae44a6429c012f6d6205dd',1,'sysStatusData::SysData']]],
-  ['resetcount_4',['resetCount',['../classsys_status_data_1_1_sys_data.html#a8905aae58be262d2bf83628081500c50',1,'sysStatusData::SysData']]],
-  ['resetwait_5',['resetWait',['../_generalized-_core-_counter_8cpp.html#a51c21d3aa0797826d2cfcf9de5c1082d',1,'resetWait:&#160;Generalized-Core-Counter.cpp'],['../_state_machine_8h.html#a51c21d3aa0797826d2cfcf9de5c1082d',1,'resetWait:&#160;Generalized-Core-Counter.cpp']]],
-  ['returntosleepafterreport_6',['returnToSleepAfterReport',['../struct_session_state.html#a3d3c38bdf541bbd8b95c9859a7afeb3a',1,'SessionState']]]
+  ['persistentdatapathcurrent_0',['persistentDataPathCurrent',['../_my_persistent_data_8cpp.html#ad19d80e7395c469adb64ebdda3c51013',1,'MyPersistentData.cpp']]],
+  ['persistentdatapathsensor_1',['persistentDataPathSensor',['../_my_persistent_data_8cpp.html#ac2144de3454f3a6b0f7d5bed2c0a3323',1,'MyPersistentData.cpp']]],
+  ['persistentdatapathsystem_2',['persistentDataPathSystem',['../_my_persistent_data_8cpp.html#adf4dfdcb482780a2f68aef27c2c6934c',1,'MyPersistentData.cpp']]],
+  ['policy_3',['policy',['../struct_power_report.html#a9fdc71a07279baa13893a6b28e27c207',1,'PowerReport']]],
+  ['powerconfigurationresult_4',['powerConfigurationResult',['../struct_power_report.html#a2e734871e22214339fa63e7e65a124b8',1,'PowerReport']]],
+  ['powersource_5',['powerSource',['../struct_power_reading.html#a7eb002896cf0d1ccfabbb7964fd889ea',1,'PowerReading']]],
+  ['powersourcestatus_6',['powerSourceStatus',['../struct_power_reading.html#a72fcbbc61ff4390fe09dbe883b093e0e',1,'PowerReading']]],
+  ['primary_7',['primary',['../struct_sensor_data.html#addc9a9116bf2fca7030c39282bb24395',1,'SensorData']]],
+  ['publish_5fqueue_5fdepth_5fafter_5fconnect_8',['publish_queue_depth_after_connect',['../struct_observability_1_1_wake_cycle_stats.html#ac597d87ecbd1d97d3f49e31a51a7b318',1,'Observability::WakeCycleStats']]],
+  ['publish_5fqueue_5fdepth_5fbefore_5fconnect_9',['publish_queue_depth_before_connect',['../struct_observability_1_1_wake_cycle_stats.html#ac201aab506b4127b8e799d7bbb9e3d30',1,'Observability::WakeCycleStats']]],
+  ['publish_5fqueue_5fdepth_5fbefore_5fsleep_10',['publish_queue_depth_before_sleep',['../struct_observability_1_1_wake_cycle_stats.html#a153cd884d191ed1510ab3793038534d3',1,'Observability::WakeCycleStats']]]
 ];
