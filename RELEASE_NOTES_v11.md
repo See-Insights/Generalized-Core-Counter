@@ -1,10 +1,10 @@
-# Release Notes: v11.0.0
+# Release Notes: v11.0.1
 
 Release name: Connectivity resiliency soak release
 
 ## Intent
 
-v11.0.0 is the soak-release candidate for the connectivity recovery work that was bench-validated before field rollout. This release keeps the production timing model conservative while adding a persisted escalation ladder for devices that remain awake and operational but fail to complete a successful cloud connection for an extended period.
+v11.0.1 is the soak-release candidate for the connectivity recovery work that was bench-validated before field rollout. This patch release keeps the production timing model conservative while carrying forward the same firmware behavior under a new release identity that also includes the architecture overview documentation in the published artifact.
 
 This is a stability and resiliency release. It is not an architectural refactor release.
 

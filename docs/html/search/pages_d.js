@@ -1,9 +1,26 @@
 var searchData=
 [
-  ['patterns_0',['Supported Sensor Patterns',['../index.html#autotoc_md4',1,'']]],
-  ['pir_20sensor_20on_20carrier_1',['Carrier board header (PIR sensor on carrier)',['../device__pinout_8h.html#autotoc_md0',1,'']]],
-  ['platforms_2',['Supported Platforms',['../index.html#autotoc_md3',1,'']]],
-  ['post_20soak_20follow_20up_3',['Post-Soak Follow-Up',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md25',1,'']]],
-  ['power_20and_20connectivity_20model_4',['Power And Connectivity Model',['../index.html#autotoc_md7',1,'']]],
-  ['production_20behavior_5',['Production Behavior',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md21',1,'']]]
+  ['data_20architecture_0',['5. Persistent Data Architecture',['../md_docs_2architecture-overview.html#autotoc_md115',1,'']]],
+  ['day_200_1',['Day 0',['../md_docs_2v11-soak-plan.html#autotoc_md235',1,'']]],
+  ['days_201_203_2',['Days 1-3',['../md_docs_2v11-soak-plan.html#autotoc_md236',1,'']]],
+  ['days_204_207_3',['Days 4-7',['../md_docs_2v11-soak-plan.html#autotoc_md237',1,'']]],
+  ['decision_4',['Post-Soak Decision',['../md_docs_2v11-soak-plan.html#autotoc_md239',1,'']]],
+  ['deep_20attempts_5',['Connect Budgets and Deep Attempts',['../md_docs_2architecture-overview.html#autotoc_md130',1,'']]],
+  ['defer_20reasons_6',['Defer Reasons',['../md_docs_2recovery-architecture.html#autotoc_md224',1,'']]],
+  ['defers_20during_20active_20connect_7',['Why The Supervisor Defers During Active Connect',['../md_docs_2recovery-architecture.html#autotoc_md223',1,'']]],
+  ['deployment_20scenarios_8',['Deployment Scenarios',['../md_docs_2architecture-overview.html#autotoc_md137',1,'']]],
+  ['deployment_20workflow_9',['Deployment Workflow',['../index.html#autotoc_md21',1,'']]],
+  ['design_20goals_10',['1. Purpose and Design Goals',['../md_docs_2architecture-overview.html#autotoc_md103',1,'']]],
+  ['details_11',['Details',['../md_docs_2led-management-system.html#autotoc_md202',1,'Implementation Details'],['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md76',1,'Technical Details']]],
+  ['detection_12',['Detection',['../md_docs_2bench-validation.html#autotoc_md184',1,'Test 6A — Thermal Fault Detection'],['../md_docs_2bench-validation.html#autotoc_md185',1,'Test 6B — Charge Timeout Detection']]],
+  ['diagnostics_13',['11. Observability and Diagnostics',['../md_docs_2architecture-overview.html#autotoc_md160',1,'']]],
+  ['diagram_14',['Diagram',['../md_docs_2architecture-overview.html#autotoc_md139',1,'Power-State Diagram'],['../md_docs_2architecture-overview.html#autotoc_md151',1,'Recovery Flow Diagram'],['../md_docs_2architecture-overview.html#autotoc_md113',1,'Sensor Interaction Diagram'],['../md_docs_2architecture-overview.html#autotoc_md125',1,'Sequence Diagram'],['../md_docs_2architecture-overview.html#autotoc_md109',1,'State Transition Diagram']]],
+  ['disabling_20test_20mode_20for_20production_15',['Disabling Test Mode For Production',['../md_docs_2bench-validation.html#autotoc_md173',1,'']]],
+  ['disconnect_20behavior_16',['Disconnect Behavior',['../md_docs_2architecture-overview.html#autotoc_md131',1,'']]],
+  ['disconnect_20budget_20exceeded_17',['Test 3 — Cloud Disconnect Budget Exceeded',['../md_docs_2bench-validation.html#autotoc_md178',1,'']]],
+  ['documentation_20index_18',['Documentation Index',['../index.html#autotoc_md19',1,'']]],
+  ['duration_20connectivity_20failsafe_19',['Long-Duration Connectivity Failsafe',['../md_docs_2recovery-architecture.html#autotoc_md222',1,'']]],
+  ['durationms_200_20',['&lt;span class=&quot;tt&quot;&gt;signalLED(bool state, uint32_t durationMs = 0)&lt;/span&gt;',['../md_docs_2led-management-system.html#autotoc_md196',1,'']]],
+  ['during_20active_20connect_21',['Why The Supervisor Defers During Active Connect',['../md_docs_2recovery-architecture.html#autotoc_md223',1,'']]],
+  ['during_20soak_22',['Operational Expectations During Soak',['../md_docs_2recovery-architecture.html#autotoc_md227',1,'']]]
 ];

@@ -1,10 +1,9 @@
 var searchData=
 [
-  ['enclosuretempc_0',['enclosureTempC',['../struct_power_inputs.html#a3486201d30a193ec7295fe3642ba1117',1,'PowerInputs']]],
-  ['ensuresensorenabled_1',['ensureSensorEnabled',['../_state___common_8h.html#a26af5a78d8cca160ca913b5e91a224d6',1,'ensureSensorEnabled(const char *context):&#160;State_Idle.cpp'],['../_state___idle_8cpp.html#a26af5a78d8cca160ca913b5e91a224d6',1,'ensureSensorEnabled(const char *context):&#160;State_Idle.cpp']]],
-  ['error_5fstate_2',['ERROR_STATE',['../_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aa07813f3418b83dc769daa78689fb9c3',1,'StateMachine.h']]],
-  ['estimatesocfromvoltage_3',['estimateSocFromVoltage',['../namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a5e3e975006a3ea6d5ce637eef262bc84',1,'anonymous_namespace{SensorManager.cpp}']]],
-  ['evaluateconnectbudget_4',['evaluateConnectBudget',['../namespaceanonymous__namespace_02_state___connect_8cpp_03.html#a605cca907481b6d33dc1959d33d5fb63',1,'anonymous_namespace{State_Connect.cpp}']]],
-  ['extendedsleepsuggested_5',['extendedSleepSuggested',['../struct_power_policy.html#a0f7cfe33fa3d39bf82252ba0d966c521',1,'PowerPolicy']]],
-  ['externaltempc_6',['externalTempC',['../classcurrent_status_data_1_1_current_data.html#a6631f1c5e492a839917a32ab8a5d9ce5',1,'currentStatusData::CurrentData']]]
+  ['6_20—_20pmic_20health_20monitoring_20remediation_20boron_20only_0',['Test 6 — PMIC Health Monitoring &amp;amp; Remediation (Boron Only)',['../md_docs_2bench-validation.html#autotoc_md181',1,'']]],
+  ['6_20cloud_20architecture_1',['6. Cloud Architecture',['../md_docs_2architecture-overview.html#autotoc_md120',1,'']]],
+  ['6a_20—_20thermal_20fault_20detection_2',['Test 6A — Thermal Fault Detection',['../md_docs_2bench-validation.html#autotoc_md184',1,'']]],
+  ['6b_20—_20charge_20timeout_20detection_3',['Test 6B — Charge Timeout Detection',['../md_docs_2bench-validation.html#autotoc_md185',1,'']]],
+  ['6c_20—_20remediation_20cooldown_20anti_20thrashing_4',['Test 6C — Remediation Cooldown &amp;amp; Anti-Thrashing',['../md_docs_2bench-validation.html#autotoc_md186',1,'']]],
+  ['6d_20—_20remediation_20success_20alert_20clearing_5',['Test 6D — Remediation Success &amp;amp; Alert Clearing',['../md_docs_2bench-validation.html#autotoc_md187',1,'']]]
 ];

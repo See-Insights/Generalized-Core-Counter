@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;13.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -93,15 +93,15 @@ $(function(){initNavTree('index.html','',''); });
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><p><a class="anchor" id="md__r_e_a_d_m_e"></a></p>
-<p><b>Version:</b> 11.0.0 | <b>Latest:</b> <a class="el" href="namespace_connectivity.html">Connectivity</a> resiliency soak release</p>
-<p>Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v11 release is the production soak candidate for the new connectivity recovery ladder and its supporting observability.</p>
+<p><b>Version:</b> 13.0.0 | <b>Latest:</b> Watchdog, occupancy, and PMIC forensic instrumentation release</p>
+<p>Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v13 release packages field forensics for watchdog resets, occupancy corruption, and PMIC charging contradictions without changing the existing production power, sleep, connectivity, or watchdog policies.</p>
 <h1 class="doxsection"><a class="anchor" id="autotoc_md2"></a>
 Release Focus</h1>
 <ul>
-<li>Stable soak candidate for <span class="tt">1</span> Photon 2 in Singapore and <span class="tt">6</span> Borons in North Carolina.</li>
-<li>Recovery-first connectivity behavior for marginal RF conditions.</li>
-<li>Clear operator documentation for ledger-backed configuration, wake-cycle diagnostics, and release validation.</li>
-<li>No new feature refactor in this release; focus is resiliency, maintainability, and deployment clarity.</li>
+<li>Production-ready Raleigh Boron soak release built from the tested watchdog-forensics baseline.</li>
+<li>Watchdog forensic visibility across resets via retained counters and startup telemetry.</li>
+<li>Occupancy close validation and anomaly logging to block impossible unsigned-wrap totals.</li>
+<li>PMIC contradiction forensic capture for low-SOC <span class="tt">Charged</span> or <span class="tt">Not Charging</span> events with no automatic remediation.</li>
 </ul>
 <h1 class="doxsection"><a class="anchor" id="autotoc_md3"></a>
 Supported Platforms</h1>
@@ -134,6 +134,16 @@ Core Architecture</h1>
 </ul>
 <p><span class="tt"><a class="el" href="_generalized-_core-_counter_8cpp.html">Generalized-Core-Counter.cpp</a></span> owns global lifecycle, retained breadcrumbs, startup telemetry, and top-level supervision. State-specific behavior lives under <span class="tt">src/state/</span>. Power and connectivity policies live under <span class="tt">src/power/</span>. <a class="el" href="class_cloud.html" title="This class is a singleton; you do not create one as a global, on the stack, or with new.">Cloud</a> configuration and ledger publishing live under <span class="tt">src/cloud/</span>.</p>
 <h1 class="doxsection"><a class="anchor" id="autotoc_md6"></a>
+Release Guardrails</h1>
+<p>Release v13 is intentionally instrumentation-only for the newly added PMIC path:</p>
+<ul>
+<li>No automatic PMIC remediation.</li>
+<li>No connectivity-policy changes.</li>
+<li>No watchdog-policy changes.</li>
+<li>No sleep-policy changes.</li>
+<li>No new PMIC alert codes.</li>
+</ul>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md7"></a>
 Recovery Architecture</h1>
 <p>v11 adds a persisted long-duration connectivity failsafe on top of the existing bounded connect and teardown budgets.</p>
 <p>Normal protection layers:</p>
@@ -149,8 +159,8 @@ Recovery Architecture</h1>
 <li>Stage 3: AB1805 <span class="tt">deepPowerDown()</span></li>
 </ol>
 <p>The ladder persists its stage and count in <span class="tt"><a class="el" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a></span> so it can escalate across resets. A successful cloud connection clears the recovery state. The supervisor now defers action while <span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a549bd89b38411c3eb84cead55c7df867">CONNECTING_STATE</a></span> still owns an in-budget connect attempt, which prevents the long-duration monitor from fighting the short-term connect policy.</p>
-<p>See docs/recovery-architecture.md for the operator-facing description.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md7"></a>
+<p>See <a class="el" href="md_docs_2recovery-architecture.html" title="Recovery Architecture">docs/recovery-architecture.md</a> for the operator-facing description.</p>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md8"></a>
 Power And Connectivity Model</h1>
 <p><a class="el" href="namespace_connectivity.html">Connectivity</a> and power policy are centralized in <span class="tt"><a class="el" href="_connectivity_policy_8h.html">ConnectivityPolicy.h</a></span>. The important operational guardrails are:</p>
 <ul>
@@ -163,8 +173,10 @@ Power And Connectivity Model</h1>
 <li>Output-ledger sync gate: <span class="tt">70s</span> cellular, <span class="tt">30s</span> Wi-Fi</li>
 </ul>
 <p>Battery-aware connection behavior can reduce connectivity aggressiveness as state of charge drops. Occupancy keep-alive is retained only when the platform and current battery tier can justify it.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md8"></a>
-<span class="tt">CONNECTIVITY_FAILSAFE_TEST_MODE</span></h1>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md9"></a>
+Build Flags</h1>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md10"></a>
+<span class="tt">CONNECTIVITY_FAILSAFE_TEST_MODE</span></h2>
 <p><span class="tt"><a class="el" href="_build_profile_8h.html#ace016f8be71ba4de13d0741f003ce9a1" title="Bench-only override for connectivity failsafe timing.">CONNECTIVITY_FAILSAFE_TEST_MODE</a></span> exists only to validate the long-duration recovery ladder on the bench.</p>
 <p>When enabled, it changes only the failsafe timing:</p>
 <ul>
@@ -181,7 +193,16 @@ Power And Connectivity Model</h1>
 <li>Production validation must confirm <span class="tt">FailsafeTest=0</span> in logs and production timing values in the failsafe boot line.</li>
 </ul>
 <p>See <a href="docs/bench-validation.md">docs/bench-validation.md</a> for the short-threshold validation workflow.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md9"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md11"></a>
+<span class="tt">ENABLE_PMIC_FORENSICS</span></h2>
+<p><span class="tt"><a class="el" href="_build_profile_8h.html#ac3fc20c1f1dca3684d048d0a13be8fee" title="Enable retained PMIC contradiction forensic instrumentation.">ENABLE_PMIC_FORENSICS</a></span> gates only the PMIC contradiction forensic path introduced for v13.</p>
+<ul>
+<li>Default is <span class="tt">ON</span> in <span class="tt"><a class="el" href="_build_profile_8h.html" title="Build-profile guardrails for serial/debug waits.">BuildProfile.h</a></span> for release builds.</li>
+<li>When enabled, the firmware records retained PMIC contradiction counters and includes PMIC forensic fields in startup and device-status telemetry.</li>
+<li>When disabled, PMIC contradiction logging, counters, and PMIC-specific startup/device-status telemetry are compiled out.</li>
+<li>It does not affect watchdog breadcrumbs, occupancy protection, charging policy, connectivity policy, sleep policy, or watchdog policy.</li>
+</ul>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md12"></a>
 Ledger Configuration Model</h1>
 <p>The firmware uses Particle Ledger for both cloud-to-device configuration and device-to-cloud status visibility.</p>
 <table class="markdownTable">
@@ -205,7 +226,7 @@ Ledger Configuration Model</h1>
 <li>Device publishes <span class="tt">device-status</span> so Console reflects what is actually running.</li>
 </ol>
 <p>This split allows offline edits in Console without requiring the device to stay continuously connected.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md10"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md13"></a>
 Configuration Shape</h2>
 <div class="fragment"><div class="line">{</div>
 <div class="line">  &quot;messaging&quot;: {</div>
@@ -237,7 +258,7 @@ Configuration Shape</h2>
 <div class="line">  }</div>
 <div class="line">}</div>
 </div><!-- fragment --><p>Timezone values must be POSIX timezone strings, not IANA names.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md11"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md14"></a>
 Build And Validation</h1>
 <p>The repository is build-validated on Boron, Photon 2, and Argon using Device OS <span class="tt">6.4.1</span>.</p>
 <p>Typical local compile pattern:</p>
@@ -255,7 +276,7 @@ Build And Validation</h1>
 <li><span class="tt">argon</span></li>
 </ul>
 <p>Bench-only short-threshold validation builds can add <span class="tt">EXTRA_CFLAGS="-DCONNECTIVITY_FAILSAFE_TEST_MODE=1"</span>, but release builds must not.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md12"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md15"></a>
 Observability</h1>
 <p>The firmware emits compact operational diagnostics designed for poor-connectivity, power-constrained deployments.</p>
 <p>Important signals:</p>
@@ -266,24 +287,70 @@ Observability</h1>
 <li>failsafe boot and action lines</li>
 <li>alert codes for bounded connect, ledger sync, and recovery conditions</li>
 </ul>
-<p>Startup status for v11 includes the connectivity recovery state needed for soak analysis:</p>
+<p>Startup status for v13 includes the connectivity recovery state plus the new forensic fields needed for soak analysis:</p>
 <ul>
 <li><span class="tt">failsafeStage</span></li>
 <li><span class="tt">failsafeCount</span></li>
 <li><span class="tt">lastConnectionAgeSec</span></li>
 <li><span class="tt">failsafeTest</span></li>
+<li><span class="tt">watchdogResetCount</span></li>
+<li><span class="tt">lastWatchdogBreadcrumb</span></li>
+<li><span class="tt">lastWatchdogUptimeMs</span></li>
+<li><span class="tt"><a class="el" href="_sensor_manager_8cpp.html#a4e485e9c12df5bc38b61fb52ea09fdd6">pmicAnomalyCount</a></span></li>
+<li><span class="tt"><a class="el" href="_sensor_manager_8cpp.html#a288f19cbbf7c424482bd30d91c004095">lastPmicAnomalySoc</a></span></li>
+<li><span class="tt"><a class="el" href="_sensor_manager_8cpp.html#a9318e68eb5a14e9b684a39baa692b5bb">lastPmicAnomalyChargeStatus</a></span></li>
+<li><span class="tt">lastPmicAnomalyAgeSec</span></li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md13"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md16"></a>
+Watchdog Forensics</h1>
+<p>Watchdog reset investigations now use retained startup fields to preserve the prior boot's evidence even when serial logs are missing.</p>
+<ul>
+<li><span class="tt">watchdogResetCount</span>: retained count of watchdog-attributed resets seen by the application.</li>
+<li><span class="tt">lastWatchdogBreadcrumb</span>: last retained application breadcrumb written before the watchdog reset path completed or the device stopped making progress.</li>
+<li><span class="tt">lastWatchdogUptimeMs</span>: retained uptime snapshot from the watchdog forensic capture path.</li>
+</ul>
+<p>Interpretation:</p>
+<ul>
+<li>Rising <span class="tt">watchdogResetCount</span> indicates repeat watchdog intervention.</li>
+<li><span class="tt">lastWatchdogBreadcrumb</span> identifies the last known application phase.</li>
+<li><span class="tt">lastWatchdogUptimeMs</span> helps distinguish immediate boot failures from long-uptime stalls.</li>
+</ul>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md17"></a>
+Occupancy Protection</h1>
+<p>Occupancy close handling now validates session durations before adding them to the retained daily total.</p>
+<ul>
+<li>Close paths reject <span class="tt">occupancyStartTime</span> values that are zero, implausibly in the future, or would create impossible day totals.</li>
+<li>This prevents unsigned-wrap corruption where <span class="tt">Time.now() - occupancyStartTime</span> could explode into a huge occupied duration.</li>
+<li>When validation fails, the firmware emits <span class="tt">OccAnom</span> logs with the close path, timestamps, and prior total for field RCA.</li>
+</ul>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md18"></a>
+PMIC Forensics</h1>
+<p>PMIC contradiction forensics are intended for field investigations where charging behavior changes after a reset and serial logs may be unavailable.</p>
+<p>Contradiction definition:</p>
+<ul>
+<li>SOC below <span class="tt">20%</span></li>
+<li>Battery context is <span class="tt">Charged</span> or <span class="tt">Not Charging</span></li>
+<li>Temperature is within the normal charging range</li>
+<li>The contradiction persists for the configured consecutive evaluations</li>
+</ul>
+<p>When <span class="tt"><a class="el" href="_build_profile_8h.html#ac3fc20c1f1dca3684d048d0a13be8fee" title="Enable retained PMIC contradiction forensic instrumentation.">ENABLE_PMIC_FORENSICS</a>=1</span>, the firmware retains:</p>
+<ul>
+<li><span class="tt"><a class="el" href="_sensor_manager_8cpp.html#a4e485e9c12df5bc38b61fb52ea09fdd6">pmicAnomalyCount</a></span></li>
+<li><span class="tt"><a class="el" href="_sensor_manager_8cpp.html#a288f19cbbf7c424482bd30d91c004095">lastPmicAnomalySoc</a></span></li>
+<li><span class="tt"><a class="el" href="_sensor_manager_8cpp.html#a9318e68eb5a14e9b684a39baa692b5bb">lastPmicAnomalyChargeStatus</a></span></li>
+<li><span class="tt">lastPmicAnomalyAgeSec</span> in telemetry</li>
+</ul>
+<p>The detector records evidence only on the transition from inactive to active so one prolonged contradiction counts once. The feature is forensic-only in this release; it does not toggle charging, alter power policy, or introduce a new alert code.</p>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md19"></a>
 Documentation Index</h1>
 <ul>
-<li><a href="RELEASE_NOTES_v11.md">RELEASE_NOTES_v11.md</a></li>
+<li><a href="CHANGELOG.md">CHANGELOG.md</a></li>
 <li><a href="docs/architecture-overview.md">docs/architecture-overview.md</a></li>
 <li><a href="docs/recovery-architecture.md">docs/recovery-architecture.md</a></li>
-<li><a href="docs/v11-soak-plan.md">docs/v11-soak-plan.md</a></li>
 <li><a href="docs/bench-validation.md">docs/bench-validation.md</a></li>
 <li>Generated API reference: <span class="tt">docs/html/index.html</span></li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md14"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md20"></a>
 Repository Layout</h1>
 <ul>
 <li><span class="tt">src/</span>: firmware source</li>
@@ -294,17 +361,16 @@ Repository Layout</h1>
 <li><span class="tt">docs/</span>: operator and design documentation</li>
 <li><span class="tt">lib/</span>: vendored dependencies</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md15"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md21"></a>
 Deployment Workflow</h1>
 <ol type="1">
-<li>Build a production image with <span class="tt"><a class="el" href="_build_profile_8h.html#ace016f8be71ba4de13d0741f003ce9a1" title="Bench-only override for connectivity failsafe timing.">CONNECTIVITY_FAILSAFE_TEST_MODE</a>=0</span>.</li>
+<li>Build a production image with <span class="tt"><a class="el" href="_build_profile_8h.html#ace016f8be71ba4de13d0741f003ce9a1" title="Bench-only override for connectivity failsafe timing.">CONNECTIVITY_FAILSAFE_TEST_MODE</a>=0</span> and <span class="tt"><a class="el" href="_build_profile_8h.html#ac3fc20c1f1dca3684d048d0a13be8fee" title="Enable retained PMIC contradiction forensic instrumentation.">ENABLE_PMIC_FORENSICS</a>=1</span>.</li>
 <li>Flash or OTA deploy to the intended platform.</li>
-<li>Confirm startup status includes the expected version and recovery fields.</li>
+<li>Confirm startup status includes the expected version plus watchdog and PMIC forensic fields.</li>
 <li>Confirm ledger sync and publish behavior during the first connection window.</li>
-<li>Monitor wake-cycle summaries, connection age, and any recovery-stage transitions.</li>
+<li>Monitor wake-cycle summaries, connection age, watchdog counters, occupancy anomaly logs, and any PMIC contradiction evidence.</li>
 </ol>
-<p>For the v11 soak rollout, follow <a href="docs/v11-soak-plan.md">docs/v11-soak-plan.md</a>.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md16"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md22"></a>
 Contributor Notes</h1>
 <ul>
 <li>Keep new power and connectivity timing values centralized in <span class="tt"><a class="el" href="_connectivity_policy_8h.html">ConnectivityPolicy.h</a></span>.</li>
@@ -312,9 +378,9 @@ Contributor Notes</h1>
 <li>Prefer comment-only clarity improvements before architectural refactors during soak.</li>
 <li>Treat generated docs as release artifacts and regenerate them when public headers or release-facing markdown changes.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md17"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md23"></a>
 Current Release Status</h1>
-<p>v11.0.0 is the connectivity resiliency soak release. It is intended to validate the new long-duration recovery ladder under real deployment conditions without widening scope into post-soak refactors. </p>
+<p>v13.0.0 is the Raleigh Boron forensic instrumentation release. It adds retained watchdog and PMIC investigation data plus occupancy corruption protection while intentionally leaving charging, connectivity, sleep, and watchdog policies unchanged. </p>
 </div></div><!-- PageDoc -->
 <a href="doxygen_crawl.html"></a>
 </div><!-- contents -->

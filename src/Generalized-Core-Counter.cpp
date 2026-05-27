@@ -27,7 +27,7 @@
 
 // Firmware version recognized by Particle Product firmware management
 // Bump this integer whenever you cut a new production release.
-PRODUCT_VERSION(11);
+PRODUCT_VERSION(13);
 
 // Hardware abstraction and device-specific pinouts
 #include "device_pinout.h"           // Platform-specific pin definitions
@@ -94,7 +94,11 @@ extern const char* FIRMWARE_RELEASE_NOTES;
  */
 
 // Forward declarations
+#if Wiring_Watchdog
+static void awakeWatchdogExpiredHandler();
+#else
 static void appWatchdogHandler(); // Application watchdog handler
+#endif
 void publishData();           // Publish the data to the cloud
 void userSwitchISR();         // Interrupt for the user switch
 void sensorISR();             // Interrupt for legacy tire-counting sensor
@@ -136,6 +140,35 @@ unsigned long connectedStartMs = 0;
 
 namespace {
 
+constexpr unsigned long AWAKE_WATCHDOG_TIMEOUT_MS = 60000UL;
+constexpr unsigned long REPORT_FORENSICS_SLOW_LOG_THRESHOLD_MS = 250UL;
+
+enum AwakeWatchdogSleepStrategy : uint8_t {
+  AWAKE_WATCHDOG_SLEEP_CONFIG_PAUSE = 0,
+  AWAKE_WATCHDOG_SLEEP_MANUAL_STOP = 1,
+};
+
+#if Wiring_Watchdog
+AwakeWatchdogSleepStrategy awakeWatchdogSleepStrategy =
+#if PLATFORM_ID == PLATFORM_P2 || (defined(PLATFORM_PHOTON2) && PLATFORM_ID == PLATFORM_PHOTON2)
+    AWAKE_WATCHDOG_SLEEP_MANUAL_STOP;
+#else
+    AWAKE_WATCHDOG_SLEEP_CONFIG_PAUSE;
+#endif
+bool awakeWatchdogInitialized = false;
+bool awakeWatchdogStarted = false;
+#endif
+
+const char *awakeWatchdogSleepStrategyName(AwakeWatchdogSleepStrategy strategy) {
+  switch (strategy) {
+  case AWAKE_WATCHDOG_SLEEP_MANUAL_STOP:
+    return "manual-stop";
+  case AWAKE_WATCHDOG_SLEEP_CONFIG_PAUSE:
+  default:
+    return "config-pause";
+  }
+}
+
 enum AppBreadcrumb : uint8_t {
   BREADCRUMB_NONE = 0,
   BREADCRUMB_SETUP_START = 1,
@@ -148,6 +181,10 @@ enum AppBreadcrumb : uint8_t {
   BREADCRUMB_APP_WATCHDOG_RESET = 8,
   BREADCRUMB_CONNECTIVITY_FAILSAFE = 9,
   BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD = 10,
+  BREADCRUMB_REPORT_QUEUE_START = 11,
+  BREADCRUMB_REPORT_QUEUE_DONE = 12,
+  BREADCRUMB_REPORT_LEDGER_START = 13,
+  BREADCRUMB_REPORT_LEDGER_DONE = 14,
 };
 
 const char *appBreadcrumbName(uint8_t code) {
@@ -172,6 +209,14 @@ const char *appBreadcrumbName(uint8_t code) {
     return "CONN_FAILSAFE";
   case BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD:
     return "CONN_FAILSAFE_HARD";
+  case BREADCRUMB_REPORT_QUEUE_START:
+    return "REPORT_QUEUE_START";
+  case BREADCRUMB_REPORT_QUEUE_DONE:
+    return "REPORT_QUEUE_DONE";
+  case BREADCRUMB_REPORT_LEDGER_START:
+    return "REPORT_LEDGER_START";
+  case BREADCRUMB_REPORT_LEDGER_DONE:
+    return "REPORT_LEDGER_DONE";
   default:
     return "NONE";
   }
@@ -506,6 +551,7 @@ void setup() {
   const uint32_t reasonData = System.resetReasonData();
   const uint8_t previousBreadcrumb = appBreadcrumb;
   const uint32_t previousBreadcrumbMs = appBreadcrumbMs;
+  const bool watchdogResetDetected = (reason == RESET_REASON_WATCHDOG);
   startupPreviousBreadcrumb = previousBreadcrumb;
   startupPreviousBreadcrumbMs = previousBreadcrumbMs;
   setAppBreadcrumb(BREADCRUMB_SETUP_START);
@@ -584,11 +630,41 @@ void setup() {
                                  // safety tip. If we run out of memory a
                                  // System.reset() is done.
 
-  // Application watchdog: reset if loop() doesn't execute within 60 seconds.
-  // This catches state machine hangs, blocking operations, and cellular/cloud
-  // stalls that exceed our non-blocking design intent. The AB1805 hardware
-  // watchdog (124s) provides ultimate backstop if this software watchdog fails.
+  // Awake watchdog: reset if the firmware stops making forward progress while
+  // running normally. Use the Device OS hardware watchdog so intended sleep
+  // does not look like an application hang on P2/Photon 2.
+#if Wiring_Watchdog
+  particle::WatchdogConfiguration awakeWatchdogConfig;
+#if PLATFORM_ID != PLATFORM_P2 && !(defined(PLATFORM_PHOTON2) && PLATFORM_ID == PLATFORM_PHOTON2)
+  const uint32_t awakeWatchdogCaps =
+      awakeWatchdogConfig.capabilities().value() & ~HAL_WATCHDOG_CAPS_SLEEP_RUNNING;
+  awakeWatchdogConfig.capabilities(particle::WatchdogCaps::fromUnderlying(awakeWatchdogCaps));
+#endif
+  awakeWatchdogConfig.timeout(AWAKE_WATCHDOG_TIMEOUT_MS);
+
+  const int awakeWatchdogInitResult = Watchdog.init(awakeWatchdogConfig);
+  int awakeWatchdogNotifyResult = SYSTEM_ERROR_NONE;
+  int awakeWatchdogStartResult = awakeWatchdogInitResult;
+  awakeWatchdogInitialized = (awakeWatchdogInitResult == SYSTEM_ERROR_NONE);
+
+  if (awakeWatchdogInitialized) {
+    awakeWatchdogNotifyResult = Watchdog.onExpired(awakeWatchdogExpiredHandler);
+    awakeWatchdogStartResult = Watchdog.start();
+    awakeWatchdogStarted = Watchdog.started();
+  }
+
+  Log.info("AppWDT: armed=%d impl=hw timeout=%lu strat=%s init=%d start=%d notify=%d started=%d",
+           awakeWatchdogStarted ? 1 : 0,
+           AWAKE_WATCHDOG_TIMEOUT_MS,
+           awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
+           awakeWatchdogInitResult,
+           awakeWatchdogStartResult,
+           awakeWatchdogNotifyResult,
+           Watchdog.started() ? 1 : 0);
+#else
+  // Fallback for platforms without the Device OS hardware watchdog API.
   static ApplicationWatchdog appWatchdog(60000, appWatchdogHandler, 1536);
+#endif
 
   // Subscribe to the Ubidots integration response event so we can track
   // successful webhook deliveries and update lastHookResponse.
@@ -628,6 +704,16 @@ void setup() {
   current.setup();      // Initialize the current status data
   PowerManager::instance().setup();
 
+  if (watchdogResetDetected) {
+    const uint16_t priorWatchdogResetCount = sysStatus.get_watchdogResetCount();
+    if (priorWatchdogResetCount < 0xFFFF) {
+      sysStatus.set_watchdogResetCount((uint16_t)(priorWatchdogResetCount + 1));
+    }
+    sysStatus.set_lastWatchdogBreadcrumb(previousBreadcrumb);
+    sysStatus.set_lastWatchdogUptimeMs(previousBreadcrumbMs);
+    sysStatus.set_lastWatchdogResetReasonData(reasonData);
+  }
+
   // If a boot storm holdoff was triggered on this or the prior boot, surface
   // it as an alert now that persistent current status storage is initialized.
   if (bootStormAlertPending) {
@@ -649,6 +735,7 @@ void setup() {
     // cloud config has not enabled serial logging yet.
     const unsigned long serialWaitStart = millis();
     while (!Serial.isConnected() && (millis() - serialWaitStart) < ConnectivityPolicy::DEBUG_SERIAL_WAIT_TIMEOUT_MS) {
+      serviceAwakeWatchdog();
       Particle.process();
       delay(ConnectivityPolicy::DEBUG_SERIAL_WAIT_POLL_DELAY_MS);
     }
@@ -924,6 +1011,8 @@ void loop() {
   // Service outgoing publish queue
   PublishQueuePosix::instance().loop();
 
+  serviceAwakeWatchdog();
+
   // Check for short-term webhook response timeout.
   // Requirement: 20 seconds starting only after a successful cloud connect.
   if (Particle.connected() && session.awaitingWebhookResponse && session.webhookAwaitStartMs != 0) {
@@ -965,7 +1054,7 @@ void loop() {
   // counts are captured even during long-running operations like cellular
   // connection attempts (which can take minutes) or firmware updates.
   // MEASUREMENT mode is time-based (handled in IDLE only), not interrupt-driven.
-  uint8_t sensorMode = sysStatus.get_sensorMode();
+  uint8_t sensorMode = sysStatus.get_sensorMode(); 
   if (sensorMode == COUNTING) {
     handleCountingMode();  // Count each sensor event
   } else if (sensorMode == OCCUPANCY) {
@@ -976,11 +1065,84 @@ void loop() {
 
 // ********** Helper Functions **********
 
+void serviceAwakeWatchdog() {
+#if Wiring_Watchdog
+  if (!awakeWatchdogInitialized) {
+    return;
+  }
+
+  if (Watchdog.started()) {
+    Watchdog.refresh();
+    awakeWatchdogStarted = true;
+  } else {
+    awakeWatchdogStarted = false;
+  }
+#endif
+}
+
+void pauseAwakeWatchdogForSleep(const char *context) {
+#if Wiring_Watchdog
+  if (!awakeWatchdogInitialized) {
+    return;
+  }
+
+  if (awakeWatchdogSleepStrategy == AWAKE_WATCHDOG_SLEEP_MANUAL_STOP) {
+    const int stopResult = Watchdog.stop();
+    awakeWatchdogStarted = Watchdog.started();
+    Log.info("AppWDT: sleep ctx=%s action=stop strat=%s rc=%d started=%d",
+             context,
+             awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
+             stopResult,
+             awakeWatchdogStarted ? 1 : 0);
+    return;
+  }
+
+  awakeWatchdogStarted = Watchdog.started();
+  Log.info("AppWDT: sleep ctx=%s action=auto strat=%s started=%d",
+           context,
+           awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
+           awakeWatchdogStarted ? 1 : 0);
+#else
+  (void)context;
+#endif
+}
+
+void restoreAwakeWatchdogAfterWake(const char *context) {
+#if Wiring_Watchdog
+  if (!awakeWatchdogInitialized) {
+    return;
+  }
+
+  int startResult = SYSTEM_ERROR_NONE;
+  const bool wasStarted = Watchdog.started();
+  if (!wasStarted) {
+    startResult = Watchdog.start();
+  }
+
+  awakeWatchdogStarted = Watchdog.started();
+
+  Log.info("AppWDT: wake ctx=%s action=%s strat=%s rc=%d started=%d",
+           context,
+           wasStarted ? "resume" : "start",
+           awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
+           startResult,
+           awakeWatchdogStarted ? 1 : 0);
+#else
+  (void)context;
+#endif
+}
+
+#if Wiring_Watchdog
+static void awakeWatchdogExpiredHandler() {
+  setAppBreadcrumb(BREADCRUMB_APP_WATCHDOG_RESET);
+}
+#else
 // ApplicationWatchdog expects a plain function pointer.
 static void appWatchdogHandler() {
   setAppBreadcrumb(BREADCRUMB_APP_WATCHDOG_RESET);
   System.reset();
 }
+#endif
 
 // ===== Policy and publishing helpers =====
 
@@ -1219,9 +1381,18 @@ void publishData() {
   // Get webhook name from cloud configuration (with fallback to convention)
   const char *webhookName = Cloud::instance().getWebhookName();
 
+  setAppBreadcrumb(BREADCRUMB_REPORT_QUEUE_START);
+  const unsigned long queueStartMs = millis();
   bool queued = PublishQueuePosix::instance().publish(webhookName, data, PRIVATE);
+  const unsigned long queueElapsedMs = millis() - queueStartMs;
+  setAppBreadcrumb(BREADCRUMB_REPORT_QUEUE_DONE);
   if (!queued) {
     Log.warn("Report webhook queue rejected name=%s", webhookName);
+  }
+  if (queueElapsedMs >= REPORT_FORENSICS_SLOW_LOG_THRESHOLD_MS) {
+    Log.warn("ReportPerf: step=queue ms=%lu queued=%d",
+             queueElapsedMs,
+             queued ? 1 : 0);
   }
 
   // General alert lifecycle rule: once an alert has been included in a report
@@ -1249,12 +1420,21 @@ void publishData() {
   }
 
   // Also update device-data ledger with structured JSON snapshot
+  setAppBreadcrumb(BREADCRUMB_REPORT_LEDGER_START);
+  const unsigned long ledgerStartMs = millis();
   const bool ledgerOk = Cloud::instance().publishDataToLedger();
+  const unsigned long ledgerElapsedMs = millis() - ledgerStartMs;
+  setAppBreadcrumb(BREADCRUMB_REPORT_LEDGER_DONE);
   const char *ledgerState = ledgerOk ? "req" : "err";
   if (!ledgerOk) {
     // Data ledger publish failure; escalate via alert so the error
     // supervisor can decide on corrective action.
     current.raiseAlert(42);
+  }
+  if (ledgerElapsedMs >= REPORT_FORENSICS_SLOW_LOG_THRESHOLD_MS) {
+    Log.warn("ReportPerf: step=ledger ms=%lu ok=%d",
+             ledgerElapsedMs,
+             ledgerOk ? 1 : 0);
   }
 
   if (sensorMode == OCCUPANCY) {
@@ -1285,7 +1465,7 @@ void publishData() {
  * before the radio is brought up.
  */
 void publishStartupStatus() {
-  char status[416];
+  char status[896];
 
   int resetReason = System.resetReason();
   uint32_t resetReasonData = System.resetReasonData();
@@ -1295,14 +1475,27 @@ void publishStartupStatus() {
   const uint8_t failsafeStage = sysStatus.get_connectivityRecoveryStage();
   const uint8_t failsafeCount = sysStatus.get_connectivityRecoveryCount();
   const time_t failsafeLastAction = sysStatus.get_lastConnectivityRecoveryAction();
+  const uint16_t watchdogResetCount = sysStatus.get_watchdogResetCount();
+  const uint8_t lastWatchdogBreadcrumb = sysStatus.get_lastWatchdogBreadcrumb();
+  const uint32_t lastWatchdogUptimeMs = sysStatus.get_lastWatchdogUptimeMs();
+  const uint32_t lastWatchdogResetReasonData = sysStatus.get_lastWatchdogResetReasonData();
+#if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
+  const uint16_t startupPmicAnomalyCount = pmicAnomalyCount;
+  const float startupLastPmicAnomalySoc = lastPmicAnomalySoc;
+  const uint8_t startupLastPmicAnomalyChargeStatus = lastPmicAnomalyChargeStatus;
+  const uint32_t startupLastPmicAnomalyAgeSec = pmicAnomalyAgeSec();
+  const uint8_t startupLastPmicAnomalyPowerSource = lastPmicAnomalyPowerSource;
+  const uint8_t startupLastPmicAnomalyVbusStatus = lastPmicAnomalyVbusStatus;
+#endif
   const time_t lastConnection = sysStatus.get_lastConnection();
   const long lastConnectionAgeSec =
       (Time.isValid() && lastConnection != 0 && Time.now() > lastConnection)
           ? (long)(Time.now() - lastConnection)
           : -1L;
 
+#if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
   snprintf(status, sizeof(status),
-           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d}",
+           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"pmicAnomalyCount\":%u,\"lastPmicAnomalySoc\":%.2f,\"lastPmicAnomalyChargeStatus\":%u,\"lastPmicAnomalyAgeSec\":%lu,\"lastPmicAnomalyPowerSource\":%u,\"lastPmicAnomalyVbusStatus\":%u,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d}",
            FIRMWARE_VERSION,
            resetReason,
            (unsigned long)resetReasonData,
@@ -1311,12 +1504,44 @@ void publishStartupStatus() {
            freeHeap,
            (unsigned)startupPreviousBreadcrumb,
            (unsigned long)startupPreviousBreadcrumbMs,
+           (unsigned)watchdogResetCount,
+           (unsigned)lastWatchdogBreadcrumb,
+           (unsigned long)lastWatchdogUptimeMs,
+           (unsigned long)lastWatchdogResetReasonData,
+           (unsigned)startupPmicAnomalyCount,
+           (double)startupLastPmicAnomalySoc,
+           (unsigned)startupLastPmicAnomalyChargeStatus,
+           (unsigned long)startupLastPmicAnomalyAgeSec,
+           (unsigned)startupLastPmicAnomalyPowerSource,
+           (unsigned)startupLastPmicAnomalyVbusStatus,
            (unsigned)failsafeStage,
            (unsigned)failsafeCount,
            (long)failsafeLastAction,
            lastConnectionAgeSec,
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0);
+#else
+  snprintf(status, sizeof(status),
+           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d}",
+           FIRMWARE_VERSION,
+           resetReason,
+           (unsigned long)resetReasonData,
+           (int)alertCode,
+           (long)lastAlert,
+           freeHeap,
+           (unsigned)startupPreviousBreadcrumb,
+           (unsigned long)startupPreviousBreadcrumbMs,
+           (unsigned)watchdogResetCount,
+           (unsigned)lastWatchdogBreadcrumb,
+           (unsigned long)lastWatchdogUptimeMs,
+           (unsigned long)lastWatchdogResetReasonData,
+           (unsigned)failsafeStage,
+           (unsigned)failsafeCount,
+           (long)failsafeLastAction,
+           lastConnectionAgeSec,
+           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
+           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0);
+#endif
 
   PublishQueuePosix::instance().publish("status", status, PRIVATE);
 }

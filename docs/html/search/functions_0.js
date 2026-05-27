@@ -7,5 +7,6 @@ var searchData=
   ['applyinputprofile_4',['applyInputProfile',['../namespace_power_platform.html#a7e33859aba707d0250f147e7b982905d',1,'PowerPlatform']]],
   ['areledgerssynced_5',['areLedgersSynced',['../class_cloud.html#abd1e7289193949f93905243f7fb848cf',1,'Cloud']]],
   ['armactiveconnectattempt_6',['armActiveConnectAttempt',['../namespaceanonymous__namespace_02_state___connect_8cpp_03.html#a1c956caa2f1f116bf52948f8c8c8cc2c',1,'anonymous_namespace{State_Connect.cpp}']]],
-  ['availabilitylabel_7',['availabilityLabel',['../class_power_manager.html#a73f362406055e8295988b332e2838ac0',1,'PowerManager::availabilityLabel()'],['../namespace_power_diagnostics.html#a855a849813019595bafc6006498c9aea',1,'PowerDiagnostics::availabilityLabel()']]]
+  ['availabilitylabel_7',['availabilityLabel',['../class_power_manager.html#a73f362406055e8295988b332e2838ac0',1,'PowerManager::availabilityLabel()'],['../namespace_power_diagnostics.html#a855a849813019595bafc6006498c9aea',1,'PowerDiagnostics::availabilityLabel()']]],
+  ['awakewatchdogsleepstrategyname_8',['awakeWatchdogSleepStrategyName',['../namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#aa780afa2786eda3a2b492233ee242275',1,'anonymous_namespace{Generalized-Core-Counter.cpp}']]]
 ];

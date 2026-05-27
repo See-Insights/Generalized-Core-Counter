@@ -135,18 +135,11 @@ void updateOccupancyState() {
 
   // Check if debounce timeout has expired
   if (timeSinceLastEvent > debounceMs) {
-    // Calculate this occupancy session duration
-    uint32_t sessionDuration = Time.now() - current.get_occupancyStartTime();
-
-    // Add to total occupied seconds for the day
-    uint32_t totalOccupied = current.get_totalOccupiedSeconds() + sessionDuration;
-    current.set_totalOccupiedSeconds(totalOccupied);
-
-    // Mark as unoccupied
-    current.set_occupied(false);
-    current.set_occupancyStartTime(0);
     const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
-    logUnoccupiedEvent("debounce", sessionDuration, totalOccupied, reportNow);
+    const OccupancyCloseResult closeResult = closeOccupancySessionSafely("modes");
+    if (closeResult.valid) {
+      logUnoccupiedEvent("debounce", closeResult.sessionSeconds, closeResult.totalSeconds, reportNow);
+    }
 
     signalLED(false);  // Turn off LED
     

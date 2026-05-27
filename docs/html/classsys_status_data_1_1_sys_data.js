@@ -16,6 +16,9 @@ var classsys_status_data_1_1_sys_data =
     [ "lastHookResponse", "classsys_status_data_1_1_sys_data.html#ad3f38ef14a6418b0dfaf9656e4e84152", null ],
     [ "lastReport", "classsys_status_data_1_1_sys_data.html#a553a7a26ab8760a9d912476e1dfd837f", null ],
     [ "lastTimeSync", "classsys_status_data_1_1_sys_data.html#afafd4b77d084a2e9f2e425bd7dc6868d", null ],
+    [ "lastWatchdogBreadcrumb", "classsys_status_data_1_1_sys_data.html#a04b5d219aefe37a36293022f47c8fbfe", null ],
+    [ "lastWatchdogResetReasonData", "classsys_status_data_1_1_sys_data.html#ad96c5093b8b2cb8feb2fa5822d0ad575", null ],
+    [ "lastWatchdogUptimeMs", "classsys_status_data_1_1_sys_data.html#a600c7e7a3064f0a7b3b3c0811a55094c", null ],
     [ "lowBatteryMode", "classsys_status_data_1_1_sys_data.html#a585c498d8e5c329844bee07dc696aa58", null ],
     [ "lowPowerMode", "classsys_status_data_1_1_sys_data.html#aebaa91e1d0c5b5a892a4d5d93e8914f3", null ],
     [ "modemOffBudgetSec", "classsys_status_data_1_1_sys_data.html#a0bbf6577468e7f05f9101582d2ac0c61", null ],
@@ -38,6 +41,7 @@ var classsys_status_data_1_1_sys_data =
     [ "verboseMode", "classsys_status_data_1_1_sys_data.html#a16316871cb17f0e9643e7a8a4efab0b0", null ],
     [ "verboseModeStartTime", "classsys_status_data_1_1_sys_data.html#ad8f3ac5f74d58b34d2d04159602d6781", null ],
     [ "verboseTimeoutMin", "classsys_status_data_1_1_sys_data.html#a7c89f1779ae342efe40303f3f1fe1062", null ],
+    [ "watchdogResetCount", "classsys_status_data_1_1_sys_data.html#a21608084208b8769dcf4c46c3c407dc9", null ],
     [ "webhookEnabled", "classsys_status_data_1_1_sys_data.html#a294ecc86e44f7cb180ea78debdf7914a", null ],
     [ "webhookName", "classsys_status_data_1_1_sys_data.html#a0e444ace1641199039b9dbdf2ea2ab19", null ],
     [ "webhookTimeoutMs", "classsys_status_data_1_1_sys_data.html#af41aac936e74cee70830a5e86c98d211", null ]

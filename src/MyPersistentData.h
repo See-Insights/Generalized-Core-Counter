@@ -236,6 +236,10 @@ public:
 		uint8_t connectivityRecoveryStage;               // 0=none, 1=radio reset, 2=system reset, 3=deep power down
 		time_t lastConnectivityRecoveryAction;           // Last time the connectivity failsafe acted or deferred
 		uint8_t connectivityRecoveryCount;               // Count of connectivity failsafe recovery actions since last good connect
+		uint16_t watchdogResetCount;                     // Count of watchdog-related resets observed across boots
+		uint8_t lastWatchdogBreadcrumb;                  // Last retained app breadcrumb observed on a watchdog boot
+		uint32_t lastWatchdogUptimeMs;                   // millis() value recorded with the last watchdog breadcrumb
+		uint32_t lastWatchdogResetReasonData;            // System.resetReasonData() from the last watchdog boot
 
 	};
 
@@ -412,6 +416,14 @@ public:
 	 * @param value Recovery action count to store
 	 */
 	void set_connectivityRecoveryCount(uint8_t value);
+	uint16_t get_watchdogResetCount() const;
+	void set_watchdogResetCount(uint16_t value);
+	uint8_t get_lastWatchdogBreadcrumb() const;
+	void set_lastWatchdogBreadcrumb(uint8_t value);
+	uint32_t get_lastWatchdogUptimeMs() const;
+	void set_lastWatchdogUptimeMs(uint32_t value);
+	uint32_t get_lastWatchdogResetReasonData() const;
+	void set_lastWatchdogResetReasonData(uint32_t value);
 
 	//Members here are internal only and therefore protected
 protected:

@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;13.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -312,7 +312,7 @@ Static Protected Attributes</h2></td></tr>
 
 <p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00113">TIER_CONSERVING</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00114">TIER_CRITICAL</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00112">TIER_HEALTHY</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00115">TIER_SURVIVAL</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00987">applyBatteryAwareConnectionModePolicy()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00216">anonymous_namespace{Generalized-Core-Counter.cpp}::currentBatteryTierForFailsafe()</a>, and <a class="el" href="_battery_backoff_8cpp_source.html#l00098">testBatteryBackoffLogic()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01149">applyBatteryAwareConnectionModePolicy()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00261">anonymous_namespace{Generalized-Core-Counter.cpp}::currentBatteryTierForFailsafe()</a>, and <a class="el" href="_battery_backoff_8cpp_source.html#l00098">testBatteryBackoffLogic()</a>.</p>
 
 </div>
 </div>
@@ -433,7 +433,7 @@ Static Protected Attributes</h2></td></tr>
 
 <p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00054">COUNTING</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00056">MEASUREMENT</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00055">OCCUPANCY</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01148">publishData()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01310">publishData()</a>.</p>
 
 </div>
 </div>
@@ -492,7 +492,7 @@ Static Protected Attributes</h2></td></tr>
 
 <p class="reference">References <a class="el" href="_cloud_8h_source.html#l00357">_instance</a>, and <a class="el" href="_cloud_8cpp_source.html#l00024">Cloud()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00139">handleConnectingState()</a>, <a class="el" href="_state___connect_8cpp_source.html#l00394">handleFirmwareUpdateState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00876">loop()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01148">publishData()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00139">handleConnectingState()</a>, <a class="el" href="_state___connect_8cpp_source.html#l00394">handleFirmwareUpdateState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00963">loop()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01310">publishData()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00549">setup()</a>.</p>
 
 </div>
 </div>
@@ -541,9 +541,9 @@ Static Protected Attributes</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00070">70</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_device_status_publisher_8cpp_source.html#l00007">writeDeviceStatusToCloud()</a>.</p>
+<p class="reference">References <a class="el" href="_device_status_publisher_8cpp_source.html#l00009">writeDeviceStatusToCloud()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00876">loop()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00963">loop()</a>.</p>
 
 </div>
 </div>
@@ -595,11 +595,11 @@ Static Protected Attributes</h2></td></tr>
 <p>Updates the Device→Cloud ledger with current sensor readings, making data visible in Particle Console even when device is offline. A successful return means the local ledger accepted the write; cloud sync may still be pending.</p>
 <dl class="section return"><dt>Returns</dt><dd>true if successful </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_device_status_publisher_8cpp_source.html#l00147">147</a> of file <a class="el" href="_device_status_publisher_8cpp_source.html">DeviceStatusPublisher.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_device_status_publisher_8cpp_source.html#l00159">159</a> of file <a class="el" href="_device_status_publisher_8cpp_source.html">DeviceStatusPublisher.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00054">COUNTING</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00055">OCCUPANCY</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01148">publishData()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01310">publishData()</a>.</p>
 
 </div>
 </div>
@@ -623,7 +623,7 @@ Static Protected Attributes</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_ledger_client_8cpp_source.html#l00026">26</a> of file <a class="el" href="_ledger_client_8cpp_source.html">LedgerClient.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00549">setup()</a>.</p>
 
 </div>
 </div>
@@ -680,9 +680,9 @@ Static Protected Attributes</h2></td></tr>
 <p>Updates Device→Cloud ledger with current configuration for Console visibility. A successful return means the local ledger accepted the write; cloud sync may still be pending.</p>
 <dl class="section return"><dt>Returns</dt><dd>true if successful </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_device_status_publisher_8cpp_source.html#l00007">7</a> of file <a class="el" href="_device_status_publisher_8cpp_source.html">DeviceStatusPublisher.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_device_status_publisher_8cpp_source.html#l00009">9</a> of file <a class="el" href="_device_status_publisher_8cpp_source.html">DeviceStatusPublisher.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_wake_cycle_stats_8cpp_source.html#l00012">Observability::cycleStats()</a>, <a class="el" href="_version_8cpp_source.html#l00006">FIRMWARE_VERSION</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00043">sensorConfig</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, and <a class="el" href="_wake_cycle_stats_8cpp_source.html#l00091">Observability::toString()</a>.</p>
+<p class="reference">References <a class="el" href="_wake_cycle_stats_8cpp_source.html#l00012">Observability::cycleStats()</a>, <a class="el" href="_version_8cpp_source.html#l00006">FIRMWARE_VERSION</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00029">lastPmicAnomalyChargeStatus</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00030">lastPmicAnomalyPowerSource</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00028">lastPmicAnomalySoc</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00031">lastPmicAnomalyVbusStatus</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00032">pmicAnomalyActive</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00034">pmicAnomalyAgeSec()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00025">pmicAnomalyCount</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00043">sensorConfig</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, and <a class="el" href="_wake_cycle_stats_8cpp_source.html#l00091">Observability::toString()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="_cloud_8cpp_source.html#l00070">loop()</a>.</p>
 

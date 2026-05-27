@@ -1,5 +1,6 @@
 var _state___common_8h =
 [
+    [ "OccupancyCloseResult", "struct_occupancy_close_result.html", "struct_occupancy_close_result" ],
     [ "FailsafeDeferReason", "_state___common_8h.html#ab615e291ed6fc3b056a35a52d90c2ef5", [
       [ "FAILSAFE_DEFER_NONE", "_state___common_8h.html#ab615e291ed6fc3b056a35a52d90c2ef5a60c39b9dae1eb7d38bf1d37272acf672", null ],
       [ "FAILSAFE_DEFER_INVALID_TIME", "_state___common_8h.html#ab615e291ed6fc3b056a35a52d90c2ef5a8fc6a2f1a88655b8ae175927c877ac3c", null ],
@@ -13,6 +14,7 @@ var _state___common_8h =
     [ "applyBatteryAwareConnectionModePolicy", "_state___common_8h.html#a41a544e4d6539b3b90c9cdbd3420de83", null ],
     [ "claimFailsafeDeferLog", "_state___common_8h.html#a4f03886ca8de88b6acd699592b4a21dd", null ],
     [ "clearConnectivityFailsafeRecovery", "_state___common_8h.html#adfdc96a561bfc48d07fd89fa97b22d67", null ],
+    [ "closeOccupancySessionSafely", "_state___common_8h.html#ad78ff6c2e3d0107dbb0a1bff1279afaf", null ],
     [ "dailyCleanup", "_state___common_8h.html#a496510658b21d252547ca67ae1035445", null ],
     [ "ensureSensorEnabled", "_state___common_8h.html#a26af5a78d8cca160ca913b5e91a224d6", null ],
     [ "failsafeDeferReasonName", "_state___common_8h.html#ad43cc0046dda7f743c7e22b116b88f17", null ],

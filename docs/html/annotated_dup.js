@@ -16,6 +16,7 @@ var annotated_dup =
     [ "Cloud", "class_cloud.html", "class_cloud" ],
     [ "currentStatusData", "classcurrent_status_data.html", "classcurrent_status_data" ],
     [ "ISensor", "class_i_sensor.html", "class_i_sensor" ],
+    [ "OccupancyCloseResult", "struct_occupancy_close_result.html", "struct_occupancy_close_result" ],
     [ "Particle_Functions", "class_particle___functions.html", "class_particle___functions" ],
     [ "PIRSensor", "class_p_i_r_sensor.html", "class_p_i_r_sensor" ],
     [ "PowerAction", "struct_power_action.html", "struct_power_action" ],

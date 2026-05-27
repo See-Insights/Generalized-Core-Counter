@@ -142,3 +142,87 @@ inline void logUnoccupiedEvent(const char *reason,
 					 (unsigned long)totalSeconds,
 					 report ? 1 : 0);
 }
+
+/**
+ * @brief Result of safely closing an occupancy session.
+ */
+struct OccupancyCloseResult {
+	bool valid = false;
+	uint32_t sessionSeconds = 0;
+	uint32_t totalSeconds = 0;
+};
+
+/**
+ * @brief Safely closes the current occupancy session and guards wrapped time math.
+ *
+ * Unsigned subtraction of Time.now() - occupancyStartTime can wrap into a huge
+ * bogus duration if the stored start time is zero or in the future.
+ *
+ * @param path Short caller label for anomaly logs
+ * @return Close result including the session duration and new total on valid close
+ */
+inline OccupancyCloseResult closeOccupancySessionSafely(const char *path) {
+	OccupancyCloseResult result;
+	const bool occupied = current.get_occupied();
+	const int8_t alertCode = current.get_alertCode();
+	const bool timeValid = Time.isValid();
+	const time_t now = Time.now();
+	const time_t start = current.get_occupancyStartTime();
+	const uint32_t previousTotal = current.get_totalOccupiedSeconds();
+	result.totalSeconds = previousTotal;
+
+	bool durationComputable = false;
+	long long rawSessionSeconds = 0;
+	uint32_t sessionSeconds = 0;
+	bool invalid = !timeValid || start == 0;
+
+	if (timeValid && start != 0) {
+		time_t effectiveStart = start;
+		if (start > now && start <= now + 5) {
+			effectiveStart = now;
+		}
+		rawSessionSeconds = (long long)now - (long long)effectiveStart;
+		durationComputable = true;
+	}
+
+	if (timeValid && start > now + 5) {
+		invalid = true;
+	}
+
+	if (!invalid && durationComputable) {
+		sessionSeconds = (uint32_t)rawSessionSeconds;
+		const uint32_t newTotal = previousTotal + sessionSeconds;
+		if (sessionSeconds > 86400UL || newTotal > 86400UL) {
+			invalid = true;
+		} else {
+			current.set_totalOccupiedSeconds(newTotal);
+			result.valid = true;
+			result.sessionSeconds = sessionSeconds;
+			result.totalSeconds = newTotal;
+		}
+	} else if (!invalid) {
+		invalid = true;
+	}
+
+	if (invalid) {
+		char sessionBuf[24];
+		if (durationComputable) {
+			snprintf(sessionBuf, sizeof(sessionBuf), "%lld", rawSessionSeconds);
+		} else {
+			strncpy(sessionBuf, "na", sizeof(sessionBuf));
+			sessionBuf[sizeof(sessionBuf) - 1] = '\0';
+		}
+		Log.warn("OccAnom: path=%s now=%lu start=%lu prev=%lu dur=%s occ=%d alert=%d",
+					 path ? path : "?",
+					 (unsigned long)now,
+					 (unsigned long)start,
+					 (unsigned long)previousTotal,
+					 sessionBuf,
+					 occupied ? 1 : 0,
+					 (int)alertCode);
+	}
+
+	current.set_occupied(false);
+	current.set_occupancyStartTime(0);
+	return result;
+}

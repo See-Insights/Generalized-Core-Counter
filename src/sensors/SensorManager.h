@@ -19,6 +19,16 @@
 extern char internalTempStr[16];
 extern char signalStr[64];
 
+// Retained PMIC contradiction forensics.
+extern retained uint16_t pmicAnomalyCount;
+extern retained uint32_t lastPmicAnomalyUptimeMs;
+extern retained float lastPmicAnomalySoc;
+extern retained uint8_t lastPmicAnomalyChargeStatus;
+extern retained uint8_t lastPmicAnomalyPowerSource;
+extern retained uint8_t lastPmicAnomalyVbusStatus;
+extern bool pmicAnomalyActive;
+uint32_t pmicAnomalyAgeSec();
+
 enum class BatterySampleContext : uint8_t {
     General = 0,
     Setup,

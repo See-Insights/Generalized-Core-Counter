@@ -7,6 +7,7 @@ var hierarchy =
       [ "PIRSensor", "class_p_i_r_sensor.html", null ]
     ] ],
     [ "LocalTimeCache::LocalTimeSnapshot", "struct_local_time_cache_1_1_local_time_snapshot.html", null ],
+    [ "OccupancyCloseResult", "struct_occupancy_close_result.html", null ],
     [ "Particle_Functions", "class_particle___functions.html", null ],
     [ "StorageHelperRK::PersistentDataFile", null, [
       [ "currentStatusData", "classcurrent_status_data.html", null ],

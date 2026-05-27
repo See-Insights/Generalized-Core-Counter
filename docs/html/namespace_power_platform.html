@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;13.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -144,7 +144,7 @@ Functions</h2></td></tr>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>Result describing support, whether the change was applied, and system status </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_power_platform_8cpp_source.html#l00174">174</a> of file <a class="el" href="_power_platform_8cpp_source.html">PowerPlatform.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_power_platform_8cpp_source.html#l00181">181</a> of file <a class="el" href="_power_platform_8cpp_source.html">PowerPlatform.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_power_platform_8h_source.html#l00020">PowerPlatform::PowerConfigurationApplyResult::applied</a>, <a class="el" href="_power_manager_8h_source.html#l00051">Auto</a>, <a class="el" href="_power_manager_8h_source.html#l00052">NotApplicable</a>, <a class="el" href="_power_manager_8h_source.html#l00050">Solar35W</a>, <a class="el" href="_power_platform_8h_source.html#l00019">PowerPlatform::PowerConfigurationApplyResult::supported</a>, <a class="el" href="_power_platform_8h_source.html#l00021">PowerPlatform::PowerConfigurationApplyResult::systemResult</a>, and <a class="el" href="_power_manager_8h_source.html#l00049">UsbBench</a>.</p>
 
@@ -170,11 +170,11 @@ Functions</h2></td></tr>
 <p>Detects power-management capabilities supported by the active platform. </p>
 <dl class="section return"><dt>Returns</dt><dd>Capability snapshot for the current device </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_power_platform_8cpp_source.html#l00095">95</a> of file <a class="el" href="_power_platform_8cpp_source.html">PowerPlatform.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_power_platform_8cpp_source.html#l00102">102</a> of file <a class="el" href="_power_platform_8cpp_source.html">PowerPlatform.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_power_manager_8h_source.html#l00076">PowerCapabilities::hasBatteryContext</a>, <a class="el" href="_power_manager_8h_source.html#l00075">PowerCapabilities::hasBatteryVoltage</a>, <a class="el" href="_power_manager_8h_source.html#l00078">PowerCapabilities::hasChargingControl</a>, <a class="el" href="_power_manager_8h_source.html#l00072">PowerCapabilities::hasFuelGauge</a>, <a class="el" href="_power_manager_8h_source.html#l00073">PowerCapabilities::hasPmic</a>, <a class="el" href="_power_manager_8h_source.html#l00079">PowerCapabilities::hasPmicPowerConfiguration</a>, <a class="el" href="_power_manager_8h_source.html#l00080">PowerCapabilities::hasPmicRemediation</a>, <a class="el" href="_power_manager_8h_source.html#l00077">PowerCapabilities::hasPowerSource</a>, and <a class="el" href="_power_manager_8h_source.html#l00074">PowerCapabilities::hasSoc</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_power_platform_8cpp_source.html#l00133">hasFuelGauge()</a>, <a class="el" href="_power_platform_8cpp_source.html#l00129">hasPmic()</a>, <a class="el" href="_power_platform_8cpp_source.html#l00143">readPowerSource()</a>, <a class="el" href="_power_manager_8cpp_source.html#l00100">PowerManager::refreshInputProfile()</a>, and <a class="el" href="_power_manager_8cpp_source.html#l00092">PowerManager::setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_power_platform_8cpp_source.html#l00140">hasFuelGauge()</a>, <a class="el" href="_power_platform_8cpp_source.html#l00136">hasPmic()</a>, <a class="el" href="_power_platform_8cpp_source.html#l00150">readPowerSource()</a>, <a class="el" href="_power_manager_8cpp_source.html#l00100">PowerManager::refreshInputProfile()</a>, and <a class="el" href="_power_manager_8cpp_source.html#l00092">PowerManager::setup()</a>.</p>
 
 </div>
 </div>
@@ -196,9 +196,9 @@ Functions</h2></td></tr>
 <p>Returns whether the active platform has a fuel gauge. </p>
 <dl class="section return"><dt>Returns</dt><dd>true when fuel-gauge APIs are available </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_power_platform_8cpp_source.html#l00133">133</a> of file <a class="el" href="_power_platform_8cpp_source.html">PowerPlatform.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_power_platform_8cpp_source.html#l00140">140</a> of file <a class="el" href="_power_platform_8cpp_source.html">PowerPlatform.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_power_platform_8cpp_source.html#l00095">detectCapabilities()</a>, and <a class="el" href="_power_manager_8h_source.html#l00072">PowerCapabilities::hasFuelGauge</a>.</p>
+<p class="reference">References <a class="el" href="_power_platform_8cpp_source.html#l00102">detectCapabilities()</a>, and <a class="el" href="_power_manager_8h_source.html#l00072">PowerCapabilities::hasFuelGauge</a>.</p>
 
 </div>
 </div>
@@ -220,9 +220,9 @@ Functions</h2></td></tr>
 <p>Returns whether the active platform has a PMIC. </p>
 <dl class="section return"><dt>Returns</dt><dd>true when PMIC APIs are available </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_power_platform_8cpp_source.html#l00129">129</a> of file <a class="el" href="_power_platform_8cpp_source.html">PowerPlatform.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_power_platform_8cpp_source.html#l00136">136</a> of file <a class="el" href="_power_platform_8cpp_source.html">PowerPlatform.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_power_platform_8cpp_source.html#l00095">detectCapabilities()</a>, and <a class="el" href="_power_manager_8h_source.html#l00073">PowerCapabilities::hasPmic</a>.</p>
+<p class="reference">References <a class="el" href="_power_platform_8cpp_source.html#l00102">detectCapabilities()</a>, and <a class="el" href="_power_manager_8h_source.html#l00073">PowerCapabilities::hasPmic</a>.</p>
 
 </div>
 </div>
@@ -249,9 +249,9 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="_power_platform_8cpp_source.html#l00137">137</a> of file <a class="el" href="_power_platform_8cpp_source.html">PowerPlatform.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_power_platform_8cpp_source.html#l00144">144</a> of file <a class="el" href="_power_platform_8cpp_source.html">PowerPlatform.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">SensorManager::batteryState()</a>, and <a class="el" href="_power_platform_8cpp_source.html#l00143">readPowerSource()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00471">SensorManager::batteryState()</a>, and <a class="el" href="_power_platform_8cpp_source.html#l00150">readPowerSource()</a>.</p>
 
 </div>
 </div>
@@ -273,11 +273,11 @@ Functions</h2></td></tr>
 <p>Reads the current platform power source. </p>
 <dl class="section return"><dt>Returns</dt><dd>Snapshot containing the source identifier and availability </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_power_platform_8cpp_source.html#l00143">143</a> of file <a class="el" href="_power_platform_8cpp_source.html">PowerPlatform.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_power_platform_8cpp_source.html#l00150">150</a> of file <a class="el" href="_power_platform_8cpp_source.html">PowerPlatform.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_power_platform_8cpp_source.html#l00095">detectCapabilities()</a>, <a class="el" href="_power_manager_8h_source.html#l00017">Fallback</a>, <a class="el" href="_power_manager_8h_source.html#l00016">NotAvailable</a>, <a class="el" href="_power_platform_8cpp_source.html#l00137">noteObservedPowerSource()</a>, <a class="el" href="_power_platform_8h_source.html#l00011">PowerPlatform::PowerSourceSnapshot::source</a>, <a class="el" href="_power_platform_8h_source.html#l00012">PowerPlatform::PowerSourceSnapshot::status</a>, <a class="el" href="_power_manager_8h_source.html#l00015">Unknown</a>, and <a class="el" href="_power_manager_8h_source.html#l00014">Valid</a>.</p>
+<p class="reference">References <a class="el" href="_power_platform_8cpp_source.html#l00102">detectCapabilities()</a>, <a class="el" href="_power_manager_8h_source.html#l00017">Fallback</a>, <a class="el" href="_power_manager_8h_source.html#l00016">NotAvailable</a>, <a class="el" href="_power_platform_8cpp_source.html#l00144">noteObservedPowerSource()</a>, <a class="el" href="_power_platform_8h_source.html#l00011">PowerPlatform::PowerSourceSnapshot::source</a>, <a class="el" href="_power_platform_8h_source.html#l00012">PowerPlatform::PowerSourceSnapshot::status</a>, <a class="el" href="_power_manager_8h_source.html#l00015">Unknown</a>, and <a class="el" href="_power_manager_8h_source.html#l00014">Valid</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">SensorManager::batteryState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00224">anonymous_namespace{Generalized-Core-Counter.cpp}::connectivityFailsafeHasExternalPower()</a>, and <a class="el" href="_power_manager_8cpp_source.html#l00100">PowerManager::refreshInputProfile()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00471">SensorManager::batteryState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00269">anonymous_namespace{Generalized-Core-Counter.cpp}::connectivityFailsafeHasExternalPower()</a>, and <a class="el" href="_power_manager_8cpp_source.html#l00100">PowerManager::refreshInputProfile()</a>.</p>
 
 </div>
 </div>

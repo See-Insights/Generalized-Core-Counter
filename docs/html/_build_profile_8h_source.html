@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;13.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -94,30 +94,38 @@ $(function(){initNavTree('_build_profile_8h_source.html','',''); });
 <div class="contents">
 <a href="_build_profile_8h.html">Go to the documentation of this file.</a><div class="fragment"><div class="line"><a id="l00001" name="l00001"></a><span class="lineno">    1</span><span class="preprocessor">#pragma once</span></div>
 <div class="line"><a id="l00002" name="l00002"></a><span class="lineno">    2</span></div>
-<div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span><span class="preprocessor">#ifndef DEV_BUILD</span><span class="preprocessor"></span></div>
-<div class="line"><a id="l00028" name="l00028"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a1c8895ff02f86bdd856ef0110a1a7a47">   28</a></span><span class="preprocessor">#define DEV_BUILD 1</span></div>
-<div class="line"><a id="l00029" name="l00029"></a><span class="lineno">   29</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00030" name="l00030"></a><span class="lineno">   30</span> </div>
-<div class="line"><a id="l00031" name="l00031"></a><span class="lineno">   31</span><span class="preprocessor">#ifndef FIELD_BUILD</span><span class="preprocessor"></span></div>
-<div class="line"><a id="l00035" name="l00035"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#ad4ad87bab679b526e350864dcf54b49b">   35</a></span><span class="preprocessor">#define FIELD_BUILD (!DEV_BUILD)</span></div>
-<div class="line"><a id="l00036" name="l00036"></a><span class="lineno">   36</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00037" name="l00037"></a><span class="lineno">   37</span> </div>
-<div class="line"><a id="l00038" name="l00038"></a><span class="lineno">   38</span><span class="preprocessor">#ifndef ALLOW_BLOCKING_SERIAL_WAITS</span><span class="preprocessor"></span></div>
-<div class="line"><a id="l00042" name="l00042"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a862e5c5913487ba4049590c35342976c">   42</a></span><span class="preprocessor">#define ALLOW_BLOCKING_SERIAL_WAITS 1</span></div>
-<div class="line"><a id="l00043" name="l00043"></a><span class="lineno">   43</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span> </div>
-<div class="line"><a id="l00045" name="l00045"></a><span class="lineno">   45</span><span class="preprocessor">#ifndef CONNECTIVITY_FAILSAFE_TEST_MODE</span><span class="preprocessor"></span></div>
-<div class="line"><a id="l00056" name="l00056"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#ace016f8be71ba4de13d0741f003ce9a1">   56</a></span><span class="preprocessor">#define CONNECTIVITY_FAILSAFE_TEST_MODE 0</span></div>
-<div class="line"><a id="l00057" name="l00057"></a><span class="lineno">   57</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00058" name="l00058"></a><span class="lineno">   58</span> </div>
-<div class="line"><a id="l00059" name="l00059"></a><span class="lineno">   59</span><span class="preprocessor">#if (CONNECTIVITY_FAILSAFE_TEST_MODE != 0) &amp;&amp; (CONNECTIVITY_FAILSAFE_TEST_MODE != 1)</span></div>
-<div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span><span class="preprocessor">#error &quot;CONNECTIVITY_FAILSAFE_TEST_MODE must be 0 or 1&quot;</span></div>
-<div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span> </div>
-<div class="line"><a id="l00063" name="l00063"></a><span class="lineno">   63</span><span class="comment">// Optional convenience: enable DEBUG_SERIAL in DEV builds unless overridden.</span></div>
-<div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span><span class="preprocessor">#if DEV_BUILD &amp;&amp; !defined(DEBUG_SERIAL)</span></div>
-<div class="line"><a id="l00065" name="l00065"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a61e127df60d55ea4c8bd6b8ec1f88367">   65</a></span><span class="preprocessor">#define DEBUG_SERIAL</span></div>
-<div class="line"><a id="l00066" name="l00066"></a><span class="lineno">   66</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00025" name="l00025"></a><span class="lineno">   25</span><span class="preprocessor">#ifndef DEV_BUILD</span><span class="preprocessor"></span></div>
+<div class="line"><a id="l00029" name="l00029"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a1c8895ff02f86bdd856ef0110a1a7a47">   29</a></span><span class="preprocessor">#define DEV_BUILD 0</span></div>
+<div class="line"><a id="l00030" name="l00030"></a><span class="lineno">   30</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00031" name="l00031"></a><span class="lineno">   31</span> </div>
+<div class="line"><a id="l00032" name="l00032"></a><span class="lineno">   32</span><span class="preprocessor">#ifndef FIELD_BUILD</span><span class="preprocessor"></span></div>
+<div class="line"><a id="l00036" name="l00036"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#ad4ad87bab679b526e350864dcf54b49b">   36</a></span><span class="preprocessor">#define FIELD_BUILD (!DEV_BUILD)</span></div>
+<div class="line"><a id="l00037" name="l00037"></a><span class="lineno">   37</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00038" name="l00038"></a><span class="lineno">   38</span> </div>
+<div class="line"><a id="l00039" name="l00039"></a><span class="lineno">   39</span><span class="preprocessor">#ifndef ALLOW_BLOCKING_SERIAL_WAITS</span><span class="preprocessor"></span></div>
+<div class="line"><a id="l00043" name="l00043"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a862e5c5913487ba4049590c35342976c">   43</a></span><span class="preprocessor">#define ALLOW_BLOCKING_SERIAL_WAITS 0</span></div>
+<div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00045" name="l00045"></a><span class="lineno">   45</span> </div>
+<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span><span class="preprocessor">#ifndef CONNECTIVITY_FAILSAFE_TEST_MODE</span><span class="preprocessor"></span></div>
+<div class="line"><a id="l00057" name="l00057"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#ace016f8be71ba4de13d0741f003ce9a1">   57</a></span><span class="preprocessor">#define CONNECTIVITY_FAILSAFE_TEST_MODE 0</span></div>
+<div class="line"><a id="l00058" name="l00058"></a><span class="lineno">   58</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00059" name="l00059"></a><span class="lineno">   59</span> </div>
+<div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span><span class="preprocessor">#if (CONNECTIVITY_FAILSAFE_TEST_MODE != 0) &amp;&amp; (CONNECTIVITY_FAILSAFE_TEST_MODE != 1)</span></div>
+<div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span><span class="preprocessor">#error &quot;CONNECTIVITY_FAILSAFE_TEST_MODE must be 0 or 1&quot;</span></div>
+<div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00063" name="l00063"></a><span class="lineno">   63</span> </div>
+<div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span><span class="preprocessor">#ifndef ENABLE_PMIC_FORENSICS</span><span class="preprocessor"></span></div>
+<div class="line"><a id="l00073" name="l00073"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#ac3fc20c1f1dca3684d048d0a13be8fee">   73</a></span><span class="preprocessor">#define ENABLE_PMIC_FORENSICS 1</span></div>
+<div class="line"><a id="l00074" name="l00074"></a><span class="lineno">   74</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00075" name="l00075"></a><span class="lineno">   75</span> </div>
+<div class="line"><a id="l00076" name="l00076"></a><span class="lineno">   76</span><span class="preprocessor">#if (ENABLE_PMIC_FORENSICS != 0) &amp;&amp; (ENABLE_PMIC_FORENSICS != 1)</span></div>
+<div class="line"><a id="l00077" name="l00077"></a><span class="lineno">   77</span><span class="preprocessor">#error &quot;ENABLE_PMIC_FORENSICS must be 0 or 1&quot;</span></div>
+<div class="line"><a id="l00078" name="l00078"></a><span class="lineno">   78</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00079" name="l00079"></a><span class="lineno">   79</span> </div>
+<div class="line"><a id="l00080" name="l00080"></a><span class="lineno">   80</span><span class="comment">// Optional convenience: enable DEBUG_SERIAL in DEV builds unless overridden.</span></div>
+<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span><span class="preprocessor">#if DEV_BUILD &amp;&amp; !defined(DEBUG_SERIAL)</span></div>
+<div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span><span class="preprocessor">#define DEBUG_SERIAL</span></div>
+<div class="line"><a id="l00083" name="l00083"></a><span class="lineno">   83</span><span class="preprocessor">#endif</span></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
 </div><!-- container -->

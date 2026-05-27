@@ -1,27 +1,5 @@
 var searchData=
 [
-  ['handleconnectingstate_0',['handleConnectingState',['../_state___connect_8cpp.html#aa428c2511c13d95e982397fd0083bd12',1,'handleConnectingState():&#160;State_Connect.cpp'],['../_state_handlers_8h.html#aa428c2511c13d95e982397fd0083bd12',1,'handleConnectingState():&#160;State_Connect.cpp']]],
-  ['handlecountingmode_1',['handleCountingMode',['../_state___modes_8cpp.html#adc7da8d3496485d3ed0bf024531f583a',1,'handleCountingMode():&#160;State_Modes.cpp'],['../_state_handlers_8h.html#adc7da8d3496485d3ed0bf024531f583a',1,'handleCountingMode():&#160;State_Modes.cpp']]],
-  ['handleerrorstate_2',['handleErrorState',['../_state___error_8cpp.html#a86e6341b9ca5e0fc50d331642d4b016a',1,'handleErrorState():&#160;State_Error.cpp'],['../_state_handlers_8h.html#a86e6341b9ca5e0fc50d331642d4b016a',1,'handleErrorState():&#160;State_Error.cpp']]],
-  ['handlefirmwareupdatestate_3',['handleFirmwareUpdateState',['../_state___connect_8cpp.html#ab6be1808dd4cca26a77640cd4a1997ed',1,'handleFirmwareUpdateState():&#160;State_Connect.cpp'],['../_state_handlers_8h.html#ab6be1808dd4cca26a77640cd4a1997ed',1,'handleFirmwareUpdateState():&#160;State_Connect.cpp']]],
-  ['handleidlestate_4',['handleIdleState',['../_state___idle_8cpp.html#a71fc1190b1b30ccc640403f795bd0175',1,'handleIdleState():&#160;State_Idle.cpp'],['../_state_handlers_8h.html#a71fc1190b1b30ccc640403f795bd0175',1,'handleIdleState():&#160;State_Idle.cpp']]],
-  ['handleoccupancymode_5',['handleOccupancyMode',['../_state___modes_8cpp.html#a8209bb1f1bd0a92f24ac651caf5287dd',1,'handleOccupancyMode():&#160;State_Modes.cpp'],['../_state_handlers_8h.html#a8209bb1f1bd0a92f24ac651caf5287dd',1,'handleOccupancyMode():&#160;State_Modes.cpp']]],
-  ['handlereportingstate_6',['handleReportingState',['../_state___report_8cpp.html#a1ef85fec9be65d21b46ebd2b1a57294a',1,'handleReportingState():&#160;State_Report.cpp'],['../_state_handlers_8h.html#a1ef85fec9be65d21b46ebd2b1a57294a',1,'handleReportingState():&#160;State_Report.cpp']]],
-  ['handlesleepingstate_7',['handleSleepingState',['../_state___sleep_8cpp.html#a733df5bda859981b51a039b66edc6a5a',1,'handleSleepingState():&#160;State_Sleep.cpp'],['../_state_handlers_8h.html#a733df5bda859981b51a039b66edc6a5a',1,'handleSleepingState():&#160;State_Sleep.cpp']]],
-  ['hasbatterycontext_8',['hasBatteryContext',['../struct_power_capabilities.html#aba440955c8b37c5aff19a0b2623a07ce',1,'PowerCapabilities']]],
-  ['hasbatteryvoltage_9',['hasBatteryVoltage',['../struct_power_capabilities.html#a2351fd4e5de9cbeb682df99a5354d709',1,'PowerCapabilities']]],
-  ['haschargingcontrol_10',['hasChargingControl',['../struct_power_capabilities.html#a9aab26a2e091b8ab015ceed659c58480',1,'PowerCapabilities']]],
-  ['hasfuelgauge_11',['hasFuelGauge',['../struct_power_capabilities.html#a6ebaa869ee3e28cae2f8d852a35b364b',1,'PowerCapabilities::hasFuelGauge'],['../class_power_manager.html#a4357663f73ba510f1ac2f3d77e939604',1,'PowerManager::hasFuelGauge()'],['../namespace_power_platform.html#aee8ea315e90cc5091cb7775bbf28cedb',1,'PowerPlatform::hasFuelGauge()']]],
-  ['hasnewdata_12',['hasNewData',['../struct_sensor_data.html#a4f6309bd50c2b45d4cea3d224c1a6e6b',1,'SensorData']]],
-  ['haspendingoutputledgersync_13',['hasPendingOutputLedgerSync',['../class_cloud.html#a48e3ac0c1a13d4186d87047e2359bf24',1,'Cloud']]],
-  ['haspmic_14',['hasPmic',['../struct_power_capabilities.html#af8c8c2e9f90485a32c5eb85e57cfe5cc',1,'PowerCapabilities::hasPmic'],['../class_power_manager.html#a34a2dc36989f5f4b4c7a9e137657be7f',1,'PowerManager::hasPmic()'],['../namespace_power_platform.html#a36a61cbd8e3a298ed3d766e4f1c8d7be',1,'PowerPlatform::hasPmic()']]],
-  ['haspmicpowerconfiguration_15',['hasPmicPowerConfiguration',['../struct_power_capabilities.html#af88abf1b7d25bc56176a4feee4060590',1,'PowerCapabilities']]],
-  ['haspmicremediation_16',['hasPmicRemediation',['../struct_power_capabilities.html#af0707322e648cffde8d028c066897e4c',1,'PowerCapabilities']]],
-  ['haspowersource_17',['hasPowerSource',['../struct_power_capabilities.html#ac56de5fe2548e19e2e33ebc2ea27dccf',1,'PowerCapabilities']]],
-  ['hassoc_18',['hasSoc',['../struct_power_capabilities.html#afacd2b502f44ce1a6804299dd00d2e31',1,'PowerCapabilities']]],
-  ['header_20pir_20sensor_20on_20carrier_19',['Carrier board header (PIR sensor on carrier)',['../device__pinout_8h.html#autotoc_md0',1,'']]],
-  ['healthy_20',['Healthy',['../_power_manager_8h.html#a4cd3fba464706ae15d5303ccee1ea10ba396d45b57c2fbe3318e7b93272a2686b',1,'PowerManager.h']]],
-  ['hibernatedisabledforsession_21',['hibernateDisabledForSession',['../struct_session_state.html#ac03474741cb2abc800e6fcfedcba9939',1,'SessionState']]],
-  ['highlights_22',['Highlights',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md20',1,'']]],
-  ['hourlycount_23',['hourlyCount',['../classcurrent_status_data_1_1_current_data.html#afc17a6a54a16ef952620ae5efada0ddc',1,'currentStatusData::CurrentData']]]
+  ['9_2000_202026_2004_2024_0',['9.00 - 2026-04-24',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md48',1,'']]],
+  ['9_20recovery_20and_20resiliency_20architecture_1',['9. Recovery and Resiliency Architecture',['../md_docs_2architecture-overview.html#autotoc_md141',1,'']]]
 ];

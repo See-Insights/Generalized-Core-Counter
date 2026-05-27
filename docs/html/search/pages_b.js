@@ -1,5 +1,29 @@
 var searchData=
 [
-  ['notes_0',['Contributor Notes',['../index.html#autotoc_md16',1,'']]],
-  ['notes_3a_20v11_200_200_1',['Release Notes: v11.0.0',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html',1,'']]]
+  ['baseline_0',['Normal Operation Baseline',['../md_docs_2bench-validation.html#autotoc_md182',1,'']]],
+  ['battery_20charging_20alerts_20boron_20only_1',['Battery/Charging Alerts (Boron Only)',['../md_docs_2bench-validation.html#autotoc_md191',1,'']]],
+  ['battery_20tiers_2',['Battery Tiers',['../md_docs_2architecture-overview.html#autotoc_md135',1,'']]],
+  ['behavior_3',['Behavior',['../md_docs_2architecture-overview.html#autotoc_md123',1,'Configuration Merge Behavior'],['../md_docs_2architecture-overview.html#autotoc_md131',1,'Disconnect Behavior'],['../md_docs_2led-management-system.html#autotoc_md199',1,'Mode-Specific Behavior']]],
+  ['bench_20build_4',['Connectivity Failsafe Bench Build',['../md_docs_2bench-validation.html#autotoc_md172',1,'']]],
+  ['bench_20setup_5',['Bench Setup',['../md_docs_2bench-validation.html#autotoc_md174',1,'']]],
+  ['bench_20validation_20checklist_20pre_20field_6',['Bench Validation Checklist (Pre-Field)',['../md_docs_2bench-validation.html',1,'']]],
+  ['bench_20validation_20mode_7',['Bench Validation Mode',['../md_docs_2recovery-architecture.html#autotoc_md225',1,'']]],
+  ['benefits_8',['Benefits',['../md_docs_2led-management-system.html#autotoc_md209',1,'']]],
+  ['blocking_9',['Test 5 — Loop Responsiveness (No Blocking)',['../md_docs_2bench-validation.html#autotoc_md180',1,'']]],
+  ['board_20header_20pir_20sensor_20on_20carrier_10',['Carrier board header (PIR sensor on carrier)',['../device__pinout_8h.html#autotoc_md0',1,'']]],
+  ['bool_20state_20uint32_5ft_20durationms_200_11',['&lt;span class=&quot;tt&quot;&gt;signalLED(bool state, uint32_t durationMs = 0)&lt;/span&gt;',['../md_docs_2led-management-system.html#autotoc_md196',1,'']]],
+  ['boot_20storm_20protection_12',['Boot-Storm Protection',['../md_docs_2architecture-overview.html#autotoc_md147',1,'']]],
+  ['boron_20only_13',['Boron Only',['../md_docs_2bench-validation.html#autotoc_md191',1,'Battery/Charging Alerts (Boron Only)'],['../md_docs_2bench-validation.html#autotoc_md181',1,'Test 6 — PMIC Health Monitoring &amp;amp; Remediation (Boron Only)']]],
+  ['bounded_20connect_20attempts_14',['Bounded connect attempts',['../md_docs_2recovery-architecture.html#autotoc_md218',1,'']]],
+  ['bounded_20service_20window_15',['Bounded service window',['../md_docs_2recovery-architecture.html#autotoc_md219',1,'']]],
+  ['bounded_20teardown_16',['Bounded teardown',['../md_docs_2recovery-architecture.html#autotoc_md220',1,'']]],
+  ['breadcrumbs_17',['Retained Breadcrumbs',['../md_docs_2architecture-overview.html#autotoc_md152',1,'']]],
+  ['breaking_20changes_20orthogonal_20mode_20architecture_20refactor_18',['BREAKING CHANGES - Orthogonal Mode Architecture Refactor',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md71',1,'']]],
+  ['budget_20exceeded_19',['Test 3 — Cloud Disconnect Budget Exceeded',['../md_docs_2bench-validation.html#autotoc_md178',1,'']]],
+  ['budget_20timeout_20',['Test 2 — Forced Connect Failure (Budget Timeout)',['../md_docs_2bench-validation.html#autotoc_md177',1,'']]],
+  ['budgets_20and_20deep_20attempts_21',['Connect Budgets and Deep Attempts',['../md_docs_2architecture-overview.html#autotoc_md130',1,'']]],
+  ['build_22',['Connectivity Failsafe Bench Build',['../md_docs_2bench-validation.html#autotoc_md172',1,'']]],
+  ['build_20and_20validation_23',['Build And Validation',['../index.html#autotoc_md14',1,'']]],
+  ['build_20flags_24',['Build Flags',['../index.html#autotoc_md9',1,'']]],
+  ['by_20recovery_25',['Persistent Fields Used By Recovery',['../md_docs_2recovery-architecture.html#autotoc_md226',1,'']]]
 ];

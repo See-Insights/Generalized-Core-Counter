@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['index_0',['Documentation Index',['../index.html#autotoc_md13',1,'']]],
-  ['intent_1',['Intent',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md19',1,'']]]
+  ['8_2000_202026_2004_2023_0',['8.00 - 2026-04-23',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md52',1,'']]],
+  ['8_20power_20management_20architecture_1',['8. Power Management Architecture',['../md_docs_2architecture-overview.html#autotoc_md134',1,'']]]
 ];

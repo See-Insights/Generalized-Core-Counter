@@ -16,6 +16,42 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [13.0.0] - 2026-05-27
+
+### Added
+
+- **Watchdog forensic telemetry**: Added retained watchdog reset counters and startup telemetry fields including `watchdogResetCount`, `lastWatchdogBreadcrumb`, and `lastWatchdogUptimeMs` so post-reset analysis survives missing serial logs.
+- **PMIC anomaly telemetry**: Added retained PMIC contradiction counters, transition-only anomaly capture, startup/device-status telemetry, and `PMIC_ANOM` logging for low-SOC `Charged` or `Not Charging` contradictions.
+- **Occupancy anomaly logging**: Added `OccAnom` logging on invalid occupancy close paths so impossible durations and prior totals are preserved for RCA.
+
+### Changed
+
+- **Release metadata updated for v13 rollout**: Bumped the Particle product version, firmware version string, README version header, and Doxygen project number to `13.0.0` / `PRODUCT_VERSION(13)`.
+- **Occupancy close validation hardened**: Occupancy close handling now validates impossible session durations before updating daily totals.
+- **PMIC forensics build flag added**: Added `ENABLE_PMIC_FORENSICS` as the single compile-time deployment flag, enabled by default for release builds, to gate PMIC contradiction logging, counters, and telemetry.
+
+### Fixed
+
+- **Corrupted daily occupancy totals from invalid start times**: Protected against unsigned-wrap and otherwise invalid `occupancyStartTime` values from inflating `dailyoccupancy` with impossible occupied durations.
+
+### Validation
+
+- Revalidated production compiles for Boron, Photon 2, and Argon with `CONNECTIVITY_FAILSAFE_TEST_MODE=0` and `ENABLE_PMIC_FORENSICS=1`.
+
+## [11.0.1] - 2026-05-22
+
+### Added
+
+- **Release artifact documentation completeness**: Included the new architecture overview and the refreshed soak-plan references in the `11.0.1` release artifact so the published release matches the current `main` branch onboarding and soak guidance.
+
+### Changed
+
+- **Release metadata updated for the patch soak cut**: Bumped the Particle product version, firmware version string, README version header, Doxygen project number, and soak preconditions to `11.0.1` / `PRODUCT_VERSION(12)`.
+
+### Fixed
+
+- **Version traceability for Singapore soak deployment**: The firmware tip that includes the architecture overview documentation now reports a distinct patch-release identity instead of continuing to present itself as `11.0.0`.
+
 ## [11.0.0] - 2026-05-22
 
 ### Added

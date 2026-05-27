@@ -1,5 +1,7 @@
+#include "Config.h"
 #include "cloud/Cloud.h"
 #include "observability/WakeCycleStats.h"
+#include "sensors/SensorManager.h"
 
 // External firmware version string (defined in Version.cpp)
 extern const char* FIRMWARE_VERSION;
@@ -64,7 +66,7 @@ bool Cloud::writeDeviceStatusToCloud() {
 
     // Publish payload: base status + optional per-cycle diagnostics.
     // This does NOT affect change detection, so it won't increase publish rate.
-    char bufferPublish[640];
+    char bufferPublish[896];
     JSONBufferWriter writer(bufferPublish, sizeof(bufferPublish));
     writer.beginObject();
 
@@ -99,6 +101,16 @@ bool Cloud::writeDeviceStatusToCloud() {
     writer.name("reportingMode").value((int)sysStatus.get_reportingMode());
     writer.name("samplingMode").value((int)sysStatus.get_samplingMode());
     writer.endObject();
+
+#if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
+    writer.name("pmicAnomalyCount").value((int)pmicAnomalyCount);
+    writer.name("lastPmicAnomalySoc").value((double)lastPmicAnomalySoc, 2);
+    writer.name("lastPmicAnomalyChargeStatus").value((int)lastPmicAnomalyChargeStatus);
+    writer.name("lastPmicAnomalyAgeSec").value((unsigned long)pmicAnomalyAgeSec());
+    writer.name("lastPmicAnomalyPowerSource").value((int)lastPmicAnomalyPowerSource);
+    writer.name("lastPmicAnomalyVbusStatus").value((int)lastPmicAnomalyVbusStatus);
+    writer.name("pmicAnomalyActive").value(pmicAnomalyActive ? 1 : 0);
+#endif
 
     // Optional: piggyback last completed wake-cycle stats for field diagnostics.
     // This is only included when we are already publishing device-status (config changed).

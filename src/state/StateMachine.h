@@ -79,6 +79,25 @@ extern unsigned long connectedStartMs;
 extern SessionState session;
 
 /**
+ * @brief Refreshes the awake watchdog while the firmware is intentionally running.
+ */
+void serviceAwakeWatchdog();
+
+/**
+ * @brief Prepares the awake watchdog for an intended sleep transition.
+ *
+ * @param context Short log label for the sleep site
+ */
+void pauseAwakeWatchdogForSleep(const char *context);
+
+/**
+ * @brief Restores the awake watchdog after a sleep return path.
+ *
+ * @param context Short log label for the wake site
+ */
+void restoreAwakeWatchdogAfterWake(const char *context);
+
+/**
  * @brief Returns true when the local-time snapshot is inside configured open hours.
  *
  * @return true when the device should behave as within operating hours

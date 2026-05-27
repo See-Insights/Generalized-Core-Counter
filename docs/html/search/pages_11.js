@@ -1,6 +1,8 @@
 var searchData=
 [
-  ['v11_200_200_0',['Release Notes: v11.0.0',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html',1,'']]],
-  ['validation_1',['Build And Validation',['../index.html#autotoc_md11',1,'']]],
-  ['validation_20summary_2',['Bench Validation Summary',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md22',1,'']]]
+  ['hardware_20watchdog_0',['AB1805 Hardware Watchdog',['../md_docs_2architecture-overview.html#autotoc_md145',1,'']]],
+  ['header_20pir_20sensor_20on_20carrier_1',['Carrier board header (PIR sensor on carrier)',['../device__pinout_8h.html#autotoc_md0',1,'']]],
+  ['health_20monitoring_20remediation_20boron_20only_2',['Test 6 — PMIC Health Monitoring &amp;amp; Remediation (Boron Only)',['../md_docs_2bench-validation.html#autotoc_md181',1,'']]],
+  ['high_20level_20system_20architecture_3',['2. High-Level System Architecture',['../md_docs_2architecture-overview.html#autotoc_md105',1,'']]],
+  ['honored_4',['Test 4 — Sleep Return / Sleep Not Honored',['../md_docs_2bench-validation.html#autotoc_md179',1,'']]]
 ];

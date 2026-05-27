@@ -19,9 +19,18 @@ var namespaces_dup =
         [ "BREADCRUMB_CLOUD_CONNECTED", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba1a124c01a209149458f63420e9d07f8e", null ],
         [ "BREADCRUMB_APP_WATCHDOG_RESET", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba4437fa49e9455b2ca7a6ad393dd2ad00", null ],
         [ "BREADCRUMB_CONNECTIVITY_FAILSAFE", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baf1ea3bf33035cb6ea625a7474ba43aa0", null ],
-        [ "BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baf870bcc4e02cbbc31405c09bf7d9d8b6", null ]
+        [ "BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baf870bcc4e02cbbc31405c09bf7d9d8b6", null ],
+        [ "BREADCRUMB_REPORT_QUEUE_START", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baf28aa61195d5ba3b71bfcd0523162632", null ],
+        [ "BREADCRUMB_REPORT_QUEUE_DONE", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4bad3613612c06773ecf887798e9eb85b41", null ],
+        [ "BREADCRUMB_REPORT_LEDGER_START", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baff990d4c61f0dcc61659ce48e576c797", null ],
+        [ "BREADCRUMB_REPORT_LEDGER_DONE", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba30151a1db162f36d208cffb326a88e53", null ]
+      ] ],
+      [ "AwakeWatchdogSleepStrategy", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a733878f37693926607ec59f8dfda41fd", [
+        [ "AWAKE_WATCHDOG_SLEEP_CONFIG_PAUSE", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a733878f37693926607ec59f8dfda41fda6ef51118156521970c1902e234b6c2ef", null ],
+        [ "AWAKE_WATCHDOG_SLEEP_MANUAL_STOP", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a733878f37693926607ec59f8dfda41fda2c4b0fa5a2f3080d91de6d7b11d00e12", null ]
       ] ],
       [ "appBreadcrumbName", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a555d15a7ec243d93b6d9be9c1b6f1fa8", null ],
+      [ "awakeWatchdogSleepStrategyName", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#aa780afa2786eda3a2b492233ee242275", null ],
       [ "batteryTierShortName", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a898666f89a1c8e56926acc9d223bc0e1", null ],
       [ "claimFailsafeDeferLogLocal", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a4d1e08710e0c28d588c316cd3c87f2ca", null ],
       [ "connectivityFailsafeHasExternalPower", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a2df8466dd8f6e58e55b0188a0d70801a", null ],
@@ -29,7 +38,9 @@ var namespaces_dup =
       [ "currentBatteryTierForFailsafe", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a22ab13086577aee3158b407d7f87be7b", null ],
       [ "failsafeDeferReasonNameLocal", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a71eeb42ec83455b053d5ae4e83fc5558", null ],
       [ "persistConnectivityFailsafeState", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a650cc13442db2bb2b127ed466d7acb35", null ],
-      [ "stateShortName", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a12b2b29836fbe05e1de3b987f678777f", null ]
+      [ "stateShortName", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a12b2b29836fbe05e1de3b987f678777f", null ],
+      [ "AWAKE_WATCHDOG_TIMEOUT_MS", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#aaa69fbc214ee5f7e35b33c9cfdd6e027", null ],
+      [ "REPORT_FORENSICS_SLOW_LOG_THRESHOLD_MS", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a361be2e1010a6c9c37a574834a4564e3", null ]
     ] ],
     [ "anonymous_namespace{LedgerClient.cpp}", "namespaceanonymous__namespace_02_ledger_client_8cpp_03.html", [
       [ "ledgerHasConfigContent", "namespaceanonymous__namespace_02_ledger_client_8cpp_03.html#adb973634933ef1036e1092ad24f20248", null ],

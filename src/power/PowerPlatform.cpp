@@ -52,22 +52,29 @@ void logAppliedProfileConfig(PowerInputProfile profile,
                              int chargeVoltageMv,
                              bool useVinWithUsbHost,
                              int systemResult) {
+  const PowerSourceSnapshot snapshot = readPowerSource();
+  PMIC pmic(true);
+  const bool chargingEnabled = pmic.isChargingEnabled();
+
   if (systemResult != SYSTEM_ERROR_NONE) {
-    Log.warn("Power cfg failed: prof=%s result=%d",
+    Log.warn("PowerCfg: source=%d inputCurrent=%u minSystemVoltage=%u chargeVoltage=%u chargingEnabled=%d profile=%s result=%d",
+             snapshot.source,
+             (unsigned)sourceMaxCurrentMa,
+             (unsigned)sourceMinVoltageMv,
+             (unsigned)chargeVoltageMv,
+             chargingEnabled ? 1 : 0,
              PowerDiagnostics::inputProfileLabel(profile),
              systemResult);
     return;
   }
 
-  if (sysStatus.get_verboseMode()) {
-    Log.info("Power cfg: prof=%s srcMax=%d srcMin=%d chgCur=%d chgVolt=%d vin=%d",
-             PowerDiagnostics::inputProfileLabel(profile),
-             sourceMaxCurrentMa,
-             sourceMinVoltageMv,
-             chargeCurrentMa,
-             chargeVoltageMv,
-             useVinWithUsbHost ? 1 : 0);
-  }
+  Log.info("PowerCfg: source=%d inputCurrent=%u minSystemVoltage=%u chargeVoltage=%u chargingEnabled=%d profile=%s",
+           snapshot.source,
+           (unsigned)sourceMaxCurrentMa,
+           (unsigned)sourceMinVoltageMv,
+           (unsigned)chargeVoltageMv,
+           chargingEnabled ? 1 : 0,
+           PowerDiagnostics::inputProfileLabel(profile));
 }
 
 SystemPowerConfiguration makeUsbBenchConfiguration() {

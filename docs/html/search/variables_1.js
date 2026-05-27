@@ -12,5 +12,6 @@ var searchData=
   ['authoritative_5fpost_5fconnect_5fdelta_5fthreshold_9',['AUTHORITATIVE_POST_CONNECT_DELTA_THRESHOLD',['../namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a50d7e96994354eb92f9a78fd8264c3f9',1,'anonymous_namespace{SensorManager.cpp}']]],
   ['aux1_10',['aux1',['../struct_sensor_data.html#ac7ac11fa966d2161a60b4ee1bc4c3264',1,'SensorData']]],
   ['aux2_11',['aux2',['../struct_sensor_data.html#a3cc80364cff8be6a9ea11f1af9fcd690',1,'SensorData']]],
-  ['awaitingwebhookresponse_12',['awaitingWebhookResponse',['../struct_session_state.html#af7dffe574bae3e71f15882288106f58c',1,'SessionState']]]
+  ['awaitingwebhookresponse_12',['awaitingWebhookResponse',['../struct_session_state.html#af7dffe574bae3e71f15882288106f58c',1,'SessionState']]],
+  ['awake_5fwatchdog_5ftimeout_5fms_13',['AWAKE_WATCHDOG_TIMEOUT_MS',['../namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#aaa69fbc214ee5f7e35b33c9cfdd6e027',1,'anonymous_namespace{Generalized-Core-Counter.cpp}']]]
 ];

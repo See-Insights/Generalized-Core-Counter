@@ -54,14 +54,12 @@ void handleIdleState() {
 
       if (timeSinceLastEvent >= debounceMs) {
         // Debounce timeout expired - space is now unoccupied
-        uint32_t sessionDuration = Time.now() - current.get_occupancyStartTime();
-        uint32_t totalOccupied = current.get_totalOccupiedSeconds() + sessionDuration;
         const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
-        current.set_totalOccupiedSeconds(totalOccupied);
-        current.set_occupied(false);
-        current.set_occupancyStartTime(0);
+        const OccupancyCloseResult closeResult = closeOccupancySessionSafely("idle");
         signalLED(false);  // Turn off LED
-        logUnoccupiedEvent("debounce", sessionDuration, totalOccupied, reportNow);
+        if (closeResult.valid) {
+          logUnoccupiedEvent("debounce", closeResult.sessionSeconds, closeResult.totalSeconds, reportNow);
+        }
         
         // In INTERMITTENT_KEEP_ALIVE mode (connectionMode 3), report immediately
         // on occupancy transitions. In other modes, occupancy transitions are

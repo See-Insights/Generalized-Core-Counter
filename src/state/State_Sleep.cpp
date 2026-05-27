@@ -350,6 +350,7 @@ void handleSleepingState() {
         }
         // Mark progress to prevent ThrashGuard timeout during legitimate cloud operations wait
         thrashGuard.markProgress("CLOUD_OPS_WAIT");
+        serviceAwakeWatchdog();
         Particle.process(); // Keep connection alive
         return; // Stay in SLEEPING_STATE until complete or timeout
       }
@@ -561,6 +562,7 @@ void handleSleepingState() {
       thrashGuard.markProgress("DISCONNECT_WAIT");
       lastDisconnectProgressMs = nowMs;
     }
+    serviceAwakeWatchdog();
     Particle.process();
     return;
   }
@@ -677,6 +679,7 @@ void handleSleepingState() {
       thrashGuard.markProgress("DISCONNECT_WAIT");
       lastGateProgressMs = nowMs;
     }
+    serviceAwakeWatchdog();
     Particle.process();
     return;
   }
@@ -736,6 +739,7 @@ void handleSleepingState() {
     #endif
 
       ab1805.stopWDT();
+      pauseAwakeWatchdogForSleep("hib");
       // Reset sleep configuration so prior ULTRA_LOW_POWER GPIOs do not
       // accidentally carry into HIBERNATE configuration.
       config = SystemSleepConfiguration();
@@ -1024,6 +1028,7 @@ void handleSleepingState() {
   // Stop watchdog immediately before sleep (after config is fully built)
   // to minimize time between I2C transaction and sleep entry
   const bool watchdogStopped = ab1805.stopWDT();
+  pauseAwakeWatchdogForSleep("ulp");
   Log.info("SleepCall: standby=%d dur=%d wdt=%s gate=ok",
            useNetworkStandby ? 1 : 0,
            wakeInSeconds,
@@ -1127,6 +1132,7 @@ void handleSleepingState() {
   
   // Resume hardware watchdog immediately after wake
   ab1805.resumeWDT();
+  restoreAwakeWatchdogAfterWake("ulp");
 
   // Mark progress immediately after wake to reset ThrashGuard timer
   thrashGuard.markProgress("WAKE_FROM_SLEEP");
@@ -1141,6 +1147,7 @@ void handleSleepingState() {
     unsigned long serialWaitStart = millis();
     while (!Serial.isConnected() && (millis() - serialWaitStart) < ConnectivityPolicy::DEBUG_SERIAL_WAIT_TIMEOUT_MS) {
       thrashGuard.markProgress("SERIAL_WAIT");
+      serviceAwakeWatchdog();
       Particle.process();
       delay(ConnectivityPolicy::DEBUG_SERIAL_WAIT_POLL_DELAY_MS);
     }
@@ -1155,6 +1162,11 @@ void handleSleepingState() {
   Log.info("WakeReturn: elapsed=%lu reason=%s",
            sleepElapsedMs,
            wakeReturnReason);
+
+#if Wiring_Watchdog
+  Log.info("AppWDT: active ctx=ulp armed=%d",
+           Watchdog.started() ? 1 : 0);
+#endif
 
   // Re-attach user button interrupt after sleep (sleep may have detached it)
   attachInterrupt(BUTTON_PIN, userSwitchISR, FALLING);
@@ -1221,14 +1233,12 @@ void handleSleepingState() {
     // This ensures we don't immediately undo state changes from PIR processing
     if (sysStatus.get_sensorMode() == OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
       // LED timeout expired - debounce period elapsed without motion
-      uint32_t sessionDuration = Time.now() - current.get_occupancyStartTime();
-      uint32_t totalOccupied = current.get_totalOccupiedSeconds() + sessionDuration;
       const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
-      current.set_totalOccupiedSeconds(totalOccupied);
-      current.set_occupied(false);
-      current.set_occupancyStartTime(0);
+      const OccupancyCloseResult closeResult = closeOccupancySessionSafely("sleep");
       signalLED(false);  // Turn off LED
-      logUnoccupiedEvent("debounce", sessionDuration, totalOccupied, reportNow);
+      if (closeResult.valid) {
+        logUnoccupiedEvent("debounce", closeResult.sessionSeconds, closeResult.totalSeconds, reportNow);
+      }
       
       // Match the rest of the occupancy state machine: only KEEP_ALIVE mode
       // forces an immediate report/connect on occupancy transitions.

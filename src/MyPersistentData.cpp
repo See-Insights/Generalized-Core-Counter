@@ -140,6 +140,10 @@ void sysStatusData::initialize() {
     sysStatus.set_connectivityRecoveryStage(0);
     sysStatus.set_lastConnectivityRecoveryAction(0);
     sysStatus.set_connectivityRecoveryCount(0);
+    sysStatus.set_watchdogResetCount(0);
+    sysStatus.set_lastWatchdogBreadcrumb(0);
+    sysStatus.set_lastWatchdogUptimeMs(0);
+    sysStatus.set_lastWatchdogResetReasonData(0);
 }
 
 uint8_t sysStatusData::get_structuresVersion() const {
@@ -424,6 +428,34 @@ uint8_t sysStatusData::get_connectivityRecoveryCount() const {
 }
 void sysStatusData::set_connectivityRecoveryCount(uint8_t value) {
     setValue<uint8_t>(offsetof(SysData,connectivityRecoveryCount), value);
+}
+
+uint16_t sysStatusData::get_watchdogResetCount() const {
+    return getValue<uint16_t>(offsetof(SysData,watchdogResetCount));
+}
+void sysStatusData::set_watchdogResetCount(uint16_t value) {
+    setValue<uint16_t>(offsetof(SysData,watchdogResetCount), value);
+}
+
+uint8_t sysStatusData::get_lastWatchdogBreadcrumb() const {
+    return getValue<uint8_t>(offsetof(SysData,lastWatchdogBreadcrumb));
+}
+void sysStatusData::set_lastWatchdogBreadcrumb(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,lastWatchdogBreadcrumb), value);
+}
+
+uint32_t sysStatusData::get_lastWatchdogUptimeMs() const {
+    return getValue<uint32_t>(offsetof(SysData,lastWatchdogUptimeMs));
+}
+void sysStatusData::set_lastWatchdogUptimeMs(uint32_t value) {
+    setValue<uint32_t>(offsetof(SysData,lastWatchdogUptimeMs), value);
+}
+
+uint32_t sysStatusData::get_lastWatchdogResetReasonData() const {
+    return getValue<uint32_t>(offsetof(SysData,lastWatchdogResetReasonData));
+}
+void sysStatusData::set_lastWatchdogResetReasonData(uint32_t value) {
+    setValue<uint32_t>(offsetof(SysData,lastWatchdogResetReasonData), value);
 }
 
 // End of sysStatusData class

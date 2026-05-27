@@ -10,5 +10,6 @@ var searchData=
   ['requestradiopoweroff_7',['requestRadioPowerOff',['../namespace_connectivity.html#a2a57cc42c82eb80256258e783f248508',1,'Connectivity']]],
   ['reset_8',['reset',['../class_i_sensor.html#a5a11e705590a9a16bef6c0dd154da2e7',1,'ISensor::reset()'],['../class_p_i_r_sensor.html#a0f0d1a8a3d010e2fbef7acaed0b381b7',1,'PIRSensor::reset()']]],
   ['reseteverything_9',['resetEverything',['../classcurrent_status_data.html#a338c2e9242f5cbbc12a1be90861c45cb',1,'currentStatusData']]],
-  ['resetonwake_10',['resetOnWake',['../struct_observability_1_1_wake_cycle_stats.html#a06cab85b425af73192f92487cb60d163',1,'Observability::WakeCycleStats']]]
+  ['resetonwake_10',['resetOnWake',['../struct_observability_1_1_wake_cycle_stats.html#a06cab85b425af73192f92487cb60d163',1,'Observability::WakeCycleStats']]],
+  ['restoreawakewatchdogafterwake_11',['restoreAwakeWatchdogAfterWake',['../_generalized-_core-_counter_8cpp.html#a078231b7793d30858efbccc85f37efab',1,'restoreAwakeWatchdogAfterWake(const char *context):&#160;Generalized-Core-Counter.cpp'],['../_state_machine_8h.html#a078231b7793d30858efbccc85f37efab',1,'restoreAwakeWatchdogAfterWake(const char *context):&#160;Generalized-Core-Counter.cpp']]]
 ];

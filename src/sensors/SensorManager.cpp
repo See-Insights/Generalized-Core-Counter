@@ -12,6 +12,7 @@ const char *batteryContext[7] = {"Unknown",    "Not Charging", "Charging",
 #include "power/PowerManager.h"
 #include "power/PowerPlatform.h"
 #include "power/ConnectivityPolicy.h"
+#include "state/StateMachine.h"
 #include "sensors/SensorFactory.h"
 #include "device_pinout.h"     // TMP36_SENSE_PIN for enclosure temperature
 
@@ -21,13 +22,51 @@ const char *batteryContext[7] = {"Unknown",    "Not Charging", "Charging",
 FuelGauge fuelGauge;
 
 SensorManager *SensorManager::_instance;
+retained uint16_t pmicAnomalyCount = 0;
+retained uint32_t lastPmicAnomalyUptimeMs = 0;
+retained time_t lastPmicAnomalyEpoch = 0;
+retained float lastPmicAnomalySoc = 0.0f;
+retained uint8_t lastPmicAnomalyChargeStatus = 0;
+retained uint8_t lastPmicAnomalyPowerSource = 0;
+retained uint8_t lastPmicAnomalyVbusStatus = 0;
+bool pmicAnomalyActive = false;
+
+uint32_t pmicAnomalyAgeSec() {
+#if !defined(ENABLE_PMIC_FORENSICS) || !ENABLE_PMIC_FORENSICS
+  return 0;
+#else
+  if (pmicAnomalyCount == 0) {
+    return 0;
+  }
+
+  if (Time.isValid() && lastPmicAnomalyEpoch != 0 && Time.now() > lastPmicAnomalyEpoch) {
+    return (uint32_t)(Time.now() - lastPmicAnomalyEpoch);
+  }
+
+  if (lastPmicAnomalyUptimeMs == 0) {
+    return 0;
+  }
+
+  const uint32_t nowMs = millis();
+  if (nowMs < lastPmicAnomalyUptimeMs) {
+    return 0;
+  }
+
+  return (nowMs - lastPmicAnomalyUptimeMs) / 1000UL;
+#endif
+}
 
 namespace {
+
+#if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
+constexpr uint8_t PMIC_ANOMALY_CONSECUTIVE_LIMIT = 3;
+#endif
 
 #if HAL_PLATFORM_CELLULAR || PLATFORM_ID == PLATFORM_ARGON
 void boundedBatterySettleDelay(unsigned long delayMs) {
   const unsigned long startMs = millis();
   while ((millis() - startMs) < delayMs) {
+    serviceAwakeWatchdog();
     Particle.process();
     const unsigned long elapsedMs = millis() - startMs;
     const unsigned long remainingMs = (elapsedMs < delayMs) ? (delayMs - elapsedMs) : 0UL;
@@ -946,12 +985,66 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   static byte lastLoggedPmicFaultReg = 0xFF;
   static int lastLoggedPmicPowerSource = -999;
   static PowerInputProfile lastLoggedPmicProfile = PowerInputProfile::NotApplicable;
+#if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
+  static uint8_t consecutivePmicContradictions = 0;
+#endif
   const uint8_t systemBattState = battState;
   const uint8_t pmicBattState = batteryStateFromPmicStatus(chargeStatus, faultReg);
   if (sampleCanBeAuthoritative) {
     _authoritativeBatteryState = pmicBattState;
   }
   current.set_batteryState(pmicBattState);
+
+#if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
+  // Instrument contradictory PMIC state without changing charging behavior.
+  const float effectiveSoc = rejectAuthoritativeOverwrite ? _authoritativeBatterySoc : soc;
+  const bool pmicStateContradiction =
+      safeToCharge &&
+      batterySocIsValid(effectiveSoc) &&
+      effectiveSoc < 20.0f &&
+      (pmicBattState == (uint8_t)PowerBatteryContext::Charged ||
+       pmicBattState == (uint8_t)PowerBatteryContext::NotCharging);
+
+  if (pmicStateContradiction) {
+    if (consecutivePmicContradictions < 0xFF) {
+      consecutivePmicContradictions++;
+    }
+  } else {
+    consecutivePmicContradictions = 0;
+  }
+
+  const bool pmicAnomalyNowActive =
+      consecutivePmicContradictions >= PMIC_ANOMALY_CONSECUTIVE_LIMIT;
+  const bool pmicAnomalyBecameActive = pmicAnomalyNowActive && !pmicAnomalyActive;
+  pmicAnomalyActive = pmicAnomalyNowActive;
+
+  if (pmicAnomalyBecameActive) {
+    if (pmicAnomalyCount < 0xFFFF) {
+      pmicAnomalyCount++;
+    }
+    lastPmicAnomalyUptimeMs = millis();
+    lastPmicAnomalyEpoch = Time.isValid() ? Time.now() : 0;
+    lastPmicAnomalySoc = effectiveSoc;
+    lastPmicAnomalyChargeStatus = pmicBattState;
+    lastPmicAnomalyPowerSource = (powerSource >= 0 && powerSource <= 0xFF) ? (uint8_t)powerSource : 0;
+    lastPmicAnomalyVbusStatus = vbusStatus;
+
+    Log.warn("PMIC_ANOM: soc=%.2f vcell=%.3f chargeStatus=%u chargeState=%s faultReg=0x%02X vbusStatus=%u powerGood=%d powerSource=%d temp=%.1f lowBattery=%d uptime=%lu lastResetReason=%d profile=%s",
+             (double)effectiveSoc,
+             (double)vcell,
+             (unsigned)pmicBattState,
+             batteryContext[(pmicBattState <= 6) ? pmicBattState : 0],
+             faultReg,
+             (unsigned)vbusStatus,
+             powerGood ? 1 : 0,
+             powerSource,
+             (double)current.get_internalTempC(),
+             sysStatus.get_lowBatteryMode() ? 1 : 0,
+             (unsigned long)millis(),
+             (int)System.resetReason(),
+             compactProfileLabel(powerReport.activeInputProfile));
+  }
+#endif
 
   const uint8_t finalLoggedBattState = pmicBattState;
   const bool pmicStatusChanged =

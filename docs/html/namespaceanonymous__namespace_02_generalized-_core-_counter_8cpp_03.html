@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;13.0.0</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -109,12 +109,21 @@ Enumerations</h2></td></tr>
 &#160;&#160;<a class="el" href="#a747ed59bc7ff9db8dac8459738c85c4ba4437fa49e9455b2ca7a6ad393dd2ad00">BREADCRUMB_APP_WATCHDOG_RESET</a> = 8
 , <a class="el" href="#a747ed59bc7ff9db8dac8459738c85c4baf1ea3bf33035cb6ea625a7474ba43aa0">BREADCRUMB_CONNECTIVITY_FAILSAFE</a> = 9
 , <a class="el" href="#a747ed59bc7ff9db8dac8459738c85c4baf870bcc4e02cbbc31405c09bf7d9d8b6">BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD</a> = 10
+, <a class="el" href="#a747ed59bc7ff9db8dac8459738c85c4baf28aa61195d5ba3b71bfcd0523162632">BREADCRUMB_REPORT_QUEUE_START</a> = 11
+, <br />
+&#160;&#160;<a class="el" href="#a747ed59bc7ff9db8dac8459738c85c4bad3613612c06773ecf887798e9eb85b41">BREADCRUMB_REPORT_QUEUE_DONE</a> = 12
+, <a class="el" href="#a747ed59bc7ff9db8dac8459738c85c4baff990d4c61f0dcc61659ce48e576c797">BREADCRUMB_REPORT_LEDGER_START</a> = 13
+, <a class="el" href="#a747ed59bc7ff9db8dac8459738c85c4ba30151a1db162f36d208cffb326a88e53">BREADCRUMB_REPORT_LEDGER_DONE</a> = 14
 <br />
+ }</td></tr>
+<tr class="memitem:a733878f37693926607ec59f8dfda41fd" id="r_a733878f37693926607ec59f8dfda41fd"><td class="memItemLeft">enum &#160;</td><td class="memItemRight"><a class="el" href="#a733878f37693926607ec59f8dfda41fd">AwakeWatchdogSleepStrategy</a> : uint8_t { <a class="el" href="#a733878f37693926607ec59f8dfda41fda6ef51118156521970c1902e234b6c2ef">AWAKE_WATCHDOG_SLEEP_CONFIG_PAUSE</a> = 0
+, <a class="el" href="#a733878f37693926607ec59f8dfda41fda2c4b0fa5a2f3080d91de6d7b11d00e12">AWAKE_WATCHDOG_SLEEP_MANUAL_STOP</a> = 1
  }</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:a555d15a7ec243d93b6d9be9c1b6f1fa8" id="r_a555d15a7ec243d93b6d9be9c1b6f1fa8"><td class="memItemLeft">const char *&#160;</td><td class="memItemRight"><a class="el" href="#a555d15a7ec243d93b6d9be9c1b6f1fa8">appBreadcrumbName</a> (uint8_t code)</td></tr>
+<tr class="memitem:aa780afa2786eda3a2b492233ee242275" id="r_aa780afa2786eda3a2b492233ee242275"><td class="memItemLeft">const char *&#160;</td><td class="memItemRight"><a class="el" href="#aa780afa2786eda3a2b492233ee242275">awakeWatchdogSleepStrategyName</a> (<a class="el" href="#a733878f37693926607ec59f8dfda41fd">AwakeWatchdogSleepStrategy</a> strategy)</td></tr>
 <tr class="memitem:a898666f89a1c8e56926acc9d223bc0e1" id="r_a898666f89a1c8e56926acc9d223bc0e1"><td class="memItemLeft">const char *&#160;</td><td class="memItemRight"><a class="el" href="#a898666f89a1c8e56926acc9d223bc0e1">batteryTierShortName</a> (<a class="el" href="_my_persistent_data_8h.html#a426866053adc87a6b48f04938146e0ff">BatteryTier</a> tier)</td></tr>
 <tr class="memitem:a4d1e08710e0c28d588c316cd3c87f2ca" id="r_a4d1e08710e0c28d588c316cd3c87f2ca"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a4d1e08710e0c28d588c316cd3c87f2ca">claimFailsafeDeferLogLocal</a> (<a class="el" href="_state___common_8h.html#ab615e291ed6fc3b056a35a52d90c2ef5">FailsafeDeferReason</a> reason)</td></tr>
 <tr class="memitem:a2df8466dd8f6e58e55b0188a0d70801a" id="r_a2df8466dd8f6e58e55b0188a0d70801a"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a2df8466dd8f6e58e55b0188a0d70801a">connectivityFailsafeHasExternalPower</a> ()</td></tr>
@@ -123,6 +132,11 @@ Functions</h2></td></tr>
 <tr class="memitem:a71eeb42ec83455b053d5ae4e83fc5558" id="r_a71eeb42ec83455b053d5ae4e83fc5558"><td class="memItemLeft">const char *&#160;</td><td class="memItemRight"><a class="el" href="#a71eeb42ec83455b053d5ae4e83fc5558">failsafeDeferReasonNameLocal</a> (<a class="el" href="_state___common_8h.html#ab615e291ed6fc3b056a35a52d90c2ef5">FailsafeDeferReason</a> reason)</td></tr>
 <tr class="memitem:a650cc13442db2bb2b127ed466d7acb35" id="r_a650cc13442db2bb2b127ed466d7acb35"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a650cc13442db2bb2b127ed466d7acb35">persistConnectivityFailsafeState</a> (uint8_t stage, time_t actionTime, bool incrementCount)</td></tr>
 <tr class="memitem:a12b2b29836fbe05e1de3b987f678777f" id="r_a12b2b29836fbe05e1de3b987f678777f"><td class="memItemLeft">const char *&#160;</td><td class="memItemRight"><a class="el" href="#a12b2b29836fbe05e1de3b987f678777f">stateShortName</a> (<a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8">State</a> value)</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 id="header-var-members" class="groupheader"><a id="var-members" name="var-members"></a>
+Variables</h2></td></tr>
+<tr class="memitem:aaa69fbc214ee5f7e35b33c9cfdd6e027" id="r_aaa69fbc214ee5f7e35b33c9cfdd6e027"><td class="memItemLeft">constexpr unsigned long&#160;</td><td class="memItemRight"><a class="el" href="#aaa69fbc214ee5f7e35b33c9cfdd6e027">AWAKE_WATCHDOG_TIMEOUT_MS</a> = 60000UL</td></tr>
+<tr class="memitem:a361be2e1010a6c9c37a574834a4564e3" id="r_a361be2e1010a6c9c37a574834a4564e3"><td class="memItemLeft">constexpr unsigned long&#160;</td><td class="memItemRight"><a class="el" href="#a361be2e1010a6c9c37a574834a4564e3">REPORT_FORENSICS_SLOW_LOG_THRESHOLD_MS</a> = 250UL</td></tr>
 </table>
 <a name="doc-enum-members" id="doc-enum-members"></a><h2 id="header-doc-enum-members" class="groupheader">Enumeration Type Documentation</h2>
 <a id="a747ed59bc7ff9db8dac8459738c85c4b" name="a747ed59bc7ff9db8dac8459738c85c4b"></a>
@@ -148,9 +162,33 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="a747ed59bc7ff9db8dac8459738c85c4ba4437fa49e9455b2ca7a6ad393dd2ad00" name="a747ed59bc7ff9db8dac8459738c85c4ba4437fa49e9455b2ca7a6ad393dd2ad00"></a>BREADCRUMB_APP_WATCHDOG_RESET&#160;</td><td class="fielddoc"></td></tr>
 <tr><td class="fieldname"><a id="a747ed59bc7ff9db8dac8459738c85c4baf1ea3bf33035cb6ea625a7474ba43aa0" name="a747ed59bc7ff9db8dac8459738c85c4baf1ea3bf33035cb6ea625a7474ba43aa0"></a>BREADCRUMB_CONNECTIVITY_FAILSAFE&#160;</td><td class="fielddoc"></td></tr>
 <tr><td class="fieldname"><a id="a747ed59bc7ff9db8dac8459738c85c4baf870bcc4e02cbbc31405c09bf7d9d8b6" name="a747ed59bc7ff9db8dac8459738c85c4baf870bcc4e02cbbc31405c09bf7d9d8b6"></a>BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a747ed59bc7ff9db8dac8459738c85c4baf28aa61195d5ba3b71bfcd0523162632" name="a747ed59bc7ff9db8dac8459738c85c4baf28aa61195d5ba3b71bfcd0523162632"></a>BREADCRUMB_REPORT_QUEUE_START&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a747ed59bc7ff9db8dac8459738c85c4bad3613612c06773ecf887798e9eb85b41" name="a747ed59bc7ff9db8dac8459738c85c4bad3613612c06773ecf887798e9eb85b41"></a>BREADCRUMB_REPORT_QUEUE_DONE&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a747ed59bc7ff9db8dac8459738c85c4baff990d4c61f0dcc61659ce48e576c797" name="a747ed59bc7ff9db8dac8459738c85c4baff990d4c61f0dcc61659ce48e576c797"></a>BREADCRUMB_REPORT_LEDGER_START&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a747ed59bc7ff9db8dac8459738c85c4ba30151a1db162f36d208cffb326a88e53" name="a747ed59bc7ff9db8dac8459738c85c4ba30151a1db162f36d208cffb326a88e53"></a>BREADCRUMB_REPORT_LEDGER_DONE&#160;</td><td class="fielddoc"></td></tr>
 </table>
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00139">139</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00172">172</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+
+</div>
+</div>
+<a id="a733878f37693926607ec59f8dfda41fd" name="a733878f37693926607ec59f8dfda41fd"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a733878f37693926607ec59f8dfda41fd">&#9670;&#160;</a></span>AwakeWatchdogSleepStrategy</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum anonymous_namespace{Generalized-Core-Counter.cpp}::AwakeWatchdogSleepStrategy : uint8_t</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="a733878f37693926607ec59f8dfda41fda6ef51118156521970c1902e234b6c2ef" name="a733878f37693926607ec59f8dfda41fda6ef51118156521970c1902e234b6c2ef"></a>AWAKE_WATCHDOG_SLEEP_CONFIG_PAUSE&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a733878f37693926607ec59f8dfda41fda2c4b0fa5a2f3080d91de6d7b11d00e12" name="a733878f37693926607ec59f8dfda41fda2c4b0fa5a2f3080d91de6d7b11d00e12"></a>AWAKE_WATCHDOG_SLEEP_MANUAL_STOP&#160;</td><td class="fielddoc"></td></tr>
+</table>
+
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00146">146</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
 </div>
 </div>
@@ -170,11 +208,34 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00153">153</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00190">190</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00148">BREADCRUMB_APP_WATCHDOG_RESET</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00147">BREADCRUMB_CLOUD_CONNECTED</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00146">BREADCRUMB_CONNECT_REQUESTED</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00149">BREADCRUMB_CONNECTIVITY_FAILSAFE</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00150">BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00145">BREADCRUMB_REPORTING</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00142">BREADCRUMB_SETUP_COMPLETE</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00141">BREADCRUMB_SETUP_START</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00143">BREADCRUMB_SLEEP_ENTRY</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00144">BREADCRUMB_WAKE</a>.</p>
+<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00181">BREADCRUMB_APP_WATCHDOG_RESET</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00180">BREADCRUMB_CLOUD_CONNECTED</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00179">BREADCRUMB_CONNECT_REQUESTED</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00182">BREADCRUMB_CONNECTIVITY_FAILSAFE</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00183">BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00187">BREADCRUMB_REPORT_LEDGER_DONE</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00186">BREADCRUMB_REPORT_LEDGER_START</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00185">BREADCRUMB_REPORT_QUEUE_DONE</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00184">BREADCRUMB_REPORT_QUEUE_START</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00178">BREADCRUMB_REPORTING</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00175">BREADCRUMB_SETUP_COMPLETE</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00174">BREADCRUMB_SETUP_START</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00176">BREADCRUMB_SLEEP_ENTRY</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00177">BREADCRUMB_WAKE</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00549">setup()</a>.</p>
+
+</div>
+</div>
+<a id="aa780afa2786eda3a2b492233ee242275" name="aa780afa2786eda3a2b492233ee242275"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa780afa2786eda3a2b492233ee242275">&#9670;&#160;</a></span>awakeWatchdogSleepStrategyName()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const char * anonymous_namespace{Generalized-Core-Counter.cpp}::awakeWatchdogSleepStrategyName </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="#a733878f37693926607ec59f8dfda41fd">AwakeWatchdogSleepStrategy</a></td>          <td class="paramname"><span class="paramname"><em>strategy</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00162">162</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00147">AWAKE_WATCHDOG_SLEEP_CONFIG_PAUSE</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00148">AWAKE_WATCHDOG_SLEEP_MANUAL_STOP</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01083">pauseAwakeWatchdogForSleep()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01110">restoreAwakeWatchdogAfterWake()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00549">setup()</a>.</p>
 
 </div>
 </div>
@@ -193,11 +254,11 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00201">201</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00246">246</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00113">TIER_CONSERVING</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00114">TIER_CRITICAL</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00112">TIER_HEALTHY</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00115">TIER_SURVIVAL</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01470">connectivityFailsafeSupervisor()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01695">connectivityFailsafeSupervisor()</a>.</p>
 
 </div>
 </div>
@@ -216,11 +277,11 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00291">291</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00336">336</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_state___common_8h_source.html#l00017">FAILSAFE_DEFER_NONE</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00132">session</a>.</p>
+<p class="reference">References <a class="el" href="_state___common_8h_source.html#l00017">FAILSAFE_DEFER_NONE</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00136">session</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00464">claimFailsafeDeferLog()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00509">claimFailsafeDeferLog()</a>.</p>
 
 </div>
 </div>
@@ -239,11 +300,11 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00224">224</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00269">269</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_power_manager_8h_source.html#l00016">NotAvailable</a>, <a class="el" href="_power_platform_8cpp_source.html#l00143">PowerPlatform::readPowerSource()</a>, <a class="el" href="_power_platform_8h_source.html#l00011">PowerPlatform::PowerSourceSnapshot::source</a>, and <a class="el" href="_power_platform_8h_source.html#l00012">PowerPlatform::PowerSourceSnapshot::status</a>.</p>
+<p class="reference">References <a class="el" href="_power_manager_8h_source.html#l00016">NotAvailable</a>, <a class="el" href="_power_platform_8cpp_source.html#l00150">PowerPlatform::readPowerSource()</a>, <a class="el" href="_power_platform_8h_source.html#l00011">PowerPlatform::PowerSourceSnapshot::source</a>, and <a class="el" href="_power_platform_8h_source.html#l00012">PowerPlatform::PowerSourceSnapshot::status</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01470">connectivityFailsafeSupervisor()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01695">connectivityFailsafeSupervisor()</a>.</p>
 
 </div>
 </div>
@@ -262,11 +323,11 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00241">241</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00286">286</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_connectivity_policy_8h_source.html#l00113">ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01470">connectivityFailsafeSupervisor()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01695">connectivityFailsafeSupervisor()</a>.</p>
 
 </div>
 </div>
@@ -285,11 +346,11 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00216">216</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00261">261</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_battery_backoff_8cpp_source.html#l00006">Cloud::calculateBatteryTier()</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00115">TIER_SURVIVAL</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01470">connectivityFailsafeSupervisor()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01695">connectivityFailsafeSupervisor()</a>.</p>
 
 </div>
 </div>
@@ -308,11 +369,11 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00272">272</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00317">317</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_state___common_8h_source.html#l00023">FAILSAFE_DEFER_CLOSED_HOURS_LONG_SLEEP</a>, <a class="el" href="_state___common_8h_source.html#l00020">FAILSAFE_DEFER_DISCONNECTED_MODE</a>, <a class="el" href="_state___common_8h_source.html#l00018">FAILSAFE_DEFER_INVALID_TIME</a>, <a class="el" href="_state___common_8h_source.html#l00022">FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED</a>, <a class="el" href="_state___common_8h_source.html#l00019">FAILSAFE_DEFER_NO_LAST_CONNECTION</a>, and <a class="el" href="_state___common_8h_source.html#l00021">FAILSAFE_DEFER_UPDATE_PENDING</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00460">failsafeDeferReasonName()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00505">failsafeDeferReasonName()</a>.</p>
 
 </div>
 </div>
@@ -340,11 +401,11 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00260">260</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00305">305</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01470">connectivityFailsafeSupervisor()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01695">connectivityFailsafeSupervisor()</a>.</p>
 
 </div>
 </div>
@@ -363,11 +424,64 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00180">180</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00225">225</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_state_machine_8h_source.html#l00019">CONNECTING_STATE</a>, <a class="el" href="_state_machine_8h_source.html#l00016">ERROR_STATE</a>, <a class="el" href="_state_machine_8h_source.html#l00021">FIRMWARE_UPDATE_STATE</a>, <a class="el" href="_state_machine_8h_source.html#l00017">IDLE_STATE</a>, <a class="el" href="_state_machine_8h_source.html#l00015">INITIALIZATION_STATE</a>, <a class="el" href="_state_machine_8h_source.html#l00020">REPORTING_STATE</a>, and <a class="el" href="_state_machine_8h_source.html#l00018">SLEEPING_STATE</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01470">connectivityFailsafeSupervisor()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01431">publishStateTransition()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01695">connectivityFailsafeSupervisor()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01656">publishStateTransition()</a>.</p>
+
+</div>
+</div>
+<a name="doc-var-members" id="doc-var-members"></a><h2 id="header-doc-var-members" class="groupheader">Variable Documentation</h2>
+<a id="aaa69fbc214ee5f7e35b33c9cfdd6e027" name="aaa69fbc214ee5f7e35b33c9cfdd6e027"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aaa69fbc214ee5f7e35b33c9cfdd6e027">&#9670;&#160;</a></span>AWAKE_WATCHDOG_TIMEOUT_MS</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">unsigned long anonymous_namespace{Generalized-Core-Counter.cpp}::AWAKE_WATCHDOG_TIMEOUT_MS = 60000UL</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel constexpr">constexpr</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00143">143</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00549">setup()</a>.</p>
+
+</div>
+</div>
+<a id="a361be2e1010a6c9c37a574834a4564e3" name="a361be2e1010a6c9c37a574834a4564e3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a361be2e1010a6c9c37a574834a4564e3">&#9670;&#160;</a></span>REPORT_FORENSICS_SLOW_LOG_THRESHOLD_MS</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">unsigned long anonymous_namespace{Generalized-Core-Counter.cpp}::REPORT_FORENSICS_SLOW_LOG_THRESHOLD_MS = 250UL</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel constexpr">constexpr</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00144">144</a> of file <a class="el" href="_generalized-_core-_counter_8cpp_source.html">Generalized-Core-Counter.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01310">publishData()</a>.</p>
 
 </div>
 </div>

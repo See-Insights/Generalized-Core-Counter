@@ -16,6 +16,7 @@
  * - DEV (non-blocking): -DDEV_BUILD=1
  * - DEV (blocking waits enabled): -DDEV_BUILD=1 -DALLOW_BLOCKING_SERIAL_WAITS=1
  * - Connectivity failsafe bench test: -DCONNECTIVITY_FAILSAFE_TEST_MODE=1
+ * - PMIC forensics override: -DENABLE_PMIC_FORENSICS=0
  *
  * Current repo defaults are set for field-safe behavior.
  * Switch to developer behavior by setting DEV_BUILD=1 (and optionally
@@ -25,7 +26,7 @@
 /**
  * @brief Set to 1 for developer builds.
  */
-#define DEV_BUILD 1
+#define DEV_BUILD 0
 #endif
 
 #ifndef FIELD_BUILD
@@ -39,7 +40,7 @@
 /**
  * @brief Allow explicit blocking waits for USB serial attachment.
  */
-#define ALLOW_BLOCKING_SERIAL_WAITS 1
+#define ALLOW_BLOCKING_SERIAL_WAITS 0
 #endif
 
 #ifndef CONNECTIVITY_FAILSAFE_TEST_MODE
@@ -58,6 +59,22 @@
 
 #if (CONNECTIVITY_FAILSAFE_TEST_MODE != 0) && (CONNECTIVITY_FAILSAFE_TEST_MODE != 1)
 #error "CONNECTIVITY_FAILSAFE_TEST_MODE must be 0 or 1"
+#endif
+
+#ifndef ENABLE_PMIC_FORENSICS
+/**
+ * @brief Enable retained PMIC contradiction forensic instrumentation.
+ *
+ * Release v13 defaults this to 1 so contradiction counters, logs, and
+ * startup/device-status telemetry are included in production soak builds.
+ * Set to 0 only for an explicit comparison build that needs the PMIC
+ * forensic path compiled out.
+ */
+#define ENABLE_PMIC_FORENSICS 1
+#endif
+
+#if (ENABLE_PMIC_FORENSICS != 0) && (ENABLE_PMIC_FORENSICS != 1)
+#error "ENABLE_PMIC_FORENSICS must be 0 or 1"
 #endif
 
 // Optional convenience: enable DEBUG_SERIAL in DEV builds unless overridden.

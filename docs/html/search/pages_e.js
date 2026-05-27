@@ -1,9 +1,12 @@
 var searchData=
 [
-  ['recovery_20architecture_0',['Recovery Architecture',['../index.html#autotoc_md6',1,'']]],
-  ['release_20focus_1',['Release Focus',['../index.html#autotoc_md2',1,'']]],
-  ['release_20notes_3a_20v11_200_200_2',['Release Notes: v11.0.0',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html',1,'']]],
-  ['release_20status_3',['Current Release Status',['../index.html#autotoc_md17',1,'']]],
-  ['repository_20layout_4',['Repository Layout',['../index.html#autotoc_md14',1,'']]],
-  ['rollback_20guidance_5',['Rollback Guidance',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md24',1,'']]]
+  ['edge_20cases_0',['Edge Cases',['../md_docs_2led-management-system.html#autotoc_md214',1,'']]],
+  ['enable_5fpmic_5fforensics_1',['&lt;span class=&quot;tt&quot;&gt;ENABLE_PMIC_FORENSICS&lt;/span&gt;',['../index.html#autotoc_md11',1,'']]],
+  ['enhancements_2',['Added - Occupancy Mode Enhancements',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md78',1,'']]],
+  ['error_5fstate_20supervision_3',['&lt;span class=&quot;tt&quot;&gt;ERROR_STATE&lt;/span&gt; Supervision',['../md_docs_2architecture-overview.html#autotoc_md148',1,'']]],
+  ['escalation_20guidance_4',['Escalation Guidance',['../md_docs_2v11-soak-plan.html#autotoc_md233',1,'']]],
+  ['escalation_20ladder_5',['Escalation Ladder',['../md_docs_2architecture-overview.html#autotoc_md150',1,'']]],
+  ['examples_6',['Migration Examples',['../md_docs_2led-management-system.html#autotoc_md208',1,'']]],
+  ['exceeded_7',['Test 3 — Cloud Disconnect Budget Exceeded',['../md_docs_2bench-validation.html#autotoc_md178',1,'']]],
+  ['expectations_20during_20soak_8',['Operational Expectations During Soak',['../md_docs_2recovery-architecture.html#autotoc_md227',1,'']]]
 ];
