@@ -72,6 +72,32 @@ bool getMergedStringValue(const Variant &defaultsSection,
     return true;
 }
 
+void normalizeTimezoneInPlace(char *timezone, size_t timezoneSize) {
+    if (!timezone || timezoneSize == 0) {
+        return;
+    }
+
+    const char *normalized = nullptr;
+    const char *reason = nullptr;
+
+    if (strcmp(timezone, "SGT8") == 0) {
+        normalized = "SGT-8";
+        reason = "posix-sign";
+    } else if (strcmp(timezone, "UTC+8") == 0 ||
+               strcmp(timezone, "GMT+8") == 0 ||
+               strcmp(timezone, "Singapore") == 0) {
+        normalized = "SGT-8";
+        reason = "alias";
+    }
+
+    if (!normalized) {
+        return;
+    }
+
+    Log.warn("TimezoneNormalize: from=%s to=%s reason=%s", timezone, normalized, reason);
+    snprintf(timezone, timezoneSize, "%s", normalized);
+}
+
 } // namespace
 
 bool Cloud::applyConfigurationFromLedger(const LedgerData &defaults, const LedgerData &device) {
@@ -87,6 +113,7 @@ bool Cloud::applyConfigurationFromLedger(const LedgerData &defaults, const Ledge
     success = sensorOk && timingOk && messagingOk && modesOk && reportingOk;
     
     if (success) {
+
         // Do not force synchronous storage flushes here; they can exceed the
         // 100 ms loop budget. Persistence is handled by sysStatus.loop() and
         // sensorConfig.loop() (called from the main loop).
@@ -95,7 +122,21 @@ bool Cloud::applyConfigurationFromLedger(const LedgerData &defaults, const Ledge
 
         // Defer device-status publishing to Cloud::loop() so it doesn't
         // execute inside CONNECTING_STATE or async callbacks.
+        const bool wasPending = pendingStatusPublish;
         pendingStatusPublish = true;
+        pendingStatusPublishSource = "ConfigApply";
+        if (!wasPending) {
+            Cloud::instance().ledgerSyncDiagnostics();
+            const Cloud::LedgerSyncDiagnostics diagnostics = ledgerSyncDiagnostics();
+#if defined(ENABLE_LEDGER_TRACE) && ENABLE_LEDGER_TRACE
+            Log.info("LedgerQueue: kind=status pending=%u syncing=%d inflight=%d",
+                     diagnostics.pendingCount,
+                     diagnostics.syncing ? 1 : 0,
+                     diagnostics.inflight ? 1 : 0);
+#else
+            (void)diagnostics;
+#endif
+        }
     } else {
         Log.warn("Configuration apply failed: sensor=%s timing=%s messaging=%s modes=%s reporting=%s",
                  sensorOk ? "OK" : "FAIL",
@@ -174,6 +215,7 @@ bool Cloud::applyTimingConfig(const LedgerData &defaults, const LedgerData &devi
     char timezone[sizeof(sysStatusData::SysData::timeZoneStr)] = {0};
 
     if (getMergedStringValue(defaultTiming, deviceTiming, "timezone", timezone, sizeof(timezone))) {
+        normalizeTimezoneInPlace(timezone, sizeof(timezone));
         size_t timezoneLen = strlen(timezone);
         if (timezoneLen > 0 && timezoneLen < sizeof(timezone)) {
             if (strcmp(sysStatus.get_timeZoneStrCStr(), timezone) != 0) {

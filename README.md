@@ -1,3 +1,7 @@
+## Project Context
+
+This repository includes `PROJECT_STATUS.md`, which defines the project purpose, current priorities, architecture principles, constraints, and design rules for AI-assisted development. Contributors and AI coding assistants should consult it before proposing major changes.
+
 # Generalized-Core-Counter
 
 **Version:** 13.0.0 | **Latest:** Watchdog, occupancy, and PMIC forensic instrumentation release
@@ -173,6 +177,9 @@ This split allows offline edits in Console without requiring the device to stay 
 ```
 
 Timezone values must be POSIX timezone strings, not IANA names.
+
+- Singapore / UTC+8: `SGT-8`
+- Do not use `SGT8` for Singapore; in POSIX notation that is interpreted as UTC-8.
 
 ## Build And Validation
 

@@ -1,6 +1,6 @@
 #include "power/PowerManager.h"
 
-#include "Config.h"
+#include "../Config.h"
 #include "MyPersistentData.h"
 #include "power/PowerDiagnostics.h"
 #include "power/PowerPlatform.h"

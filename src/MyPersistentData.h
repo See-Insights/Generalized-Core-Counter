@@ -240,6 +240,8 @@ public:
 		uint8_t lastWatchdogBreadcrumb;                  // Last retained app breadcrumb observed on a watchdog boot
 		uint32_t lastWatchdogUptimeMs;                   // millis() value recorded with the last watchdog breadcrumb
 		uint32_t lastWatchdogResetReasonData;            // System.resetReasonData() from the last watchdog boot
+		bool hasValidLedgerConfig;                       // True once at least one complete, valid ledger configuration has been applied
+		uint8_t configSource;                            // Config::Source enum persisted for diagnostics
 
 	};
 
@@ -424,6 +426,10 @@ public:
 	void set_lastWatchdogUptimeMs(uint32_t value);
 	uint32_t get_lastWatchdogResetReasonData() const;
 	void set_lastWatchdogResetReasonData(uint32_t value);
+	bool get_hasValidLedgerConfig() const;
+	void set_hasValidLedgerConfig(bool value);
+	uint8_t get_configSource() const;
+	void set_configSource(uint8_t value);
 
 	//Members here are internal only and therefore protected
 protected:

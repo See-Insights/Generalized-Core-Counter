@@ -142,6 +142,7 @@ namespace {
 
 constexpr unsigned long AWAKE_WATCHDOG_TIMEOUT_MS = 60000UL;
 constexpr unsigned long REPORT_FORENSICS_SLOW_LOG_THRESHOLD_MS = 250UL;
+constexpr unsigned long REPORT_FORENSICS_ABNORMAL_WARN_THRESHOLD_MS = 1000UL;
 
 enum AwakeWatchdogSleepStrategy : uint8_t {
   AWAKE_WATCHDOG_SLEEP_CONFIG_PAUSE = 0,
@@ -384,13 +385,13 @@ void formatFailsafeConnectionAgeField(char *buffer, size_t bufferSize, time_t la
 }
 
 int plannedClosedHoursSleepSec() {
-  if (!Time.isValid() || isWithinOpenHours()) {
+  if (!Time.isValid() || !Config::isValid(false) || isWithinOpenHours()) {
     return -1;
   }
 
   int nightSleepSec = secondsUntilNextOpen();
   if (nightSleepSec <= 0) {
-    nightSleepSec = 3600;
+    nightSleepSec = Config::DEFAULT_REPORT_INTERVAL_SEC;
   }
 
   const int maxSleepSec = 546 * 60;
@@ -653,6 +654,7 @@ void setup() {
     awakeWatchdogStarted = Watchdog.started();
   }
 
+#if ENABLE_SLEEP_TRACE
   Log.info("AppWDT: armed=%d impl=hw timeout=%lu strat=%s init=%d start=%d notify=%d started=%d",
            awakeWatchdogStarted ? 1 : 0,
            AWAKE_WATCHDOG_TIMEOUT_MS,
@@ -661,6 +663,19 @@ void setup() {
            awakeWatchdogStartResult,
            awakeWatchdogNotifyResult,
            Watchdog.started() ? 1 : 0);
+#else
+  if (awakeWatchdogInitResult != SYSTEM_ERROR_NONE ||
+      awakeWatchdogNotifyResult != SYSTEM_ERROR_NONE ||
+      awakeWatchdogStartResult != SYSTEM_ERROR_NONE ||
+      !Watchdog.started()) {
+    Log.warn("AppWDT: abnormal strat=%s init=%d start=%d notify=%d started=%d",
+             awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
+             awakeWatchdogInitResult,
+             awakeWatchdogStartResult,
+             awakeWatchdogNotifyResult,
+             Watchdog.started() ? 1 : 0);
+  }
+#endif
 #else
   // Fallback for platforms without the Device OS hardware watchdog API.
   static ApplicationWatchdog appWatchdog(60000, appWatchdogHandler, 1536);
@@ -703,6 +718,12 @@ void setup() {
   sensorConfig.setup(); // Initialize the sensor configuration
   current.setup();      // Initialize the current status data
   PowerManager::instance().setup();
+
+  if (sysStatus.get_hasValidLedgerConfig()) {
+    Config::markStorageConfigurationLoaded();
+  } else {
+    Config::markFactoryDefaultsActive();
+  }
 
   if (watchdogResetDetected) {
     const uint16_t priorWatchdogResetCount = sysStatus.get_watchdogResetCount();
@@ -876,10 +897,16 @@ void setup() {
   // This must be configured before we can make any open/close hour decisions.
   const char *tz = sysStatus.get_timeZoneStrCStr();
   if (!tz || tz[0] == '\0') {
-    tz = "SGT-8"; // Fallback default
+    tz = Config::DEFAULT_TIMEZONE;
     sysStatus.set_timeZoneStr(tz);
   }
   LocalTime::instance().withConfig(LocalTimePosixTimezone(tz));
+
+  Config::logDiagnostics("ConfigDiag");
+  if (!Config::isValid(true)) {
+    Log.warn("Config invalid at boot - forcing CONNECTING_STATE for ledger acquisition");
+    state = CONNECTING_STATE;
+  }
 
   // Validate time and configure local time converter
   if (!Time.isValid()) {
@@ -1089,19 +1116,37 @@ void pauseAwakeWatchdogForSleep(const char *context) {
   if (awakeWatchdogSleepStrategy == AWAKE_WATCHDOG_SLEEP_MANUAL_STOP) {
     const int stopResult = Watchdog.stop();
     awakeWatchdogStarted = Watchdog.started();
+#if ENABLE_SLEEP_TRACE
     Log.info("AppWDT: sleep ctx=%s action=stop strat=%s rc=%d started=%d",
              context,
              awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
              stopResult,
              awakeWatchdogStarted ? 1 : 0);
+#else
+    if (stopResult != SYSTEM_ERROR_NONE) {
+      Log.warn("AppWDT: sleep-stop failed ctx=%s strat=%s rc=%d started=%d",
+               context,
+               awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
+               stopResult,
+               awakeWatchdogStarted ? 1 : 0);
+    }
+#endif
     return;
   }
 
   awakeWatchdogStarted = Watchdog.started();
+#if ENABLE_SLEEP_TRACE
   Log.info("AppWDT: sleep ctx=%s action=auto strat=%s started=%d",
            context,
            awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
            awakeWatchdogStarted ? 1 : 0);
+#else
+  if (!awakeWatchdogStarted) {
+    Log.warn("AppWDT: sleep-auto watchdog-not-started ctx=%s strat=%s",
+             context,
+             awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy));
+  }
+#endif
 #else
   (void)context;
 #endif
@@ -1121,12 +1166,23 @@ void restoreAwakeWatchdogAfterWake(const char *context) {
 
   awakeWatchdogStarted = Watchdog.started();
 
+#if ENABLE_SLEEP_TRACE
   Log.info("AppWDT: wake ctx=%s action=%s strat=%s rc=%d started=%d",
            context,
            wasStarted ? "resume" : "start",
            awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
            startResult,
            awakeWatchdogStarted ? 1 : 0);
+#else
+  if (startResult != SYSTEM_ERROR_NONE || !awakeWatchdogStarted) {
+    Log.warn("AppWDT: wake abnormal ctx=%s action=%s strat=%s rc=%d started=%d",
+             context,
+             wasStarted ? "resume" : "start",
+             awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
+             startResult,
+             awakeWatchdogStarted ? 1 : 0);
+  }
+#endif
 #else
   (void)context;
 #endif
@@ -1250,6 +1306,10 @@ bool isWithinOpenHours() {
     return true;
   }
 
+  if (!Config::isValid(false)) {
+    return true;
+  }
+
   uint8_t openHour = sysStatus.get_openTime();
   uint8_t closeHour = sysStatus.get_closeTime();
   const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
@@ -1259,11 +1319,51 @@ bool isWithinOpenHours() {
   return openNow;
 }
 
+void logTimeDiag(bool isOpen) {
+  const char *tz = sysStatus.get_timeZoneStrCStr();
+  if (!tz) {
+    tz = "";
+  }
+
+  const bool timeValid = Time.isValid();
+  const time_t epoch = Time.now();
+  struct tm utcTm = {};
+  if (timeValid) {
+    gmtime_r(&epoch, &utcTm);
+  }
+
+  const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
+  const LocalTimeYMD localDate = snapshot.localYmd;
+  const uint32_t localSecondsOfDay = snapshot.localSecondsOfDay;
+  const uint8_t localHour = snapshot.localHour;
+  const uint8_t localMinute = (uint8_t)((localSecondsOfDay / 60UL) % 60UL);
+  const uint8_t localSecond = (uint8_t)(localSecondsOfDay % 60UL);
+
+  Log.info("TimeDiag: tz=%s valid=%d epoch=%lu utc=%04d-%02d-%02d %02d:%02d:%02d local=%04d-%02d-%02d %02d:%02d:%02d open=%d close=%d isOpen=%d",
+           tz,
+           timeValid ? 1 : 0,
+           (unsigned long)epoch,
+           utcTm.tm_year + 1900,
+           utcTm.tm_mon + 1,
+           utcTm.tm_mday,
+           utcTm.tm_hour,
+           utcTm.tm_min,
+           utcTm.tm_sec,
+           localDate.getYear(),
+           localDate.getMonth(),
+           localDate.getDay(),
+           localHour,
+           localMinute,
+           localSecond,
+           (int)sysStatus.get_openTime(),
+           (int)sysStatus.get_closeTime(),
+           isOpen ? 1 : 0);
+}
+
 // Helper to compute seconds until next park opening time (local time)
 int secondsUntilNextOpen() {
-  if (!Time.isValid()) {
-    // Fallback: 1 hour if time is not yet valid
-    return 3600;
+  if (!Time.isValid() || !Config::isValid(false)) {
+    return Config::DEFAULT_REPORT_INTERVAL_SEC;
   }
 
   uint8_t openHour = sysStatus.get_openTime();
@@ -1389,8 +1489,12 @@ void publishData() {
   if (!queued) {
     Log.warn("Report webhook queue rejected name=%s", webhookName);
   }
-  if (queueElapsedMs >= REPORT_FORENSICS_SLOW_LOG_THRESHOLD_MS) {
+  if (!queued || queueElapsedMs >= REPORT_FORENSICS_ABNORMAL_WARN_THRESHOLD_MS) {
     Log.warn("ReportPerf: step=queue ms=%lu queued=%d",
+             queueElapsedMs,
+             queued ? 1 : 0);
+  } else if (ENABLE_PERF_TRACE && queueElapsedMs >= REPORT_FORENSICS_SLOW_LOG_THRESHOLD_MS) {
+    Log.info("ReportPerf: step=queue ms=%lu queued=%d",
              queueElapsedMs,
              queued ? 1 : 0);
   }
@@ -1422,7 +1526,7 @@ void publishData() {
   // Also update device-data ledger with structured JSON snapshot
   setAppBreadcrumb(BREADCRUMB_REPORT_LEDGER_START);
   const unsigned long ledgerStartMs = millis();
-  const bool ledgerOk = Cloud::instance().publishDataToLedger();
+  const bool ledgerOk = Cloud::instance().publishDataToLedger("ReportState");
   const unsigned long ledgerElapsedMs = millis() - ledgerStartMs;
   setAppBreadcrumb(BREADCRUMB_REPORT_LEDGER_DONE);
   const char *ledgerState = ledgerOk ? "req" : "err";
@@ -1431,8 +1535,12 @@ void publishData() {
     // supervisor can decide on corrective action.
     current.raiseAlert(42);
   }
-  if (ledgerElapsedMs >= REPORT_FORENSICS_SLOW_LOG_THRESHOLD_MS) {
+  if (!ledgerOk || ledgerElapsedMs >= REPORT_FORENSICS_ABNORMAL_WARN_THRESHOLD_MS) {
     Log.warn("ReportPerf: step=ledger ms=%lu ok=%d",
+             ledgerElapsedMs,
+             ledgerOk ? 1 : 0);
+  } else if (ENABLE_PERF_TRACE && ledgerElapsedMs >= REPORT_FORENSICS_SLOW_LOG_THRESHOLD_MS) {
+    Log.info("ReportPerf: step=ledger ms=%lu ok=%d",
              ledgerElapsedMs,
              ledgerOk ? 1 : 0);
   }

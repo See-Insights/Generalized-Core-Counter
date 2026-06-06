@@ -1,5 +1,5 @@
 #include "state/State_Common.h"
-#include "Config.h"
+#include "../Config.h"
 #include "cloud/Cloud.h"
 #include "power/ConnectivityPolicy.h"
 #include "time/LocalTimeCache.h"
@@ -125,6 +125,12 @@ void handleReportingState() {
   if (serviceRequestTriggered) {
     session.serviceRequestTriggered = false;
   }
+
+  if (!Config::isValid(true)) {
+    Log.warn("REPORTING: configuration invalid - forcing CONNECTING_STATE");
+    state = CONNECTING_STATE;
+    return;
+  }
   
   if (!Particle.connected()) {
     // Calculate current battery tier with hysteresis to prevent thrashing
@@ -134,7 +140,7 @@ void handleReportingState() {
     
     // Calculate effective interval based on tier multiplier only
     // Connection timing is boundary-aligned, not elapsed-time based
-    uint16_t baseInterval = sysStatus.get_reportingInterval();
+    uint16_t baseInterval = Config::reportingIntervalSecForRuntime();
     uint16_t tierMultiplier = Cloud::getIntervalMultiplier(newTier);
     uint32_t effectiveInterval = (uint32_t)baseInterval * tierMultiplier;
     
@@ -145,8 +151,11 @@ void handleReportingState() {
              (offset >= effectiveInterval - ConnectivityPolicy::CONNECT_ALIGNMENT_TOLERANCE_SEC);
     
     const char* tierName = (newTier == TIER_HEALTHY ? "HEALTHY" : 
-                            newTier == TIER_CONSERVING ? "CONSERVING" :
-                            newTier == TIER_CRITICAL ? "CRITICAL" : "SURVIVAL");
+                newTier == TIER_CONSERVING ? "CONSERVING" :
+                newTier == TIER_CRITICAL ? "CRITICAL" : "SURVIVAL");
+  #if !ENABLE_CONNECT_DECISION_TRACE
+    (void)tierName;
+  #endif
     bool deferAutoConnectForUnstableModem = false;
     unsigned long reconnectDeferRemainingMs = 0;
     if (session.modemUnstable && session.lastTeardownEndMs != 0) {
@@ -160,23 +169,31 @@ void handleReportingState() {
     // Check if occupied in low-power mode - need to return to sleep after reporting
     // to wake periodically and check debounce timeout
     if (current.get_occupied() && sysStatus.get_connectionMode() != CONNECTED) {
+#if ENABLE_CONNECT_DECISION_TRACE
       Log.info("REPORTING: Occupied in low-power mode - will return to sleep after report tier=%s",
                tierName);
+#endif
       session.returnToSleepAfterReport = true;
     }
     
     // Check if report was triggered by occupancy state change
     if (serviceRequestTriggered) {
+#if ENABLE_CONNECT_DECISION_TRACE
       Log.info("REPORTING: Immediate connection (service request) - bypassing alignment tier=%s",
                tierName);
+#endif
       state = CONNECTING_STATE;
     } else if (session.occupancyChangeTriggered) {
       session.occupancyChangeTriggered = false;  // Clear flag after processing
+#if ENABLE_CONNECT_DECISION_TRACE
       Log.info("REPORTING: Immediate connection (occupancy change) - bypassing alignment tier=%s",
                tierName);
+#endif
       state = CONNECTING_STATE;
     } else if (forceConnectForLongTermWebhook) {
+#if ENABLE_CONNECT_DECISION_TRACE
       Log.info("REPORTING: Forcing connection due to long-term webhook health (OPEN hours)");
+#endif
       state = CONNECTING_STATE;
     } else if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
       // In INTERMITTENT_KEEP_ALIVE mode, connect immediately for all reports
@@ -185,8 +202,10 @@ void handleReportingState() {
                  reconnectDeferRemainingMs);
         state = IDLE_STATE;
       } else {
+#if ENABLE_CONNECT_DECISION_TRACE
         Log.info("REPORTING: Immediate connection (KEEP_ALIVE mode) - bypassing alignment tier=%s",
                  tierName);
+#endif
         state = CONNECTING_STATE;
       }
     } else if (isAligned) {
@@ -195,21 +214,27 @@ void handleReportingState() {
                  reconnectDeferRemainingMs);
         state = IDLE_STATE;
       } else {
+#if ENABLE_CONNECT_DECISION_TRACE
         Log.info("REPORTING: Connection due - boundary aligned tier=%s interval=%us (base=%u x %u) offset=%lus",
                  tierName,
                  (unsigned)effectiveInterval,
                  (unsigned)baseInterval,
                  (unsigned)tierMultiplier,
                  (unsigned long)offset);
+#endif
         state = CONNECTING_STATE;
       }
     } else {
       time_t nextBoundary = effectiveInterval - offset;
+#if ENABLE_CONNECT_DECISION_TRACE
       Log.info("REPORTING: Connection deferred - not aligned tier=%s interval=%us offset=%lus next_in=%lus",
                tierName,
                (unsigned)effectiveInterval,
                (unsigned long)offset,
                (unsigned long)nextBoundary);
+    #else
+      (void)nextBoundary;
+#endif
       state = IDLE_STATE;
     }
   } else {

@@ -10,11 +10,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- (none)
+- Timezone handling now explicitly normalizes known ambiguous Singapore aliases to POSIX-correct `SGT-8` in ledger config apply (`SGT8`, `UTC+8`, `GMT+8`, `Singapore` -> `SGT-8`).
 
 ### Fixed
 
-- (none)
+- Removed temporary timezone investigation logs (`TimeLedgerUpdate`, `TimeTZObject`, `TimeLedgerVerify`, `TimeBootVerify`) while keeping standard production diagnostics (`ConfigApply`, `ConfigValidate`, `ConfigDiag`, `TimeDiag`).
 
 ## [13.0.0] - 2026-05-27
 

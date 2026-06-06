@@ -1,6 +1,6 @@
 #include "BuildProfile.h"
 #include "state/State_Common.h"
-#include "Config.h"
+#include "../Config.h"
 #include "cloud/Cloud.h"
 #include "power/Connectivity.h"
 #include "power/ConnectivityPolicy.h"
@@ -150,6 +150,54 @@ unsigned long computeCloudSyncTimeoutMs(uint16_t queueDepth) {
   return queueAwareTimeoutMs;
 }
 
+constexpr unsigned long kGateBlockLogThresholdMs = 10000UL;
+
+constexpr uint8_t kGateBlockerQueue = 0x01;
+constexpr uint8_t kGateBlockerLedger = 0x02;
+constexpr uint8_t kGateBlockerWebhook = 0x04;
+constexpr uint8_t kGateBlockerUpdate = 0x08;
+constexpr uint8_t kGateBlockerUninitialized = 0xFF;
+
+const char *gateBlockerReasonLabel(uint8_t blockerMask) {
+  switch (blockerMask) {
+  case 0x00:
+    return "none";
+  case kGateBlockerQueue:
+    return "queue";
+  case kGateBlockerLedger:
+    return "ledger";
+  case kGateBlockerQueue | kGateBlockerLedger:
+    return "queue+ledger";
+  case kGateBlockerWebhook:
+    return "webhook";
+  case kGateBlockerQueue | kGateBlockerWebhook:
+    return "queue+webhook";
+  case kGateBlockerLedger | kGateBlockerWebhook:
+    return "ledger+webhook";
+  case kGateBlockerQueue | kGateBlockerLedger | kGateBlockerWebhook:
+    return "queue+ledger+webhook";
+  case kGateBlockerUpdate:
+    return "update";
+  case kGateBlockerQueue | kGateBlockerUpdate:
+    return "queue+update";
+  case kGateBlockerLedger | kGateBlockerUpdate:
+    return "ledger+update";
+  case kGateBlockerQueue | kGateBlockerLedger | kGateBlockerUpdate:
+    return "queue+ledger+update";
+  case kGateBlockerWebhook | kGateBlockerUpdate:
+    return "webhook+update";
+  case kGateBlockerQueue | kGateBlockerWebhook | kGateBlockerUpdate:
+    return "queue+webhook+update";
+  case kGateBlockerLedger | kGateBlockerWebhook | kGateBlockerUpdate:
+    return "ledger+webhook+update";
+  case kGateBlockerQueue | kGateBlockerLedger | kGateBlockerWebhook |
+      kGateBlockerUpdate:
+    return "queue+ledger+webhook+update";
+  default:
+    return "unknown";
+  }
+}
+
 } // namespace
 
 // NOTE:
@@ -165,6 +213,9 @@ void handleSleepingState() {
   static bool operationsCompleteLogged = false;  // Track if we've logged completion message
   static bool gateWasBlocking = false;
   static unsigned long lastGateStatusLogMs = 0;
+  static uint8_t lastGateBlockerMask = kGateBlockerUninitialized;
+  static uint8_t lastGateBlockerBeforeRelease = 0;
+  static bool gateReleaseReasonKnown = false;
   static bool cloudDisconnectCompleteLogged = false;
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
   bool hibernateFallbackThisPass = false;
@@ -184,6 +235,9 @@ void handleSleepingState() {
     operationsCompleteLogged = false;  // Reset flag on state entry
     gateWasBlocking = false;
     lastGateStatusLogMs = 0;
+    lastGateBlockerMask = kGateBlockerUninitialized;
+    lastGateBlockerBeforeRelease = 0;
+    gateReleaseReasonKnown = false;
     cloudDisconnectCompleteLogged = false;
   #if Wiring_Cellular
     radioOffCompleteLogged = false;
@@ -302,6 +356,10 @@ void handleSleepingState() {
     bool queueEmpty = PublishQueuePosix::instance().getCanSleep();
     bool configLedgersSynced = Cloud::instance().areLedgersSynced();
     bool outputLedgersSynced = !Cloud::instance().hasPendingOutputLedgerSync();
+    Cloud::LedgerSyncDiagnostics ledgerDiagnostics = Cloud::instance().ledgerSyncDiagnostics();
+  #if !ENABLE_GATE_TRACE
+    (void)ledgerDiagnostics;
+  #endif
     bool ledgersSynced = configLedgersSynced && outputLedgersSynced;
     bool updatesChecked = !System.updatesPending();
     bool webhookConfirmed = !session.awaitingWebhookResponse;
@@ -334,10 +392,61 @@ void handleSleepingState() {
       const int ledgerPending = ledgersSynced ? 0 : 1;
       const int webhookPending = webhookConfirmed ? 0 : 1;
       const int updatePending = updatesChecked ? 0 : 1;
+      uint8_t blockerMask = 0;
+      if (queuePending) {
+        blockerMask |= kGateBlockerQueue;
+      }
+      if (ledgerPending) {
+        blockerMask |= kGateBlockerLedger;
+      }
+      if (webhookPending) {
+        blockerMask |= kGateBlockerWebhook;
+      }
+      if (updatePending) {
+        blockerMask |= kGateBlockerUpdate;
+      }
+      if (blockerMask != 0) {
+        lastGateBlockerBeforeRelease = blockerMask;
+        gateReleaseReasonKnown = true;
+      }
+
+      if (elapsedMs > kGateBlockLogThresholdMs &&
+          lastGateBlockerMask != blockerMask) {
+        if (ledgerPending) {
+#if ENABLE_GATE_TRACE
+          Log.info("GateDetail: wait=%lu ledger=%d pending=%u syncing=%d inflight=%d reason=%s",
+                   elapsedMs,
+                   ledgerPending,
+                   ledgerDiagnostics.pendingCount,
+                   ledgerDiagnostics.syncing ? 1 : 0,
+                   ledgerDiagnostics.inflight ? 1 : 0,
+                   gateBlockerReasonLabel(blockerMask));
+          Log.info("GateDetailState: config=%d output=%d queued=%d statusSync=%d dataSync=%d statusInflight=%d dataInflight=%d",
+                   configLedgersSynced ? 1 : 0,
+                   outputLedgersSynced ? 1 : 0,
+                   ledgerDiagnostics.pendingStatusPublish ? 1 : 0,
+                   ledgerDiagnostics.pendingDeviceStatusSync ? 1 : 0,
+                   ledgerDiagnostics.pendingDeviceDataSync ? 1 : 0,
+                   ledgerDiagnostics.statusInflight ? 1 : 0,
+                   ledgerDiagnostics.dataInflight ? 1 : 0);
+#endif
+        }
+#if ENABLE_GATE_TRACE
+        Log.info("GateBlock: wait=%lu reason=%s q=%d ledger=%d webhook=%d update=%d",
+                 elapsedMs,
+                 gateBlockerReasonLabel(blockerMask),
+                 queuePending,
+                 ledgerPending,
+                 webhookPending,
+                 updatePending);
+#endif
+        lastGateBlockerMask = blockerMask;
+      }
 
       if (elapsedMs < cloudSyncBudgetMs) {
         if (!gateWasBlocking ||
             (millis() - lastGateStatusLogMs) >= ConnectivityPolicy::CLOUD_OPS_STATUS_LOG_INTERVAL_MS) {
+#if ENABLE_GATE_TRACE
           Log.info("Gate: q=%d ledger=%d webhook=%d update=%d wait=%lu/%lu",
                    queuePending,
                    ledgerPending,
@@ -345,6 +454,7 @@ void handleSleepingState() {
                    updatePending,
                    elapsedMs,
                    cloudSyncBudgetMs);
+#endif
           gateWasBlocking = true;
           lastGateStatusLogMs = millis();
         }
@@ -367,6 +477,9 @@ void handleSleepingState() {
           updatePending);
        gateWasBlocking = false;
        lastGateStatusLogMs = 0;
+       lastGateBlockerMask = kGateBlockerUninitialized;
+       lastGateBlockerBeforeRelease = 0;
+       gateReleaseReasonKnown = false;
 
       // Only raise one alert - check in priority order (queue > ledger > updates > webhook)
       if (!queueEmpty) {
@@ -390,11 +503,39 @@ void handleSleepingState() {
       cloudSyncBudgetMs = 0;
       cloudSyncMaxQueueDepth = 0;
     } else {
+      unsigned long gateWaitMs = millis() - cloudSyncStartMs;
+      if (gateWaitMs > kGateBlockLogThresholdMs && lastGateBlockerMask != 0) {
+#if ENABLE_GATE_TRACE
+        Log.info("GateBlock: wait=%lu reason=none q=0 ledger=0 webhook=0 update=0",
+                 gateWaitMs);
+#endif
+        lastGateBlockerMask = 0;
+      }
       if (gateWasBlocking) {
-        Log.info("Gate: ok wait=%lu", millis() - cloudSyncStartMs);
+        Cloud::LedgerSyncDiagnostics ledgerDiagnosticsRelease = Cloud::instance().ledgerSyncDiagnostics();
+#if ENABLE_GATE_TRACE
+        Log.info("GateReleaseDetail: wait=%lu pending=%u syncing=%d inflight=%d reason=%s",
+                 gateWaitMs,
+                 ledgerDiagnosticsRelease.pendingCount,
+                 ledgerDiagnosticsRelease.syncing ? 1 : 0,
+                 ledgerDiagnosticsRelease.inflight ? 1 : 0,
+                 gateReleaseReasonKnown
+                     ? gateBlockerReasonLabel(lastGateBlockerBeforeRelease)
+                     : "unknown");
+#endif
+        (void)ledgerDiagnosticsRelease;
+        Log.info("GateRelease: wait=%lu reason=%s",
+                 gateWaitMs,
+                 gateReleaseReasonKnown
+                     ? gateBlockerReasonLabel(lastGateBlockerBeforeRelease)
+                     : "unknown");
+        Log.info("Gate: ok wait=%lu", gateWaitMs);
       }
       gateWasBlocking = false;
       lastGateStatusLogMs = 0;
+      lastGateBlockerMask = kGateBlockerUninitialized;
+      lastGateBlockerBeforeRelease = 0;
+      gateReleaseReasonKnown = false;
       // All operations complete - reset timer and proceed
       cloudSyncStartMs = 0;
       cloudSyncBudgetMs = 0;
@@ -418,6 +559,9 @@ void handleSleepingState() {
     cloudSyncStartMs = 0;
     cloudSyncBudgetMs = 0;
     cloudSyncMaxQueueDepth = 0;
+    lastGateBlockerMask = kGateBlockerUninitialized;
+    lastGateBlockerBeforeRelease = 0;
+    gateReleaseReasonKnown = false;
   }
 
   // If we're going to sleep with cellular network standby, do NOT wait for radio-off.
@@ -685,7 +829,9 @@ void handleSleepingState() {
   }
 
   int nightSleepSec = -1;
-  if (!isWithinOpenHours()) {
+  const bool openNow = isWithinOpenHours();
+  logTimeDiag(openNow);
+  if (!openNow) {
     // Notify sensor layer we are entering full night sleep so sensors and
     // indicator LEDs can be powered down. During daytime naps we keep
     // interrupt-driven sensors (like PIR) powered so they can wake the
@@ -695,7 +841,7 @@ void handleSleepingState() {
     // ********** Night sleep (outside opening hours) **********
     nightSleepSec = secondsUntilNextOpen();
     if (nightSleepSec <= 0) {
-      nightSleepSec = 3600; // Fallback
+      nightSleepSec = Config::DEFAULT_REPORT_INTERVAL_SEC;
     }
 
     // Device OS maximum sleep duration is 546 minutes (~9.1 hours).
@@ -749,6 +895,7 @@ void handleSleepingState() {
 
       // HIBERNATE should reset the device on wake, so execution should
       // not resume here under normal conditions.
+      Cloud::instance().logLedgerSleepState();
       System.sleep(config);
 
       // If we reach this point, HIBERNATE did not reset as expected on
@@ -780,10 +927,7 @@ void handleSleepingState() {
   // Outside opening hours, if HIBERNATE is disabled or unsupported,
   // fall back to ULTRA_LOW_POWER with a long sleep equal to the
   // time until next open to avoid rapid wake/sleep thrashing.
-  uint16_t intervalSec = sysStatus.get_reportingInterval();
-  if (intervalSec == 0) {
-    intervalSec = 1 * 3600; // Preserve 1 hour default if unset
-  }
+  uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
 
   const char *sleepReason = "scheduled";
   int wakeInSeconds;
@@ -1029,10 +1173,18 @@ void handleSleepingState() {
   // to minimize time between I2C transaction and sleep entry
   const bool watchdogStopped = ab1805.stopWDT();
   pauseAwakeWatchdogForSleep("ulp");
+#if ENABLE_SLEEP_TRACE
   Log.info("SleepCall: standby=%d dur=%d wdt=%s gate=ok",
            useNetworkStandby ? 1 : 0,
            wakeInSeconds,
            watchdogStopped ? "off" : "err");
+#else
+  if (!watchdogStopped) {
+    Log.warn("SleepCall: watchdog-stop failed standby=%d dur=%d",
+             useNetworkStandby ? 1 : 0,
+             wakeInSeconds);
+  }
+#endif
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
   Log.info("Sleep: ULP standby=%d reason=%s dur=%ds occ=%d soc=%.1f hibFallback=%d test=1",
            useNetworkStandby ? 1 : 0,
@@ -1052,6 +1204,7 @@ void handleSleepingState() {
 
   thrashGuard.markProgress("SLEEP_ATTEMPT");
   const unsigned long sleepCallStartMs = millis();
+  Cloud::instance().logLedgerSleepState();
   SystemSleepResult result = System.sleep(config);
   const unsigned long sleepElapsedMs = millis() - sleepCallStartMs;
   pin_t wakePin = result.wakeupPin();
@@ -1096,6 +1249,7 @@ void handleSleepingState() {
       .gpio(BUTTON_PIN, FALLING)
       .gpio(intPin, RISING)
       .duration((uint32_t)wakeInSeconds * 1000UL);
+    Cloud::instance().logLedgerSleepState();
     result = System.sleep(config);
 
     if (result.error() != SYSTEM_ERROR_NONE) {
@@ -1103,6 +1257,7 @@ void handleSleepingState() {
       config = SystemSleepConfiguration();
       config.mode(SystemSleepMode::STOP)
         .duration((uint32_t)wakeInSeconds * 1000UL);
+      Cloud::instance().logLedgerSleepState();
       result = System.sleep(config);
 
       if (result.error() != SYSTEM_ERROR_NONE) {
@@ -1164,8 +1319,14 @@ void handleSleepingState() {
            wakeReturnReason);
 
 #if Wiring_Watchdog
+#if ENABLE_SLEEP_TRACE
   Log.info("AppWDT: active ctx=ulp armed=%d",
            Watchdog.started() ? 1 : 0);
+#else
+  if (!Watchdog.started()) {
+    Log.warn("AppWDT: active abnormal ctx=ulp armed=0");
+  }
+#endif
 #endif
 
   // Re-attach user button interrupt after sleep (sleep may have detached it)
@@ -1287,7 +1448,7 @@ void handleSleepingState() {
           // Keep LED on for the debounce window (sensor.setting1 is milliseconds).
           uint32_t debounceMs = sensorConfig.get_sensorSetting1();
           if (debounceMs == 0) {
-            debounceMs = 60000; // default 60s
+            debounceMs = Config::occupancyDebounceMsForRuntime();
           }
           signalLED(true, debounceMs);
           const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
@@ -1305,7 +1466,7 @@ void handleSleepingState() {
           // Already occupied - motion detected during debounce, restart timer
           uint32_t debounceMs = sensorConfig.get_sensorSetting1();
           if (debounceMs == 0) {
-            debounceMs = 60000; // default 60s
+            debounceMs = Config::occupancyDebounceMsForRuntime();
           }
           signalLED(true, debounceMs);  // Restart LED timer
           logOccupiedEvent("pir-wake", debounceMs / 1000UL, false, true);
@@ -1344,8 +1505,7 @@ void handleSleepingState() {
           sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
         // Skip overdue-report check while occupied.
       } else {
-      uint16_t intervalSec = sysStatus.get_reportingInterval();
-      if (intervalSec == 0) intervalSec = 3600;
+      uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
 
       time_t now = Time.now();
       time_t lastReport = sysStatus.get_lastReport();
