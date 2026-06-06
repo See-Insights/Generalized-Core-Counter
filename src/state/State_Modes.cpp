@@ -1,5 +1,5 @@
 #include "state/State_Common.h"
-#include "Config.h"
+#include "../Config.h"
 #include "cloud/Cloud.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
@@ -121,7 +121,7 @@ void updateOccupancyState() {
   // V3.23: Occupancy debounce timeout comes from sensor.setting1
   uint32_t debounceMs = sensorConfig.get_sensorSetting1();
   if (debounceMs == 0) {
-    debounceMs = 60000; // default 60s
+    debounceMs = Config::occupancyDebounceMsForRuntime();
   }
 
   uint32_t lastEvent = current.get_lastOccupancyEvent();

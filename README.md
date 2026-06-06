@@ -1,8 +1,12 @@
+## Project Context
+
+This repository includes `PROJECT_STATUS.md`, which defines the project purpose, current priorities, architecture principles, constraints, and design rules for AI-assisted development. Contributors and AI coding assistants should consult it before proposing major changes.
+
 # Generalized-Core-Counter
 
-**Version:** 13.0.0 | **Latest:** Watchdog, occupancy, and PMIC forensic instrumentation release
+**Version:** 14.0.0 | **Latest:** Cloud recovery tuning and logging cleanup release
 
-Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v13 release packages field forensics for watchdog resets, occupancy corruption, and PMIC charging contradictions without changing the existing production power, sleep, connectivity, or watchdog policies.
+Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v14 release packages cloud recovery tuning and release-safe logging cleanup without changing the existing production power, sleep, connectivity, watchdog, ledger, or PMIC behavior.
 
 ## Release Focus
 
@@ -44,13 +48,13 @@ The application is a small explicit state machine with focused handler modules:
 
 ## Release Guardrails
 
-Release v13 is intentionally instrumentation-only for the newly added PMIC path:
+Release v14 focuses on production-safe cloud recovery tuning and logging cleanup:
 
-- No automatic PMIC remediation.
-- No connectivity-policy changes.
-- No watchdog-policy changes.
+- No new runtime behavior changes.
 - No sleep-policy changes.
-- No new PMIC alert codes.
+- No watchdog-policy changes.
+- No ledger lifecycle changes.
+- No PMIC remediation-policy changes.
 
 ## Recovery Architecture
 
@@ -173,6 +177,9 @@ This split allows offline edits in Console without requiring the device to stay 
 ```
 
 Timezone values must be POSIX timezone strings, not IANA names.
+
+- Singapore / UTC+8: `SGT-8`
+- Do not use `SGT8` for Singapore; in POSIX notation that is interpreted as UTC-8.
 
 ## Build And Validation
 

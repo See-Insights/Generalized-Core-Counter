@@ -666,7 +666,9 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
 
 #if !(HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM))
   const uint8_t loggedBattState = rejectAuthoritativeOverwrite ? _authoritativeBatteryState : battState;
-  if (logBatteryDetail) {
+  const bool allowPreSleepBatteryLog =
+      (sampleContext != BatterySampleContext::PreSleep) || (ENABLE_SLEEP_TRACE != 0);
+  if (logBatteryDetail && allowPreSleepBatteryLog) {
     Log.info("%s: soc=%.2f raw=%.2f norm=%.2f vcell=%.3f authority=%s state=%s(%d) power=%d%s",
              batterySampleContextPrefix(sampleContext),
              (double)loggedSoc,
@@ -1052,7 +1054,13 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   const bool pmicRouteChanged =
       powerSource != lastLoggedPmicPowerSource ||
       powerReport.activeInputProfile != lastLoggedPmicProfile;
-  if (sysStatus.get_verboseMode() || pmicStatusChanged || pmicRouteChanged) {
+#if defined(ENABLE_PMIC_TRACE) && ENABLE_PMIC_TRACE
+  const bool pmicTraceEnabled = true;
+#else
+  const bool pmicTraceEnabled = false;
+#endif
+  const bool pmicFaultActive = (faultReg != 0);
+  if (pmicTraceEnabled || pmicFaultActive) {
     Log.info("PMIC: vbus=%s chg=%s fault=%02x pg=%d th=%s vsys=%d prof=%s src=%s",
              compactPmicVbusLabel(vbusStatus),
              compactPmicChargeLabel(chargeStatus, faultReg),
@@ -1066,12 +1074,17 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
     lastLoggedPmicFaultReg = faultReg;
     lastLoggedPmicPowerSource = powerSource;
     lastLoggedPmicProfile = powerReport.activeInputProfile;
+  } else {
+    (void)pmicStatusChanged;
+    (void)pmicRouteChanged;
   }
   if (powerReport.activeInputProfile == PowerInputProfile::Solar35W && vbusStatus == 1) {
     Log.warn("Power mismatch: prof=SOLAR vbus=USB");
   }
 
-  if (logBatteryDetail) {
+  const bool allowPreSleepBatteryLog =
+      (sampleContext != BatterySampleContext::PreSleep) || (ENABLE_SLEEP_TRACE != 0);
+  if (logBatteryDetail && allowPreSleepBatteryLog) {
     Log.info("%s: soc=%.2f raw=%.2f norm=%.2f vcell=%.3f authority=%s state=%s(%d) systemState=%s(%d) power=%s(%d)%s",
              batterySampleContextPrefix(sampleContext),
              (double)loggedSoc,
@@ -1213,8 +1226,11 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   // Always report "Unknown" since voltage alone can't distinguish between
   // charging and discharging at the same voltage level.
   uint8_t battState = 0; // Unknown
-  
-  if (shouldLogBatterySample(sampleContext) || sysStatus.get_verboseMode()) {
+
+  const bool allowPreSleepBatteryLog =
+      (sampleContext != BatterySampleContext::PreSleep) || (ENABLE_SLEEP_TRACE != 0);
+  if ((shouldLogBatterySample(sampleContext) || sysStatus.get_verboseMode()) &&
+      allowPreSleepBatteryLog) {
     Log.info("%s: soc=%.2f raw=-1.00 norm=-1.00 vcell=%.3f authority=voltage-estimated state=%s(%d) power=-1",
              batterySampleContextPrefix(sampleContext),
              (double)soc,

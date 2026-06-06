@@ -77,6 +77,13 @@ void setAppBreadcrumb(uint8_t code);
 void clearConnectivityFailsafeRecovery(const char *reason);
 
 /**
+ * @brief Logs a compact time/park-hours diagnostic snapshot.
+ *
+ * @param isOpen Current open-hours decision
+ */
+void logTimeDiag(bool isOpen);
+
+/**
  * @brief Returns true when CONNECTING_STATE still owns an in-budget connect attempt.
  *
  * @return true when long-duration failsafe actions should defer to CONNECTING_STATE

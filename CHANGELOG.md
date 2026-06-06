@@ -16,6 +16,28 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [14.0.0] - 2026-06-06
+
+### Added
+
+- **Release trace controls**: Added compile-time trace controls for ledger, connect, connect-decision, sleep, performance, PMIC, and config logging so release builds can stay quiet without removing forensic and escalation visibility.
+
+### Changed
+
+- **Cloud recovery tuning**: Refined cloud recovery tuning and connect-decision observability while keeping the existing connection, recovery, and sleep behavior unchanged.
+- **Release logging cleanup**: Reduced release log noise by gating routine trace and narrative logs while retaining state transitions, report/connect summaries, gate release logs, sleep/time diagnostics, and all warning/error paths.
+- **Release metadata updated for v14 rollout**: Bumped the Particle product version, firmware version string, README version header, and Doxygen project number to `14.0.0` / `PRODUCT_VERSION(14)`.
+- **Timezone normalization retained**: Carried forward explicit normalization of known ambiguous Singapore aliases to POSIX-correct `SGT-8` in ledger config apply (`SGT8`, `UTC+8`, `GMT+8`, `Singapore` -> `SGT-8`).
+
+### Fixed
+
+- **Misleading warning-level performance logs**: Successful `ReportPerf` timing entries are no longer emitted as warnings in normal release builds; only failures or abnormal latency remain warning-level.
+- **Temporary diagnostic log noise**: Removed or trace-gated temporary timezone investigation logs (`TimeLedgerUpdate`, `TimeTZObject`, `TimeLedgerVerify`, `TimeBootVerify`) while keeping standard production diagnostics (`ConfigApply`, `ConfigValidate`, `ConfigDiag`, `TimeDiag`).
+
+### Validation
+
+- Revalidated production compiles for Boron and Photon 2 / P2 with Device OS `6.4.1` and release-safe trace defaults.
+
 ## [13.0.0] - 2026-05-27
 
 ### Added

@@ -47,6 +47,12 @@
  */
 class Cloud {
 public:
+    enum LedgerRequestKind : uint8_t {
+        LEDGER_REQUEST_KIND_UNKNOWN = 0,
+        LEDGER_REQUEST_KIND_STATUS = 1,
+        LEDGER_REQUEST_KIND_DATA = 2,
+    };
+
     /**
      * @brief Gets the singleton instance of this class, allocating it if necessary
      * 
@@ -80,7 +86,7 @@ public:
      * 
      * @return true if successful
      */
-    bool writeDeviceStatusToCloud();
+    bool writeDeviceStatusToCloud(const char *source = "Unknown");
 
     /**
      * @brief Publish latest sensor data to device-data ledger
@@ -92,7 +98,7 @@ public:
      * 
      * @return true if successful
      */
-    bool publishDataToLedger();
+    bool publishDataToLedger(const char *source = "Unknown");
 
         /**
         * @brief Check whether any device-to-cloud ledger work is still pending.
@@ -103,6 +109,66 @@ public:
         * @return true if device-data/device-status ledger work is still pending
         */
         bool hasPendingOutputLedgerSync() const;
+
+        /**
+         * @brief Snapshot output-ledger sync state for diagnostics.
+         *
+         * This is a read-only view of the local device-status/device-data ledger
+         * bookkeeping used by the sleep gate and ledger publish path.
+         */
+        struct LedgerSyncDiagnostics {
+            uint16_t pendingCount;
+            bool pendingStatusPublish;
+            bool pendingDeviceStatusSync;
+            bool pendingDeviceDataSync;
+            bool statusInflight;
+            bool dataInflight;
+            bool syncing;
+            bool inflight;
+        };
+
+        LedgerSyncDiagnostics ledgerSyncDiagnostics() const;
+
+        /**
+         * @brief Check whether the request tracker already has an active entry for a ledger object pointer.
+         */
+        bool isLedgerPointerTracked(const void *ptr) const;
+
+        /**
+         * @brief Record a ledger sync request that has been accepted locally.
+         *
+         * Returns the monotonic request sequence number used in the diagnostic logs.
+         */
+        uint32_t noteLedgerSyncRequest(LedgerRequestKind kind,
+                           const char *source,
+                           const void *ptr);
+
+        /**
+         * @brief Record completion of a ledger sync request.
+         */
+        void noteLedgerSyncComplete(LedgerRequestKind kind,
+                        const LedgerSyncDiagnostics &before,
+                        const LedgerSyncDiagnostics &after);
+
+        /**
+         * @brief Record failure of a previously-issued ledger sync request.
+         */
+        void noteLedgerSyncFail(uint32_t seq, int error);
+
+        /**
+         * @brief Log current active ledger request state on a new cloud connection.
+         */
+        void logLedgerConnectState() const;
+
+        /**
+         * @brief Log active ledger request state before entering sleep.
+         */
+        void logLedgerSleepState() const;
+
+        /**
+         * @brief Log active ledger request state for a ledger failure return code.
+         */
+        void logLedgerFailure(int rc) const;
 
     /**
      * @brief Get the webhook event name for data publishing
@@ -322,6 +388,7 @@ private:
 
     // Deferred work flags
     bool pendingStatusPublish;
+    const char *pendingStatusPublishSource;
     bool pendingConfigApply;
     bool pendingDeviceStatusSync;
     bool pendingDeviceDataSync;

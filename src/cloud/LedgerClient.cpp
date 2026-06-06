@@ -41,6 +41,8 @@ void Cloud::setup() {
 
 // Static callbacks
 void Cloud::onDefaultSettingsSync(Ledger ledger) {
+    Log.info("LedgerCallback: kind=input ledger=default-settings synced=%lu",
+             (unsigned long)ledger.lastSynced());
     if (sysStatus.get_verboseMode()) {
         Log.info("default-settings synced from cloud");
     }
@@ -51,6 +53,8 @@ void Cloud::onDefaultSettingsSync(Ledger ledger) {
 }
 
 void Cloud::onDeviceSettingsSync(Ledger ledger) {
+    Log.info("LedgerCallback: kind=input ledger=device-settings synced=%lu",
+             (unsigned long)ledger.lastSynced());
     if (sysStatus.get_verboseMode()) {
         Log.info("device-settings synced from cloud");
     }
@@ -61,11 +65,19 @@ void Cloud::onDeviceSettingsSync(Ledger ledger) {
 }
 
 void Cloud::onDeviceStatusLedgerSync(Ledger ledger) {
+    (void)ledger;
+    const LedgerSyncDiagnostics before = Cloud::instance().ledgerSyncDiagnostics();
     Cloud::instance().pendingDeviceStatusSync = false;
+    const LedgerSyncDiagnostics after = Cloud::instance().ledgerSyncDiagnostics();
+    Cloud::instance().noteLedgerSyncComplete(Cloud::LEDGER_REQUEST_KIND_STATUS, before, after);
 }
 
 void Cloud::onDeviceDataLedgerSync(Ledger ledger) {
+    (void)ledger;
+    const LedgerSyncDiagnostics before = Cloud::instance().ledgerSyncDiagnostics();
     Cloud::instance().pendingDeviceDataSync = false;
+    const LedgerSyncDiagnostics after = Cloud::instance().ledgerSyncDiagnostics();
+    Cloud::instance().noteLedgerSyncComplete(Cloud::LEDGER_REQUEST_KIND_DATA, before, after);
 }
 
 bool Cloud::hasPendingOutputLedgerSync() const {
@@ -90,6 +102,7 @@ bool Cloud::areLedgersSynced() const {
     static bool wasDisconnected = true;
     static time_t lastObservedConnectionEpoch = 0;
     static bool timeoutOutcomeLogged = false;
+    static bool readyOutcomeLogged = false;
     unsigned long nowMs = millis();
     
     if (Particle.connected()) {
@@ -102,15 +115,34 @@ bool Cloud::areLedgersSynced() const {
             wasDisconnected = false;
             lastObservedConnectionEpoch = currentConnectionEpoch;
             timeoutOutcomeLogged = false;
+            readyOutcomeLogged = false;
             if (sysStatus.get_verboseMode()) {
                 Log.info("Connected - starting %lu ms ledger sync window", 
                          ConnectivityPolicy::LEDGER_SYNC_TIMEOUT_MS);
             }
+#if ENABLE_LEDGER_TRACE
+            Log.info("LedgerInputWindow: start defaultSynced=%d deviceSynced=%d timeout=%lu",
+                     defaultSynced ? 1 : 0,
+                     deviceSynced ? 1 : 0,
+                     (unsigned long)ConnectivityPolicy::LEDGER_SYNC_TIMEOUT_MS);
+#endif
         }
 
         // If both ledgers are already synced for this connection, do not force the
         // caller to wait out the remaining window. This is the key Alert 44 fix.
         if (defaultSynced && deviceSynced) {
+            if (!readyOutcomeLogged) {
+                unsigned long elapsedSinceConnect = nowMs - firstConnectedTime;
+#if ENABLE_LEDGER_TRACE
+                Log.info("LedgerInputReady: elapsed=%lu default=%lu device=%lu",
+                         elapsedSinceConnect,
+                         (unsigned long)defaultSync,
+                         (unsigned long)deviceSync);
+#else
+                (void)elapsedSinceConnect;
+#endif
+                readyOutcomeLogged = true;
+            }
             return true;
         }
         
@@ -127,6 +159,14 @@ bool Cloud::areLedgersSynced() const {
                     Log.info("default-settings synced and device-settings is empty after %lu ms - assuming no device overrides",
                              elapsedSinceConnect);
                 }
+                if (!timeoutOutcomeLogged) {
+#if ENABLE_LEDGER_TRACE
+                    Log.info("LedgerInputReady: elapsed=%lu default=%lu device=%lu empty-device=1",
+                             elapsedSinceConnect,
+                             (unsigned long)defaultSync,
+                             (unsigned long)deviceSync);
+#endif
+                }
                 timeoutOutcomeLogged = true;
                 return true;
             }
@@ -135,6 +175,14 @@ bool Cloud::areLedgersSynced() const {
                 if (!timeoutOutcomeLogged && sysStatus.get_verboseMode()) {
                     Log.info("device-settings synced and default-settings is empty after %lu ms - assuming no product defaults",
                              elapsedSinceConnect);
+                }
+                if (!timeoutOutcomeLogged) {
+#if ENABLE_LEDGER_TRACE
+                    Log.info("LedgerInputReady: elapsed=%lu default=%lu device=%lu empty-default=1",
+                             elapsedSinceConnect,
+                             (unsigned long)defaultSync,
+                             (unsigned long)deviceSync);
+#endif
                 }
                 timeoutOutcomeLogged = true;
                 return true;
@@ -148,6 +196,10 @@ bool Cloud::areLedgersSynced() const {
                         Log.warn("Partial ledger sync after %lu ms: default=%lu device=%lu", 
                                  elapsedSinceConnect,
                                  (unsigned long)defaultSync, (unsigned long)deviceSync);
+                        Log.info("LedgerInputBlocked: elapsed=%lu defaultSynced=%d deviceSynced=%d",
+                                 elapsedSinceConnect,
+                                 defaultSynced ? 1 : 0,
+                                 deviceSynced ? 1 : 0);
                         timeoutOutcomeLogged = true;
                     }
                 }
@@ -156,6 +208,14 @@ bool Cloud::areLedgersSynced() const {
             // If neither has synced after timeout, assume they're empty and that's okay
             if (!timeoutOutcomeLogged && sysStatus.get_verboseMode()) {
                 Log.info("No ledger data after %lu ms - assuming empty ledgers (OK)", elapsedSinceConnect);
+            }
+            if (!timeoutOutcomeLogged) {
+#if ENABLE_LEDGER_TRACE
+                Log.info("LedgerInputReady: elapsed=%lu default=%lu device=%lu empty=1",
+                         elapsedSinceConnect,
+                         (unsigned long)defaultSync,
+                         (unsigned long)deviceSync);
+#endif
             }
             timeoutOutcomeLogged = true;
             return true;
