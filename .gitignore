@@ -6,6 +6,7 @@
 
 # Particle / build outputs
 *.bin
+release/artifacts/*.bin
 firmware*.bin
 boron_firmware_*.bin
 p2_firmware_*.bin

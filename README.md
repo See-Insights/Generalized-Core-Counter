@@ -217,7 +217,7 @@ Important signals:
 - failsafe boot and action lines
 - alert codes for bounded connect, ledger sync, and recovery conditions
 
-Startup status for v13 includes the connectivity recovery state plus the new forensic fields needed for soak analysis:
+Startup status for v14 includes the connectivity recovery state plus the forensic fields needed for soak analysis:
 
 - `failsafeStage`
 - `failsafeCount`
@@ -308,4 +308,4 @@ The detector records evidence only on the transition from inactive to active so 
 
 ## Current Release Status
 
-v13.0.0 is the Raleigh Boron forensic instrumentation release. It adds retained watchdog and PMIC investigation data plus occupancy corruption protection while intentionally leaving charging, connectivity, sleep, and watchdog policies unchanged.
+v14.0.0 is the cloud recovery tuning and logging cleanup release. It retains watchdog and PMIC forensic visibility while intentionally leaving charging, connectivity, sleep, and watchdog policies unchanged.
