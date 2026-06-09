@@ -186,6 +186,13 @@ enum AppBreadcrumb : uint8_t {
   BREADCRUMB_REPORT_QUEUE_DONE = 12,
   BREADCRUMB_REPORT_LEDGER_START = 13,
   BREADCRUMB_REPORT_LEDGER_DONE = 14,
+  BREADCRUMB_REPORT_POST_LEDGER = 15,
+  BREADCRUMB_REPORT_EXIT = 16,
+  BREADCRUMB_IDLE_ENTRY = 17,
+  BREADCRUMB_SLEEP_GATE_START = 18,
+  BREADCRUMB_SLEEP_GATE_DONE = 19,
+  BREADCRUMB_SLEEP_CONFIG_START = 20,
+  BREADCRUMB_SLEEP_SYSTEM_CALL = 21,
 };
 
 const char *appBreadcrumbName(uint8_t code) {
@@ -218,6 +225,20 @@ const char *appBreadcrumbName(uint8_t code) {
     return "REPORT_LEDGER_START";
   case BREADCRUMB_REPORT_LEDGER_DONE:
     return "REPORT_LEDGER_DONE";
+  case BREADCRUMB_REPORT_POST_LEDGER:
+    return "REPORT_POST_LEDGER";
+  case BREADCRUMB_REPORT_EXIT:
+    return "REPORT_EXIT";
+  case BREADCRUMB_IDLE_ENTRY:
+    return "IDLE_ENTRY";
+  case BREADCRUMB_SLEEP_GATE_START:
+    return "SLEEP_GATE_START";
+  case BREADCRUMB_SLEEP_GATE_DONE:
+    return "SLEEP_GATE_DONE";
+  case BREADCRUMB_SLEEP_CONFIG_START:
+    return "SLEEP_CONFIG_START";
+  case BREADCRUMB_SLEEP_SYSTEM_CALL:
+    return "SLEEP_SYSTEM_CALL";
   default:
     return "NONE";
   }
@@ -1529,6 +1550,7 @@ void publishData() {
   const bool ledgerOk = Cloud::instance().publishDataToLedger("ReportState");
   const unsigned long ledgerElapsedMs = millis() - ledgerStartMs;
   setAppBreadcrumb(BREADCRUMB_REPORT_LEDGER_DONE);
+  setAppBreadcrumb(BREADCRUMB_REPORT_POST_LEDGER);
   const char *ledgerState = ledgerOk ? "req" : "err";
   if (!ledgerOk) {
     // Data ledger publish failure; escalate via alert so the error
@@ -1560,6 +1582,8 @@ void publishData() {
              queued ? 1 : 0,
              ledgerState);
   }
+
+  setAppBreadcrumb(BREADCRUMB_REPORT_EXIT);
 }
 
 // ===== Startup status and webhook supervision =====

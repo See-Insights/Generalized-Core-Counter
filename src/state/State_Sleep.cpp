@@ -4,7 +4,6 @@
 #include "cloud/Cloud.h"
 #include "power/Connectivity.h"
 #include "power/ConnectivityPolicy.h"
-#include "time/LocalTimeCache.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
 #include "PublishQueuePosixRK.h"
@@ -217,9 +216,6 @@ void handleSleepingState() {
   static uint8_t lastGateBlockerBeforeRelease = 0;
   static bool gateReleaseReasonKnown = false;
   static bool cloudDisconnectCompleteLogged = false;
-#if CONNECTIVITY_FAILSAFE_TEST_MODE
-  bool hibernateFallbackThisPass = false;
-#endif
 #if HAL_PLATFORM_CELLULAR
   static bool preserveStandbyAfterNormalReturn = false;
   static bool forceModemOffAfterStandbyFailure = false;
@@ -741,6 +737,8 @@ void handleSleepingState() {
     modemOffElapsedMs = 0;
   }
 
+  setAppBreadcrumb(18);
+
   // Enforce sleep preconditions before any final sleep call in this state.
   // Non-standby cellular sleep requires both cloud disconnect and radio/modem off.
   // Standby sleep requires cloud disconnect only.
@@ -828,6 +826,8 @@ void handleSleepingState() {
     return;
   }
 
+  setAppBreadcrumb(19);
+
   int nightSleepSec = -1;
   const bool openNow = isWithinOpenHours();
   logTimeDiag(openNow);
@@ -868,63 +868,11 @@ void handleSleepingState() {
     }
 #endif
 
-    // First attempt a true HIBERNATE so platforms that support it
-    // still get a cold boot at next opening time.
-    if (!session.hibernateDisabledForSession) {
-      // Diagnostic logging to help debug alert 16 issues
-      const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
-      uint8_t currentHour = snapshot.localHour;
-      if (sysStatus.get_verboseMode()) {
-        Log.info("Sleep: HIB ctx valid=%d hr=%d open=%d close=%d",
-                 Time.isValid(), currentHour, sysStatus.get_openTime(), sysStatus.get_closeTime());
-      }
-    #if CONNECTIVITY_FAILSAFE_TEST_MODE
-      Log.info("Sleep: HIB dur=%ds open=0 test=1", nightSleepSec);
-    #else
-      Log.info("Sleep: HIB dur=%ds open=0", nightSleepSec);
-    #endif
-
-      ab1805.stopWDT();
-      pauseAwakeWatchdogForSleep("hib");
-      // Reset sleep configuration so prior ULTRA_LOW_POWER GPIOs do not
-      // accidentally carry into HIBERNATE configuration.
-      config = SystemSleepConfiguration();
-      config.mode(SystemSleepMode::HIBERNATE)
-        .gpio(BUTTON_PIN, FALLING)
-        .duration((uint32_t)nightSleepSec * 1000UL);
-
-      // HIBERNATE should reset the device on wake, so execution should
-      // not resume here under normal conditions.
-      Cloud::instance().logLedgerSleepState();
-      System.sleep(config);
-
-      // If we reach this point, HIBERNATE did not reset as expected on
-      // this hardware/OS combination. Log once, raise an alert, and
-      // permanently disable HIBERNATE for the remainder of this boot so
-      // we can fall back to ULTRA_LOW_POWER instead of thrashing.
-      ab1805.resumeWDT();
-    #if CONNECTIVITY_FAILSAFE_TEST_MODE
-      Log.warn("SleepWarn: HIB returned fallback=ULP test=1");
-    #endif
-      Log.error("HIBERNATE sleep returned unexpectedly (platform does not support or HIBERNATE woke early)");
-      Log.error("Park hours context: Time.isValid=%d localHour=%d openTime=%d closeTime=%d",
-                Time.isValid(), currentHour, sysStatus.get_openTime(), sysStatus.get_closeTime());
-      current.raiseAlert(16); // Alert: unexpected return from HIBERNATE
-      session.hibernateDisabledForSession = true;
-    #if CONNECTIVITY_FAILSAFE_TEST_MODE
-      hibernateFallbackThisPass = true;
-    #endif
-      // Clear alert immediately since we've handled the failure by disabling HIBERNATE
-      // Without a reset, the setup() alert clearing code won't run
-      current.set_alertCode(0);
-      current.set_lastAlertTime(0);
-      // Fall through to ULTRA_LOW_POWER fallback below.
-    }
   }
 
   // ********** ULTRA_LOW_POWER sleep (daytime or night fallback) **********
   // During opening hours we use the reportingIntervalSec as before.
-  // Outside opening hours, if HIBERNATE is disabled or unsupported,
+  // Outside opening hours,
   // fall back to ULTRA_LOW_POWER with a long sleep equal to the
   // time until next open to avoid rapid wake/sleep thrashing.
   uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
@@ -985,7 +933,7 @@ void handleSleepingState() {
     }
   }
 
-  // If HIBERNATE is unavailable and we are about to take a long overnight
+  // Before a long overnight
   // ULTRA_LOW_POWER fallback sleep, optionally reset first when heap has
   // drifted low. This gives the next day a clean start without affecting
   // open-hours behavior.
@@ -1009,6 +957,7 @@ void handleSleepingState() {
 
   // Reset sleep configuration on each sleep so GPIO selections do not
   // accumulate across calls.
+  setAppBreadcrumb(20);
   config = SystemSleepConfiguration();
 
   // ********** WORKING SLEEP CONFIGURATION **********
@@ -1186,13 +1135,12 @@ void handleSleepingState() {
   }
 #endif
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
-  Log.info("Sleep: ULP standby=%d reason=%s dur=%ds occ=%d soc=%.1f hibFallback=%d test=1",
+  Log.info("Sleep: ULP standby=%d reason=%s dur=%ds occ=%d soc=%.1f test=1",
            useNetworkStandby ? 1 : 0,
            sleepReason,
            wakeInSeconds,
            current.get_occupied() ? 1 : 0,
-           (double)current.get_stateOfCharge(),
-           hibernateFallbackThisPass ? 1 : 0);
+           (double)current.get_stateOfCharge());
 #else
   Log.info("Sleep: ULP standby=%d reason=%s dur=%ds occ=%d soc=%.1f",
            useNetworkStandby ? 1 : 0,
@@ -1205,6 +1153,7 @@ void handleSleepingState() {
   thrashGuard.markProgress("SLEEP_ATTEMPT");
   const unsigned long sleepCallStartMs = millis();
   Cloud::instance().logLedgerSleepState();
+  setAppBreadcrumb(21);
   SystemSleepResult result = System.sleep(config);
   const unsigned long sleepElapsedMs = millis() - sleepCallStartMs;
   pin_t wakePin = result.wakeupPin();
@@ -1244,20 +1193,24 @@ void handleSleepingState() {
     current.raiseAlert(16);
 
    // STOP generally supports a wider set of wake pins on some platforms.
+    setAppBreadcrumb(20);
     config = SystemSleepConfiguration();
     config.mode(SystemSleepMode::STOP)
       .gpio(BUTTON_PIN, FALLING)
       .gpio(intPin, RISING)
       .duration((uint32_t)wakeInSeconds * 1000UL);
     Cloud::instance().logLedgerSleepState();
+    setAppBreadcrumb(21);
     result = System.sleep(config);
 
     if (result.error() != SYSTEM_ERROR_NONE) {
       Log.error("STOP sleep fallback failed err=%d (wakeIn=%d sec) - using timer-only STOP sleep", (int)result.error(), wakeInSeconds);
+      setAppBreadcrumb(20);
       config = SystemSleepConfiguration();
       config.mode(SystemSleepMode::STOP)
         .duration((uint32_t)wakeInSeconds * 1000UL);
       Cloud::instance().logLedgerSleepState();
+      setAppBreadcrumb(21);
       result = System.sleep(config);
 
       if (result.error() != SYSTEM_ERROR_NONE) {

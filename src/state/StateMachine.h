@@ -50,7 +50,6 @@ void userSwitchISR();
 struct SessionState {
   bool firstConnectionObserved = false;
   bool firstConnectionQueueDrainedLogged = false;
-  bool hibernateDisabledForSession = false;
   bool suppressAlert40ThisSession = false;
   bool awaitingWebhookResponse = false;
   bool webhookExpectedOnConnect = false;   // We queued a webhook publish and should start a response window on next cloud connect
