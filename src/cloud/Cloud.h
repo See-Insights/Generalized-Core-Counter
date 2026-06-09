@@ -207,7 +207,7 @@ private:
      * 
      * @return true if successful
      */
-    bool applySensorConfig(const LedgerData &defaults, const LedgerData &device);
+    bool applySensorConfig(const LedgerData &defaults, const LedgerData &device, bool *changedOut = nullptr);
 
     /**
      * @brief Callback when default-settings ledger syncs
@@ -234,28 +234,28 @@ private:
      * 
      * @return true if successful
      */
-    bool applyMessagingConfig(const LedgerData &defaults, const LedgerData &device);
+    bool applyMessagingConfig(const LedgerData &defaults, const LedgerData &device, bool *changedOut = nullptr);
 
     /**
      * @brief Apply modes configuration section
      * 
      * @return true if successful
      */
-    bool applyModesConfig(const LedgerData &defaults, const LedgerData &device);
+    bool applyModesConfig(const LedgerData &defaults, const LedgerData &device, bool *changedOut = nullptr);
 
     /**
      * @brief Apply reporting configuration section (webhook settings)
      * 
      * @return true if successful
      */
-    bool applyReportingConfig(const LedgerData &defaults, const LedgerData &device);
+    bool applyReportingConfig(const LedgerData &defaults, const LedgerData &device, bool *changedOut = nullptr);
 
     /**
      * @brief Apply timing configuration section
      *
      * @return true if successful
      */
-    bool applyTimingConfig(const LedgerData &defaults, const LedgerData &device);
+    bool applyTimingConfig(const LedgerData &defaults, const LedgerData &device, bool *changedOut = nullptr);
 
     /**
      * @brief Validate configuration value is within acceptable range

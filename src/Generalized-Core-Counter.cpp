@@ -244,6 +244,7 @@ const char *appBreadcrumbName(uint8_t code) {
   }
 }
 
+#if PLATFORM_ID == PLATFORM_BORON
 const char *ab1805WakeReasonName(AB1805::WakeReason reason) {
   switch (reason) {
   case AB1805::WakeReason::WATCHDOG:
@@ -259,6 +260,7 @@ const char *ab1805WakeReasonName(AB1805::WakeReason reason) {
     return "UNKNOWN";
   }
 }
+#endif
 
 const char *stateShortName(State value) {
   switch (value) {
