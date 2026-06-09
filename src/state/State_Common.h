@@ -69,6 +69,13 @@ BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC);
  */
 void setAppBreadcrumb(uint8_t code);
 
+// Retained hibernate diagnostics (Boron RTC-alarm hibernate path)
+extern retained time_t retainedHibernateRtcBefore;
+extern retained time_t retainedHibernateWakeTime;
+extern retained uint32_t retainedHibernateRequestedSleep;
+extern retained uint32_t retainedHibernateCount;
+extern retained bool retainedHibernatePending;
+
 /**
  * @brief Clears persisted connectivity failsafe state after successful recovery.
  *

@@ -101,6 +101,11 @@ bool sysStatusData::validate(size_t dataSize) {
             Log.info("data not valid connectivity recovery stage =%d", sysStatus.get_connectivityRecoveryStage());
             valid = false;
         }
+
+        if (sysStatus.getValue<uint8_t>(offsetof(SysData,reservedByte0)) > 1) {
+            Log.info("data not valid enable hibernate flag");
+            valid = false;
+        }
     }
     if (!valid) {
         Log.warn("sysStatus data is not valid");
@@ -138,6 +143,7 @@ void sysStatusData::initialize() {
     sysStatus.set_connectAttemptBudgetSec(Config::DEFAULT_CONNECT_ATTEMPT_BUDGET_SEC);
     sysStatus.set_cloudDisconnectBudgetSec(Config::DEFAULT_CLOUD_DISCONNECT_BUDGET_SEC);
     sysStatus.set_modemOffBudgetSec(Config::DEFAULT_MODEM_OFF_BUDGET_SEC);
+    sysStatus.set_enableHibernateSleep(false);
     sysStatus.set_connectivityRecoveryStage(0);
     sysStatus.set_lastConnectivityRecoveryAction(0);
     sysStatus.set_connectivityRecoveryCount(0);
@@ -361,6 +367,13 @@ uint16_t sysStatusData::get_modemOffBudgetSec() const {
 }
 void sysStatusData::set_modemOffBudgetSec(uint16_t value) {
     setValue<uint16_t>(offsetof(SysData,modemOffBudgetSec), value);
+}
+
+bool sysStatusData::get_enableHibernateSleep() const {
+    return getValue<uint8_t>(offsetof(SysData,reservedByte0)) != 0;
+}
+void sysStatusData::set_enableHibernateSleep(bool value) {
+    setValue<uint8_t>(offsetof(SysData,reservedByte0), value ? 1 : 0);
 }
 
 uint8_t sysStatusData::get_currentBatteryTier() const {

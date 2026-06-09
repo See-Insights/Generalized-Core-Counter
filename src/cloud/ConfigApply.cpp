@@ -386,6 +386,7 @@ bool Cloud::applyModesConfig(const LedgerData &defaults, const LedgerData &devic
     int samplingMode = 0;
     int cloudDisconnectBudgetSec = 0;
     int modemOffBudgetSec = 0;
+    bool enableHibernateSleep = false;
 
     // Sensor mode: 0=COUNTING, 1=OCCUPANCY, 2=MEASUREMENT
     if (getMergedIntValue(defaultModes, deviceModes, "sensorMode", sensorMode)) {
@@ -473,6 +474,14 @@ bool Cloud::applyModesConfig(const LedgerData &defaults, const LedgerData &devic
             }
         } else {
             success = false;
+        }
+    }
+
+    if (getMergedBoolValue(defaultModes, deviceModes, "enableHibernateSleep", enableHibernateSleep)) {
+        if (sysStatus.get_enableHibernateSleep() != enableHibernateSleep) {
+            sysStatus.set_enableHibernateSleep(enableHibernateSleep);
+            Log.info("Config: enable hibernate sleep -> %s", enableHibernateSleep ? "YES" : "NO");
+            changed = true;
         }
     }
 

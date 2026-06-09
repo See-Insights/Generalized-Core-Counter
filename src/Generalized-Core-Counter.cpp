@@ -244,6 +244,22 @@ const char *appBreadcrumbName(uint8_t code) {
   }
 }
 
+const char *ab1805WakeReasonName(AB1805::WakeReason reason) {
+  switch (reason) {
+  case AB1805::WakeReason::WATCHDOG:
+    return "WATCHDOG";
+  case AB1805::WakeReason::DEEP_POWER_DOWN:
+    return "DEEP_POWER_DOWN";
+  case AB1805::WakeReason::COUNTDOWN_TIMER:
+    return "COUNTDOWN_TIMER";
+  case AB1805::WakeReason::ALARM:
+    return "ALARM";
+  case AB1805::WakeReason::UNKNOWN:
+  default:
+    return "UNKNOWN";
+  }
+}
+
 const char *stateShortName(State value) {
   switch (value) {
   case INITIALIZATION_STATE:
@@ -552,8 +568,17 @@ retained uint8_t bootStormTripCount = 0;
 retained bool bootStormAlertPending = false;
 retained uint8_t appBreadcrumb = BREADCRUMB_NONE;
 retained uint32_t appBreadcrumbMs = 0;
+retained time_t retainedHibernateRtcBefore = 0;
+retained time_t retainedHibernateWakeTime = 0;
+retained uint32_t retainedHibernateRequestedSleep = 0;
+retained uint32_t retainedHibernateCount = 0;
+retained bool retainedHibernatePending = false;
 uint8_t startupPreviousBreadcrumb = BREADCRUMB_NONE;
 uint32_t startupPreviousBreadcrumbMs = 0;
+bool startupHibernateStatusReady = false;
+const char *startupHibernateWakeReason = "UNKNOWN";
+uint32_t startupHibernateActualSleepSec = 0;
+int32_t startupHibernateSleepErrorSec = 0;
 
 void setAppBreadcrumb(uint8_t code) {
   appBreadcrumb = code;
@@ -895,6 +920,41 @@ void setup() {
              ab1805.isRTCSet() ? "true" : "false",
              rtcReadOk ? "true" : "false");
   }
+
+  startupHibernateStatusReady = false;
+  startupHibernateWakeReason = "UNKNOWN";
+  startupHibernateActualSleepSec = 0;
+  startupHibernateSleepErrorSec = 0;
+#if PLATFORM_ID == PLATFORM_BORON
+  if (retainedHibernatePending) {
+    const AB1805::WakeReason wakeReason = ab1805.getWakeReason();
+    startupHibernateWakeReason = ab1805WakeReasonName(wakeReason);
+    if (reason == RESET_REASON_POWER_MANAGEMENT &&
+        wakeReason == AB1805::WakeReason::ALARM &&
+        rtcReadOk &&
+        retainedHibernateRtcBefore > 0 &&
+        retainedHibernateRequestedSleep > 0 &&
+        rtcTime >= retainedHibernateRtcBefore) {
+      startupHibernateActualSleepSec = (uint32_t)(rtcTime - retainedHibernateRtcBefore);
+      startupHibernateSleepErrorSec = (int32_t)startupHibernateActualSleepSec -
+                                      (int32_t)retainedHibernateRequestedSleep;
+      startupHibernateStatusReady = true;
+
+      Log.info("HibernateWake: reason=%s req=%lu actual=%lu err=%ld count=%lu",
+               startupHibernateWakeReason,
+               (unsigned long)retainedHibernateRequestedSleep,
+               (unsigned long)startupHibernateActualSleepSec,
+               (long)startupHibernateSleepErrorSec,
+               (unsigned long)retainedHibernateCount);
+    } else {
+      Log.info("HibernateWake: pending=1 reason=%d wake=%s rtcOk=%d",
+               reason,
+               startupHibernateWakeReason,
+               rtcReadOk ? 1 : 0);
+    }
+  }
+#endif
+  retainedHibernatePending = false;
 
   Cloud::instance().setup(); // Initialize the cloud functions
 
@@ -1624,10 +1684,20 @@ void publishStartupStatus() {
       (Time.isValid() && lastConnection != 0 && Time.now() > lastConnection)
           ? (long)(Time.now() - lastConnection)
           : -1L;
+  char hibernateFields[192] = "";
+  if (startupHibernateStatusReady) {
+    snprintf(hibernateFields,
+             sizeof(hibernateFields),
+             ",\"sleepMode\":\"hibernate\",\"wakeReason\":\"%s\",\"actualSleep\":%lu,\"sleepError\":%ld,\"hibernateCount\":%lu",
+             startupHibernateWakeReason,
+             (unsigned long)startupHibernateActualSleepSec,
+             (long)startupHibernateSleepErrorSec,
+             (unsigned long)retainedHibernateCount);
+  }
 
 #if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
   snprintf(status, sizeof(status),
-           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"pmicAnomalyCount\":%u,\"lastPmicAnomalySoc\":%.2f,\"lastPmicAnomalyChargeStatus\":%u,\"lastPmicAnomalyAgeSec\":%lu,\"lastPmicAnomalyPowerSource\":%u,\"lastPmicAnomalyVbusStatus\":%u,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d}",
+           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"pmicAnomalyCount\":%u,\"lastPmicAnomalySoc\":%.2f,\"lastPmicAnomalyChargeStatus\":%u,\"lastPmicAnomalyAgeSec\":%lu,\"lastPmicAnomalyPowerSource\":%u,\"lastPmicAnomalyVbusStatus\":%u,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d%s}",
            FIRMWARE_VERSION,
            resetReason,
            (unsigned long)resetReasonData,
@@ -1651,10 +1721,11 @@ void publishStartupStatus() {
            (long)failsafeLastAction,
            lastConnectionAgeSec,
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
-           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0);
+           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
+           hibernateFields);
 #else
   snprintf(status, sizeof(status),
-           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d}",
+           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d%s}",
            FIRMWARE_VERSION,
            resetReason,
            (unsigned long)resetReasonData,
@@ -1672,7 +1743,8 @@ void publishStartupStatus() {
            (long)failsafeLastAction,
            lastConnectionAgeSec,
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
-           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0);
+           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
+           hibernateFields);
 #endif
 
   PublishQueuePosix::instance().publish("status", status, PRIVATE);

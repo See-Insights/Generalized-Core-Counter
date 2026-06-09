@@ -94,6 +94,7 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     writerBase.name("connectionMode").value((int)sysStatus.get_connectionMode());
     writerBase.name("reportingMode").value((int)sysStatus.get_reportingMode());
     writerBase.name("samplingMode").value((int)sysStatus.get_samplingMode());
+    writerBase.name("enableHibernateSleep").value(sysStatus.get_enableHibernateSleep());
     writerBase.endObject();
     writerBase.endObject();
 
@@ -145,6 +146,7 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     writer.name("connectionMode").value((int)sysStatus.get_connectionMode());
     writer.name("reportingMode").value((int)sysStatus.get_reportingMode());
     writer.name("samplingMode").value((int)sysStatus.get_samplingMode());
+    writer.name("enableHibernateSleep").value(sysStatus.get_enableHibernateSleep());
     writer.endObject();
 
 #if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS

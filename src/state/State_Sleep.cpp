@@ -197,6 +197,92 @@ const char *gateBlockerReasonLabel(uint8_t blockerMask) {
   }
 }
 
+#if PLATFORM_ID == PLATFORM_BORON
+bool isDeviceOsAtLeast6400() {
+  int major = 0;
+  int minor = 0;
+  int patch = 0;
+  const String version = System.version();
+  if (sscanf(version.c_str(), "%d.%d.%d", &major, &minor, &patch) < 2) {
+    return false;
+  }
+
+  if (major > 6) {
+    return true;
+  }
+  if (major < 6) {
+    return false;
+  }
+  return minor >= 4;
+}
+
+bool isRtcTimeValidForHibernate(time_t rtcNow) {
+  static const time_t kRtcMin = 1704067200; // 2024-01-01 00:00:00 UTC
+  static const time_t kRtcMax = 2051222400; // 2035-01-01 00:00:00 UTC
+  return rtcNow >= kRtcMin && rtcNow < kRtcMax;
+}
+
+bool clearAb1805StaleAlarmInterrupts() {
+  static const uint8_t kRegStatus = 0x0f;
+  static const uint8_t kRegIntMask = 0x12;
+  static const uint8_t kMaskAieTie = 0x0c;
+
+  uint8_t intMask = 0;
+  if (!ab1805.readRegister(kRegIntMask, intMask)) {
+    return false;
+  }
+
+  // Clear stale interrupt flags before arming the next one-shot alarm.
+  if (!ab1805.writeRegister(kRegStatus, 0x00)) {
+    return false;
+  }
+
+  intMask = (uint8_t)(intMask & (uint8_t)~kMaskAieTie);
+  if (!ab1805.writeRegister(kRegIntMask, intMask)) {
+    return false;
+  }
+
+  if (!ab1805.maskRegister(
+        AB1805::REG_TIMER_CTRL,
+        (uint8_t)~AB1805::REG_TIMER_CTRL_RPT_MASK,
+        AB1805::REG_TIMER_CTRL_RPT_DIS)) {
+    return false;
+  }
+
+  return true;
+}
+
+bool shouldUseBoronRtcAlarmHibernate(uint32_t requestedSleepSec, time_t &rtcNow) {
+  if (!sysStatus.get_enableHibernateSleep()) {
+    return false;
+  }
+
+  if (!isDeviceOsAtLeast6400()) {
+    return false;
+  }
+
+  static const uint32_t kMinHibernateSleepSec = 900;
+  static const uint32_t kMaxHibernateSleepSec = 21600;
+  if (requestedSleepSec < kMinHibernateSleepSec || requestedSleepSec > kMaxHibernateSleepSec) {
+    return false;
+  }
+
+  if (!ab1805.isRTCSet()) {
+    return false;
+  }
+
+  if (!ab1805.getRtcAsTime(rtcNow)) {
+    return false;
+  }
+
+  if (!isRtcTimeValidForHibernate(rtcNow)) {
+    return false;
+  }
+
+  return true;
+}
+#endif
+
 } // namespace
 
 // NOTE:
@@ -932,6 +1018,58 @@ void handleSleepingState() {
       sleepReason = "scheduled";
     }
   }
+
+#if PLATFORM_ID == PLATFORM_BORON
+  if (overnightFallbackSleep) {
+    time_t rtcNow = 0;
+    if (shouldUseBoronRtcAlarmHibernate((uint32_t)wakeInSeconds, rtcNow)) {
+      pinMode(WAKEUP_PIN, INPUT_PULLUP);
+      if (digitalRead(WAKEUP_PIN) == HIGH) {
+        if (clearAb1805StaleAlarmInterrupts()) {
+          const time_t wakeTime = rtcNow + (time_t)wakeInSeconds;
+          if (ab1805.interruptAtTime(wakeTime)) {
+            setAppBreadcrumb(20);
+            config = SystemSleepConfiguration();
+            config.mode(SystemSleepMode::HIBERNATE)
+              .gpio(WAKEUP_PIN, FALLING)
+              .gpio(BUTTON_PIN, FALLING);
+
+            const bool watchdogStopped = ab1805.stopWDT();
+            pauseAwakeWatchdogForSleep("hibernate");
+            if (!watchdogStopped) {
+              Log.warn("SleepCall: watchdog-stop failed mode=HIBERNATE dur=%ds", wakeInSeconds);
+            }
+
+            retainedHibernateRtcBefore = rtcNow;
+            retainedHibernateWakeTime = wakeTime;
+            retainedHibernateRequestedSleep = (uint32_t)wakeInSeconds;
+            retainedHibernateCount++;
+            retainedHibernatePending = true;
+
+            Log.info("Sleep: HIBERNATE reason=closed dur=%ds wakePin=%d", wakeInSeconds, (int)WAKEUP_PIN);
+            thrashGuard.markProgress("SLEEP_ATTEMPT");
+            Cloud::instance().logLedgerSleepState();
+            setAppBreadcrumb(21);
+            const SystemSleepResult hibernateResult = System.sleep(config);
+
+            // HIBERNATE should reset the MCU. If we return here, treat it as failed and fall back.
+            retainedHibernatePending = false;
+            ab1805.resumeWDT();
+            restoreAwakeWatchdogAfterWake("hibernate");
+            Log.warn("HIBERNATE sleep failed err=%d - falling back to ULTRA_LOW_POWER",
+                     (int)hibernateResult.error());
+          } else {
+            Log.warn("HIBERNATE bypass: failed to program AB1805 alarm - falling back to ULTRA_LOW_POWER");
+          }
+        } else {
+          Log.warn("HIBERNATE bypass: failed stale interrupt cleanup - falling back to ULTRA_LOW_POWER");
+        }
+      } else {
+        Log.warn("HIBERNATE bypass: wake pin held low before sleep - falling back to ULTRA_LOW_POWER");
+      }
+    }
+  }
+#endif
 
   // Before a long overnight
   // ULTRA_LOW_POWER fallback sleep, optionally reset first when heap has

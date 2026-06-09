@@ -227,7 +227,7 @@ public:
 		// ********** Test Mode Overrides **********
 		float reservedFloat0;                             // Reserved to preserve persistent layout after battery test removal
 		uint16_t testConnectionDurationOverride;          // Test mode: connection duration override (0xFFFF = disabled, 0-999 = override value in seconds)
-		uint8_t reservedByte0;                            // Reserved to preserve persistent layout after battery test removal
+		uint8_t reservedByte0;                            // Stored as enableHibernateSleep flag (0/1) while preserving persistent layout
 
 		// ********** Webhook Configuration **********
 		char webhookName[64];                             // Webhook event name from cloud config
@@ -366,6 +366,8 @@ public:
 
 	uint16_t get_modemOffBudgetSec() const;
 	void set_modemOffBudgetSec(uint16_t value);
+	bool get_enableHibernateSleep() const;
+	void set_enableHibernateSleep(bool value);
 
 	uint8_t get_currentBatteryTier() const;
 	void set_currentBatteryTier(uint8_t value);
