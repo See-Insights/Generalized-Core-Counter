@@ -16,6 +16,26 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [15.0.0] - 2026-06-10
+
+### Added
+
+- **Watchdog forensic instrumentation**: Added loop-stage forensics snapshots and startup watchdog forensic publish payloads to improve post-reset RCA for breadcrumb/stage/queue/state/connection-age context.
+
+### Changed
+
+- **Hibernate validation objective**: Release objective includes validating Boron hibernate behavior with extended 36000-second sleep duration in limited deployment.
+- **Release metadata updated for v15 rollout**: Bumped firmware version to `15.0.0` and Particle product version to `PRODUCT_VERSION(15)`.
+
+### Fixed
+
+- **Breadcrumb collision risk in forensic ranges**: Reassigned breadcrumb IDs so `14-18` are uniquely reserved for `REPORT_LEDGER_DONE`, `CLOUD_LOOP_ENTER`, `CLOUD_LOOP_EXIT`, `PUBLISH_QUEUE_ENTER`, and `PUBLISH_QUEUE_EXIT`.
+
+### Validation
+
+- Revalidated Boron compile on Device OS `6.4.1` after v15 forensic instrumentation changes.
+- Confirmed watchdog forensic publish payload remains compact and well under Particle event-data limits.
+
 ## [14.0.0] - 2026-06-06
 
 ### Added

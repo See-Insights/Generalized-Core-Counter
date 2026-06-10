@@ -253,32 +253,42 @@ bool clearAb1805StaleAlarmInterrupts() {
 }
 
 bool shouldUseBoronRtcAlarmHibernate(uint32_t requestedSleepSec, time_t &rtcNow) {
+  Log.info("HibernateDiag: check enabled=%d requested=%lu",
+           sysStatus.get_enableHibernateSleep() ? 1 : 0,
+           (unsigned long)requestedSleepSec);
   if (!sysStatus.get_enableHibernateSleep()) {
+    Log.info("HibernateDiag: fail=disabled");
     return false;
   }
 
   if (!isDeviceOsAtLeast6400()) {
+    Log.info("HibernateDiag: fail=device_os");
     return false;
   }
 
   static const uint32_t kMinHibernateSleepSec = 900;
-  static const uint32_t kMaxHibernateSleepSec = 21600;
+  static const uint32_t kMaxHibernateSleepSec = 36000;
   if (requestedSleepSec < kMinHibernateSleepSec || requestedSleepSec > kMaxHibernateSleepSec) {
+    Log.info("HibernateDiag: fail=duration requested=%lu", (unsigned long)requestedSleepSec);
     return false;
   }
 
   if (!ab1805.isRTCSet()) {
+    Log.info("HibernateDiag: fail=rtc_not_set");
     return false;
   }
 
   if (!ab1805.getRtcAsTime(rtcNow)) {
+    Log.info("HibernateDiag: fail=rtc_read");
     return false;
   }
 
   if (!isRtcTimeValidForHibernate(rtcNow)) {
+    Log.info("HibernateDiag: fail=rtc_invalid epoch=%ld", (long)rtcNow);
     return false;
   }
 
+  Log.info("HibernateDiag: pass epoch=%ld", (long)rtcNow);
   return true;
 }
 #endif
@@ -294,6 +304,8 @@ bool shouldUseBoronRtcAlarmHibernate(uint32_t requestedSleepSec, time_t &rtcNow)
  * ...
  */
 void handleSleepingState() {
+  setLoopStage(LOOP_STAGE_SLEEP_PREP);
+
   bool enteredState = (state != oldState);
   static bool operationsCompleteLogged = false;  // Track if we've logged completion message
   static bool gateWasBlocking = false;

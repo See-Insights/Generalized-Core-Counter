@@ -207,6 +207,8 @@ static const unsigned long firmwareUpdateMaxMs = ConnectivityPolicy::FIRMWARE_UP
  *          field behaviour can be analysed from device-status data.
  */
 void handleConnectingState() {
+  setLoopStage(LOOP_STAGE_CONNECTIVITY);
+
   static unsigned long connectionStartTimeStamp; // When this connect attempt started
   static bool lastEnteredFromReporting = false;  // Whether we came from REPORTING_STATE
   static bool connectRequested = false;

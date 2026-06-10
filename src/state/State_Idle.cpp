@@ -29,6 +29,8 @@ void ensureSensorEnabled(const char* context) {
 
 // IDLE_STATE: Awake, monitoring sensor and deciding what to do next
 void handleIdleState() {
+  setLoopStage(LOOP_STAGE_IDLE_PROCESSING);
+
   if (state != oldState) {
     publishStateTransition();
   }

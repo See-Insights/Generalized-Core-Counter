@@ -27,7 +27,7 @@
 
 // Firmware version recognized by Particle Product firmware management
 // Bump this integer whenever you cut a new production release.
-PRODUCT_VERSION(14);
+PRODUCT_VERSION(15);
 
 // Hardware abstraction and device-specific pinouts
 #include "device_pinout.h"           // Platform-specific pin definitions
@@ -105,6 +105,7 @@ void sensorISR();             // Interrupt for legacy tire-counting sensor
 void dailyCleanup();          // Reset daily counters and housekeeping
 void UbidotsHandler(const char *event, const char *data); // Webhook response handler
 void publishStartupStatus();  // One-time status summary at boot
+void publishWatchdogForensics(); // One-time watchdog forensic snapshot at boot
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE); // Safe diagnostic publish with queue guard
 BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC);
 void clearConnectivityFailsafeRecovery(const char *reason);
@@ -186,13 +187,17 @@ enum AppBreadcrumb : uint8_t {
   BREADCRUMB_REPORT_QUEUE_DONE = 12,
   BREADCRUMB_REPORT_LEDGER_START = 13,
   BREADCRUMB_REPORT_LEDGER_DONE = 14,
-  BREADCRUMB_REPORT_POST_LEDGER = 15,
-  BREADCRUMB_REPORT_EXIT = 16,
-  BREADCRUMB_IDLE_ENTRY = 17,
-  BREADCRUMB_SLEEP_GATE_START = 18,
-  BREADCRUMB_SLEEP_GATE_DONE = 19,
-  BREADCRUMB_SLEEP_CONFIG_START = 20,
-  BREADCRUMB_SLEEP_SYSTEM_CALL = 21,
+  BREADCRUMB_CLOUD_LOOP_ENTER = 15,
+  BREADCRUMB_CLOUD_LOOP_EXIT = 16,
+  BREADCRUMB_PUBLISH_QUEUE_ENTER = 17,
+  BREADCRUMB_PUBLISH_QUEUE_EXIT = 18,
+  BREADCRUMB_REPORT_POST_LEDGER = 19,
+  BREADCRUMB_REPORT_EXIT = 20,
+  BREADCRUMB_IDLE_ENTRY = 21,
+  BREADCRUMB_SLEEP_GATE_START = 22,
+  BREADCRUMB_SLEEP_GATE_DONE = 23,
+  BREADCRUMB_SLEEP_CONFIG_START = 24,
+  BREADCRUMB_SLEEP_SYSTEM_CALL = 25,
 };
 
 const char *appBreadcrumbName(uint8_t code) {
@@ -225,6 +230,14 @@ const char *appBreadcrumbName(uint8_t code) {
     return "REPORT_LEDGER_START";
   case BREADCRUMB_REPORT_LEDGER_DONE:
     return "REPORT_LEDGER_DONE";
+  case BREADCRUMB_CLOUD_LOOP_ENTER:
+    return "CLOUD_LOOP_ENTER";
+  case BREADCRUMB_CLOUD_LOOP_EXIT:
+    return "CLOUD_LOOP_EXIT";
+  case BREADCRUMB_PUBLISH_QUEUE_ENTER:
+    return "PUBLISH_QUEUE_ENTER";
+  case BREADCRUMB_PUBLISH_QUEUE_EXIT:
+    return "PUBLISH_QUEUE_EXIT";
   case BREADCRUMB_REPORT_POST_LEDGER:
     return "REPORT_POST_LEDGER";
   case BREADCRUMB_REPORT_EXIT:
@@ -559,6 +572,24 @@ void logConnectivityFailsafeBootDiagnostics() {
 
 // ===== Retained boot and breadcrumb state =====
 
+constexpr uint32_t kLoopForensicsMagic = 0x57444631UL;
+constexpr uint8_t kLoopForensicsVersion = 1;
+constexpr unsigned long kLoopStageWarnThresholdMs = 2000UL;
+constexpr unsigned long kLoopStageErrorThresholdMs = 10000UL;
+constexpr unsigned long kLoopForensicsSnapshotIntervalMs = 1000UL;
+
+struct RetainedLoopForensics {
+  uint32_t magic;
+  uint8_t version;
+  uint8_t lastBreadcrumb;
+  uint8_t lastLoopStage;
+  uint8_t currentState;
+  uint16_t publishQueueDepth;
+  uint32_t stageStartMillis;
+  uint32_t lastLoopStageElapsed;
+  uint32_t millisSinceLastCloudConnect;
+};
+
 // Boot-storm guard retained state protects against repeated resets that occur
 // before setup completes and therefore bypass ERROR_STATE protections.
 retained uint8_t bootStormCount = 0;
@@ -570,6 +601,7 @@ retained uint8_t bootStormTripCount = 0;
 retained bool bootStormAlertPending = false;
 retained uint8_t appBreadcrumb = BREADCRUMB_NONE;
 retained uint32_t appBreadcrumbMs = 0;
+retained RetainedLoopForensics retainedLoopForensics = {};
 retained time_t retainedHibernateRtcBefore = 0;
 retained time_t retainedHibernateWakeTime = 0;
 retained uint32_t retainedHibernateRequestedSleep = 0;
@@ -577,14 +609,166 @@ retained uint32_t retainedHibernateCount = 0;
 retained bool retainedHibernatePending = false;
 uint8_t startupPreviousBreadcrumb = BREADCRUMB_NONE;
 uint32_t startupPreviousBreadcrumbMs = 0;
+uint8_t startupPreviousLoopStage = LOOP_STAGE_NONE;
+uint32_t startupPreviousLoopStageElapsedMs = 0;
+uint16_t startupPreviousQueueDepth = 0;
+uint32_t startupPreviousMillisSinceLastCloudConnect = 0;
+uint8_t startupPreviousState = INITIALIZATION_STATE;
 bool startupHibernateStatusReady = false;
 const char *startupHibernateWakeReason = "UNKNOWN";
 uint32_t startupHibernateActualSleepSec = 0;
 int32_t startupHibernateSleepErrorSec = 0;
+unsigned long lastLoopForensicsSnapshotMs = 0;
+
+template <typename T>
+bool updateRetainedValue(T &slot, const T &value) {
+  if (slot == value) {
+    return false;
+  }
+  slot = value;
+  return true;
+}
+
+const char *loopStageName(LoopStage stage) {
+  switch (stage) {
+  case LOOP_STAGE_STATE_HANDLER:
+    return "STATE_HANDLER";
+  case LOOP_STAGE_CLOUD_LOOP:
+    return "CLOUD_LOOP";
+  case LOOP_STAGE_PUBLISH_QUEUE:
+    return "PUBLISH_QUEUE";
+  case LOOP_STAGE_DIAGNOSTICS:
+    return "DIAGNOSTICS";
+  case LOOP_STAGE_IDLE_PROCESSING:
+    return "IDLE_PROCESSING";
+  case LOOP_STAGE_SLEEP_PREP:
+    return "SLEEP_PREP";
+  case LOOP_STAGE_CONNECTIVITY:
+    return "CONNECTIVITY";
+  case LOOP_STAGE_NONE:
+  default:
+    return "NONE";
+  }
+}
+
+const char *loopStageForensicName(LoopStage stage) {
+  switch (stage) {
+  case LOOP_STAGE_PUBLISH_QUEUE:
+    return "publish";
+  case LOOP_STAGE_CLOUD_LOOP:
+    return "cloud";
+  case LOOP_STAGE_STATE_HANDLER:
+    return "state";
+  case LOOP_STAGE_DIAGNOSTICS:
+    return "diag";
+  case LOOP_STAGE_CONNECTIVITY:
+    return "connectivity";
+  case LOOP_STAGE_IDLE_PROCESSING:
+    return "idle";
+  case LOOP_STAGE_SLEEP_PREP:
+    return "sleep";
+  case LOOP_STAGE_NONE:
+  default:
+    return "none";
+  }
+}
+
+void resetRetainedLoopForensics() {
+  memset(&retainedLoopForensics, 0, sizeof(retainedLoopForensics));
+  retainedLoopForensics.magic = kLoopForensicsMagic;
+  retainedLoopForensics.version = kLoopForensicsVersion;
+  retainedLoopForensics.lastBreadcrumb = appBreadcrumb;
+  retainedLoopForensics.currentState = (uint8_t)state;
+}
+
+void ensureRetainedLoopForensicsInitialized() {
+  if (retainedLoopForensics.magic != kLoopForensicsMagic ||
+      retainedLoopForensics.version != kLoopForensicsVersion) {
+    resetRetainedLoopForensics();
+  }
+}
+
+void refreshRetainedLoopForensics(bool sampleQueueDepth = true, bool force = false) {
+  ensureRetainedLoopForensicsInitialized();
+  const unsigned long nowMs = millis();
+  const bool sampleDynamic = force ||
+      lastLoopForensicsSnapshotMs == 0 ||
+      (nowMs - lastLoopForensicsSnapshotMs) >= kLoopForensicsSnapshotIntervalMs;
+
+  updateRetainedValue(retainedLoopForensics.lastBreadcrumb, appBreadcrumb);
+  updateRetainedValue(retainedLoopForensics.currentState, (uint8_t)state);
+
+  if (!sampleDynamic) {
+    return;
+  }
+
+  const uint32_t elapsedMs = (retainedLoopForensics.stageStartMillis != 0)
+      ? (uint32_t)(nowMs - retainedLoopForensics.stageStartMillis)
+      : 0UL;
+  updateRetainedValue(retainedLoopForensics.lastLoopStageElapsed, elapsedMs);
+
+  if (sampleQueueDepth) {
+    updateRetainedValue(retainedLoopForensics.publishQueueDepth,
+                        (uint16_t)PublishQueuePosix::instance().getNumEvents());
+  }
+
+  if (connectedStartMs != 0) {
+    updateRetainedValue(retainedLoopForensics.millisSinceLastCloudConnect,
+                        (nowMs >= connectedStartMs) ? (nowMs - connectedStartMs) : 0UL);
+  } else {
+    updateRetainedValue(retainedLoopForensics.millisSinceLastCloudConnect, 0UL);
+  }
+
+  lastLoopForensicsSnapshotMs = nowMs;
+}
+
+void noteLoopStageDuration(bool sampleQueueDepth = true) {
+  const unsigned long nowMs = millis();
+  const unsigned long elapsedMs = (retainedLoopForensics.stageStartMillis != 0)
+      ? (nowMs - retainedLoopForensics.stageStartMillis)
+      : 0UL;
+  const LoopStage stage = static_cast<LoopStage>(retainedLoopForensics.lastLoopStage);
+  const uint16_t queueDepth = sampleQueueDepth
+      ? (uint16_t)PublishQueuePosix::instance().getNumEvents()
+      : retainedLoopForensics.publishQueueDepth;
+  const uint32_t millisSinceLastCloudConnect = (connectedStartMs != 0 && nowMs >= connectedStartMs)
+      ? (uint32_t)(nowMs - connectedStartMs)
+      : 0UL;
+
+  refreshRetainedLoopForensics(sampleQueueDepth, false);
+
+  if (elapsedMs >= kLoopStageErrorThresholdMs) {
+    Log.error("LoopStage: stage=%s elapsed=%lu state=%u q=%u connMs=%lu",
+              loopStageName(stage),
+              elapsedMs,
+              (unsigned)state,
+              (unsigned)queueDepth,
+              (unsigned long)millisSinceLastCloudConnect);
+  } else if (elapsedMs >= kLoopStageWarnThresholdMs) {
+    Log.warn("LoopStage: stage=%s elapsed=%lu state=%u q=%u connMs=%lu",
+             loopStageName(stage),
+             elapsedMs,
+             (unsigned)state,
+             (unsigned)queueDepth,
+             (unsigned long)millisSinceLastCloudConnect);
+  }
+}
 
 void setAppBreadcrumb(uint8_t code) {
   appBreadcrumb = code;
   appBreadcrumbMs = millis();
+  refreshRetainedLoopForensics(false, true);
+}
+
+void setLoopStage(LoopStage stage) {
+  ensureRetainedLoopForensicsInitialized();
+  if (retainedLoopForensics.lastLoopStage == (uint8_t)stage) {
+    return;
+  }
+
+  retainedLoopForensics.lastLoopStage = (uint8_t)stage;
+  retainedLoopForensics.stageStartMillis = millis();
+  refreshRetainedLoopForensics(true, true);
 }
 
 // Short-term webhook monitoring starts only after a successful cloud
@@ -596,13 +780,25 @@ const unsigned long resetWait = 30000;      // Error state dwell before reset
 
 
 void setup() {
+  ensureRetainedLoopForensicsInitialized();
+
   const int reason = System.resetReason();
   const uint32_t reasonData = System.resetReasonData();
   const uint8_t previousBreadcrumb = appBreadcrumb;
   const uint32_t previousBreadcrumbMs = appBreadcrumbMs;
+  const uint8_t previousLoopStage = retainedLoopForensics.lastLoopStage;
+  const uint32_t previousLoopStageElapsed = retainedLoopForensics.lastLoopStageElapsed;
+  const uint16_t previousQueueDepth = retainedLoopForensics.publishQueueDepth;
+  const uint32_t previousMillisSinceLastCloudConnect = retainedLoopForensics.millisSinceLastCloudConnect;
+  const uint8_t previousState = retainedLoopForensics.currentState;
   const bool watchdogResetDetected = (reason == RESET_REASON_WATCHDOG);
   startupPreviousBreadcrumb = previousBreadcrumb;
   startupPreviousBreadcrumbMs = previousBreadcrumbMs;
+  startupPreviousLoopStage = previousLoopStage;
+  startupPreviousLoopStageElapsedMs = previousLoopStageElapsed;
+  startupPreviousQueueDepth = previousQueueDepth;
+  startupPreviousMillisSinceLastCloudConnect = previousMillisSinceLastCloudConnect;
+  startupPreviousState = previousState;
   setAppBreadcrumb(BREADCRUMB_SETUP_START);
   bootStormLastResetReason = (uint8_t)reason;
   bootStormLastResetReasonData = reasonData;
@@ -1016,6 +1212,15 @@ void setup() {
            appBreadcrumbName(startupPreviousBreadcrumb),
            Time.isValid() ? (isWithinOpenHours() ? 1 : 0) : -1,
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0);
+  if (watchdogResetDetected) {
+    Log.warn("BootWDT: breadcrumb=%s stage=%s elapsed=%lu q=%u state=%u connMs=%lu",
+             appBreadcrumbName(startupPreviousBreadcrumb),
+             loopStageName(static_cast<LoopStage>(startupPreviousLoopStage)),
+             (unsigned long)startupPreviousLoopStageElapsedMs,
+             (unsigned)startupPreviousQueueDepth,
+             (unsigned)startupPreviousState,
+             (unsigned long)startupPreviousMillisSinceLastCloudConnect);
+  }
 
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
   Log.info("Failsafe: test=%d stale=%lds cooldown=%lds jitter=%lds",
@@ -1038,6 +1243,10 @@ void setup() {
         state = CONNECTING_STATE;
       }
     } else {
+
+        if (watchdogResetDetected) {
+          publishWatchdogForensics();
+        }
       // Ensure carrier sensor power rails are actually turned off even if
       // we skipped sensor initialization while closed.
       SensorManager::instance().onEnterSleep();
@@ -1077,9 +1286,12 @@ void loop() {
     bootStormWindowStart = 0;
   }
 
+  setLoopStage(LOOP_STAGE_CONNECTIVITY);
   connectivityFailsafeSupervisor();
+  noteLoopStageDuration(false);
 
   // Main state machine driving sensing, reporting, power management
+  setLoopStage(LOOP_STAGE_STATE_HANDLER);
   switch (state) {
   case IDLE_STATE:
     handleIdleState();
@@ -1105,7 +1317,9 @@ void loop() {
     handleErrorState();
     break;
   }
+  noteLoopStageDuration(false);
 
+  setLoopStage(LOOP_STAGE_DIAGNOSTICS);
   thrashGuard.loop(state, millis());
 
   ab1805.loop(); // Keeps the RTC synchronized with the device clock
@@ -1114,13 +1328,23 @@ void loop() {
   current.loop();
   sysStatus.loop();
   sensorConfig.loop();
+  noteLoopStageDuration(false);
 
   // Service deferred cloud work (ledger status publishes, etc.)
+  setLoopStage(LOOP_STAGE_CLOUD_LOOP);
+  setAppBreadcrumb(BREADCRUMB_CLOUD_LOOP_ENTER);
   Cloud::instance().loop();
+  noteLoopStageDuration();
+  setAppBreadcrumb(BREADCRUMB_CLOUD_LOOP_EXIT);
 
   // Service outgoing publish queue
+  setLoopStage(LOOP_STAGE_PUBLISH_QUEUE);
+  setAppBreadcrumb(BREADCRUMB_PUBLISH_QUEUE_ENTER);
   PublishQueuePosix::instance().loop();
+  noteLoopStageDuration();
+  setAppBreadcrumb(BREADCRUMB_PUBLISH_QUEUE_EXIT);
 
+  setLoopStage(LOOP_STAGE_DIAGNOSTICS);
   serviceAwakeWatchdog();
 
   // Check for short-term webhook response timeout.
@@ -1170,6 +1394,8 @@ void loop() {
   } else if (sensorMode == OCCUPANCY) {
     handleOccupancyMode(); // Track occupied/unoccupied state
   }
+
+  noteLoopStageDuration();
 
 } // End of loop
 
@@ -1750,6 +1976,29 @@ void publishStartupStatus() {
 #endif
 
   PublishQueuePosix::instance().publish("status", status, PRIVATE);
+}
+
+void publishWatchdogForensics() {
+  char payload[192];
+  const LoopStage stage = static_cast<LoopStage>(startupPreviousLoopStage);
+
+  const char *resetLabel = "watchdog";
+  if (System.resetReason() != RESET_REASON_WATCHDOG) {
+    resetLabel = "other";
+  }
+
+  snprintf(payload,
+           sizeof(payload),
+           "{\"reset\":\"%s\",\"bc\":%u,\"stage\":\"%s\",\"elapsed\":%lu,\"queue\":%u,\"state\":%u,\"connAge\":%lu}",
+           resetLabel,
+           (unsigned)startupPreviousBreadcrumb,
+           loopStageForensicName(stage),
+           (unsigned long)startupPreviousLoopStageElapsedMs,
+           (unsigned)startupPreviousQueueDepth,
+           (unsigned)startupPreviousState,
+           (unsigned long)startupPreviousMillisSinceLastCloudConnect);
+
+  PublishQueuePosix::instance().publish("watchdog", payload, PRIVATE);
 }
 
 /**

@@ -23,6 +23,17 @@ enum FailsafeDeferReason : uint8_t {
 	FAILSAFE_DEFER_CLOSED_HOURS_LONG_SLEEP = 6,
 };
 
+enum LoopStage : uint8_t {
+	LOOP_STAGE_NONE = 0,
+	LOOP_STAGE_STATE_HANDLER = 1,
+	LOOP_STAGE_CLOUD_LOOP = 2,
+	LOOP_STAGE_PUBLISH_QUEUE = 3,
+	LOOP_STAGE_DIAGNOSTICS = 4,
+	LOOP_STAGE_IDLE_PROCESSING = 5,
+	LOOP_STAGE_SLEEP_PREP = 6,
+	LOOP_STAGE_CONNECTIVITY = 7,
+};
+
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
 // No behavioral changes were made.
@@ -68,6 +79,13 @@ BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC);
  * @param code Retained breadcrumb code
  */
 void setAppBreadcrumb(uint8_t code);
+
+/**
+ * @brief Stores the active loop stage for watchdog forensics.
+ *
+ * @param stage Current high-level loop stage
+ */
+void setLoopStage(LoopStage stage);
 
 // Retained hibernate diagnostics (Boron RTC-alarm hibernate path)
 extern retained time_t retainedHibernateRtcBefore;
