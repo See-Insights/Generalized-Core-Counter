@@ -16,6 +16,16 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [16.0.0] - 2026-06-10
+
+### Fixed
+
+- **Watchdog forensic event suppression**: Removed conditional gating that prevented `publishWatchdogForensics()` from executing when the device was within open hours or sensor was ready. Watchdog forensic events are now queued unconditionally on every watchdog reset immediately after detection, ensuring forensic data (breadcrumb, loop stage, queue depth, state, connection age) is always captured and delivered for post-reset RCA.
+
+### Changed
+
+- **Release metadata updated for v16 patch**: Bumped firmware version to `16.0.0` and Particle product version to `PRODUCT_VERSION(16)`.
+
 ## [15.0.0] - 2026-06-10
 
 ### Added

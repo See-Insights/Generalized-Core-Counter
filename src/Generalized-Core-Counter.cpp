@@ -28,7 +28,7 @@
 
 // Firmware version recognized by Particle Product firmware management
 // Bump this integer whenever you cut a new production release.
-PRODUCT_VERSION(15);
+PRODUCT_VERSION(16);
 
 // Hardware abstraction and device-specific pinouts
 #include "device_pinout.h"           // Platform-specific pin definitions
@@ -813,6 +813,9 @@ void setup() {
     sysStatus.set_lastWatchdogBreadcrumb(previousBreadcrumb);
     sysStatus.set_lastWatchdogUptimeMs(previousBreadcrumbMs);
     sysStatus.set_lastWatchdogResetReasonData(reasonData);
+    
+    // Queue forensic event immediately - no gating conditions
+    publishWatchdogForensics();
   }
 
   // If a boot storm holdoff was triggered on this or the prior boot, surface
@@ -1079,10 +1082,6 @@ void setup() {
         state = CONNECTING_STATE;
       }
     } else {
-
-        if (watchdogResetDetected) {
-          publishWatchdogForensics();
-        }
       // Ensure carrier sensor power rails are actually turned off even if
       // we skipped sensor initialization while closed.
       SensorManager::instance().onEnterSleep();
