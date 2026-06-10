@@ -1293,6 +1293,11 @@ void loop() {
   // Main state machine driving sensing, reporting, power management
   setLoopStage(LOOP_STAGE_STATE_HANDLER);
   switch (state) {
+  case INITIALIZATION_STATE:
+    Log.warn("INITIALIZATION_STATE reached loop - transitioning to IDLE_STATE");
+    transitionTo(IDLE_STATE, "loop-initialization-fallback");
+    break;
+
   case IDLE_STATE:
     handleIdleState();
     break;
@@ -2117,6 +2122,14 @@ void publishStateTransition() {
   oldState = state;
 }
 
+void transitionTo(State newState, const char *reason) {
+  Log.info("StateReq: %s->%s reason=%s",
+           stateShortName(state),
+           stateShortName(newState),
+           (reason != nullptr) ? reason : "unspecified");
+  state = newState;
+}
+
 // ===== Recovery, failsafe, and maintenance helpers =====
 
 void outOfMemoryHandler(system_event_t event, int param) {
@@ -2334,4 +2347,3 @@ void dailyCleanup() {
   
   current.resetEverything(); // Zero the counts for the new day
 }
-

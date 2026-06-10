@@ -640,13 +640,13 @@ void handleConnectingState() {
     clearActiveConnectAttempt();
 
     if (System.updatesPending()) {
-      state = FIRMWARE_UPDATE_STATE;
+      transitionTo(FIRMWARE_UPDATE_STATE, "updates-pending");
     } else if (session.returnToSleepAfterReport) {
       // After reporting occupied state in low-power mode, return to sleep to check debounce timeout
       session.returnToSleepAfterReport = false;
-      state = SLEEPING_STATE;
+      transitionTo(SLEEPING_STATE, "return-to-sleep-after-report");
     } else {
-      state = IDLE_STATE;
+      transitionTo(IDLE_STATE, "connect-complete");
     }
     return;
   }
@@ -706,7 +706,7 @@ void handleConnectingState() {
     current.raiseAlert(31);
     Connectivity::requestFullDisconnectAndRadioOff();
     clearActiveConnectAttempt();
-    state = SLEEPING_STATE;
+    transitionTo(SLEEPING_STATE, "connect-timeout");
   }
 }
 
@@ -716,12 +716,14 @@ void handleFirmwareUpdateState() {
   // Particle Wake-Publish-Sleep example behaviour: bound the time
   // spent waiting for an update before going back to sleep.
   static unsigned long firmwareUpdateStartMs = 0;
+  static bool configLoadedInUpdateMode = false;
 
   if (state != oldState) {
     publishStateTransition();
     Log.info("Entering FIRMWARE_UPDATE_STATE - keeping device connected for updates");
 
     firmwareUpdateStartMs = millis();
+    configLoadedInUpdateMode = false;
 
     // Ensure cloud connection is requested
     if (!Particle.connected()) {
@@ -731,7 +733,6 @@ void handleFirmwareUpdateState() {
 
   // Once connected, ensure configuration is loaded at least once
   if (Particle.connected()) {
-    static bool configLoadedInUpdateMode = false;
     if (!configLoadedInUpdateMode) {
       Log.info("Connected in FIRMWARE_UPDATE_STATE - loading configuration from cloud");
       Cloud::instance().loadConfigurationFromCloud();
@@ -742,7 +743,7 @@ void handleFirmwareUpdateState() {
     if (!System.updatesPending()) {
       Log.info("No updates pending - leaving FIRMWARE_UPDATE_STATE to IDLE_STATE");
       configLoadedInUpdateMode = false;
-      state = IDLE_STATE;
+      transitionTo(IDLE_STATE, "firmware-update-complete");
       return;
     }
   }
@@ -750,7 +751,7 @@ void handleFirmwareUpdateState() {
   // Optional escape hatch: user button can also exit update mode
   if (!digitalRead(BUTTON_PIN)) { // Active-low user button
     Log.info("User button pressed - exiting FIRMWARE_UPDATE_STATE to IDLE_STATE");
-    state = IDLE_STATE;
+    transitionTo(IDLE_STATE, "firmware-update-button-exit");
     return;
   }
 
@@ -761,6 +762,6 @@ void handleFirmwareUpdateState() {
   if (firmwareUpdateStartMs != 0 && (millis() - firmwareUpdateStartMs) > firmwareUpdateMaxMs) {
     Log.info("Firmware update timed out after %lu ms in FIRMWARE_UPDATE_STATE - transitioning to SLEEPING_STATE",
              (unsigned long)(millis() - firmwareUpdateStartMs));
-    state = SLEEPING_STATE;
+    transitionTo(SLEEPING_STATE, "firmware-update-timeout");
   }
 }

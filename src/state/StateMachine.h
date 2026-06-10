@@ -116,6 +116,14 @@ int secondsUntilNextOpen();
 void publishStateTransition();
 
 /**
+ * @brief Requests a top-level state transition with a concise log breadcrumb.
+ *
+ * @param newState Target state for the next main-loop dispatch
+ * @param reason Short reason label for field logs
+ */
+void transitionTo(State newState, const char *reason);
+
+/**
  * @brief Runs once-per-day maintenance work after time is available.
  */
 void dailyCleanup();

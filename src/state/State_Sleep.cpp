@@ -374,7 +374,7 @@ void handleSleepingState() {
   // mode so we stay awake/connected and resume counting.
   if (Time.isValid() && sysStatus.get_connectionMode() == CONNECTED && isWithinOpenHours()) {
     ensureSensorEnabled("SLEEP abort: CONNECTED+OPEN");
-    state = IDLE_STATE;
+    transitionTo(IDLE_STATE, "sleep-abort-open-hours");
     return;
   }
 
@@ -395,6 +395,7 @@ void handleSleepingState() {
   static unsigned long cloudSyncStartMs = 0;
   static unsigned long cloudSyncBudgetMs = 0;
   static uint16_t cloudSyncMaxQueueDepth = 0;
+  static uint16_t lastQueueDepth = 0xFFFF;
 
   // ********** Non-blocking disconnect + modem power-down **********
   // Device OS already manages the asynchronous cloud session teardown once
@@ -406,6 +407,8 @@ void handleSleepingState() {
   static unsigned long cloudDisconnectStartMs = 0;
   static unsigned long cloudDisconnectElapsedMs = 0;
   static unsigned long modemOffElapsedMs = 0;
+  static unsigned long lastDisconnectProgressMs = 0;
+  static unsigned long lastGateProgressMs = 0;
 #if Wiring_WiFi
   static bool wifiOffGuardActive = false;
   static unsigned long wifiOffGuardStartMs = 0;
@@ -421,6 +424,9 @@ void handleSleepingState() {
     modemOffElapsedMs = 0;
     cloudSyncBudgetMs = 0;
     cloudSyncMaxQueueDepth = 0;
+    lastQueueDepth = 0xFFFF;
+    lastDisconnectProgressMs = 0;
+    lastGateProgressMs = 0;
 #if Wiring_WiFi
     wifiOffGuardActive = false;
     wifiOffGuardStartMs = 0;
@@ -471,7 +477,6 @@ void handleSleepingState() {
     }
 
     {
-      static uint16_t lastQueueDepth = 0xFFFF;
       if (lastQueueDepth != 0xFFFF && queueDepth < lastQueueDepth) {
         thrashGuard.markProgress("QUEUE_DRAIN");
       }
@@ -779,7 +784,7 @@ void handleSleepingState() {
       markModemUnstable(MODEM_UNSTABLE_REASON_SLOW_TEARDOWN,
                         (unsigned long)(millis() - disconnectRequestStartMs));
       current.raiseAlert(15);
-      state = ERROR_STATE;
+      transitionTo(ERROR_STATE, "sleep-disconnect-timeout");
       disconnectRequested = false;
       disconnectRequestStartMs = 0;
       cloudDisconnectStartMs = 0;
@@ -794,7 +799,6 @@ void handleSleepingState() {
 
     // Help DeviceOS make progress on the disconnect.
     // Throttle progress markers to avoid noisy per-loop updates.
-    static unsigned long lastDisconnectProgressMs = 0;
     unsigned long nowMs = millis();
     if ((nowMs - lastDisconnectProgressMs) > 1000UL) {
       thrashGuard.markProgress("DISCONNECT_WAIT");
@@ -900,7 +904,7 @@ void handleSleepingState() {
                useNetworkStandbyEffective ? 1 : 0);
       markModemUnstable(MODEM_UNSTABLE_REASON_SLOW_TEARDOWN, elapsedMs);
       current.raiseAlert(15);
-      state = ERROR_STATE;
+      transitionTo(ERROR_STATE, "sleep-precondition-timeout");
       disconnectRequested = false;
       disconnectRequestStartMs = 0;
       cloudDisconnectStartMs = 0;
@@ -913,7 +917,6 @@ void handleSleepingState() {
       return;
     }
 
-    static unsigned long lastGateProgressMs = 0;
     unsigned long nowMs = millis();
     if ((nowMs - lastGateProgressMs) > 1000UL) {
       thrashGuard.markProgress("DISCONNECT_WAIT");
@@ -1006,7 +1009,7 @@ void handleSleepingState() {
     if (sensorDetect || ledRemaining > 0) {
       Log.info("COUNTING: Deferring sleep - sensor=%d LED remaining=%lu sec", 
                sensorDetect, ledRemaining);
-      state = IDLE_STATE;
+      transitionTo(IDLE_STATE, "sleep-counting-led-defer");
       return;
     }
     // Turn off LED before sleep (should already be off)
@@ -1377,7 +1380,7 @@ void handleSleepingState() {
         System.reset();
         
         // Should never reach here, but set ERROR_STATE as fallback
-        state = ERROR_STATE;
+        transitionTo(ERROR_STATE, "sleep-all-attempts-failed");
         return;
       }
     }
@@ -1459,7 +1462,7 @@ void handleSleepingState() {
     measure.batteryState(BatterySampleContext::PostWake);
     logWakeSummary(wakeReasonLabel);
     session.serviceRequestTriggered = true;
-    state = REPORTING_STATE;
+    transitionTo(REPORTING_STATE, "sleep-wake-button");
     return;
   } else {
     // In this state the device was awoken for hourly reporting or PIR
@@ -1488,7 +1491,7 @@ void handleSleepingState() {
       // start of open hours so it can resume normal connected behavior.
       if (sysStatus.get_connectionMode() == CONNECTED && !Particle.connected()) {
         logWakeSummary(wakeReasonLabel);
-        state = CONNECTING_STATE;
+        transitionTo(CONNECTING_STATE, "sleep-open-hours-reconnect");
         return;
       }
     }
@@ -1508,7 +1511,7 @@ void handleSleepingState() {
       // forces an immediate report/connect on occupancy transitions.
       if (reportNow) {
         session.occupancyChangeTriggered = true;
-        state = REPORTING_STATE;
+        transitionTo(REPORTING_STATE, "sleep-occupancy-debounce-report");
         return;
       }
     }
@@ -1562,7 +1565,7 @@ void handleSleepingState() {
           if (reportNow) {
             session.occupancyChangeTriggered = true;
             setAppBreadcrumb(5);
-            state = REPORTING_STATE;
+            transitionTo(REPORTING_STATE, "sleep-pir-occupancy-report");
             return;
           }
         } else {
@@ -1592,11 +1595,11 @@ void handleSleepingState() {
       // while occupied so occupancy=1 is only reported on 0->1 transition.
       if (sysStatus.get_sensorMode() == OCCUPANCY && current.get_occupied() &&
           sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
-        state = SLEEPING_STATE;
+        transitionTo(SLEEPING_STATE, "sleep-timer-occupied-suppress-report");
         return;
       }
 
-      state = REPORTING_STATE;
+      transitionTo(REPORTING_STATE, "sleep-timer-report");
       return;
     }
 
@@ -1613,7 +1616,7 @@ void handleSleepingState() {
       time_t now = Time.now();
       time_t lastReport = sysStatus.get_lastReport();
       if (lastReport > 0 && (now - lastReport) >= intervalSec) {
-        state = REPORTING_STATE;
+        transitionTo(REPORTING_STATE, "sleep-pir-overdue-report");
         return;
       }
       }
@@ -1623,10 +1626,10 @@ void handleSleepingState() {
     // return immediately to sleep. This check comes AFTER opportunistic reporting
     // so overdue reports are not missed.
     if (pirWake && sysStatus.get_connectionMode() != CONNECTED) {
-      state = SLEEPING_STATE;
+      transitionTo(SLEEPING_STATE, "sleep-pir-return-to-sleep");
       return;
     }
 
-    state = IDLE_STATE;
+    transitionTo(IDLE_STATE, "sleep-wake-idle");
   }
 }
