@@ -512,3 +512,6 @@ This release fundamentally restructures device configuration to use four indepen
 ## 5.00 – 2026-03-18
 - Hardware Soak Production Candidate
 
+## 18 – 2026-06-11
+- Watchdog forensics hard fault fix
+

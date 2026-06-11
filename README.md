@@ -4,7 +4,7 @@ This repository includes `PROJECT_STATUS.md`, which defines the project purpose,
 
 # Generalized-Core-Counter
 
-**Version:** 14.0.0 | **Latest:** Cloud recovery tuning and logging cleanup release
+**Version:** 18 | **Latest:** Watchdog forensics hard fault fix
 
 Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v14 release packages cloud recovery tuning and release-safe logging cleanup without changing the existing production power, sleep, connectivity, watchdog, ledger, or PMIC behavior.
 
