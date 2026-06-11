@@ -813,9 +813,6 @@ void setup() {
     sysStatus.set_lastWatchdogBreadcrumb(previousBreadcrumb);
     sysStatus.set_lastWatchdogUptimeMs(previousBreadcrumbMs);
     sysStatus.set_lastWatchdogResetReasonData(reasonData);
-    
-    // Queue forensic event immediately - no gating conditions
-    publishWatchdogForensics();
   }
 
   // If a boot storm holdoff was triggered on this or the prior boot, surface
@@ -931,6 +928,11 @@ void setup() {
   PublishQueuePosix::instance()
       .withFileQueueSize(800)
       .setup(); // Initialize the publish queue
+
+  // Queue watchdog forensic event only after PublishQueuePosix setup initializes its mutex.
+  if (watchdogResetDetected) {
+    publishWatchdogForensics();
+  }
 
   // ===== TIME, RTC, AND WATCHDOG CONFIGURATION =====
   // Initialize AB1805 RTC and hardware watchdog, then restore system time if needed
