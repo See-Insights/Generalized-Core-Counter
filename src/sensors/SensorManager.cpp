@@ -36,12 +36,14 @@ bool pmicAnomalyActive = false;
 retained uint8_t staleSocConsecutiveCount = 0;
 retained uint16_t staleSocTotalCount = 0;
 
+#if HAL_PLATFORM_FUELGAUGE_MAX17043
 /**
  * @brief Publish stale SOC forensics event.
  * 
  * @details Sends a compact "stale_soc" event with diagnostic snapshot.
  *          Called once when stale SOC is first detected in a session.
  *          Payload includes SOC, voltage, PMIC state, and environmental context.
+ *          Only compiled for platforms with MAX17043 fuel gauge (Boron).
  */
 static void publishStaleSocForensics(float soc, float vcell, bool highConfidence,
                                       uint8_t chargeStatus, uint8_t vbusStatus,
@@ -66,6 +68,7 @@ static void publishStaleSocForensics(float soc, float vcell, bool highConfidence
   
   PublishQueuePosix::instance().publish("stale_soc", payload, PRIVATE);
 }
+#endif // HAL_PLATFORM_FUELGAUGE_MAX17043
 
 uint32_t pmicAnomalyAgeSec() {
 #if !defined(ENABLE_PMIC_FORENSICS) || !ENABLE_PMIC_FORENSICS
