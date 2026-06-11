@@ -67,6 +67,16 @@ struct WakeCycleStats {
   /// is_charging: 1=true, 0=false, 0xFF=unknown.
   uint8_t is_charging = 0xFF;
 
+  /// Stale SOC detection diagnostics (Phase 1: detection and instrumentation only)
+  uint16_t battery_vcell_mv = 0xFFFF;        // Battery voltage in millivolts (0xFFFF = unknown)
+  uint8_t pmic_charge_status = 0xFF;         // PMIC charge status (0-3, 0xFF = unknown/NA)
+  uint8_t pmic_vbus_status = 0xFF;           // PMIC VBUS status (0-3, 0xFF = unknown/NA)
+  uint8_t pmic_power_source = 0xFF;          // Power source (0xFF = unknown)
+  uint8_t pmic_power_good = 0xFF;            // Power good flag (1=true, 0=false, 0xFF = unknown)
+  uint8_t pmic_fault_reg = 0xFF;             // PMIC fault register (0xFF = not read/NA)
+  bool stale_soc_suspected = false;          // True if stale SOC detected this cycle
+  uint16_t stale_soc_total_count = 0xFFFF;   // Cumulative stale SOC count (0xFFFF = not tracked)
+
   /// Publish queue depth (events).
   uint16_t publish_queue_depth_before_connect = 0xFFFF;
   uint16_t publish_queue_depth_after_connect = 0xFFFF;

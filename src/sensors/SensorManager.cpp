@@ -15,6 +15,7 @@ const char *batteryContext[7] = {"Unknown",    "Not Charging", "Charging",
 #include "state/StateMachine.h"
 #include "sensors/SensorFactory.h"
 #include "device_pinout.h"     // TMP36_SENSE_PIN for enclosure temperature
+#include "PublishQueuePosixRK.h"
 
 // Device-specific includes and definitions
 // Use Particle feature detection for automatic platform identification
@@ -30,6 +31,41 @@ retained uint8_t lastPmicAnomalyChargeStatus = 0;
 retained uint8_t lastPmicAnomalyPowerSource = 0;
 retained uint8_t lastPmicAnomalyVbusStatus = 0;
 bool pmicAnomalyActive = false;
+
+// Stale SOC detection (Phase 1: detection and instrumentation only)
+retained uint8_t staleSocConsecutiveCount = 0;
+retained uint16_t staleSocTotalCount = 0;
+
+/**
+ * @brief Publish stale SOC forensics event.
+ * 
+ * @details Sends a compact "stale_soc" event with diagnostic snapshot.
+ *          Called once when stale SOC is first detected in a session.
+ *          Payload includes SOC, voltage, PMIC state, and environmental context.
+ */
+static void publishStaleSocForensics(float soc, float vcell, bool highConfidence,
+                                      uint8_t chargeStatus, uint8_t vbusStatus,
+                                      bool powerGood, uint8_t faultReg,
+                                      int powerSource, uint16_t totalCount,
+                                      float internalTempC) {
+  char payload[192];
+  
+  snprintf(payload,
+           sizeof(payload),
+           "{\"soc\":%.2f,\"vcell_mv\":%u,\"conf\":\"%s\",\"chg\":%u,\"vbus\":%u,\"pg\":%u,\"fault\":0x%02X,\"src\":%d,\"count\":%u,\"temp_c\":%.1f}",
+           (double)soc,
+           (unsigned)(vcell * 1000.0f),
+           highConfidence ? "HIGH" : "LOW",
+           (unsigned)chargeStatus,
+           (unsigned)vbusStatus,
+           powerGood ? 1u : 0u,
+           faultReg,
+           powerSource,
+           (unsigned)totalCount,
+           (double)internalTempC);
+  
+  PublishQueuePosix::instance().publish("stale_soc", payload, PRIVATE);
+}
 
 uint32_t pmicAnomalyAgeSec() {
 #if !defined(ENABLE_PMIC_FORENSICS) || !ENABLE_PMIC_FORENSICS
@@ -981,6 +1017,16 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
         current.set_lastAlertTime(0);
       }
     }
+    
+    // Narrow recovery path for Alert 21 (charge timeout/stuck charging)
+    // Clear when PMIC fault cleared and not in stuck fast-charging state
+    int8_t currentAlert = current.get_alertCode();
+    if (currentAlert == 21 && chargeStatus != 2) {
+      // Alert 21 active, no PMIC fault, and not in fast charging - charge recovered
+      Log.info("PMIC: clearing alert 21 after charge recovery");
+      current.set_alertCode(0);
+      current.set_lastAlertTime(0);
+    }
   }
 
   static byte lastLoggedPmicSystemStatus = 0xFF;
@@ -1047,6 +1093,92 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
              compactProfileLabel(powerReport.activeInputProfile));
   }
 #endif
+
+  // ========================================================================
+  // Stale SOC Detection (Phase 1: detection and instrumentation only)
+  // ========================================================================
+  // Detects fuel gauge SOC that appears stale (not updated after charge).
+  // Conservative detection criteria:
+  // - SOC < 30%
+  // - vCell >= 4.10V (preferred) or >= 4.05V (lower confidence)
+  // - External power present (VBUS active)
+  // - PMIC state: Charged/DONE or NotCharging with powerGood
+  // - No PMIC fault
+  // - Requires 2-3 consecutive samples before flagging
+  //
+  // Phase 1 scope: Detection and reporting only. No automatic remediation.
+  {
+    const float effectiveSoc = rejectAuthoritativeOverwrite ? _authoritativeBatterySoc : soc;
+    const bool externalPowerPresent = (vbusStatus == 1 || vbusStatus == 2 || vbusStatus == 3);
+    const bool pmicStateChargeDone = (chargeStatus == 3); // DONE
+    const bool pmicStateNotChargingWithPower = (chargeStatus == 0 && powerGood);
+    const bool pmicNoFault = !(faultReg & 0x38);
+    const bool vcellHighConfidence = (vcell >= 4.10f);
+    const bool vcellLowConfidence = (vcell >= 4.05f && vcell < 4.10f);
+    
+    const bool staleSocConditionsMet =
+        batterySocIsValid(effectiveSoc) &&
+        effectiveSoc < 30.0f &&
+        (vcellHighConfidence || vcellLowConfidence) &&
+        externalPowerPresent &&
+        (pmicStateChargeDone || pmicStateNotChargingWithPower) &&
+        pmicNoFault;
+    
+    if (staleSocConditionsMet) {
+      if (staleSocConsecutiveCount < 0xFF) {
+        staleSocConsecutiveCount++;
+      }
+      
+      // Require 2 consecutive samples before flagging (conservative)
+      if (staleSocConsecutiveCount >= 2) {
+        if (staleSocTotalCount < 0xFFFF) {
+          staleSocTotalCount++;
+        }
+        
+        // Log and publish once when first detected (not every sample)
+        static bool staleSocLoggedThisSession = false;
+        static bool staleSocPublishedThisSession = false;
+        if (!staleSocLoggedThisSession) {
+          const char *confidenceLabel = vcellHighConfidence ? "HIGH" : "LOW";
+          Log.warn("STALE_SOC: suspected stale fuel gauge reading - soc=%.2f vcell=%.3fV (conf=%s) vbus=%s chg=%s pg=%d fault=0x%02X src=%d consecutive=%u total=%u",
+                   (double)effectiveSoc,
+                   (double)vcell,
+                   confidenceLabel,
+                   compactPmicVbusLabel(vbusStatus),
+                   compactPmicChargeLabel(chargeStatus, faultReg),
+                   powerGood ? 1 : 0,
+                   faultReg,
+                   powerSource,
+                   (unsigned)staleSocConsecutiveCount,
+                   (unsigned)staleSocTotalCount);
+          staleSocLoggedThisSession = true;
+          
+          // Publish forensics event for remote visibility
+          if (!staleSocPublishedThisSession) {
+            publishStaleSocForensics(effectiveSoc, vcell, vcellHighConfidence,
+                                     chargeStatus, vbusStatus, powerGood, faultReg,
+                                     powerSource, staleSocTotalCount,
+                                     current.get_internalTempC());
+            staleSocPublishedThisSession = true;
+          }
+        }
+        
+        // Capture diagnostic snapshot in WakeCycleStats
+        Observability::WakeCycleStats &stats = Observability::cycleStats();
+        stats.stale_soc_suspected = true;
+        stats.battery_vcell_mv = (uint16_t)(vcell * 1000.0f);
+        stats.pmic_charge_status = chargeStatus;
+        stats.pmic_vbus_status = vbusStatus;
+        stats.pmic_power_source = (powerSource >= 0 && powerSource <= 0xFF) ? (uint8_t)powerSource : 0xFF;
+        stats.pmic_power_good = powerGood ? 1 : 0;
+        stats.pmic_fault_reg = faultReg;
+        stats.stale_soc_total_count = staleSocTotalCount;
+      }
+    } else {
+      // Reset consecutive counter when conditions not met
+      staleSocConsecutiveCount = 0;
+    }
+  }
 
   const uint8_t finalLoggedBattState = pmicBattState;
   const bool pmicStatusChanged =
