@@ -146,6 +146,18 @@ public:
      */
     void getSignalStrength();
 
+    /**
+     * @brief TEMPORARY DIAGNOSTIC: Test PMIC charge state machine behavior.
+     * 
+     * @details Controlled experiment to determine if PMIC is stuck in FAST_CHARGE
+     *          or will transition to DONE when charging is cycled. Only executes
+     *          once per boot with safety checks. Logs comprehensive PMIC state
+     *          before/during/after disabling and re-enabling charging.
+     * 
+     * @return 0 on success, negative error code on failure
+     */
+    int runPmicChargeCycleTest();
+
     ///@}
     
 protected:

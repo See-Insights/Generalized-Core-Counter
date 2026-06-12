@@ -36,6 +36,11 @@ bool pmicAnomalyActive = false;
 retained uint8_t staleSocConsecutiveCount = 0;
 retained uint16_t staleSocTotalCount = 0;
 
+// Charging trend telemetry (diagnostic-only, no behavior changes)
+retained float lastTrendSoc = -999.0f;
+retained float lastTrendVcell = -999.0f;
+retained time_t lastTrendEpoch = 0;
+
 #if HAL_PLATFORM_FUELGAUGE_MAX17043
 /**
  * @brief Publish stale SOC forensics event.
@@ -251,18 +256,6 @@ const char *compactPmicChargeLabel(uint8_t chargeStatus, byte faultReg) {
   }
 }
 
-const char *compactProfileLabel(PowerInputProfile profile) {
-  switch (profile) {
-  case PowerInputProfile::UsbBench:
-    return "USB";
-  case PowerInputProfile::Solar35W:
-    return "SOLAR";
-  case PowerInputProfile::NotApplicable:
-    return "NA";
-  default:
-    return "?";
-  }
-}
 #endif
 
 } // namespace
@@ -508,7 +501,6 @@ float batterySampleDelta(float authoritativeSoc, float soc) {
 } // namespace
 
 bool SensorManager::batteryState(BatterySampleContext sampleContext) {
-
 #if HAL_PLATFORM_CELLULAR || PLATFORM_ID == PLATFORM_ARGON
   // Boron (cellular) and Argon (Wi-Fi) Gen 3 devices.
   bool fallbackUsed = false;
@@ -732,6 +724,9 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
 #endif
 
 #if HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
+  // Refresh power profile to handle runtime power source changes
+  PowerManager::instance().refreshInputProfile();
+
   // =========================================================================
   // PMIC Health Monitoring & Smart Remediation (BQ24195 PMIC)
   // =========================================================================
@@ -1093,7 +1088,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
              sysStatus.get_lowBatteryMode() ? 1 : 0,
              (unsigned long)millis(),
              (int)System.resetReason(),
-             compactProfileLabel(powerReport.activeInputProfile));
+             PowerManager::compactProfileLabel(powerReport.activeInputProfile));
   }
 #endif
 
@@ -1203,7 +1198,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
              powerGood ? 1 : 0,
              thermalRegulation ? "REG" : "OK",
              inVsysMin ? 1 : 0,
-             compactProfileLabel(powerReport.activeInputProfile),
+             PowerManager::compactProfileLabel(powerReport.activeInputProfile),
              PowerManager::powerSourceLabel(powerSource));
     lastLoggedPmicSystemStatus = systemStatus;
     lastLoggedPmicFaultReg = faultReg;
@@ -1215,6 +1210,65 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   }
   if (powerReport.activeInputProfile == PowerInputProfile::Solar35W && vbusStatus == 1) {
     Log.warn("Power mismatch: prof=SOLAR vbus=USB");
+    const float currentSoc = fuelGauge.getSoC();
+    const float currentVcell = fuelGauge.getVCell();
+    Log.info("PowerDiag: soc=%.1f vcell=%.3f chg=%u vbus=%u pg=%u fault=0x%02X src=%d temp=%.1f",
+             (double)currentSoc,
+             (double)currentVcell,
+             (unsigned)chargeStatus,
+             (unsigned)vbusStatus,
+             powerGood ? 1u : 0u,
+             faultReg,
+             powerSource,
+             (double)current.get_internalTempC());
+    
+    // PMIC configuration diagnostic - show expected/configured charging parameters
+    const bool chargingEnabled = pmic.isChargingEnabled();
+    // Solar profile: 900mA input, 5080mV min, 900mA charge, 4208mV charge voltage
+    // USB profile: 900mA input, 3880mV min, 896mA charge, 4112mV charge voltage
+    const char* profLabel = (powerReport.activeInputProfile == PowerInputProfile::Solar35W) ? "SOLAR" : "USB";
+    const int expectedInputCurrentMa = 900;
+    const int expectedChargeCurrentMa = (powerReport.activeInputProfile == PowerInputProfile::Solar35W) ? 900 : 896;
+    const int expectedMinVoltageMv = (powerReport.activeInputProfile == PowerInputProfile::Solar35W) ? 5080 : 3880;
+    const int expectedChargeVoltageMv = (powerReport.activeInputProfile == PowerInputProfile::Solar35W) ? 4208 : 4112;
+    Log.info("PowerCfg: prof=%s iin=%umA ichg=%umA vmin=%umV vchg=%umV enabled=%d therm=%d vsysmin=%d",
+             profLabel,
+             (unsigned)expectedInputCurrentMa,
+             (unsigned)expectedChargeCurrentMa,
+             (unsigned)expectedMinVoltageMv,
+             (unsigned)expectedChargeVoltageMv,
+             chargingEnabled ? 1 : 0,
+             thermalRegulation ? 1 : 0,
+             inVsysMin ? 1 : 0);
+    
+    // Charging trend telemetry - track SOC/voltage changes over time
+    const bool trendBaselineValid = (lastTrendSoc > -500.0f && lastTrendVcell > 0.0f && lastTrendEpoch > 0);
+    if (trendBaselineValid && Time.isValid() && Time.now() > lastTrendEpoch) {
+      const float elapsedSec = (float)(Time.now() - lastTrendEpoch);
+      const float elapsedHours = elapsedSec / 3600.0f;
+      
+      if (elapsedHours >= 0.5f) {
+        const float deltaSoc = currentSoc - lastTrendSoc;
+        const float deltaVcell = currentVcell - lastTrendVcell;
+        Log.info("PowerTrend: soc=%.1f dsoc=%+.1f vcell=%.3f dv=%+.3f hrs=%.1f chg=%u",
+                 (double)currentSoc,
+                 (double)deltaSoc,
+                 (double)currentVcell,
+                 (double)deltaVcell,
+                 (double)elapsedHours,
+                 (unsigned)chargeStatus);
+        
+        // Update baseline for next trend measurement
+        lastTrendSoc = currentSoc;
+        lastTrendVcell = currentVcell;
+        lastTrendEpoch = Time.now();
+      }
+    } else if (Time.isValid()) {
+      // Initialize baseline on first valid sample
+      lastTrendSoc = currentSoc;
+      lastTrendVcell = currentVcell;
+      lastTrendEpoch = Time.now();
+    }
   }
 
   const bool allowPreSleepBatteryLog =
@@ -1271,7 +1325,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
                (double)(vcell - chargeSummaryBaselineVcell),
                compactPmicChargeLabel(chargeStatus, faultReg),
                PowerManager::powerSourceLabel(powerSource),
-               compactProfileLabel(powerReport.activeInputProfile),
+               PowerManager::compactProfileLabel(powerReport.activeInputProfile),
                (unsigned long)(currentWakeAwakeMs() / 1000UL),
                (unsigned long)(stats.connect_duration_ms / 1000UL),
                (unsigned long)(stats.teardown_duration_ms / 1000UL));
@@ -1455,6 +1509,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   if (tmp112Present) {
     // TMP112A already provided a temperature this cycle; skip TMP36 sampling.
     // This avoids unnecessary ADC activity on boards where both might exist.
+    Log.info("DEBUG_tmp112: early return due to tmp112Present=true");
     isItSafeToCharge();
     return current.get_stateOfCharge() > 20.0f;
   }
@@ -1609,5 +1664,151 @@ void SensorManager::getSignalStrength() {
   snprintf(signalStr, sizeof(signalStr), "WiFi S:%2.0f%%, Q:%2.0f%%",
            strengthPercentage, qualityPercentage);
   Log.info(signalStr);
+#endif
+}
+
+// ============================================================================
+// TEMPORARY DIAGNOSTIC: PMIC Charge Cycle Test
+// ============================================================================
+// Purpose: Determine if PMIC is stuck in FAST_CHARGE or will transition to DONE
+// when charging is disabled and re-enabled. Captures comprehensive PMIC state
+// before, during, and after the test cycle.
+//
+// Safety: Only runs once per boot, requires external power, SOC > 50%, safe temp.
+// ============================================================================
+
+int SensorManager::runPmicChargeCycleTest() {
+#if HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
+  // One-shot guard: prevent accidental re-execution
+  static bool testAlreadyRun = false;
+  if (testAlreadyRun) {
+    Log.warn("PMIC_TEST: Already executed this boot - skipping");
+    return -1;  // Already run
+  }
+
+  Log.info("PMIC_TEST: ========== BEGIN CHARGE CYCLE DIAGNOSTIC ==========");
+
+  // Safety checks before proceeding
+  const float currentSoc = fuelGauge.getSoC();
+  const float currentTemp = current.get_internalTempC();
+  const int powerSource = System.powerSource();
+  
+  PMIC pmic(true);
+  const byte systemStatus = pmic.getSystemStatus();
+  const uint8_t vbusStatus = (systemStatus >> 6) & 0x03;
+  const bool powerGood = (systemStatus & 0x04) != 0;
+
+  // Safety gate: require external power, sufficient SOC, safe temperature
+  if (vbusStatus == 0) {
+    Log.error("PMIC_TEST: SAFETY ABORT - No external power detected (vbus=0)");
+    return -2;
+  }
+  if (!powerGood) {
+    Log.error("PMIC_TEST: SAFETY ABORT - Power not good (pg=0)");
+    return -3;
+  }
+  if (currentSoc < 50.0f) {
+    Log.error("PMIC_TEST: SAFETY ABORT - SOC too low (%.1f%% < 50%%)", (double)currentSoc);
+    return -4;
+  }
+  if (currentTemp < 0.0f || currentTemp > 45.0f) {
+    Log.error("PMIC_TEST: SAFETY ABORT - Temperature out of range (%.1f°C)", (double)currentTemp);
+    return -5;
+  }
+
+  Log.info("PMIC_TEST: Safety checks passed - proceeding with test");
+  Log.info("PMIC_TEST: soc=%.1f temp=%.1f src=%d vbus=%u pg=%u",
+           (double)currentSoc, (double)currentTemp, powerSource, (unsigned)vbusStatus, powerGood ? 1u : 0u);
+
+  // Helper lambda to capture comprehensive PMIC snapshot
+  auto captureSnapshot = [&](const char* label) {
+    const byte faultReg = pmic.getFault();
+    const byte systemStatus = pmic.getSystemStatus();
+    const uint8_t vbusStatus = (systemStatus >> 6) & 0x03;
+    const uint8_t chargeStatus = (systemStatus >> 4) & 0x03;
+    const bool powerGood = (systemStatus & 0x04) != 0;
+    const bool thermalReg = (systemStatus & 0x02) != 0;
+    const bool vsysMin = (systemStatus & 0x01) != 0;
+    const bool chargingEnabled = pmic.isChargingEnabled();
+    
+    const float soc = fuelGauge.getSoC();
+    const float vcell = fuelGauge.getVCell();
+    const float temp = current.get_internalTempC();
+    const int src = System.powerSource();
+    
+    // Power profile context
+    const PowerReport &powerReport = PowerManager::instance().latestReport();
+    const char* profLabel = (powerReport.activeInputProfile == PowerInputProfile::Solar35W) ? "SOLAR" : 
+                           (powerReport.activeInputProfile == PowerInputProfile::UsbBench) ? "USB" : "UNKNOWN";
+    const int expectedInputCurrentMa = 900;
+    const int expectedChargeCurrentMa = (powerReport.activeInputProfile == PowerInputProfile::Solar35W) ? 900 : 896;
+    const int expectedChargeVoltageMv = (powerReport.activeInputProfile == PowerInputProfile::Solar35W) ? 4208 : 4112;
+    
+    const char* chargeLabels[] = {"OFF", "PRE", "FAST", "DONE"};
+    
+    Log.info("PMIC_TEST: %s: soc=%.1f vcell=%.3f chg=%u(%s) vbus=%u pg=%u fault=0x%02X src=%d temp=%.1f",
+             label,
+             (double)soc,
+             (double)vcell,
+             (unsigned)chargeStatus,
+             chargeLabels[chargeStatus],
+             (unsigned)vbusStatus,
+             powerGood ? 1u : 0u,
+             faultReg,
+             src,
+             (double)temp);
+    
+    Log.info("PMIC_TEST: %s_CFG: prof=%s iin=%umA ichg=%umA vchg=%umV enabled=%d therm=%d vsysmin=%d",
+             label,
+             profLabel,
+             (unsigned)expectedInputCurrentMa,
+             (unsigned)expectedChargeCurrentMa,
+             (unsigned)expectedChargeVoltageMv,
+             chargingEnabled ? 1 : 0,
+             thermalReg ? 1 : 0,
+             vsysMin ? 1 : 0);
+  };
+
+  // PHASE 1: Baseline snapshot
+  Log.info("PMIC_TEST: PHASE 1 - Capturing baseline state");
+  captureSnapshot("BASELINE");
+
+  // PHASE 2: Disable charging
+  Log.info("PMIC_TEST: PHASE 2 - Disabling charging for 10 seconds");
+  pmic.disableCharging();
+  delay(500);  // Short settle delay
+  captureSnapshot("DISABLED_T0");
+  
+  delay(5000);  // Wait 5 seconds
+  captureSnapshot("DISABLED_T5");
+  
+  delay(4500);  // Wait another 4.5 seconds (total 10 seconds disabled)
+  captureSnapshot("DISABLED_T10");
+
+  // PHASE 3: Re-enable charging
+  Log.info("PMIC_TEST: PHASE 3 - Re-enabling charging for 10 seconds");
+  pmic.enableCharging();
+  delay(500);  // Short settle delay
+  captureSnapshot("ENABLED_T0");
+  
+  delay(5000);  // Wait 5 seconds
+  captureSnapshot("ENABLED_T5");
+  
+  delay(4500);  // Wait another 4.5 seconds (total 10 seconds enabled)
+  captureSnapshot("ENABLED_T10");
+
+  // PHASE 4: Final state
+  Log.info("PMIC_TEST: PHASE 4 - Final state after full cycle");
+  captureSnapshot("FINAL");
+
+  Log.info("PMIC_TEST: ========== END CHARGE CYCLE DIAGNOSTIC ==========");
+  Log.info("PMIC_TEST: Total test duration: ~21 seconds");
+  Log.info("PMIC_TEST: Charging has been RE-ENABLED and is now in normal operation");
+  
+  testAlreadyRun = true;
+  return 0;  // Success
+#else
+  Log.warn("PMIC_TEST: Not supported on this platform (requires Boron with BQ24195 PMIC)");
+  return -10;  // Platform not supported
 #endif
 }

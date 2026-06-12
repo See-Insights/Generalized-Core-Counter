@@ -250,6 +250,14 @@ public:
   static const char *profileSelectionReasonLabel(
       PowerProfileSelectionReason reason);
 
+  /**
+   * @brief Converts power input profile to compact log label.
+   *
+   * @param profile Profile enum to stringify
+   * @return Stable C string label (e.g. "USB", "SOLAR")
+   */
+  static const char *compactProfileLabel(PowerInputProfile profile);
+
 private:
   PowerManager();
 

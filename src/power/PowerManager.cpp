@@ -29,11 +29,7 @@ PowerInputProfile selectInputProfile(
     PowerProfileSelectionReason &reason) {
   switch (snapshot.source) {
   case kPowerSourceUsbHost:
-    reason = PowerProfileSelectionReason::UsbPowerSource;
-    return PowerInputProfile::UsbBench;
   case kPowerSourceUsbAdapter:
-    reason = PowerProfileSelectionReason::UsbPowerSource;
-    return PowerInputProfile::UsbBench;
   case kPowerSourceUsbOtg:
     reason = PowerProfileSelectionReason::UsbPowerSource;
     return PowerInputProfile::UsbBench;
@@ -64,7 +60,9 @@ bool shouldLogProfileDecision(const PowerReport &previousReport,
              nextReport.powerConfigurationResult;
 }
 
-const char *compactProfileLabel(PowerInputProfile profile) {
+} // namespace
+
+const char *PowerManager::compactProfileLabel(PowerInputProfile profile) {
   switch (profile) {
   case PowerInputProfile::UsbBench:
     return "USB";
@@ -76,8 +74,6 @@ const char *compactProfileLabel(PowerInputProfile profile) {
     return "?";
   }
 }
-
-} // namespace
 
 PowerManager &PowerManager::instance() {
   static PowerManager instance;
@@ -160,10 +156,10 @@ bool PowerManager::refreshInputProfile() {
   }
 
   if (shouldLogProfileDecision(report_, nextReport)) {
-    Log.info("Power: prof=%s src=%s cfg=%d",
+    Log.info("PowerApply: profile=%s source=%s reason=%s",
              compactProfileLabel(nextReport.activeInputProfile),
              powerSourceLabel(nextReport.reading.powerSource),
-             nextReport.powerConfigurationResult);
+             profileSelectionReasonLabel(nextReport.inputProfileReason));
   }
 
   report_ = nextReport;

@@ -25,6 +25,8 @@
  * - Sleep routine trace logging: -DENABLE_SLEEP_TRACE=1
  * - Routine PMIC trace logging: -DENABLE_PMIC_TRACE=1
  * - Routine config trace logging: -DENABLE_CONFIG_TRACE=1
+ * - PMIC charge cycle diagnostic test: -DENABLE_PMIC_CHARGE_CYCLE_TEST=1
+ * - PMIC register dump diagnostic: -DENABLE_PMIC_REGISTER_DUMP=1
  *
  * Trace flag notes:
  * - ENABLE_LEDGER_TRACE=1 enables detailed ledger request lifecycle logs.
@@ -158,6 +160,28 @@
 
 #if (ENABLE_CONFIG_TRACE != 0) && (ENABLE_CONFIG_TRACE != 1)
 #error "ENABLE_CONFIG_TRACE must be 0 or 1"
+#endif
+
+#ifndef ENABLE_PMIC_CHARGE_CYCLE_TEST
+/**
+ * @brief TEMPORARY DIAGNOSTIC: Run PMIC charge cycle test once on boot.
+ *
+ * Set to 1 to enable test, then reflash. Test runs automatically during setup()
+ * and takes ~21 seconds. Logs comprehensive PMIC state before/during/after
+ * disabling and re-enabling charging to diagnose charge state machine behavior.
+ * 
+ * One-shot guard prevents multiple executions per boot. After test completes,
+ * set back to 0 and reflash to remove test from binary.
+ * 
+ * Safety: Requires external power, SOC > 50%, safe temperature range.
+ * Boron/BQ24195 PMIC only. Test is harmless - device runs from USB when
+ * charging is temporarily disabled.
+ */
+#define ENABLE_PMIC_CHARGE_CYCLE_TEST 0
+#endif
+
+#if (ENABLE_PMIC_CHARGE_CYCLE_TEST != 0) && (ENABLE_PMIC_CHARGE_CYCLE_TEST != 1)
+#error "ENABLE_PMIC_CHARGE_CYCLE_TEST must be 0 or 1"
 #endif
 
 // Optional convenience: enable DEBUG_SERIAL in DEV builds unless overridden.

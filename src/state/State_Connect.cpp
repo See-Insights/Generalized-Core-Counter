@@ -558,6 +558,7 @@ void handleConnectingState() {
         current.set_alertCode(0);
       }
       measure.batteryState();
+      
       if (sysStatus.get_verboseMode()) {
         char data[64];
         snprintf(data, sizeof(data), "Connected in %i secs", sysStatus.get_lastConnectionDuration());
