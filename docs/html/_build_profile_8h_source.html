@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;13.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;18</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -94,38 +94,110 @@ $(function(){initNavTree('_build_profile_8h_source.html','',''); });
 <div class="contents">
 <a href="_build_profile_8h.html">Go to the documentation of this file.</a><div class="fragment"><div class="line"><a id="l00001" name="l00001"></a><span class="lineno">    1</span><span class="preprocessor">#pragma once</span></div>
 <div class="line"><a id="l00002" name="l00002"></a><span class="lineno">    2</span></div>
-<div class="line"><a id="l00025" name="l00025"></a><span class="lineno">   25</span><span class="preprocessor">#ifndef DEV_BUILD</span><span class="preprocessor"></span></div>
-<div class="line"><a id="l00029" name="l00029"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a1c8895ff02f86bdd856ef0110a1a7a47">   29</a></span><span class="preprocessor">#define DEV_BUILD 0</span></div>
-<div class="line"><a id="l00030" name="l00030"></a><span class="lineno">   30</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00031" name="l00031"></a><span class="lineno">   31</span> </div>
-<div class="line"><a id="l00032" name="l00032"></a><span class="lineno">   32</span><span class="preprocessor">#ifndef FIELD_BUILD</span><span class="preprocessor"></span></div>
-<div class="line"><a id="l00036" name="l00036"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#ad4ad87bab679b526e350864dcf54b49b">   36</a></span><span class="preprocessor">#define FIELD_BUILD (!DEV_BUILD)</span></div>
-<div class="line"><a id="l00037" name="l00037"></a><span class="lineno">   37</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00038" name="l00038"></a><span class="lineno">   38</span> </div>
-<div class="line"><a id="l00039" name="l00039"></a><span class="lineno">   39</span><span class="preprocessor">#ifndef ALLOW_BLOCKING_SERIAL_WAITS</span><span class="preprocessor"></span></div>
-<div class="line"><a id="l00043" name="l00043"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a862e5c5913487ba4049590c35342976c">   43</a></span><span class="preprocessor">#define ALLOW_BLOCKING_SERIAL_WAITS 0</span></div>
-<div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00045" name="l00045"></a><span class="lineno">   45</span> </div>
-<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span><span class="preprocessor">#ifndef CONNECTIVITY_FAILSAFE_TEST_MODE</span><span class="preprocessor"></span></div>
-<div class="line"><a id="l00057" name="l00057"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#ace016f8be71ba4de13d0741f003ce9a1">   57</a></span><span class="preprocessor">#define CONNECTIVITY_FAILSAFE_TEST_MODE 0</span></div>
+<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span><span class="preprocessor">#ifndef DEV_BUILD</span><span class="preprocessor"></span></div>
+<div class="line"><a id="l00050" name="l00050"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a1c8895ff02f86bdd856ef0110a1a7a47">   50</a></span><span class="preprocessor">#define DEV_BUILD 0</span></div>
+<div class="line"><a id="l00051" name="l00051"></a><span class="lineno">   51</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00052" name="l00052"></a><span class="lineno">   52</span> </div>
+<div class="line"><a id="l00053" name="l00053"></a><span class="lineno">   53</span><span class="preprocessor">#ifndef FIELD_BUILD</span><span class="preprocessor"></span></div>
+<div class="line"><a id="l00057" name="l00057"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#ad4ad87bab679b526e350864dcf54b49b">   57</a></span><span class="preprocessor">#define FIELD_BUILD (!DEV_BUILD)</span></div>
 <div class="line"><a id="l00058" name="l00058"></a><span class="lineno">   58</span><span class="preprocessor">#endif</span></div>
 <div class="line"><a id="l00059" name="l00059"></a><span class="lineno">   59</span> </div>
-<div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span><span class="preprocessor">#if (CONNECTIVITY_FAILSAFE_TEST_MODE != 0) &amp;&amp; (CONNECTIVITY_FAILSAFE_TEST_MODE != 1)</span></div>
-<div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span><span class="preprocessor">#error &quot;CONNECTIVITY_FAILSAFE_TEST_MODE must be 0 or 1&quot;</span></div>
-<div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00063" name="l00063"></a><span class="lineno">   63</span> </div>
-<div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span><span class="preprocessor">#ifndef ENABLE_PMIC_FORENSICS</span><span class="preprocessor"></span></div>
-<div class="line"><a id="l00073" name="l00073"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#ac3fc20c1f1dca3684d048d0a13be8fee">   73</a></span><span class="preprocessor">#define ENABLE_PMIC_FORENSICS 1</span></div>
-<div class="line"><a id="l00074" name="l00074"></a><span class="lineno">   74</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00075" name="l00075"></a><span class="lineno">   75</span> </div>
-<div class="line"><a id="l00076" name="l00076"></a><span class="lineno">   76</span><span class="preprocessor">#if (ENABLE_PMIC_FORENSICS != 0) &amp;&amp; (ENABLE_PMIC_FORENSICS != 1)</span></div>
-<div class="line"><a id="l00077" name="l00077"></a><span class="lineno">   77</span><span class="preprocessor">#error &quot;ENABLE_PMIC_FORENSICS must be 0 or 1&quot;</span></div>
-<div class="line"><a id="l00078" name="l00078"></a><span class="lineno">   78</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00079" name="l00079"></a><span class="lineno">   79</span> </div>
-<div class="line"><a id="l00080" name="l00080"></a><span class="lineno">   80</span><span class="comment">// Optional convenience: enable DEBUG_SERIAL in DEV builds unless overridden.</span></div>
-<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span><span class="preprocessor">#if DEV_BUILD &amp;&amp; !defined(DEBUG_SERIAL)</span></div>
-<div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span><span class="preprocessor">#define DEBUG_SERIAL</span></div>
+<div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span><span class="preprocessor">#ifndef ALLOW_BLOCKING_SERIAL_WAITS</span><span class="preprocessor"></span></div>
+<div class="line"><a id="l00064" name="l00064"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a862e5c5913487ba4049590c35342976c">   64</a></span><span class="preprocessor">#define ALLOW_BLOCKING_SERIAL_WAITS 0</span></div>
+<div class="line"><a id="l00065" name="l00065"></a><span class="lineno">   65</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00066" name="l00066"></a><span class="lineno">   66</span> </div>
+<div class="line"><a id="l00067" name="l00067"></a><span class="lineno">   67</span><span class="preprocessor">#ifndef CONNECTIVITY_FAILSAFE_TEST_MODE</span><span class="preprocessor"></span></div>
+<div class="line"><a id="l00078" name="l00078"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#ace016f8be71ba4de13d0741f003ce9a1">   78</a></span><span class="preprocessor">#define CONNECTIVITY_FAILSAFE_TEST_MODE 0</span></div>
+<div class="line"><a id="l00079" name="l00079"></a><span class="lineno">   79</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00080" name="l00080"></a><span class="lineno">   80</span> </div>
+<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span><span class="preprocessor">#if (CONNECTIVITY_FAILSAFE_TEST_MODE != 0) &amp;&amp; (CONNECTIVITY_FAILSAFE_TEST_MODE != 1)</span></div>
+<div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span><span class="preprocessor">#error &quot;CONNECTIVITY_FAILSAFE_TEST_MODE must be 0 or 1&quot;</span></div>
 <div class="line"><a id="l00083" name="l00083"></a><span class="lineno">   83</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00084" name="l00084"></a><span class="lineno">   84</span> </div>
+<div class="line"><a id="l00085" name="l00085"></a><span class="lineno">   85</span><span class="preprocessor">#ifndef ENABLE_PMIC_FORENSICS</span><span class="preprocessor"></span></div>
+<div class="line"><a id="l00094" name="l00094"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#ac3fc20c1f1dca3684d048d0a13be8fee">   94</a></span><span class="preprocessor">#define ENABLE_PMIC_FORENSICS 1</span></div>
+<div class="line"><a id="l00095" name="l00095"></a><span class="lineno">   95</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00096" name="l00096"></a><span class="lineno">   96</span> </div>
+<div class="line"><a id="l00097" name="l00097"></a><span class="lineno">   97</span><span class="preprocessor">#if (ENABLE_PMIC_FORENSICS != 0) &amp;&amp; (ENABLE_PMIC_FORENSICS != 1)</span></div>
+<div class="line"><a id="l00098" name="l00098"></a><span class="lineno">   98</span><span class="preprocessor">#error &quot;ENABLE_PMIC_FORENSICS must be 0 or 1&quot;</span></div>
+<div class="line"><a id="l00099" name="l00099"></a><span class="lineno">   99</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00100" name="l00100"></a><span class="lineno">  100</span> </div>
+<div class="line"><a id="l00101" name="l00101"></a><span class="lineno">  101</span><span class="preprocessor">#ifndef ENABLE_LEDGER_TRACE</span></div>
+<div class="line"><a id="l00102" name="l00102"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#ac1d930ed2fc5fa8f08f77da8065efcec">  102</a></span><span class="preprocessor">#define ENABLE_LEDGER_TRACE 0</span></div>
+<div class="line"><a id="l00103" name="l00103"></a><span class="lineno">  103</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00104" name="l00104"></a><span class="lineno">  104</span> </div>
+<div class="line"><a id="l00105" name="l00105"></a><span class="lineno">  105</span><span class="preprocessor">#if (ENABLE_LEDGER_TRACE != 0) &amp;&amp; (ENABLE_LEDGER_TRACE != 1)</span></div>
+<div class="line"><a id="l00106" name="l00106"></a><span class="lineno">  106</span><span class="preprocessor">#error &quot;ENABLE_LEDGER_TRACE must be 0 or 1&quot;</span></div>
+<div class="line"><a id="l00107" name="l00107"></a><span class="lineno">  107</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00108" name="l00108"></a><span class="lineno">  108</span> </div>
+<div class="line"><a id="l00109" name="l00109"></a><span class="lineno">  109</span><span class="preprocessor">#ifndef ENABLE_CONNECT_TRACE</span></div>
+<div class="line"><a id="l00110" name="l00110"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#ade323df70d166dee8f0a9da69982407d">  110</a></span><span class="preprocessor">#define ENABLE_CONNECT_TRACE 0</span></div>
+<div class="line"><a id="l00111" name="l00111"></a><span class="lineno">  111</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00112" name="l00112"></a><span class="lineno">  112</span> </div>
+<div class="line"><a id="l00113" name="l00113"></a><span class="lineno">  113</span><span class="preprocessor">#if (ENABLE_CONNECT_TRACE != 0) &amp;&amp; (ENABLE_CONNECT_TRACE != 1)</span></div>
+<div class="line"><a id="l00114" name="l00114"></a><span class="lineno">  114</span><span class="preprocessor">#error &quot;ENABLE_CONNECT_TRACE must be 0 or 1&quot;</span></div>
+<div class="line"><a id="l00115" name="l00115"></a><span class="lineno">  115</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00116" name="l00116"></a><span class="lineno">  116</span> </div>
+<div class="line"><a id="l00117" name="l00117"></a><span class="lineno">  117</span><span class="preprocessor">#ifndef ENABLE_CONNECT_DECISION_TRACE</span></div>
+<div class="line"><a id="l00118" name="l00118"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a2a713aa4e60fc33f58637e8dfddffd1c">  118</a></span><span class="preprocessor">#define ENABLE_CONNECT_DECISION_TRACE 0</span></div>
+<div class="line"><a id="l00119" name="l00119"></a><span class="lineno">  119</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00120" name="l00120"></a><span class="lineno">  120</span> </div>
+<div class="line"><a id="l00121" name="l00121"></a><span class="lineno">  121</span><span class="preprocessor">#if (ENABLE_CONNECT_DECISION_TRACE != 0) &amp;&amp; (ENABLE_CONNECT_DECISION_TRACE != 1)</span></div>
+<div class="line"><a id="l00122" name="l00122"></a><span class="lineno">  122</span><span class="preprocessor">#error &quot;ENABLE_CONNECT_DECISION_TRACE must be 0 or 1&quot;</span></div>
+<div class="line"><a id="l00123" name="l00123"></a><span class="lineno">  123</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00124" name="l00124"></a><span class="lineno">  124</span> </div>
+<div class="line"><a id="l00125" name="l00125"></a><span class="lineno">  125</span><span class="preprocessor">#ifndef ENABLE_PERF_TRACE</span></div>
+<div class="line"><a id="l00126" name="l00126"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#ac134f0014e9abf1625a4c66109a37ebe">  126</a></span><span class="preprocessor">#define ENABLE_PERF_TRACE 0</span></div>
+<div class="line"><a id="l00127" name="l00127"></a><span class="lineno">  127</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00128" name="l00128"></a><span class="lineno">  128</span> </div>
+<div class="line"><a id="l00129" name="l00129"></a><span class="lineno">  129</span><span class="preprocessor">#if (ENABLE_PERF_TRACE != 0) &amp;&amp; (ENABLE_PERF_TRACE != 1)</span></div>
+<div class="line"><a id="l00130" name="l00130"></a><span class="lineno">  130</span><span class="preprocessor">#error &quot;ENABLE_PERF_TRACE must be 0 or 1&quot;</span></div>
+<div class="line"><a id="l00131" name="l00131"></a><span class="lineno">  131</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00132" name="l00132"></a><span class="lineno">  132</span> </div>
+<div class="line"><a id="l00133" name="l00133"></a><span class="lineno">  133</span><span class="preprocessor">#ifndef ENABLE_GATE_TRACE</span></div>
+<div class="line"><a id="l00134" name="l00134"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a611d40e0dc74091dc430b08986bbed80">  134</a></span><span class="preprocessor">#define ENABLE_GATE_TRACE 0</span></div>
+<div class="line"><a id="l00135" name="l00135"></a><span class="lineno">  135</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00136" name="l00136"></a><span class="lineno">  136</span> </div>
+<div class="line"><a id="l00137" name="l00137"></a><span class="lineno">  137</span><span class="preprocessor">#if (ENABLE_GATE_TRACE != 0) &amp;&amp; (ENABLE_GATE_TRACE != 1)</span></div>
+<div class="line"><a id="l00138" name="l00138"></a><span class="lineno">  138</span><span class="preprocessor">#error &quot;ENABLE_GATE_TRACE must be 0 or 1&quot;</span></div>
+<div class="line"><a id="l00139" name="l00139"></a><span class="lineno">  139</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00140" name="l00140"></a><span class="lineno">  140</span> </div>
+<div class="line"><a id="l00141" name="l00141"></a><span class="lineno">  141</span><span class="preprocessor">#ifndef ENABLE_SLEEP_TRACE</span></div>
+<div class="line"><a id="l00142" name="l00142"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#a24cbf85bb9301ce7a2456a9c5e7f6f7a">  142</a></span><span class="preprocessor">#define ENABLE_SLEEP_TRACE 0</span></div>
+<div class="line"><a id="l00143" name="l00143"></a><span class="lineno">  143</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00144" name="l00144"></a><span class="lineno">  144</span> </div>
+<div class="line"><a id="l00145" name="l00145"></a><span class="lineno">  145</span><span class="preprocessor">#if (ENABLE_SLEEP_TRACE != 0) &amp;&amp; (ENABLE_SLEEP_TRACE != 1)</span></div>
+<div class="line"><a id="l00146" name="l00146"></a><span class="lineno">  146</span><span class="preprocessor">#error &quot;ENABLE_SLEEP_TRACE must be 0 or 1&quot;</span></div>
+<div class="line"><a id="l00147" name="l00147"></a><span class="lineno">  147</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00148" name="l00148"></a><span class="lineno">  148</span> </div>
+<div class="line"><a id="l00149" name="l00149"></a><span class="lineno">  149</span><span class="preprocessor">#ifndef ENABLE_PMIC_TRACE</span></div>
+<div class="line"><a id="l00150" name="l00150"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#aae041d048cc109e9d762ca8a51a57c37">  150</a></span><span class="preprocessor">#define ENABLE_PMIC_TRACE 0</span></div>
+<div class="line"><a id="l00151" name="l00151"></a><span class="lineno">  151</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00152" name="l00152"></a><span class="lineno">  152</span> </div>
+<div class="line"><a id="l00153" name="l00153"></a><span class="lineno">  153</span><span class="preprocessor">#if (ENABLE_PMIC_TRACE != 0) &amp;&amp; (ENABLE_PMIC_TRACE != 1)</span></div>
+<div class="line"><a id="l00154" name="l00154"></a><span class="lineno">  154</span><span class="preprocessor">#error &quot;ENABLE_PMIC_TRACE must be 0 or 1&quot;</span></div>
+<div class="line"><a id="l00155" name="l00155"></a><span class="lineno">  155</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00156" name="l00156"></a><span class="lineno">  156</span> </div>
+<div class="line"><a id="l00157" name="l00157"></a><span class="lineno">  157</span><span class="preprocessor">#ifndef ENABLE_CONFIG_TRACE</span></div>
+<div class="line"><a id="l00158" name="l00158"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#ab149b436911cfccdc683b47193f4bada">  158</a></span><span class="preprocessor">#define ENABLE_CONFIG_TRACE 0</span></div>
+<div class="line"><a id="l00159" name="l00159"></a><span class="lineno">  159</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00160" name="l00160"></a><span class="lineno">  160</span> </div>
+<div class="line"><a id="l00161" name="l00161"></a><span class="lineno">  161</span><span class="preprocessor">#if (ENABLE_CONFIG_TRACE != 0) &amp;&amp; (ENABLE_CONFIG_TRACE != 1)</span></div>
+<div class="line"><a id="l00162" name="l00162"></a><span class="lineno">  162</span><span class="preprocessor">#error &quot;ENABLE_CONFIG_TRACE must be 0 or 1&quot;</span></div>
+<div class="line"><a id="l00163" name="l00163"></a><span class="lineno">  163</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00164" name="l00164"></a><span class="lineno">  164</span> </div>
+<div class="line"><a id="l00165" name="l00165"></a><span class="lineno">  165</span><span class="preprocessor">#ifndef ENABLE_PMIC_CHARGE_CYCLE_TEST</span><span class="preprocessor"></span></div>
+<div class="line"><a id="l00180" name="l00180"></a><span class="lineno"><a class="line" href="_build_profile_8h.html#ac201caf19e1bc897ddd1013cdf320c25">  180</a></span><span class="preprocessor">#define ENABLE_PMIC_CHARGE_CYCLE_TEST 0</span></div>
+<div class="line"><a id="l00181" name="l00181"></a><span class="lineno">  181</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00182" name="l00182"></a><span class="lineno">  182</span> </div>
+<div class="line"><a id="l00183" name="l00183"></a><span class="lineno">  183</span><span class="preprocessor">#if (ENABLE_PMIC_CHARGE_CYCLE_TEST != 0) &amp;&amp; (ENABLE_PMIC_CHARGE_CYCLE_TEST != 1)</span></div>
+<div class="line"><a id="l00184" name="l00184"></a><span class="lineno">  184</span><span class="preprocessor">#error &quot;ENABLE_PMIC_CHARGE_CYCLE_TEST must be 0 or 1&quot;</span></div>
+<div class="line"><a id="l00185" name="l00185"></a><span class="lineno">  185</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00186" name="l00186"></a><span class="lineno">  186</span> </div>
+<div class="line"><a id="l00187" name="l00187"></a><span class="lineno">  187</span><span class="comment">// Optional convenience: enable DEBUG_SERIAL in DEV builds unless overridden.</span></div>
+<div class="line"><a id="l00188" name="l00188"></a><span class="lineno">  188</span><span class="preprocessor">#if DEV_BUILD &amp;&amp; !defined(DEBUG_SERIAL)</span></div>
+<div class="line"><a id="l00189" name="l00189"></a><span class="lineno">  189</span><span class="preprocessor">#define DEBUG_SERIAL</span></div>
+<div class="line"><a id="l00190" name="l00190"></a><span class="lineno">  190</span><span class="preprocessor">#endif</span></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
 </div><!-- container -->

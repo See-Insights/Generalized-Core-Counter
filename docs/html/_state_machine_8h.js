@@ -18,6 +18,7 @@ var _state_machine_8h =
     [ "restoreAwakeWatchdogAfterWake", "_state_machine_8h.html#a078231b7793d30858efbccc85f37efab", null ],
     [ "secondsUntilNextOpen", "_state_machine_8h.html#a4a15e91d0d4e7c61469be195601b2fe8", null ],
     [ "serviceAwakeWatchdog", "_state_machine_8h.html#a27185aecd3a2c78bb67a1e8c28393337", null ],
+    [ "transitionTo", "_state_machine_8h.html#a4dfe0502b724c13426dd6f8750f6b9c4", null ],
     [ "userSwitchISR", "_state_machine_8h.html#a1282f5e7e112ee067260b2fc2b5685fd", null ],
     [ "ab1805", "_state_machine_8h.html#aa2fc2ac89f9c96bbbad1d4086a8b296d", null ],
     [ "config", "_state_machine_8h.html#ab71602050f3582f2f394acb7c5e97606", null ],

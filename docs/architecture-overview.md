@@ -362,6 +362,11 @@ Tier transitions use hysteresis so the firmware does not oscillate between polic
 - apply PMIC/input-power profiles when the platform supports them
 - suppress expensive recovery actions when battery state makes them unsafe
 
+Detailed input-power profile behavior is documented in
+[`docs/architecture/power-management.md`](architecture/power-management.md).
+The June 2026 Boron PMIC charging root cause is preserved in
+[`docs/postmortems/2026-06-pmic-charging-root-cause.md`](postmortems/2026-06-pmic-charging-root-cause.md).
+
 ### Deployment Scenarios
 
 - Solar deployments: prioritize bounded connection time, back-off behavior, and survival during poor charging conditions.

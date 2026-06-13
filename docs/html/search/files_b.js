@@ -1,5 +1,6 @@
 var searchData=
 [
-  ['thrashguard_2ecpp_0',['ThrashGuard.cpp',['../_thrash_guard_8cpp.html',1,'']]],
-  ['thrashguard_2eh_1',['ThrashGuard.h',['../_thrash_guard_8h.html',1,'']]]
+  ['readme_2emd_0',['README.md',['../_r_e_a_d_m_e_8md.html',1,'']]],
+  ['recovery_2darchitecture_2emd_1',['recovery-architecture.md',['../recovery-architecture_8md.html',1,'']]],
+  ['release_2dnotes_2dv11_2emd_2',['release-notes-v11.md',['../release-notes-v11_8md.html',1,'']]]
 ];

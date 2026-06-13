@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;13.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;18</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -99,6 +99,7 @@ $(function(){initNavTree('classsys_status_data_1_1_sys_data.html','','classsys_s
 Public Attributes</h2></td></tr>
 <tr class="memitem:a124d1947b9d0a93e46b95f4bfc98527a" id="r_a124d1947b9d0a93e46b95f4bfc98527a"><td class="memItemLeft">uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#a124d1947b9d0a93e46b95f4bfc98527a">closeTime</a></td></tr>
 <tr class="memitem:a312ad3e9e14030ddebc3d5251ffb4ddd" id="r_a312ad3e9e14030ddebc3d5251ffb4ddd"><td class="memItemLeft">uint16_t&#160;</td><td class="memItemRight"><a class="el" href="#a312ad3e9e14030ddebc3d5251ffb4ddd">cloudDisconnectBudgetSec</a></td></tr>
+<tr class="memitem:a6a5845fcf3c08eec9ffb038f7a3a5a48" id="r_a6a5845fcf3c08eec9ffb038f7a3a5a48"><td class="memItemLeft">uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#a6a5845fcf3c08eec9ffb038f7a3a5a48">configSource</a></td></tr>
 <tr class="memitem:ac148bf68d19405c01a9c1ee624208737" id="r_ac148bf68d19405c01a9c1ee624208737"><td class="memItemLeft">uint16_t&#160;</td><td class="memItemRight"><a class="el" href="#ac148bf68d19405c01a9c1ee624208737">connectAttemptBudgetSec</a></td></tr>
 <tr class="memitem:ad032fbfceb6d43f08a899eaa57d1ac8c" id="r_ad032fbfceb6d43f08a899eaa57d1ac8c"><td class="memItemLeft">uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#ad032fbfceb6d43f08a899eaa57d1ac8c">connectionAttemptCounter</a></td></tr>
 <tr class="memitem:a02d2a15146a6aa1fd512809eff624ca5" id="r_a02d2a15146a6aa1fd512809eff624ca5"><td class="memItemLeft">uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#a02d2a15146a6aa1fd512809eff624ca5">connectionMode</a></td></tr>
@@ -106,6 +107,7 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:aa47134421e25b74ecb87f2cf0312acee" id="r_aa47134421e25b74ecb87f2cf0312acee"><td class="memItemLeft">uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#aa47134421e25b74ecb87f2cf0312acee">connectivityRecoveryStage</a></td></tr>
 <tr class="memitem:afc1ac9b1ee5ef09117fe63b04bb25c86" id="r_afc1ac9b1ee5ef09117fe63b04bb25c86"><td class="memItemLeft">uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#afc1ac9b1ee5ef09117fe63b04bb25c86">currentBatteryTier</a></td></tr>
 <tr class="memitem:a1d988ae2845765cdaa981f5ea8655269" id="r_a1d988ae2845765cdaa981f5ea8655269"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a1d988ae2845765cdaa981f5ea8655269">disconnectedMode</a></td></tr>
+<tr class="memitem:a429ef8bc43bd6798b8c78b75b64d6c31" id="r_a429ef8bc43bd6798b8c78b75b64d6c31"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a429ef8bc43bd6798b8c78b75b64d6c31">hasValidLedgerConfig</a></td></tr>
 <tr class="memitem:a88fef61bce4b028910de1441dc020c9c" id="r_a88fef61bce4b028910de1441dc020c9c"><td class="memItemLeft">time_t&#160;</td><td class="memItemRight"><a class="el" href="#a88fef61bce4b028910de1441dc020c9c">lastConnection</a></td></tr>
 <tr class="memitem:a00dd45aa7796876b69f20b29ec4c54a6" id="r_a00dd45aa7796876b69f20b29ec4c54a6"><td class="memItemLeft">uint16_t&#160;</td><td class="memItemRight"><a class="el" href="#a00dd45aa7796876b69f20b29ec4c54a6">lastConnectionDuration</a></td></tr>
 <tr class="memitem:a495659bf0a0c4977701f03f73640bb57" id="r_a495659bf0a0c4977701f03f73640bb57"><td class="memItemLeft">time_t&#160;</td><td class="memItemRight"><a class="el" href="#a495659bf0a0c4977701f03f73640bb57">lastConnectivityRecoveryAction</a></td></tr>
@@ -176,6 +178,22 @@ Public Attributes</h2></td></tr>
 </div><div class="memdoc">
 
 <p class="definition">Definition at line <a class="el" href="_my_persistent_data_8h_source.html#l00220">220</a> of file <a class="el" href="_my_persistent_data_8h_source.html">MyPersistentData.h</a>.</p>
+
+</div>
+</div>
+<a id="a6a5845fcf3c08eec9ffb038f7a3a5a48" name="a6a5845fcf3c08eec9ffb038f7a3a5a48"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6a5845fcf3c08eec9ffb038f7a3a5a48">&#9670;&#160;</a></span>configSource</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint8_t sysStatusData::SysData::configSource</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8h_source.html#l00244">244</a> of file <a class="el" href="_my_persistent_data_8h_source.html">MyPersistentData.h</a>.</p>
 
 </div>
 </div>
@@ -288,6 +306,22 @@ Public Attributes</h2></td></tr>
 </div><div class="memdoc">
 
 <p class="definition">Definition at line <a class="el" href="_my_persistent_data_8h_source.html#l00207">207</a> of file <a class="el" href="_my_persistent_data_8h_source.html">MyPersistentData.h</a>.</p>
+
+</div>
+</div>
+<a id="a429ef8bc43bd6798b8c78b75b64d6c31" name="a429ef8bc43bd6798b8c78b75b64d6c31"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a429ef8bc43bd6798b8c78b75b64d6c31">&#9670;&#160;</a></span>hasValidLedgerConfig</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool sysStatusData::SysData::hasValidLedgerConfig</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_my_persistent_data_8h_source.html#l00243">243</a> of file <a class="el" href="_my_persistent_data_8h_source.html">MyPersistentData.h</a>.</p>
 
 </div>
 </div>
@@ -737,7 +771,7 @@ Public Attributes</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_my_persistent_data_8h_source.html#l00197">197</a> of file <a class="el" href="_my_persistent_data_8h_source.html">MyPersistentData.h</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_my_persistent_data_8cpp_source.html#l00193">sysStatusData::get_timeZoneStr()</a>, and <a class="el" href="_my_persistent_data_8cpp_source.html#l00203">sysStatusData::set_timeZoneStr()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_my_persistent_data_8cpp_source.html#l00202">sysStatusData::get_timeZoneStr()</a>, and <a class="el" href="_my_persistent_data_8cpp_source.html#l00212">sysStatusData::set_timeZoneStr()</a>.</p>
 
 </div>
 </div>
@@ -851,7 +885,7 @@ Public Attributes</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_my_persistent_data_8h_source.html#l00233">233</a> of file <a class="el" href="_my_persistent_data_8h_source.html">MyPersistentData.h</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_my_persistent_data_8cpp_source.html#l00384">sysStatusData::get_webhookName()</a>, and <a class="el" href="_my_persistent_data_8cpp_source.html#l00394">sysStatusData::set_webhookName()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_my_persistent_data_8cpp_source.html#l00400">sysStatusData::get_webhookName()</a>, and <a class="el" href="_my_persistent_data_8cpp_source.html#l00410">sysStatusData::set_webhookName()</a>.</p>
 
 </div>
 </div>

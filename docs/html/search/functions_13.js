@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['writedevicestatustocloud_0',['writeDeviceStatusToCloud',['../class_cloud.html#a27758d9343f1531651c739f13ff6006b',1,'Cloud']]]
+  ['writedevicestatustocloud_0',['writeDeviceStatusToCloud',['../class_cloud.html#aacb8eae6febbe83b39959e80b7983bb9',1,'Cloud']]]
 ];

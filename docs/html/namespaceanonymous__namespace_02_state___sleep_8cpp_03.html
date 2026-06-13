@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;13.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;18</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -103,15 +103,26 @@ Enumerations</h2></td></tr>
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:a852e47d7206383563dcb1e7e301c6e98" id="r_a852e47d7206383563dcb1e7e301c6e98"><td class="memItemLeft">const char *&#160;</td><td class="memItemRight"><a class="el" href="#a852e47d7206383563dcb1e7e301c6e98">batteryTierLabel</a> (uint8_t tier)</td></tr>
+<tr class="memitem:a0ec7e4894e73fae7b3b3379c92e8378b" id="r_a0ec7e4894e73fae7b3b3379c92e8378b"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a0ec7e4894e73fae7b3b3379c92e8378b">clearAb1805StaleAlarmInterrupts</a> ()</td></tr>
 <tr class="memitem:a13e9915406af72c4d32f922a088d826d" id="r_a13e9915406af72c4d32f922a088d826d"><td class="memItemLeft">unsigned long&#160;</td><td class="memItemRight"><a class="el" href="#a13e9915406af72c4d32f922a088d826d">computeCloudSyncTimeoutMs</a> (uint16_t queueDepth)</td></tr>
 <tr class="memitem:aa507bd767963a02cf16d555d7431c3da" id="r_aa507bd767963a02cf16d555d7431c3da"><td class="memItemLeft">const char *&#160;</td><td class="memItemRight"><a class="el" href="#aa507bd767963a02cf16d555d7431c3da">connectionModeLabel</a> (<a class="el" href="_my_persistent_data_8h.html#a6ed5b36c9cd209c52088cb9029de61b3">ConnectionMode</a> mode)</td></tr>
+<tr class="memitem:ac97ad6c9d2761efe8d813abc923410f4" id="r_ac97ad6c9d2761efe8d813abc923410f4"><td class="memItemLeft">const char *&#160;</td><td class="memItemRight"><a class="el" href="#ac97ad6c9d2761efe8d813abc923410f4">gateBlockerReasonLabel</a> (uint8_t blockerMask)</td></tr>
+<tr class="memitem:ad193dd0c768b360b4715ed2d34aec4c5" id="r_ad193dd0c768b360b4715ed2d34aec4c5"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ad193dd0c768b360b4715ed2d34aec4c5">isDeviceOsAtLeast6400</a> ()</td></tr>
+<tr class="memitem:ab666b7e07c5e13092d87a9d2446a527c" id="r_ab666b7e07c5e13092d87a9d2446a527c"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ab666b7e07c5e13092d87a9d2446a527c">isRtcTimeValidForHibernate</a> (time_t rtcNow)</td></tr>
 <tr class="memitem:abad9bf1b7f805aea7c5db5b119e27761" id="r_abad9bf1b7f805aea7c5db5b119e27761"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#abad9bf1b7f805aea7c5db5b119e27761">logTeardownContext</a> (const char *prefix, bool standbyRequested, bool standbyEffective)</td></tr>
 <tr class="memitem:a78bb128d7c04dccc8b98b740dc79d3d2" id="r_a78bb128d7c04dccc8b98b740dc79d3d2"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a78bb128d7c04dccc8b98b740dc79d3d2">logWakeSummary</a> (const char *reason)</td></tr>
 <tr class="memitem:ad1d08f76587dad375020db5655229ae6" id="r_ad1d08f76587dad375020db5655229ae6"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#ad1d08f76587dad375020db5655229ae6">markModemUnstable</a> (<a class="el" href="#afb8230f5c47a27c78b095f28b4d35d9d">ModemUnstableReason</a> reason, unsigned long elapsedMs)</td></tr>
 <tr class="memitem:a0e57a1cbfacc48cf8f124e62fb425d5f" id="r_a0e57a1cbfacc48cf8f124e62fb425d5f"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a0e57a1cbfacc48cf8f124e62fb425d5f">maybeClearModemUnstable</a> (unsigned long teardownElapsedMs)</td></tr>
+<tr class="memitem:ab965d650ddf5d08e2e5a3132ee620601" id="r_ab965d650ddf5d08e2e5a3132ee620601"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ab965d650ddf5d08e2e5a3132ee620601">shouldUseBoronRtcAlarmHibernate</a> (uint32_t requestedSleepSec, time_t &amp;rtcNow)</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-var-members" class="groupheader"><a id="var-members" name="var-members"></a>
 Variables</h2></td></tr>
+<tr class="memitem:a1de56a8bd1d2621ea1abe48305ab1d27" id="r_a1de56a8bd1d2621ea1abe48305ab1d27"><td class="memItemLeft">constexpr uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#a1de56a8bd1d2621ea1abe48305ab1d27">kGateBlockerLedger</a> = 0x02</td></tr>
+<tr class="memitem:aefba2c3e1f6fa82f33ec78f0261b8fda" id="r_aefba2c3e1f6fa82f33ec78f0261b8fda"><td class="memItemLeft">constexpr uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#aefba2c3e1f6fa82f33ec78f0261b8fda">kGateBlockerQueue</a> = 0x01</td></tr>
+<tr class="memitem:aa4f80677571b111d9b02e6b473467381" id="r_aa4f80677571b111d9b02e6b473467381"><td class="memItemLeft">constexpr uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#aa4f80677571b111d9b02e6b473467381">kGateBlockerUninitialized</a> = 0xFF</td></tr>
+<tr class="memitem:acc4877e6c338621dcd5d9c22c72ec324" id="r_acc4877e6c338621dcd5d9c22c72ec324"><td class="memItemLeft">constexpr uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#acc4877e6c338621dcd5d9c22c72ec324">kGateBlockerUpdate</a> = 0x08</td></tr>
+<tr class="memitem:ad1c02098c789be36fd3e65d6aa71dff3" id="r_ad1c02098c789be36fd3e65d6aa71dff3"><td class="memItemLeft">constexpr uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#ad1c02098c789be36fd3e65d6aa71dff3">kGateBlockerWebhook</a> = 0x04</td></tr>
+<tr class="memitem:ac8c209fc05f78841fc4198589f2b38a6" id="r_ac8c209fc05f78841fc4198589f2b38a6"><td class="memItemLeft">constexpr unsigned long&#160;</td><td class="memItemRight"><a class="el" href="#ac8c209fc05f78841fc4198589f2b38a6">kGateBlockLogThresholdMs</a> = 10000UL</td></tr>
 <tr class="memitem:a9cd27f05d6bb0e4b58c9b5779a2b4165" id="r_a9cd27f05d6bb0e4b58c9b5779a2b4165"><td class="memItemLeft">constexpr unsigned long&#160;</td><td class="memItemRight"><a class="el" href="#a9cd27f05d6bb0e4b58c9b5779a2b4165">MODEM_UNSTABLE_RECOVERY_TEARDOWN_MS</a> = 5000UL</td></tr>
 <tr class="memitem:a96c86262c74f9ef5b1ad5c27294e238d" id="r_a96c86262c74f9ef5b1ad5c27294e238d"><td class="memItemLeft">constexpr unsigned long&#160;</td><td class="memItemRight"><a class="el" href="#a96c86262c74f9ef5b1ad5c27294e238d">MODEM_UNSTABLE_SLOW_TEARDOWN_MS</a> = 10000UL</td></tr>
 </table>
@@ -133,7 +144,7 @@ Variables</h2></td></tr>
 <tr><td class="fieldname"><a id="afb8230f5c47a27c78b095f28b4d35d9da6fcd616236c8108757d5b7ea3cfeb39d" name="afb8230f5c47a27c78b095f28b4d35d9da6fcd616236c8108757d5b7ea3cfeb39d"></a>MODEM_UNSTABLE_REASON_CONNECT_TIMEOUT&#160;</td><td class="fielddoc"></td></tr>
 </table>
 
-<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00023">23</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00022">22</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
 
 </div>
 </div>
@@ -153,11 +164,34 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00044">44</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00043">43</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00113">TIER_CONSERVING</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00114">TIER_CRITICAL</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00112">TIER_HEALTHY</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00115">TIER_SURVIVAL</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00068">logTeardownContext()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00067">logTeardownContext()</a>.</p>
+
+</div>
+</div>
+<a id="a0ec7e4894e73fae7b3b3379c92e8378b" name="a0ec7e4894e73fae7b3b3379c92e8378b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0ec7e4894e73fae7b3b3379c92e8378b">&#9670;&#160;</a></span>clearAb1805StaleAlarmInterrupts()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool anonymous_namespace{State_Sleep.cpp}::clearAb1805StaleAlarmInterrupts </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00225">225</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_state_machine_8h.html#aa2fc2ac89f9c96bbbad1d4086a8b296d">ab1805</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>.</p>
 
 </div>
 </div>
@@ -176,11 +210,11 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00131">131</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00130">130</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_connectivity_policy_8h_source.html#l00133">ConnectivityPolicy::CLOUD_OPS_GATE_TIMEOUT_MS</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>.</p>
 
 </div>
 </div>
@@ -199,11 +233,76 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00029">29</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00028">28</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00071">CONNECTED</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00073">DISCONNECTED</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00072">INTERMITTENT</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00074">INTERMITTENT_KEEP_ALIVE</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00068">logTeardownContext()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00067">logTeardownContext()</a>.</p>
+
+</div>
+</div>
+<a id="ac97ad6c9d2761efe8d813abc923410f4" name="ac97ad6c9d2761efe8d813abc923410f4"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac97ad6c9d2761efe8d813abc923410f4">&#9670;&#160;</a></span>gateBlockerReasonLabel()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const char * anonymous_namespace{State_Sleep.cpp}::gateBlockerReasonLabel </td>
+          <td>(</td>
+          <td class="paramtype">uint8_t</td>          <td class="paramname"><span class="paramname"><em>blockerMask</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00160">160</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_state___sleep_8cpp_source.html#l00155">kGateBlockerLedger</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00154">kGateBlockerQueue</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00157">kGateBlockerUpdate</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00156">kGateBlockerWebhook</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>.</p>
+
+</div>
+</div>
+<a id="ad193dd0c768b360b4715ed2d34aec4c5" name="ad193dd0c768b360b4715ed2d34aec4c5"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad193dd0c768b360b4715ed2d34aec4c5">&#9670;&#160;</a></span>isDeviceOsAtLeast6400()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool anonymous_namespace{State_Sleep.cpp}::isDeviceOsAtLeast6400 </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00201">201</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00255">shouldUseBoronRtcAlarmHibernate()</a>.</p>
+
+</div>
+</div>
+<a id="ab666b7e07c5e13092d87a9d2446a527c" name="ab666b7e07c5e13092d87a9d2446a527c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab666b7e07c5e13092d87a9d2446a527c">&#9670;&#160;</a></span>isRtcTimeValidForHibernate()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool anonymous_namespace{State_Sleep.cpp}::isRtcTimeValidForHibernate </td>
+          <td>(</td>
+          <td class="paramtype">time_t</td>          <td class="paramname"><span class="paramname"><em>rtcNow</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00219">219</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00255">shouldUseBoronRtcAlarmHibernate()</a>.</p>
 
 </div>
 </div>
@@ -231,11 +330,11 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00068">68</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00067">67</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_state___sleep_8cpp_source.html#l00044">batteryTierLabel()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00029">connectionModeLabel()</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
+<p class="reference">References <a class="el" href="_state___sleep_8cpp_source.html#l00043">batteryTierLabel()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00028">connectionModeLabel()</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>.</p>
 
 </div>
 </div>
@@ -254,11 +353,11 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00059">59</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00058">58</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00232">SensorManager::instance()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01248">isWithinOpenHours()</a>, and <a class="el" href="device__pinout_8cpp_source.html#l00124">signalLEDTimeRemaining()</a>.</p>
+<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00264">SensorManager::instance()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01455">isWithinOpenHours()</a>, and <a class="el" href="device__pinout_8cpp_source.html#l00124">signalLEDTimeRemaining()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>.</p>
 
 </div>
 </div>
@@ -281,11 +380,11 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00084">84</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00083">83</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_state___sleep_8cpp_source.html#l00026">MODEM_UNSTABLE_REASON_CONNECT_TIMEOUT</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00025">MODEM_UNSTABLE_REASON_SLOW_TEARDOWN</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00136">session</a>.</p>
+<p class="reference">References <a class="el" href="_state___sleep_8cpp_source.html#l00025">MODEM_UNSTABLE_REASON_CONNECT_TIMEOUT</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00024">MODEM_UNSTABLE_REASON_SLOW_TEARDOWN</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00131">session</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>.</p>
 
 </div>
 </div>
@@ -304,15 +403,198 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00110">110</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00109">109</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_wake_cycle_stats_8cpp_source.html#l00012">Observability::cycleStats()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00024">MODEM_UNSTABLE_REASON_NONE</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00021">MODEM_UNSTABLE_RECOVERY_TEARDOWN_MS</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00136">session</a>, and <a class="el" href="_wake_cycle_stats_8h_source.html#l00037">Observability::WakeCycleStats::SUCCESS</a>.</p>
+<p class="reference">References <a class="el" href="_wake_cycle_stats_8cpp_source.html#l00012">Observability::cycleStats()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00023">MODEM_UNSTABLE_REASON_NONE</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00020">MODEM_UNSTABLE_RECOVERY_TEARDOWN_MS</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00131">session</a>, and <a class="el" href="_wake_cycle_stats_8h_source.html#l00037">Observability::WakeCycleStats::SUCCESS</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>.</p>
+
+</div>
+</div>
+<a id="ab965d650ddf5d08e2e5a3132ee620601" name="ab965d650ddf5d08e2e5a3132ee620601"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab965d650ddf5d08e2e5a3132ee620601">&#9670;&#160;</a></span>shouldUseBoronRtcAlarmHibernate()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool anonymous_namespace{State_Sleep.cpp}::shouldUseBoronRtcAlarmHibernate </td>
+          <td>(</td>
+          <td class="paramtype">uint32_t</td>          <td class="paramname"><span class="paramname"><em>requestedSleepSec</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">time_t &amp;</td>          <td class="paramname"><span class="paramname"><em>rtcNow</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00255">255</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_state_machine_8h.html#aa2fc2ac89f9c96bbbad1d4086a8b296d">ab1805</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00201">isDeviceOsAtLeast6400()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00219">isRtcTimeValidForHibernate()</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>.</p>
 
 </div>
 </div>
 <a name="doc-var-members" id="doc-var-members"></a><h2 id="header-doc-var-members" class="groupheader">Variable Documentation</h2>
+<a id="a1de56a8bd1d2621ea1abe48305ab1d27" name="a1de56a8bd1d2621ea1abe48305ab1d27"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1de56a8bd1d2621ea1abe48305ab1d27">&#9670;&#160;</a></span>kGateBlockerLedger</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint8_t anonymous_namespace{State_Sleep.cpp}::kGateBlockerLedger = 0x02</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel constexpr">constexpr</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00155">155</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00160">gateBlockerReasonLabel()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>.</p>
+
+</div>
+</div>
+<a id="aefba2c3e1f6fa82f33ec78f0261b8fda" name="aefba2c3e1f6fa82f33ec78f0261b8fda"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aefba2c3e1f6fa82f33ec78f0261b8fda">&#9670;&#160;</a></span>kGateBlockerQueue</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint8_t anonymous_namespace{State_Sleep.cpp}::kGateBlockerQueue = 0x01</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel constexpr">constexpr</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00154">154</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00160">gateBlockerReasonLabel()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>.</p>
+
+</div>
+</div>
+<a id="aa4f80677571b111d9b02e6b473467381" name="aa4f80677571b111d9b02e6b473467381"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa4f80677571b111d9b02e6b473467381">&#9670;&#160;</a></span>kGateBlockerUninitialized</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint8_t anonymous_namespace{State_Sleep.cpp}::kGateBlockerUninitialized = 0xFF</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel constexpr">constexpr</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00158">158</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>.</p>
+
+</div>
+</div>
+<a id="acc4877e6c338621dcd5d9c22c72ec324" name="acc4877e6c338621dcd5d9c22c72ec324"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#acc4877e6c338621dcd5d9c22c72ec324">&#9670;&#160;</a></span>kGateBlockerUpdate</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint8_t anonymous_namespace{State_Sleep.cpp}::kGateBlockerUpdate = 0x08</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel constexpr">constexpr</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00157">157</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00160">gateBlockerReasonLabel()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>.</p>
+
+</div>
+</div>
+<a id="ad1c02098c789be36fd3e65d6aa71dff3" name="ad1c02098c789be36fd3e65d6aa71dff3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad1c02098c789be36fd3e65d6aa71dff3">&#9670;&#160;</a></span>kGateBlockerWebhook</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint8_t anonymous_namespace{State_Sleep.cpp}::kGateBlockerWebhook = 0x04</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel constexpr">constexpr</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00156">156</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00160">gateBlockerReasonLabel()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>.</p>
+
+</div>
+</div>
+<a id="ac8c209fc05f78841fc4198589f2b38a6" name="ac8c209fc05f78841fc4198589f2b38a6"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac8c209fc05f78841fc4198589f2b38a6">&#9670;&#160;</a></span>kGateBlockLogThresholdMs</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">unsigned long anonymous_namespace{State_Sleep.cpp}::kGateBlockLogThresholdMs = 10000UL</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel constexpr">constexpr</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00152">152</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>.</p>
+
+</div>
+</div>
 <a id="a9cd27f05d6bb0e4b58c9b5779a2b4165" name="a9cd27f05d6bb0e4b58c9b5779a2b4165"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a9cd27f05d6bb0e4b58c9b5779a2b4165">&#9670;&#160;</a></span>MODEM_UNSTABLE_RECOVERY_TEARDOWN_MS</h2>
 
@@ -333,9 +615,9 @@ Variables</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00021">21</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00020">20</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00110">maybeClearModemUnstable()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00109">maybeClearModemUnstable()</a>.</p>
 
 </div>
 </div>
@@ -359,9 +641,9 @@ Variables</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00020">20</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state___sleep_8cpp_source.html#l00019">19</a> of file <a class="el" href="_state___sleep_8cpp_source.html">State_Sleep.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00306">handleSleepingState()</a>.</p>
 
 </div>
 </div>

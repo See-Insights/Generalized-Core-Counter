@@ -10,6 +10,6 @@ var searchData=
   ['haspmicremediation_7',['hasPmicRemediation',['../struct_power_capabilities.html#af0707322e648cffde8d028c066897e4c',1,'PowerCapabilities']]],
   ['haspowersource_8',['hasPowerSource',['../struct_power_capabilities.html#ac56de5fe2548e19e2e33ebc2ea27dccf',1,'PowerCapabilities']]],
   ['hassoc_9',['hasSoc',['../struct_power_capabilities.html#afacd2b502f44ce1a6804299dd00d2e31',1,'PowerCapabilities']]],
-  ['hibernatedisabledforsession_10',['hibernateDisabledForSession',['../struct_session_state.html#ac03474741cb2abc800e6fcfedcba9939',1,'SessionState']]],
+  ['hasvalidledgerconfig_10',['hasValidLedgerConfig',['../classsys_status_data_1_1_sys_data.html#a429ef8bc43bd6798b8c78b75b64d6c31',1,'sysStatusData::SysData']]],
   ['hourlycount_11',['hourlyCount',['../classcurrent_status_data_1_1_current_data.html#afc17a6a54a16ef952620ae5efada0ddc',1,'currentStatusData::CurrentData']]]
 ];

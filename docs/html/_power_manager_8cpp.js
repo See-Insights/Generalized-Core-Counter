@@ -1,6 +1,5 @@
 var _power_manager_8cpp =
 [
-    [ "anonymous_namespace{PowerManager.cpp}::compactProfileLabel", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#a4b41efac56e70a8707ad53c066ad8ea5", null ],
     [ "anonymous_namespace{PowerManager.cpp}::configuredFallbackProfile", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#a9c7b27719e9a0067176aea9df8651605", null ],
     [ "anonymous_namespace{PowerManager.cpp}::selectInputProfile", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#aca3326c72903ef9d6c1e4a9038cfba37", null ],
     [ "anonymous_namespace{PowerManager.cpp}::shouldLogProfileDecision", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#ad8df3828526fad5c70b88814b780545b", null ],

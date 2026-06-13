@@ -1,11 +1,16 @@
 var namespaces_dup =
 [
+    [ "anonymous_namespace{Cloud.cpp}", "namespaceanonymous__namespace_02_cloud_8cpp_03.html", "namespaceanonymous__namespace_02_cloud_8cpp_03" ],
     [ "anonymous_namespace{ConfigApply.cpp}", "namespaceanonymous__namespace_02_config_apply_8cpp_03.html", [
       [ "getMergedBoolValue", "namespaceanonymous__namespace_02_config_apply_8cpp_03.html#a6f0db844a94f45001e94584d82046943", null ],
       [ "getMergedIntValue", "namespaceanonymous__namespace_02_config_apply_8cpp_03.html#a2dc8b88b0461af698f01773e88407246", null ],
       [ "getMergedStringValue", "namespaceanonymous__namespace_02_config_apply_8cpp_03.html#ac88f90d08274fa514ff7df25100e6ed8", null ],
       [ "getNestedMap", "namespaceanonymous__namespace_02_config_apply_8cpp_03.html#a31374c69c16e9d6aaf8721073ec520e5", null ],
-      [ "getTopLevelMap", "namespaceanonymous__namespace_02_config_apply_8cpp_03.html#a60abad9cbfe54e2c48afe42c7dc501ce", null ]
+      [ "getTopLevelMap", "namespaceanonymous__namespace_02_config_apply_8cpp_03.html#a60abad9cbfe54e2c48afe42c7dc501ce", null ],
+      [ "normalizeTimezoneInPlace", "namespaceanonymous__namespace_02_config_apply_8cpp_03.html#a94438c6b6feab38e3356ece7531dd684", null ]
+    ] ],
+    [ "anonymous_namespace{DeviceStatusPublisher.cpp}", "namespaceanonymous__namespace_02_device_status_publisher_8cpp_03.html", [
+      [ "ledgerHasUnsyncedWriteForDiag", "namespaceanonymous__namespace_02_device_status_publisher_8cpp_03.html#ace21b816cc80973f2b8fab27bdd768e5", null ]
     ] ],
     [ "anonymous_namespace{Generalized-Core-Counter.cpp}", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html", [
       [ "AppBreadcrumb", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4b", [
@@ -23,12 +28,24 @@ var namespaces_dup =
         [ "BREADCRUMB_REPORT_QUEUE_START", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baf28aa61195d5ba3b71bfcd0523162632", null ],
         [ "BREADCRUMB_REPORT_QUEUE_DONE", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4bad3613612c06773ecf887798e9eb85b41", null ],
         [ "BREADCRUMB_REPORT_LEDGER_START", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baff990d4c61f0dcc61659ce48e576c797", null ],
-        [ "BREADCRUMB_REPORT_LEDGER_DONE", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba30151a1db162f36d208cffb326a88e53", null ]
+        [ "BREADCRUMB_REPORT_LEDGER_DONE", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba30151a1db162f36d208cffb326a88e53", null ],
+        [ "BREADCRUMB_CLOUD_LOOP_ENTER", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4bad02de17c400ce2a8a414af329d5fae28", null ],
+        [ "BREADCRUMB_CLOUD_LOOP_EXIT", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba6368a22add05cfd0775286b8f8899f08", null ],
+        [ "BREADCRUMB_PUBLISH_QUEUE_ENTER", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4bad85e072c3b94ae5e27687056219a55d8", null ],
+        [ "BREADCRUMB_PUBLISH_QUEUE_EXIT", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba6bba39d6537711fc1f7623f989c60d2b", null ],
+        [ "BREADCRUMB_REPORT_POST_LEDGER", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba45060fe10da6798bb01c4abf4f7bc9eb", null ],
+        [ "BREADCRUMB_REPORT_EXIT", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4bab2081b1162ef33b0a5e958dcdbed92e8", null ],
+        [ "BREADCRUMB_IDLE_ENTRY", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4baf628b513b9eee4c435e05d3dc15b9d82", null ],
+        [ "BREADCRUMB_SLEEP_GATE_START", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4bac3be2436b553b71d3816e6b4644cf863", null ],
+        [ "BREADCRUMB_SLEEP_GATE_DONE", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba002966d231e74cac113cb450a305019f", null ],
+        [ "BREADCRUMB_SLEEP_CONFIG_START", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba86430188e9cf0b38197753a4c1f29ef3", null ],
+        [ "BREADCRUMB_SLEEP_SYSTEM_CALL", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a747ed59bc7ff9db8dac8459738c85c4ba9adc06a6f654093a04347f8bb7ae0ff2", null ]
       ] ],
       [ "AwakeWatchdogSleepStrategy", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a733878f37693926607ec59f8dfda41fd", [
         [ "AWAKE_WATCHDOG_SLEEP_CONFIG_PAUSE", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a733878f37693926607ec59f8dfda41fda6ef51118156521970c1902e234b6c2ef", null ],
         [ "AWAKE_WATCHDOG_SLEEP_MANUAL_STOP", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a733878f37693926607ec59f8dfda41fda2c4b0fa5a2f3080d91de6d7b11d00e12", null ]
       ] ],
+      [ "ab1805WakeReasonName", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a57b3da200e533bab4846da20e7117794", null ],
       [ "appBreadcrumbName", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a555d15a7ec243d93b6d9be9c1b6f1fa8", null ],
       [ "awakeWatchdogSleepStrategyName", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#aa780afa2786eda3a2b492233ee242275", null ],
       [ "batteryTierShortName", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a898666f89a1c8e56926acc9d223bc0e1", null ],
@@ -40,6 +57,7 @@ var namespaces_dup =
       [ "persistConnectivityFailsafeState", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a650cc13442db2bb2b127ed466d7acb35", null ],
       [ "stateShortName", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a12b2b29836fbe05e1de3b987f678777f", null ],
       [ "AWAKE_WATCHDOG_TIMEOUT_MS", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#aaa69fbc214ee5f7e35b33c9cfdd6e027", null ],
+      [ "REPORT_FORENSICS_ABNORMAL_WARN_THRESHOLD_MS", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#af4f0c316c4af5c20b9957e17bd196065", null ],
       [ "REPORT_FORENSICS_SLOW_LOG_THRESHOLD_MS", "namespaceanonymous__namespace_02_generalized-_core-_counter_8cpp_03.html#a361be2e1010a6c9c37a574834a4564e3", null ]
     ] ],
     [ "anonymous_namespace{LedgerClient.cpp}", "namespaceanonymous__namespace_02_ledger_client_8cpp_03.html", [
@@ -48,7 +66,6 @@ var namespaces_dup =
     ] ],
     [ "anonymous_namespace{LocalTimeCache.cpp}", "namespaceanonymous__namespace_02_local_time_cache_8cpp_03.html", null ],
     [ "anonymous_namespace{PowerManager.cpp}", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html", [
-      [ "compactProfileLabel", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#a4b41efac56e70a8707ad53c066ad8ea5", null ],
       [ "configuredFallbackProfile", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#a9c7b27719e9a0067176aea9df8651605", null ],
       [ "selectInputProfile", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#aca3326c72903ef9d6c1e4a9038cfba37", null ],
       [ "shouldLogProfileDecision", "namespaceanonymous__namespace_02_power_manager_8cpp_03.html#ad8df3828526fad5c70b88814b780545b", null ],
@@ -83,12 +100,23 @@ var namespaces_dup =
         [ "MODEM_UNSTABLE_REASON_CONNECT_TIMEOUT", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#afb8230f5c47a27c78b095f28b4d35d9da6fcd616236c8108757d5b7ea3cfeb39d", null ]
       ] ],
       [ "batteryTierLabel", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a852e47d7206383563dcb1e7e301c6e98", null ],
+      [ "clearAb1805StaleAlarmInterrupts", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a0ec7e4894e73fae7b3b3379c92e8378b", null ],
       [ "computeCloudSyncTimeoutMs", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a13e9915406af72c4d32f922a088d826d", null ],
       [ "connectionModeLabel", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#aa507bd767963a02cf16d555d7431c3da", null ],
+      [ "gateBlockerReasonLabel", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#ac97ad6c9d2761efe8d813abc923410f4", null ],
+      [ "isDeviceOsAtLeast6400", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#ad193dd0c768b360b4715ed2d34aec4c5", null ],
+      [ "isRtcTimeValidForHibernate", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#ab666b7e07c5e13092d87a9d2446a527c", null ],
       [ "logTeardownContext", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#abad9bf1b7f805aea7c5db5b119e27761", null ],
       [ "logWakeSummary", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a78bb128d7c04dccc8b98b740dc79d3d2", null ],
       [ "markModemUnstable", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#ad1d08f76587dad375020db5655229ae6", null ],
       [ "maybeClearModemUnstable", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a0e57a1cbfacc48cf8f124e62fb425d5f", null ],
+      [ "shouldUseBoronRtcAlarmHibernate", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#ab965d650ddf5d08e2e5a3132ee620601", null ],
+      [ "kGateBlockerLedger", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a1de56a8bd1d2621ea1abe48305ab1d27", null ],
+      [ "kGateBlockerQueue", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#aefba2c3e1f6fa82f33ec78f0261b8fda", null ],
+      [ "kGateBlockerUninitialized", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#aa4f80677571b111d9b02e6b473467381", null ],
+      [ "kGateBlockerUpdate", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#acc4877e6c338621dcd5d9c22c72ec324", null ],
+      [ "kGateBlockerWebhook", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#ad1c02098c789be36fd3e65d6aa71dff3", null ],
+      [ "kGateBlockLogThresholdMs", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#ac8c209fc05f78841fc4198589f2b38a6", null ],
       [ "MODEM_UNSTABLE_RECOVERY_TEARDOWN_MS", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a9cd27f05d6bb0e4b58c9b5779a2b4165", null ],
       [ "MODEM_UNSTABLE_SLOW_TEARDOWN_MS", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a96c86262c74f9ef5b1ad5c27294e238d", null ]
     ] ],
@@ -99,12 +127,14 @@ var namespaces_dup =
       [ "TIER3_TRIP_COUNT", "namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#af396c832c1943dc159954049a9503303", null ],
       [ "TIER3_WINDOW_MS", "namespaceanonymous__namespace_02_thrash_guard_8cpp_03.html#afbb332fff9abe10374e0a8920493b9d2", null ]
     ] ],
+    [ "Config", "namespace_config.html", "namespace_config" ],
     [ "Connectivity", "namespace_connectivity.html", [
       [ "isRadioPoweredOn", "namespace_connectivity.html#a834c90315e1ac893f48fc5dfccbae3cf", null ],
       [ "requestCloudDisconnectOnly", "namespace_connectivity.html#a0e2777379673ce5006c16847bc640547", null ],
       [ "requestFullDisconnectAndRadioOff", "namespace_connectivity.html#a50bb34193371f247ff8639d8fba69409", null ],
       [ "requestRadioPowerOff", "namespace_connectivity.html#a2a57cc42c82eb80256258e783f248508", null ]
     ] ],
+    [ "ConnectivityFailsafeTest", "namespace_connectivity_failsafe_test.html", null ],
     [ "ConnectivityPolicy", "namespace_connectivity_policy.html", [
       [ "BATTERY_WAKE_MAX_RETRIES", "namespace_connectivity_policy.html#aab6a8ffd368bd5a38fa7027aa9132dc4", null ],
       [ "BATTERY_WAKE_QUICKSTART_DELAY_MS", "namespace_connectivity_policy.html#accb711c2bdb603b993647a684f509e61", null ],

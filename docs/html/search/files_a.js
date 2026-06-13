@@ -1,20 +1,15 @@
 var searchData=
 [
-  ['sensordata_2eh_0',['SensorData.h',['../_sensor_data_8h.html',1,'']]],
-  ['sensordefinitions_2eh_1',['SensorDefinitions.h',['../_sensor_definitions_8h.html',1,'']]],
-  ['sensorfactory_2eh_2',['SensorFactory.h',['../_sensor_factory_8h.html',1,'']]],
-  ['sensormanager_2ecpp_3',['SensorManager.cpp',['../_sensor_manager_8cpp.html',1,'']]],
-  ['sensormanager_2eh_4',['SensorManager.h',['../_sensor_manager_8h.html',1,'']]],
-  ['settings_2eh_5',['Settings.h',['../_settings_8h.html',1,'']]],
-  ['state_5fcommon_2eh_6',['State_Common.h',['../_state___common_8h.html',1,'']]],
-  ['state_5fconnect_2ecpp_7',['State_Connect.cpp',['../_state___connect_8cpp.html',1,'']]],
-  ['state_5ferror_2ecpp_8',['State_Error.cpp',['../_state___error_8cpp.html',1,'']]],
-  ['state_5fidle_2ecpp_9',['State_Idle.cpp',['../_state___idle_8cpp.html',1,'']]],
-  ['state_5fmodes_2ecpp_10',['State_Modes.cpp',['../_state___modes_8cpp.html',1,'']]],
-  ['state_5freport_2ecpp_11',['State_Report.cpp',['../_state___report_8cpp.html',1,'']]],
-  ['state_5fsleep_2ecpp_12',['State_Sleep.cpp',['../_state___sleep_8cpp.html',1,'']]],
-  ['statehandlers_2ecpp_13',['StateHandlers.cpp',['../_state_handlers_8cpp.html',1,'']]],
-  ['statehandlers_2eh_14',['StateHandlers.h',['../_state_handlers_8h.html',1,'']]],
-  ['statemachine_2eh_15',['StateMachine.h',['../_state_machine_8h.html',1,'']]],
-  ['statemanager_2eh_16',['StateManager.h',['../_state_manager_8h.html',1,'']]]
+  ['particle_5ffunctions_2ecpp_0',['Particle_Functions.cpp',['../_particle___functions_8cpp.html',1,'']]],
+  ['particle_5ffunctions_2eh_1',['Particle_Functions.h',['../_particle___functions_8h.html',1,'']]],
+  ['pirsensor_2ecpp_2',['PIRSensor.cpp',['../_p_i_r_sensor_8cpp.html',1,'']]],
+  ['pirsensor_2eh_3',['PIRSensor.h',['../_p_i_r_sensor_8h.html',1,'']]],
+  ['power_2dmanagement_2emd_4',['power-management.md',['../power-management_8md.html',1,'']]],
+  ['powerdiagnostics_2ecpp_5',['PowerDiagnostics.cpp',['../_power_diagnostics_8cpp.html',1,'']]],
+  ['powerdiagnostics_2eh_6',['PowerDiagnostics.h',['../_power_diagnostics_8h.html',1,'']]],
+  ['powermanager_2ecpp_7',['PowerManager.cpp',['../_power_manager_8cpp.html',1,'']]],
+  ['powermanager_2eh_8',['PowerManager.h',['../_power_manager_8h.html',1,'']]],
+  ['powerplatform_2ecpp_9',['PowerPlatform.cpp',['../_power_platform_8cpp.html',1,'']]],
+  ['powerplatform_2eh_10',['PowerPlatform.h',['../_power_platform_8h.html',1,'']]],
+  ['projectconfig_2eh_11',['ProjectConfig.h',['../_project_config_8h.html',1,'']]]
 ];

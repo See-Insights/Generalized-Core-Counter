@@ -257,6 +257,11 @@ Occupancy close handling now validates session durations before adding them to t
 
 PMIC contradiction forensics are intended for field investigations where charging behavior changes after a reset and serial logs may be unavailable.
 
+Permanent power-profile architecture notes live in
+[`docs/architecture/power-management.md`](docs/architecture/power-management.md).
+The June 2026 Boron USB/Solar charging root cause is documented in
+[`docs/postmortems/2026-06-pmic-charging-root-cause.md`](docs/postmortems/2026-06-pmic-charging-root-cause.md).
+
 Contradiction definition:
 
 - SOC below `20%`
@@ -277,6 +282,8 @@ The detector records evidence only on the transition from inactive to active so 
 
 - <a href="CHANGELOG.md">CHANGELOG.md</a>
 - <a href="docs/architecture-overview.md">docs/architecture-overview.md</a>
+- <a href="docs/architecture/power-management.md">docs/architecture/power-management.md</a>
+- <a href="docs/postmortems/2026-06-pmic-charging-root-cause.md">docs/postmortems/2026-06-pmic-charging-root-cause.md</a>
 - <a href="docs/recovery-architecture.md">docs/recovery-architecture.md</a>
 - <a href="docs/bench-validation.md">docs/bench-validation.md</a>
 - Generated API reference: `docs/html/index.html`

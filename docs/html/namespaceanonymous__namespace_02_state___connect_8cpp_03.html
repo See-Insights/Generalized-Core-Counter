@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;13.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;18</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -97,17 +97,61 @@ $(function(){initNavTree('namespaceanonymous__namespace_02_state___connect_8cpp_
 Classes</h2></td></tr>
 <tr class="memitem:ConnectBudgetContext" id="r_ConnectBudgetContext"><td class="memItemLeft">struct &#160;</td><td class="memItemRight"><a class="el" href="structanonymous__namespace_02_state___connect_8cpp_03_1_1_connect_budget_context.html">ConnectBudgetContext</a></td></tr>
 </table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 id="header-enum-members" class="groupheader"><a id="enum-members" name="enum-members"></a>
+Enumerations</h2></td></tr>
+<tr class="memitem:a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6" id="r_a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6"><td class="memItemLeft">enum class &#160;</td><td class="memItemRight"><a class="el" href="#a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6">ConnAcquirePhase</a> : uint8_t { <a class="el" href="#a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6af0ec7ccf80520b587d1815feb53f6d3a">CELLULAR_ACQUIRE</a> = 0
+, <a class="el" href="#a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6a5ba96f021d78bf44d86ead0848a579fd">NETWORK_ACQUIRE</a>
+, <a class="el" href="#a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6a162022a275cdec49549cc125127c273f">CLOUD_ACQUIRE</a>
+, <a class="el" href="#a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6aa5afd6edd5336d91316964e493936858">CONNECTED</a>
+ }</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:a1c956caa2f1f116bf52948f8c8c8cc2c" id="r_a1c956caa2f1f116bf52948f8c8c8cc2c"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a1c956caa2f1f116bf52948f8c8c8cc2c">armActiveConnectAttempt</a> (unsigned long budgetMs)</td></tr>
+<tr class="memitem:a1219041cc65c51da5ef062126614a9ac" id="r_a1219041cc65c51da5ef062126614a9ac"><td class="memItemLeft"><a class="el" href="#a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6">ConnAcquirePhase</a>&#160;</td><td class="memItemRight"><a class="el" href="#a1219041cc65c51da5ef062126614a9ac">classifyConnAcquirePhase</a> (bool cellularReady, bool networkReady, bool cloudConnected)</td></tr>
 <tr class="memitem:a13561af897c1b5dbb175e8c61086fd0b" id="r_a13561af897c1b5dbb175e8c61086fd0b"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a13561af897c1b5dbb175e8c61086fd0b">clearActiveConnectAttempt</a> ()</td></tr>
+<tr class="memitem:ae998fe2bcca7eccdb875973ed5d57c43" id="r_ae998fe2bcca7eccdb875973ed5d57c43"><td class="memItemLeft">const char *&#160;</td><td class="memItemRight"><a class="el" href="#ae998fe2bcca7eccdb875973ed5d57c43">connAcquirePhaseLabel</a> (<a class="el" href="#a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6">ConnAcquirePhase</a> phase)</td></tr>
 <tr class="memitem:a605cca907481b6d33dc1959d33d5fb63" id="r_a605cca907481b6d33dc1959d33d5fb63"><td class="memItemLeft"><a class="el" href="structanonymous__namespace_02_state___connect_8cpp_03_1_1_connect_budget_context.html">ConnectBudgetContext</a>&#160;</td><td class="memItemRight"><a class="el" href="#a605cca907481b6d33dc1959d33d5fb63">evaluateConnectBudget</a> ()</td></tr>
 <tr class="memitem:acb98fba9d672339ef431d4a93f8af782" id="r_acb98fba9d672339ef431d4a93f8af782"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#acb98fba9d672339ef431d4a93f8af782">markModemUnstableFromConnectTimeout</a> ()</td></tr>
+<tr class="memitem:a116711a27f836b86a75931829fa17986" id="r_a116711a27f836b86a75931829fa17986"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a116711a27f836b86a75931829fa17986">requestCloudAcquireStage1Recovery</a> ()</td></tr>
+<tr class="memitem:a51c7a1e4ce4da2535816cd7c3de131f4" id="r_a51c7a1e4ce4da2535816cd7c3de131f4"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a51c7a1e4ce4da2535816cd7c3de131f4">requestCloudAcquireStage2Recovery</a> ()</td></tr>
+<tr class="memitem:a47187f3eb84ab425a5cdfb9e8cb4de3c" id="r_a47187f3eb84ab425a5cdfb9e8cb4de3c"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a47187f3eb84ab425a5cdfb9e8cb4de3c">sampleConnectionSignal</a> (int &amp;strengthPct, int &amp;qualityPct, bool &amp;valid)</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-var-members" class="groupheader"><a id="var-members" name="var-members"></a>
 Variables</h2></td></tr>
 <tr class="memitem:ad611f23ca7d942d8b0f943b14eaafd8a" id="r_ad611f23ca7d942d8b0f943b14eaafd8a"><td class="memItemLeft">constexpr uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#ad611f23ca7d942d8b0f943b14eaafd8a">MODEM_UNSTABLE_CONNECT_TIMEOUT_THRESHOLD</a> = 2</td></tr>
 </table>
+<a name="doc-enum-members" id="doc-enum-members"></a><h2 id="header-doc-enum-members" class="groupheader">Enumeration Type Documentation</h2>
+<a id="a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6" name="a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6">&#9670;&#160;</a></span>ConnAcquirePhase</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum class anonymous_namespace{State_Connect.cpp}::ConnAcquirePhase : uint8_t</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel strong">strong</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6af0ec7ccf80520b587d1815feb53f6d3a" name="a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6af0ec7ccf80520b587d1815feb53f6d3a"></a>CELLULAR_ACQUIRE&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6a5ba96f021d78bf44d86ead0848a579fd" name="a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6a5ba96f021d78bf44d86ead0848a579fd"></a>NETWORK_ACQUIRE&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6a162022a275cdec49549cc125127c273f" name="a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6a162022a275cdec49549cc125127c273f"></a>CLOUD_ACQUIRE&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6aa5afd6edd5336d91316964e493936858" name="a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6aa5afd6edd5336d91316964e493936858"></a>CONNECTED&#160;</td><td class="fielddoc"></td></tr>
+</table>
+
+<p class="definition">Definition at line <a class="el" href="_state___connect_8cpp_source.html#l00023">23</a> of file <a class="el" href="_state___connect_8cpp_source.html">State_Connect.cpp</a>.</p>
+
+</div>
+</div>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
 <a id="a1c956caa2f1f116bf52948f8c8c8cc2c" name="a1c956caa2f1f116bf52948f8c8c8cc2c"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a1c956caa2f1f116bf52948f8c8c8cc2c">&#9670;&#160;</a></span>armActiveConnectAttempt()</h2>
@@ -124,11 +168,43 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state___connect_8cpp_source.html#l00056">56</a> of file <a class="el" href="_state___connect_8cpp_source.html">State_Connect.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state___connect_8cpp_source.html#l00126">126</a> of file <a class="el" href="_state___connect_8cpp_source.html">State_Connect.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00136">session</a>.</p>
+<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00131">session</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00139">handleConnectingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00209">handleConnectingState()</a>.</p>
+
+</div>
+</div>
+<a id="a1219041cc65c51da5ef062126614a9ac" name="a1219041cc65c51da5ef062126614a9ac"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1219041cc65c51da5ef062126614a9ac">&#9670;&#160;</a></span>classifyConnAcquirePhase()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="#a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6">ConnAcquirePhase</a> anonymous_namespace{State_Connect.cpp}::classifyConnAcquirePhase </td>
+          <td>(</td>
+          <td class="paramtype">bool</td>          <td class="paramname"><span class="paramname"><em>cellularReady</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool</td>          <td class="paramname"><span class="paramname"><em>networkReady</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool</td>          <td class="paramname"><span class="paramname"><em>cloudConnected</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state___connect_8cpp_source.html#l00045">45</a> of file <a class="el" href="_state___connect_8cpp_source.html">State_Connect.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_state___connect_8cpp_source.html#l00024">CELLULAR_ACQUIRE</a>, <a class="el" href="_state___connect_8cpp_source.html#l00026">CLOUD_ACQUIRE</a>, <a class="el" href="_state___connect_8cpp_source.html#l00027">CONNECTED</a>, and <a class="el" href="_state___connect_8cpp_source.html#l00025">NETWORK_ACQUIRE</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00209">handleConnectingState()</a>.</p>
 
 </div>
 </div>
@@ -147,11 +223,34 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state___connect_8cpp_source.html#l00061">61</a> of file <a class="el" href="_state___connect_8cpp_source.html">State_Connect.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state___connect_8cpp_source.html#l00131">131</a> of file <a class="el" href="_state___connect_8cpp_source.html">State_Connect.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00136">session</a>.</p>
+<p class="reference">References <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00131">session</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00139">handleConnectingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00209">handleConnectingState()</a>.</p>
+
+</div>
+</div>
+<a id="ae998fe2bcca7eccdb875973ed5d57c43" name="ae998fe2bcca7eccdb875973ed5d57c43"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae998fe2bcca7eccdb875973ed5d57c43">&#9670;&#160;</a></span>connAcquirePhaseLabel()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const char * anonymous_namespace{State_Connect.cpp}::connAcquirePhaseLabel </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="#a6ce3a06e2fa2f4a6ca89b1ac1d65a3a6">ConnAcquirePhase</a></td>          <td class="paramname"><span class="paramname"><em>phase</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state___connect_8cpp_source.html#l00030">30</a> of file <a class="el" href="_state___connect_8cpp_source.html">State_Connect.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_state___connect_8cpp_source.html#l00024">CELLULAR_ACQUIRE</a>, <a class="el" href="_state___connect_8cpp_source.html#l00026">CLOUD_ACQUIRE</a>, <a class="el" href="_state___connect_8cpp_source.html#l00027">CONNECTED</a>, and <a class="el" href="_state___connect_8cpp_source.html#l00025">NETWORK_ACQUIRE</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00209">handleConnectingState()</a>.</p>
 
 </div>
 </div>
@@ -170,11 +269,11 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state___connect_8cpp_source.html#l00032">32</a> of file <a class="el" href="_state___connect_8cpp_source.html">State_Connect.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state___connect_8cpp_source.html#l00102">102</a> of file <a class="el" href="_state___connect_8cpp_source.html">State_Connect.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_state___connect_8cpp_source.html#l00028">anonymous_namespace{State_Connect.cpp}::ConnectBudgetContext::allowDeepAttempt</a>, <a class="el" href="_state___connect_8cpp_source.html#l00026">anonymous_namespace{State_Connect.cpp}::ConnectBudgetContext::attemptCounter</a>, <a class="el" href="_state___connect_8cpp_source.html#l00024">anonymous_namespace{State_Connect.cpp}::ConnectBudgetContext::budgetMs</a>, <a class="el" href="_state___connect_8cpp_source.html#l00029">anonymous_namespace{State_Connect.cpp}::ConnectBudgetContext::configuredBudgetBelowMinimum</a>, <a class="el" href="_state___connect_8cpp_source.html#l00025">anonymous_namespace{State_Connect.cpp}::ConnectBudgetContext::configuredBudgetSec</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00066">ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MAX_SEC</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00065">ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MIN_SEC</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00063">ConnectivityPolicy::CONNECT_BUDGET_DEEP_MS</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00062">ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_state___connect_8cpp_source.html#l00027">anonymous_namespace{State_Connect.cpp}::ConnectBudgetContext::currentSoC</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00081">ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00082">ConnectivityPolicy::DEEP_ATTEMPT_SOC_THRESHOLD</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
+<p class="reference">References <a class="el" href="_state___connect_8cpp_source.html#l00098">anonymous_namespace{State_Connect.cpp}::ConnectBudgetContext::allowDeepAttempt</a>, <a class="el" href="_state___connect_8cpp_source.html#l00096">anonymous_namespace{State_Connect.cpp}::ConnectBudgetContext::attemptCounter</a>, <a class="el" href="_state___connect_8cpp_source.html#l00094">anonymous_namespace{State_Connect.cpp}::ConnectBudgetContext::budgetMs</a>, <a class="el" href="_state___connect_8cpp_source.html#l00099">anonymous_namespace{State_Connect.cpp}::ConnectBudgetContext::configuredBudgetBelowMinimum</a>, <a class="el" href="_state___connect_8cpp_source.html#l00095">anonymous_namespace{State_Connect.cpp}::ConnectBudgetContext::configuredBudgetSec</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00066">ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MAX_SEC</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00065">ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MIN_SEC</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00063">ConnectivityPolicy::CONNECT_BUDGET_DEEP_MS</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00062">ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_state___connect_8cpp_source.html#l00097">anonymous_namespace{State_Connect.cpp}::ConnectBudgetContext::currentSoC</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00081">ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD</a>, <a class="el" href="_connectivity_policy_8h_source.html#l00082">ConnectivityPolicy::DEEP_ATTEMPT_SOC_THRESHOLD</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00139">handleConnectingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00209">handleConnectingState()</a>.</p>
 
 </div>
 </div>
@@ -193,11 +292,87 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_state___connect_8cpp_source.html#l00066">66</a> of file <a class="el" href="_state___connect_8cpp_source.html">State_Connect.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_state___connect_8cpp_source.html#l00136">136</a> of file <a class="el" href="_state___connect_8cpp_source.html">State_Connect.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_state___connect_8cpp_source.html#l00021">MODEM_UNSTABLE_CONNECT_TIMEOUT_THRESHOLD</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00136">session</a>.</p>
+<p class="reference">References <a class="el" href="_state___connect_8cpp_source.html#l00021">MODEM_UNSTABLE_CONNECT_TIMEOUT_THRESHOLD</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00131">session</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00139">handleConnectingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00209">handleConnectingState()</a>.</p>
+
+</div>
+</div>
+<a id="a116711a27f836b86a75931829fa17986" name="a116711a27f836b86a75931829fa17986"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a116711a27f836b86a75931829fa17986">&#9670;&#160;</a></span>requestCloudAcquireStage1Recovery()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void anonymous_namespace{State_Connect.cpp}::requestCloudAcquireStage1Recovery </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state___connect_8cpp_source.html#l00077">77</a> of file <a class="el" href="_state___connect_8cpp_source.html">State_Connect.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_connectivity_8h_source.html#l00046">Connectivity::requestCloudDisconnectOnly()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00209">handleConnectingState()</a>.</p>
+
+</div>
+</div>
+<a id="a51c7a1e4ce4da2535816cd7c3de131f4" name="a51c7a1e4ce4da2535816cd7c3de131f4"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a51c7a1e4ce4da2535816cd7c3de131f4">&#9670;&#160;</a></span>requestCloudAcquireStage2Recovery()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void anonymous_namespace{State_Connect.cpp}::requestCloudAcquireStage2Recovery </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state___connect_8cpp_source.html#l00082">82</a> of file <a class="el" href="_state___connect_8cpp_source.html">State_Connect.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_connectivity_8h_source.html#l00025">Connectivity::requestRadioPowerOff()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00209">handleConnectingState()</a>.</p>
+
+</div>
+</div>
+<a id="a47187f3eb84ab425a5cdfb9e8cb4de3c" name="a47187f3eb84ab425a5cdfb9e8cb4de3c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a47187f3eb84ab425a5cdfb9e8cb4de3c">&#9670;&#160;</a></span>sampleConnectionSignal()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void anonymous_namespace{State_Connect.cpp}::sampleConnectionSignal </td>
+          <td>(</td>
+          <td class="paramtype">int &amp;</td>          <td class="paramname"><span class="paramname"><em>strengthPct</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int &amp;</td>          <td class="paramname"><span class="paramname"><em>qualityPct</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool &amp;</td>          <td class="paramname"><span class="paramname"><em>valid</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_state___connect_8cpp_source.html#l00060">60</a> of file <a class="el" href="_state___connect_8cpp_source.html">State_Connect.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00209">handleConnectingState()</a>.</p>
 
 </div>
 </div>
@@ -224,7 +399,7 @@ Variables</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_state___connect_8cpp_source.html#l00021">21</a> of file <a class="el" href="_state___connect_8cpp_source.html">State_Connect.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00066">markModemUnstableFromConnectTimeout()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00136">markModemUnstableFromConnectTimeout()</a>.</p>
 
 </div>
 </div>

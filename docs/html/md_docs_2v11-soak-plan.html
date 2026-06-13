@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;13.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;18</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -92,8 +92,8 @@ $(function(){initNavTree('md_docs_2v11-soak-plan.html','',''); });
   <div class="headertitle"><div class="title">v11 Soak Plan </div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p><a class="anchor" id="autotoc_md228"></a></p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md229"></a>
+<div class="textblock"><p><a class="anchor" id="autotoc_md325"></a></p>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md326"></a>
 Scope</h1>
 <p>This soak validates release <span class="tt">11.0.1</span> as the connectivity resiliency candidate.</p>
 <p>Deployment plan:</p>
@@ -102,7 +102,7 @@ Scope</h1>
 <li><span class="tt">6</span> Borons in North Carolina</li>
 </ul>
 <p>The soak is intended to validate resiliency, observability, and operational clarity. It is not intended to validate a new architecture or a large feature expansion.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md230"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md327"></a>
 Preconditions</h1>
 <ul>
 <li>Firmware version reports <span class="tt">11.0.1</span>.</li>
@@ -112,7 +112,7 @@ Preconditions</h1>
 <li><span class="tt"><a class="el" href="_build_profile_8h.html#ace016f8be71ba4de13d0741f003ce9a1" title="Bench-only override for connectivity failsafe timing.">CONNECTIVITY_FAILSAFE_TEST_MODE</a></span> is disabled.</li>
 <li>Startup status includes <span class="tt">failsafeStage</span>, <span class="tt">failsafeCount</span>, <span class="tt">lastConnectionAgeSec</span>, and <span class="tt">failsafeTest</span>.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md231"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md328"></a>
 Primary Success Criteria</h1>
 <ul>
 <li>No evidence of test-mode timing in production logs.</li>
@@ -121,7 +121,7 @@ Primary Success Criteria</h1>
 <li>Devices in marginal connectivity can recover without entering unstable reset loops.</li>
 <li>Ledger-backed configuration continues to apply cleanly with no new sync regressions.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md232"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md329"></a>
 Monitoring Checklist</h1>
 <p>Review these signals daily during soak:</p>
 <ul>
@@ -134,7 +134,7 @@ Monitoring Checklist</h1>
 <li>queue drain and teardown timing</li>
 <li>battery state and any unexpected drop correlated with repeated recovery actions</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md233"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md330"></a>
 Escalation Guidance</h1>
 <p>Investigate immediately if any device shows:</p>
 <ul>
@@ -144,28 +144,28 @@ Escalation Guidance</h1>
 <li>repeated long wake cycles dominated by connect or teardown time</li>
 <li>abnormal battery drain after the v11 rollout</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md234"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md331"></a>
 Suggested Soak Cadence</h1>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md235"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md332"></a>
 Day 0</h2>
 <ul>
 <li>Confirm first boot after deployment.</li>
 <li>Confirm ledger sync and device-status publication.</li>
 <li>Confirm expected operating mode and local timezone.</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md236"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md333"></a>
 Days 1-3</h2>
 <ul>
 <li>Review daily connection age, alert activity, and wake-cycle summaries.</li>
 <li>Compare Boron behavior against the Photon 2 baseline.</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md237"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md334"></a>
 Days 4-7</h2>
 <ul>
 <li>Focus on stability trends rather than single events.</li>
 <li>Watch for any device whose recovery count continues to grow without clearing.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md238"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md335"></a>
 Rollback Criteria</h1>
 <p>Rollback to the previous production release if any of the following is observed:</p>
 <ul>
@@ -175,7 +175,7 @@ Rollback Criteria</h1>
 <li>production devices show test-mode leakage</li>
 </ul>
 <p>Recommended rollback target: release <span class="tt">10.00</span>.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md239"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md336"></a>
 Post-Soak Decision</h1>
 <p>Promote v11 beyond soak only if:</p>
 <ul>

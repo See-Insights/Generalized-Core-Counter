@@ -50,7 +50,6 @@ void logAppliedProfileConfig(PowerInputProfile profile,
                              int sourceMinVoltageMv,
                              int chargeCurrentMa,
                              int chargeVoltageMv,
-                             bool useVinWithUsbHost,
                              int systemResult) {
   const PowerSourceSnapshot snapshot = readPowerSource();
   PMIC pmic(true);
@@ -88,6 +87,10 @@ SystemPowerConfiguration makeUsbBenchConfiguration() {
 
 SystemPowerConfiguration makeSolarConfiguration() {
   SystemPowerConfiguration conf;
+  // Do not enable USE_VIN_SETTINGS_WITH_USB_HOST here. On Boron / Device OS
+  // 6.4.1 this can remap a real USB_HOST source to VIN, causing mixed
+  // USB/Solar deployments to apply the 5080mV SOLAR VINDPM threshold and
+  // throttle USB charging.
   conf.powerSourceMaxCurrent(SOLAR_MAX_CURRENT_MA)
       .powerSourceMinVoltage(SOLAR_MIN_VOLTAGE_MV)
       .batteryChargeCurrent(SOLAR_CHARGE_CURRENT_MA)
@@ -192,7 +195,6 @@ PowerConfigurationApplyResult applyInputProfile(PowerInputProfile profile) {
                            USB_BENCH_MIN_VOLTAGE_MV,
                            USB_BENCH_CHARGE_CURRENT_MA,
                            USB_BENCH_CHARGE_VOLTAGE_MV,
-                           false,
                            result.systemResult);
     return result;
 
@@ -204,7 +206,6 @@ PowerConfigurationApplyResult applyInputProfile(PowerInputProfile profile) {
                            SOLAR_MIN_VOLTAGE_MV,
                            SOLAR_CHARGE_CURRENT_MA,
                            SOLAR_CHARGE_VOLTAGE_MV,
-                           true,
                            result.systemResult);
     return result;
 

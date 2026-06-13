@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;13.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;18</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -92,26 +92,26 @@ $(function(){initNavTree('md_docs_2recovery-architecture.html','',''); });
   <div class="headertitle"><div class="title">Recovery Architecture </div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p><a class="anchor" id="autotoc_md215"></a></p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md216"></a>
+<div class="textblock"><p><a class="anchor" id="autotoc_md271"></a></p>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md272"></a>
 Purpose</h1>
 <p>The recovery architecture exists to keep unattended outdoor devices safe under prolonged poor connectivity without letting the modem or cloud stack consume unbounded time or battery.</p>
 <p>The design is layered. Short-term protections run every wake cycle. Long-term protections act only after a device has gone an unusually long time without a successful cloud connection.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md217"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md273"></a>
 Short-Term Protection Layers</h1>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md218"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md274"></a>
 Bounded connect attempts</h2>
 <p>Each wake cycle has a bounded connection budget. The device can use a normal connect budget or, periodically, a deeper budget that is long enough to allow modem behaviors that sometimes recover marginal cellular situations.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md219"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md275"></a>
 Bounded service window</h2>
 <p>After a connection succeeds, cloud work is limited by a service gate. This keeps queue drain, ledger sync, webhook response waits, and OTA checks from holding the device awake indefinitely.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md220"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md276"></a>
 Bounded teardown</h2>
 <p>Disconnect and modem power-down have separate budgets. If cloud or radio teardown exceeds those budgets, the device raises the appropriate alert and moves toward a safe state instead of waiting forever.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md221"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md277"></a>
 Thrash protection</h2>
 <p><span class="tt"><a class="el" href="class_thrash_guard.html">ThrashGuard</a></span> watches for states that stop making progress. It escalates through backoff, forced sleep/disconnect, and reset depending on severity and repetition.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md222"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md278"></a>
 Long-Duration Connectivity Failsafe</h1>
 <p>The long-duration failsafe handles a different class of problem: the device keeps cycling normally, but it has not successfully connected to Particle for many hours.</p>
 <p>Production thresholds:</p>
@@ -127,11 +127,11 @@ Long-Duration Connectivity Failsafe</h1>
 <li>Stage 3: AB1805 <span class="tt">deepPowerDown()</span></li>
 </ol>
 <p>The stage and action count are persisted in <span class="tt"><a class="el" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a></span>, so escalation can continue across resets. A successful cloud connection clears the recovery state.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md223"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md279"></a>
 Why The Supervisor Defers During Active Connect</h1>
 <p>The long-duration failsafe is intentionally higher level than <span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a549bd89b38411c3eb84cead55c7df867">CONNECTING_STATE</a></span>. It should not interrupt a connection attempt that is still within the policy budget for the current wake.</p>
 <p>v11 explicitly enforces that rule. If <span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a549bd89b38411c3eb84cead55c7df867">CONNECTING_STATE</a></span> still owns an active, in-budget attempt, the supervisor logs a defer reason and waits. This prevents recovery logic from fighting normal recovery work.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md224"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md280"></a>
 Defer Reasons</h1>
 <p>The supervisor may intentionally defer instead of escalating. Common defer reasons include:</p>
 <ul>
@@ -143,7 +143,7 @@ Defer Reasons</h1>
 <li>closed-hours long sleep</li>
 </ul>
 <p>Defer reasons are logged separately from overall eligibility so operators can distinguish healthy intentional inactivity from an actual recovery failure.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md225"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md281"></a>
 Bench Validation Mode</h1>
 <p><span class="tt"><a class="el" href="_build_profile_8h.html#ace016f8be71ba4de13d0741f003ce9a1" title="Bench-only override for connectivity failsafe timing.">CONNECTIVITY_FAILSAFE_TEST_MODE</a></span> is a compile-time bench helper. It exists so the recovery ladder can be fully validated in a reasonable bench session.</p>
 <p>When enabled:</p>
@@ -159,7 +159,7 @@ Bench Validation Mode</h1>
 <li>It must remain disabled for soak and production images.</li>
 <li>Production verification should confirm <span class="tt">FailsafeTest=0</span> in the boot log and production timing values in the failsafe diagnostic line.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md226"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md282"></a>
 Persistent Fields Used By Recovery</h1>
 <p>The following <span class="tt"><a class="el" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a></span> fields back the supervisor:</p>
 <ul>
@@ -169,7 +169,7 @@ Persistent Fields Used By Recovery</h1>
 <li><span class="tt">connectivityRecoveryCount</span></li>
 </ul>
 <p>These fields let the device resume the correct recovery posture after resets and allow startup status to report the current recovery context upstream.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md227"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md283"></a>
 Operational Expectations During Soak</h1>
 <p>Healthy devices should show:</p>
 <ul>

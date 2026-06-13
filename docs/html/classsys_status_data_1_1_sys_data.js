@@ -2,6 +2,7 @@ var classsys_status_data_1_1_sys_data =
 [
     [ "closeTime", "classsys_status_data_1_1_sys_data.html#a124d1947b9d0a93e46b95f4bfc98527a", null ],
     [ "cloudDisconnectBudgetSec", "classsys_status_data_1_1_sys_data.html#a312ad3e9e14030ddebc3d5251ffb4ddd", null ],
+    [ "configSource", "classsys_status_data_1_1_sys_data.html#a6a5845fcf3c08eec9ffb038f7a3a5a48", null ],
     [ "connectAttemptBudgetSec", "classsys_status_data_1_1_sys_data.html#ac148bf68d19405c01a9c1ee624208737", null ],
     [ "connectionAttemptCounter", "classsys_status_data_1_1_sys_data.html#ad032fbfceb6d43f08a899eaa57d1ac8c", null ],
     [ "connectionMode", "classsys_status_data_1_1_sys_data.html#a02d2a15146a6aa1fd512809eff624ca5", null ],
@@ -9,6 +10,7 @@ var classsys_status_data_1_1_sys_data =
     [ "connectivityRecoveryStage", "classsys_status_data_1_1_sys_data.html#aa47134421e25b74ecb87f2cf0312acee", null ],
     [ "currentBatteryTier", "classsys_status_data_1_1_sys_data.html#afc1ac9b1ee5ef09117fe63b04bb25c86", null ],
     [ "disconnectedMode", "classsys_status_data_1_1_sys_data.html#a1d988ae2845765cdaa981f5ea8655269", null ],
+    [ "hasValidLedgerConfig", "classsys_status_data_1_1_sys_data.html#a429ef8bc43bd6798b8c78b75b64d6c31", null ],
     [ "lastConnection", "classsys_status_data_1_1_sys_data.html#a88fef61bce4b028910de1441dc020c9c", null ],
     [ "lastConnectionDuration", "classsys_status_data_1_1_sys_data.html#a00dd45aa7796876b69f20b29ec4c54a6", null ],
     [ "lastConnectivityRecoveryAction", "classsys_status_data_1_1_sys_data.html#a495659bf0a0c4977701f03f73640bb57", null ],

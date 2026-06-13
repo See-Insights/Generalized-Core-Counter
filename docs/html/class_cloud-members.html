@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;13.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;18</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -105,13 +105,25 @@ $(function(){initNavTree('class_cloud.html','',''); });
   <tr class="odd"><td class="entry"><a class="el" href="class_cloud.html#ad4f5a131e2d2e3c2349d03e892ff40ab">getWebhookName</a>() const</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
   <tr class="even"><td class="entry"><a class="el" href="class_cloud.html#a48e3ac0c1a13d4186d87047e2359bf24">hasPendingOutputLedgerSync</a>() const</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
   <tr class="odd"><td class="entry"><a class="el" href="class_cloud.html#aa44ce3e3d2500cdca692c67458f81364">instance</a>()</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"><span class="mlabel">static</span></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="class_cloud.html#a28b50a243f880a3c70355f151f0f7904">isLedgerPointerTracked</a>(const void *ptr) const</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="class_cloud.html#a1ccde2ac5461640e74f6e7b60f77c5caa48913da3968739b354b4214bad39bfdc">LEDGER_REQUEST_KIND_DATA</a> enum value</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="class_cloud.html#a1ccde2ac5461640e74f6e7b60f77c5caab862fea83c4b1b607b09229db38625d0">LEDGER_REQUEST_KIND_STATUS</a> enum value</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="class_cloud.html#a1ccde2ac5461640e74f6e7b60f77c5caa69f0c375a40b636fd42d996922152765">LEDGER_REQUEST_KIND_UNKNOWN</a> enum value</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="class_cloud.html#a1ccde2ac5461640e74f6e7b60f77c5ca">LedgerRequestKind</a> enum name</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="class_cloud.html#aee2b9cc3074b1c143ef6d126053c189a">ledgerSyncDiagnostics</a>() const</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
   <tr class="even"><td class="entry"><a class="el" href="class_cloud.html#a82b4714d5ad360e54ad9bece976b3860">loadConfigurationFromCloud</a>()</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
-  <tr class="odd"><td class="entry"><a class="el" href="class_cloud.html#ab6354f2706aa556f0fb0ee8a625c722c">loop</a>()</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="class_cloud.html#aee1ad8b89f4ee82f7d2b0a850b9bdcbb">logLedgerConnectState</a>() const</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="class_cloud.html#a2054a2955f6235fb0da1d8d4d66e7499">logLedgerFailure</a>(int rc) const</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="class_cloud.html#a8a39f199b45227cd18ed4d34a71a267e">logLedgerSleepState</a>() const</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="class_cloud.html#ab6354f2706aa556f0fb0ee8a625c722c">loop</a>()</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="class_cloud.html#a18ca0dbb057caa53081ade60ae2f8b8a">noteLedgerSyncComplete</a>(LedgerRequestKind kind, const LedgerSyncDiagnostics &amp;before, const LedgerSyncDiagnostics &amp;after)</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="class_cloud.html#a0f9c6d203e2bf041a6b9f5578e2ef105">noteLedgerSyncFail</a>(uint32_t seq, int error)</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="class_cloud.html#a422da1f0cd72eb35300959b81b1dd141">noteLedgerSyncRequest</a>(LedgerRequestKind kind, const char *source, const void *ptr)</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
   <tr class="even"><td class="entry"><a class="el" href="class_cloud.html#a89d68dd84add935e621be4b7b380192a">operator=</a>(const Cloud &amp;)=delete</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"><span class="mlabel">protected</span></td></tr>
-  <tr class="odd"><td class="entry"><a class="el" href="class_cloud.html#a832b2fee272f68202c5877a0b2fee7c0">publishDataToLedger</a>()</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="class_cloud.html#ac134bd6eda8e682cac6085fe12edc4d3">publishDataToLedger</a>(const char *source=&quot;Unknown&quot;)</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
   <tr class="even"><td class="entry"><a class="el" href="class_cloud.html#a7f2f52213a6074b5829aa196ef2f3b15">setup</a>()</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
   <tr class="odd"><td class="entry"><a class="el" href="class_cloud.html#a701127388a0a476309747986bcaa1a20">testBatteryBackoffLogic</a>()</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"><span class="mlabel">static</span></td></tr>
-  <tr class="even"><td class="entry"><a class="el" href="class_cloud.html#a27758d9343f1531651c739f13ff6006b">writeDeviceStatusToCloud</a>()</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="class_cloud.html#aacb8eae6febbe83b39959e80b7983bb9">writeDeviceStatusToCloud</a>(const char *source=&quot;Unknown&quot;)</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"></td></tr>
   <tr class="odd"><td class="entry"><a class="el" href="class_cloud.html#ac3b4ccc03e48584cacf48d803c2c9737">~Cloud</a>()</td><td class="entry"><a class="el" href="class_cloud.html">Cloud</a></td><td class="entry"><span class="mlabel">protected</span><span class="mlabel">virtual</span></td></tr>
 </table></div><!-- contents -->
 </div><!-- doc-content -->

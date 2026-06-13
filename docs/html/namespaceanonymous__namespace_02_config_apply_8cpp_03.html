@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;13.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;18</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -100,6 +100,7 @@ Functions</h2></td></tr>
 <tr class="memitem:ac88f90d08274fa514ff7df25100e6ed8" id="r_ac88f90d08274fa514ff7df25100e6ed8"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ac88f90d08274fa514ff7df25100e6ed8">getMergedStringValue</a> (const Variant &amp;defaultsSection, const Variant &amp;deviceSection, const char *key, char *buffer, size_t bufferSize)</td></tr>
 <tr class="memitem:a31374c69c16e9d6aaf8721073ec520e5" id="r_a31374c69c16e9d6aaf8721073ec520e5"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a31374c69c16e9d6aaf8721073ec520e5">getNestedMap</a> (const LedgerData &amp;ledger, const char *parentKey, const char *childKey, Variant &amp;section)</td></tr>
 <tr class="memitem:a60abad9cbfe54e2c48afe42c7dc501ce" id="r_a60abad9cbfe54e2c48afe42c7dc501ce"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a60abad9cbfe54e2c48afe42c7dc501ce">getTopLevelMap</a> (const LedgerData &amp;ledger, const char *key, Variant &amp;section)</td></tr>
+<tr class="memitem:a94438c6b6feab38e3356ece7531dd684" id="r_a94438c6b6feab38e3356ece7531dd684"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a94438c6b6feab38e3356ece7531dd684">normalizeTimezoneInPlace</a> (char *timezone, size_t timezoneSize)</td></tr>
 </table>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
 <a id="a6f0db844a94f45001e94584d82046943" name="a6f0db844a94f45001e94584d82046943"></a>
@@ -268,6 +269,29 @@ Functions</h2></td></tr>
 <p class="definition">Definition at line <a class="el" href="_config_apply_8cpp_source.html#l00005">5</a> of file <a class="el" href="_config_apply_8cpp_source.html">ConfigApply.cpp</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="_config_apply_8cpp_source.html#l00014">getNestedMap()</a>.</p>
+
+</div>
+</div>
+<a id="a94438c6b6feab38e3356ece7531dd684" name="a94438c6b6feab38e3356ece7531dd684"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a94438c6b6feab38e3356ece7531dd684">&#9670;&#160;</a></span>normalizeTimezoneInPlace()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void anonymous_namespace{ConfigApply.cpp}::normalizeTimezoneInPlace </td>
+          <td>(</td>
+          <td class="paramtype">char *</td>          <td class="paramname"><span class="paramname"><em>timezone</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>timezoneSize</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_config_apply_8cpp_source.html#l00075">75</a> of file <a class="el" href="_config_apply_8cpp_source.html">ConfigApply.cpp</a>.</p>
 
 </div>
 </div>

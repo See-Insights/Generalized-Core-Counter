@@ -21,6 +21,11 @@ var _sensor_manager_8cpp =
     [ "lastPmicAnomalySoc", "_sensor_manager_8cpp.html#a288f19cbbf7c424482bd30d91c004095", null ],
     [ "lastPmicAnomalyUptimeMs", "_sensor_manager_8cpp.html#a195bce92398e1f883e9b45e8fae03b99", null ],
     [ "lastPmicAnomalyVbusStatus", "_sensor_manager_8cpp.html#aa293bed84da237c6e48d63b3a2c496ba", null ],
+    [ "lastTrendEpoch", "_sensor_manager_8cpp.html#afba24b9114ea2b1b23c79abf6ffab79e", null ],
+    [ "lastTrendSoc", "_sensor_manager_8cpp.html#aa3bcdefcdd5b5fcf622e667e5619ee8b", null ],
+    [ "lastTrendVcell", "_sensor_manager_8cpp.html#aa2981ffe6f840a5e9701eb7eb15a625d", null ],
     [ "pmicAnomalyActive", "_sensor_manager_8cpp.html#a98ab1817dfc8d4cd547b8797d5a4b48e", null ],
-    [ "pmicAnomalyCount", "_sensor_manager_8cpp.html#a4e485e9c12df5bc38b61fb52ea09fdd6", null ]
+    [ "pmicAnomalyCount", "_sensor_manager_8cpp.html#a4e485e9c12df5bc38b61fb52ea09fdd6", null ],
+    [ "staleSocConsecutiveCount", "_sensor_manager_8cpp.html#a7da0d9879b783741a1e905c937cebeac", null ],
+    [ "staleSocTotalCount", "_sensor_manager_8cpp.html#ae55a73786bacfc6a6997ae7cf99a3ead", null ]
 ];

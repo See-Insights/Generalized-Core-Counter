@@ -15,6 +15,7 @@ var class_sensor_manager =
     [ "onExitSleep", "class_sensor_manager.html#a3d605277298d063851c91b1238784c17", null ],
     [ "operator=", "class_sensor_manager.html#a27577f963c22e4249ea73d0961d7cba3", null ],
     [ "readTmp112TemperatureC", "class_sensor_manager.html#a87645f59d0a2fe8c6644b386f24b7692", null ],
+    [ "runPmicChargeCycleTest", "class_sensor_manager.html#a42709452178ea32c7082ec9896f44f9a", null ],
     [ "setSensor", "class_sensor_manager.html#aaf00c40722d05d7fb5be18f47f18e94a", null ],
     [ "setup", "class_sensor_manager.html#a24c47251bd3eb4e8962ce41783fa426e", null ],
     [ "tmp36TemperatureC", "class_sensor_manager.html#a049e5cf771c954f3b4d0702f2ac1c412", null ],
