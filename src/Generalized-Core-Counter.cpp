@@ -1103,15 +1103,6 @@ void setup() {
   }
   // ===================================
 
-#if ENABLE_PMIC_CHARGE_CYCLE_TEST
-  // TEMPORARY DIAGNOSTIC: Run PMIC charge cycle test once on boot
-  // Test runs automatically when ENABLE_PMIC_CHARGE_CYCLE_TEST is set to 1
-  Log.info("PMIC_TEST: Compile-time test enabled - will run after brief delay");
-  delay(3000);  // Brief delay to ensure serial logs are visible
-  measure.runPmicChargeCycleTest();
-  Log.info("PMIC_TEST: Test complete - normal operation resuming");
-#endif
-
   attachInterrupt(BUTTON_PIN, userSwitchISR,
                   FALLING); // We may need to monitor the user switch to change
                             // behaviours / modes

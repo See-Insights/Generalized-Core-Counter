@@ -91,8 +91,7 @@ SystemPowerConfiguration makeSolarConfiguration() {
   conf.powerSourceMaxCurrent(SOLAR_MAX_CURRENT_MA)
       .powerSourceMinVoltage(SOLAR_MIN_VOLTAGE_MV)
       .batteryChargeCurrent(SOLAR_CHARGE_CURRENT_MA)
-      .batteryChargeVoltage(SOLAR_CHARGE_VOLTAGE_MV)
-      .feature(SystemPowerFeature::USE_VIN_SETTINGS_WITH_USB_HOST);
+      .batteryChargeVoltage(SOLAR_CHARGE_VOLTAGE_MV);
   return conf;
 }
 #endif
