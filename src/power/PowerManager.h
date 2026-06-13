@@ -61,6 +61,7 @@ enum class PowerProfileSelectionReason : uint8_t {
   VinPowerSource,
   BatteryKeepLast,
   BatteryFallback,
+  UnknownSourceKeepLast,
   UnknownSourceFallback,
   UnsupportedPlatform,
 };

@@ -44,6 +44,10 @@ PowerInputProfile selectInputProfile(
     reason = PowerProfileSelectionReason::BatteryFallback;
     return fallbackProfile;
   default:
+    if (lastAppliedProfile != PowerInputProfile::NotApplicable) {
+      reason = PowerProfileSelectionReason::UnknownSourceKeepLast;
+      return lastAppliedProfile;
+    }
     reason = PowerProfileSelectionReason::UnknownSourceFallback;
     return fallbackProfile;
   }
