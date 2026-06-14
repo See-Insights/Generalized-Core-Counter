@@ -80,6 +80,14 @@ void logTeardownContext(const char *prefix,
            current.get_occupied() ? 1 : 0);
 }
 
+// Drain USB CDC serial buffer before sleep to prevent split log lines (bench testing only)
+void drainSerialBeforeSleep() {
+  if (Serial.isConnected()) {
+    Serial.flush();
+    delay(75);
+  }
+}
+
 void markModemUnstable(ModemUnstableReason reason, unsigned long elapsedMs) {
   const bool reasonChanged = !session.modemUnstable ||
                              session.modemUnstableReason != (uint8_t)reason;
@@ -1065,6 +1073,7 @@ void handleSleepingState() {
             thrashGuard.markProgress("SLEEP_ATTEMPT");
             Cloud::instance().logLedgerSleepState();
             setAppBreadcrumb(21);
+            drainSerialBeforeSleep();
             const SystemSleepResult hibernateResult = System.sleep(config);
 
             // HIBERNATE should reset the MCU. If we return here, treat it as failed and fall back.
@@ -1307,6 +1316,7 @@ void handleSleepingState() {
   const unsigned long sleepCallStartMs = millis();
   Cloud::instance().logLedgerSleepState();
   setAppBreadcrumb(21);
+  drainSerialBeforeSleep();
   SystemSleepResult result = System.sleep(config);
   const unsigned long sleepElapsedMs = millis() - sleepCallStartMs;
   pin_t wakePin = result.wakeupPin();
@@ -1354,6 +1364,7 @@ void handleSleepingState() {
       .duration((uint32_t)wakeInSeconds * 1000UL);
     Cloud::instance().logLedgerSleepState();
     setAppBreadcrumb(21);
+    drainSerialBeforeSleep();
     result = System.sleep(config);
 
     if (result.error() != SYSTEM_ERROR_NONE) {
@@ -1364,6 +1375,7 @@ void handleSleepingState() {
         .duration((uint32_t)wakeInSeconds * 1000UL);
       Cloud::instance().logLedgerSleepState();
       setAppBreadcrumb(21);
+      drainSerialBeforeSleep();
       result = System.sleep(config);
 
       if (result.error() != SYSTEM_ERROR_NONE) {

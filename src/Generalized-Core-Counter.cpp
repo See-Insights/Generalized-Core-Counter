@@ -396,6 +396,14 @@ bool claimFailsafeDeferLogLocal(FailsafeDeferReason reason) {
   return true;
 }
 
+// Drain USB CDC serial buffer before sleep to prevent split log lines (bench testing only)
+void drainSerialBeforeSleep() {
+  if (Serial.isConnected()) {
+    Serial.flush();
+    delay(75);
+  }
+}
+
 } // namespace
 
 const char *failsafeDeferReasonName(FailsafeDeferReason reason) {
@@ -693,6 +701,7 @@ void setup() {
     Particle.process();
     SystemSleepConfiguration bootStormSleep;
     bootStormSleep.mode(SystemSleepMode::ULTRA_LOW_POWER).duration(600000UL);
+    drainSerialBeforeSleep();
     System.sleep(bootStormSleep);
     Log.warn("BOOT STORM holdoff sleep returned unexpectedly - continuing boot");
   }
