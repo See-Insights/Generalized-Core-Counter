@@ -800,7 +800,7 @@ void setup() {
   // recover a device that would otherwise immediately sleep.
   if (digitalRead(BUTTON_PIN) == LOW) { // Active-low user button
     Log.info("Boot override: user button held - forcing CONNECTING_STATE");
-    state = CONNECTING_STATE;
+    transitionTo(CONNECTING_STATE, "boot button override");
   }
 
   sysStatus.setup();    // Initialize persistent storage
@@ -909,7 +909,7 @@ void setup() {
     // configuration from ledger. This ensures device-settings
     // (operatingMode, etc.) override any stale FRAM values.
     Log.info("OTA update detected - forcing connection to reload config");
-    state = CONNECTING_STATE;
+    transitionTo(CONNECTING_STATE, "OTA update");
     break;
   case RESET_REASON_POWER_MANAGEMENT:
     // Waking from sleep. Alert 40 suppression for overnight hibernate
@@ -1034,12 +1034,12 @@ void setup() {
   Config::logDiagnostics("ConfigDiag");
   if (!Config::isValid(true)) {
     Log.warn("Config invalid at boot - forcing CONNECTING_STATE for ledger acquisition");
-    state = CONNECTING_STATE;
+    transitionTo(CONNECTING_STATE, "invalid config");
   }
 
   // Validate time and configure local time converter
   if (!Time.isValid()) {
-    state = CONNECTING_STATE;
+    transitionTo(CONNECTING_STATE, "time invalid");
   } else {
     // Now that time is valid, configure local time converter for timezone-aware operations
     conv.withCurrentTime().convert();
@@ -1090,7 +1090,7 @@ void setup() {
 
       if (!SensorManager::instance().isSensorReady()) {
         Log.error("Sensor failed to initialize after timezone setup; connecting to report error");
-        state = CONNECTING_STATE;
+        transitionTo(CONNECTING_STATE, "sensor init failed");
       }
     } else {
       // Ensure carrier sensor power rails are actually turned off even if
@@ -1117,7 +1117,7 @@ void setup() {
                             // behaviours / modes
 
   if (state == INITIALIZATION_STATE)
-    state = IDLE_STATE; // Default to IDLE; CONNECTING only when explicitly requested
+    transitionTo(IDLE_STATE, "setup complete"); // Default to IDLE; CONNECTING only when explicitly requested
 
   // setup reached stable completion; clear early-boot in-progress marker.
   bootInProgress = false;
@@ -1223,7 +1223,7 @@ void loop() {
     // Out-of-memory is treated as a critical alert; only overwrite any
     // existing alert if this is more severe.
     current.raiseAlert(14);
-    state = ERROR_STATE;
+    transitionTo(ERROR_STATE, "out of memory");
   }
 
   // If the user switch is pressed, force an immediate report and connection
@@ -1231,7 +1231,7 @@ void loop() {
     Log.info("User switch pressed - triggering immediate report and connection");
     userSwitchDetected = false;
     session.serviceRequestTriggered = true;
-    state = REPORTING_STATE;
+    transitionTo(REPORTING_STATE, "user switch");
   }
 
   // ********** Centralized sensor event handling **********
@@ -2099,7 +2099,7 @@ void connectivityFailsafeSupervisor() {
     Log.info("Failsafe: stage=1 action=radio-reset age=%lds",
              (long)connectionAgeSec);
     Connectivity::requestFullDisconnectAndRadioOff();
-    state = CONNECTING_STATE;
+    transitionTo(CONNECTING_STATE, "failsafe stage 1");
     return;
   }
 

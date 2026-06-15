@@ -77,7 +77,7 @@ void handleOccupancyMode() {
       if (reportNow) {
         session.occupancyChangeTriggered = true;
         if (state == IDLE_STATE) {
-          state = REPORTING_STATE;
+          transitionTo(REPORTING_STATE, "occupancy change");
         }
       }
     } else {
@@ -148,7 +148,7 @@ void updateOccupancyState() {
     if (reportNow) {
       session.occupancyChangeTriggered = true;
       if (state == IDLE_STATE) {
-        state = REPORTING_STATE;
+        transitionTo(REPORTING_STATE, "occupancy cleared");
       }
     }
   }
