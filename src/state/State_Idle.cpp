@@ -68,7 +68,7 @@ void handleIdleState() {
         // still tracked, but do not force an immediate report/connect.
         if (reportNow) {
           session.occupancyChangeTriggered = true;
-          state = REPORTING_STATE;
+          transitionTo(REPORTING_STATE, "occupancy transition");
           return;
         }
       }
@@ -107,7 +107,7 @@ void handleIdleState() {
     logTimeDiag(openNow);
     if (!openNow) {
       Log.info("CONNECTED mode: park CLOSED - transitioning to SLEEPING_STATE for overnight sleep");
-      state = SLEEPING_STATE;
+      transitionTo(SLEEPING_STATE, "park closed");
       return;
     }
     // Park is open: remain awake in CONNECTED mode.
@@ -177,7 +177,7 @@ void handleIdleState() {
       } else {
         Log.info("IDLE: Scheduled report interval reached - transitioning to REPORTING_STATE");
       }
-      state = REPORTING_STATE;
+      transitionTo(REPORTING_STATE, "report interval");
       return;
     }
     }
@@ -228,7 +228,7 @@ void handleIdleState() {
       } else {
         Log.info("Low-power idle: queue drained and no updates pending - entering SLEEPING_STATE");
       }
-      state = SLEEPING_STATE;
+      transitionTo(SLEEPING_STATE, "low power idle");
       return; // Go back to sleep when there's no work this hour
     }
   }
@@ -291,7 +291,7 @@ void handleIdleState() {
           Connectivity::requestFullDisconnectAndRadioOff();
           connectedStartMs = 0;
           idleCeilingStartMs = 0;
-          state = SLEEPING_STATE;
+          transitionTo(SLEEPING_STATE, "idle ceiling exceeded");
           return;
         }
       }

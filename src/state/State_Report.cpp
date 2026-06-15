@@ -109,7 +109,7 @@ void handleReportingState() {
             Log.warn("Webhook long-term failure persists (age=%ld sec) - escalating to ERROR_STATE (backoff ok)", ageSec);
             // Repurpose lastAlertTime as our escalation timestamp for alert 40.
             current.set_lastAlertTime(now);
-            state = ERROR_STATE;
+            transitionTo(ERROR_STATE, "webhook long-term failure");
             return;
           }
         }
@@ -128,7 +128,7 @@ void handleReportingState() {
 
   if (!Config::isValid(true)) {
     Log.warn("REPORTING: configuration invalid - forcing CONNECTING_STATE");
-    state = CONNECTING_STATE;
+    transitionTo(CONNECTING_STATE, "config invalid");
     return;
   }
   
@@ -182,37 +182,37 @@ void handleReportingState() {
       Log.info("REPORTING: Immediate connection (service request) - bypassing alignment tier=%s",
                tierName);
 #endif
-      state = CONNECTING_STATE;
+      transitionTo(CONNECTING_STATE, "service request");
     } else if (session.occupancyChangeTriggered) {
       session.occupancyChangeTriggered = false;  // Clear flag after processing
 #if ENABLE_CONNECT_DECISION_TRACE
       Log.info("REPORTING: Immediate connection (occupancy change) - bypassing alignment tier=%s",
                tierName);
 #endif
-      state = CONNECTING_STATE;
+      transitionTo(CONNECTING_STATE, "occupancy change");
     } else if (forceConnectForLongTermWebhook) {
 #if ENABLE_CONNECT_DECISION_TRACE
       Log.info("REPORTING: Forcing connection due to long-term webhook health (OPEN hours)");
 #endif
-      state = CONNECTING_STATE;
+      transitionTo(CONNECTING_STATE, "webhook health check");
     } else if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
       // In INTERMITTENT_KEEP_ALIVE mode, connect immediately for all reports
       if (deferAutoConnectForUnstableModem) {
         Log.warn("MODEM_POLICY: reconnect deferred reason=unstable_modem remaining=%lu ms trigger=keep_alive",
                  reconnectDeferRemainingMs);
-        state = IDLE_STATE;
+        transitionTo(IDLE_STATE, "modem unstable");
       } else {
 #if ENABLE_CONNECT_DECISION_TRACE
         Log.info("REPORTING: Immediate connection (KEEP_ALIVE mode) - bypassing alignment tier=%s",
                  tierName);
 #endif
-        state = CONNECTING_STATE;
+        transitionTo(CONNECTING_STATE, "keep alive mode");
       }
     } else if (isAligned) {
       if (deferAutoConnectForUnstableModem) {
         Log.warn("MODEM_POLICY: reconnect deferred reason=unstable_modem remaining=%lu ms trigger=aligned",
                  reconnectDeferRemainingMs);
-        state = IDLE_STATE;
+        transitionTo(IDLE_STATE, "modem unstable aligned");
       } else {
 #if ENABLE_CONNECT_DECISION_TRACE
         Log.info("REPORTING: Connection due - boundary aligned tier=%s interval=%us (base=%u x %u) offset=%lus",
@@ -222,7 +222,7 @@ void handleReportingState() {
                  (unsigned)tierMultiplier,
                  (unsigned long)offset);
 #endif
-        state = CONNECTING_STATE;
+        transitionTo(CONNECTING_STATE, "boundary aligned");
       }
     } else {
       time_t nextBoundary = effectiveInterval - offset;
@@ -235,10 +235,10 @@ void handleReportingState() {
     #else
       (void)nextBoundary;
 #endif
-      state = IDLE_STATE;
+      transitionTo(IDLE_STATE, "not aligned");
     }
   } else {
-    state = IDLE_STATE;
+    transitionTo(IDLE_STATE, "already connected");
   }
 
   // If a webhook supervision alert (40) has been raised, we leave the

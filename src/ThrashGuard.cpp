@@ -140,7 +140,7 @@ void ThrashGuard::loop(int currentState, uint32_t nowMs) {
     current.raiseAlert(18);  // Alert 18: Thrash detected (tier 2)
     Connectivity::requestFullDisconnectAndRadioOff();
     if (state != SLEEPING_STATE) {
-      state = SLEEPING_STATE;
+      transitionTo(SLEEPING_STATE, "thrash tier 2");
     }
     return;
   }
