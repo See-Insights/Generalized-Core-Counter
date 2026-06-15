@@ -1,6 +1,10 @@
 ## Project Context
 
-This repository includes `PROJECT_STATUS.md`, which defines the project purpose, current priorities, architecture principles, constraints, and design rules for AI-assisted development. Contributors and AI coding assistants should consult it before proposing major changes.
+This repository includes key documentation files that contributors and AI coding assistants should review before proposing major changes:
+
+- `PROJECT_STATUS.md` - Project purpose, current priorities, architecture principles, and constraints
+- `ARCHITECTURE_OVERVIEW.md` - Detailed system architecture and design patterns
+- `AI_DEVELOPMENT_WORKFLOW.md` - Development workflow and guidelines for AI-assisted engineering
 
 # Generalized-Core-Counter
 
