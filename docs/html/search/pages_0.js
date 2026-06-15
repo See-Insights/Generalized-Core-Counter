@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['0_0',['0',['../md_docs_2led-management-system.html#autotoc_md240',1,'&lt;span class=&quot;tt&quot;&gt;signalLED(bool state, uint32_t durationMs = 0)&lt;/span&gt;'],['../md_docs_2v11-soak-plan.html#autotoc_md332',1,'Day 0']]],
+  ['0_0',['0',['../md_docs_2led-management-system.html#autotoc_md241',1,'&lt;span class=&quot;tt&quot;&gt;signalLED(bool state, uint32_t durationMs = 0)&lt;/span&gt;'],['../md_docs_2v11-soak-plan.html#autotoc_md333',1,'Day 0']]],
   ['0_200_202026_2005_2022_1',['[11.0.0] - 2026-05-22',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md52',1,'']]],
   ['0_200_202026_2005_2027_2',['[13.0.0] - 2026-05-27',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md43',1,'']]],
   ['0_200_202026_2006_2006_3',['[14.0.0] - 2026-06-06',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md38',1,'']]],
@@ -48,6 +48,7 @@ var searchData=
   ['06_2006_45',['[14.0.0] - 2026-06-06',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md38',1,'']]],
   ['06_2010_46',['06 10',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md33',1,'[15.0.0] - 2026-06-10'],['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md30',1,'[16.0.0] - 2026-06-10']]],
   ['06_2011_47',['18 – 2026-06-11',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md116',1,'']]],
-  ['06_20pmic_20charging_20root_20cause_48',['2026-06 PMIC Charging Root Cause',['../md_docs_2postmortems_22026-06-pmic-charging-root-cause.html',1,'']]],
-  ['09_49',['3.24 – 2026-02-09',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md82',1,'']]]
+  ['06_2015_48',['19 – 2026-06-15',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md117',1,'']]],
+  ['06_20pmic_20charging_20root_20cause_49',['2026-06 PMIC Charging Root Cause',['../md_docs_2postmortems_22026-06-pmic-charging-root-cause.html',1,'']]],
+  ['09_50',['3.24 – 2026-02-09',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md82',1,'']]]
 ];

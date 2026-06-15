@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;18</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;19</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -92,8 +92,8 @@ $(function(){initNavTree('md_docs_2hibernate-sleep-design.html','',''); });
   <div class="headertitle"><div class="title">Hibernate Sleep Design (Boron) </div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p><a class="anchor" id="autotoc_md229"></a></p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md230"></a>
+<div class="textblock"><p><a class="anchor" id="autotoc_md230"></a></p>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md231"></a>
 Scope</h1>
 <p>This design adds a conservative AB1805 RTC-alarm hibernate path only for Boron overnight/long-duration sleep.</p>
 <p>Constraints:</p><ul>
@@ -103,7 +103,7 @@ Scope</h1>
 <li>Photon 2 / P2 behavior unchanged</li>
 <li>Existing ULP/STOP path remains fallback</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md231"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md232"></a>
 Hardware Path</h1>
 <p>Validated wake route:</p>
 <p>AB1805 alarm -&gt; FOUT/nIRQ (active low) -&gt; carrier wake line -&gt; Boron WAKE pin -&gt; <span class="tt">SystemSleepMode::HIBERNATE</span> wake on <span class="tt">FALLING</span></p>
@@ -114,7 +114,7 @@ Hardware Path</h1>
 <p>Secondary recovery wake:</p><ul>
 <li><span class="tt"><a class="el" href="device__pinout_8cpp.html#ae2f2771b68bc677751483fae6699726a">BUTTON_PIN</a></span> on <span class="tt">FALLING</span></li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md232"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md233"></a>
 Guardrails</h1>
 <p>Hibernate is attempted only when all checks pass:</p><ul>
 <li><span class="tt">modes.enableHibernateSleep</span> is <span class="tt">true</span> (kill switch)</li>
@@ -124,7 +124,7 @@ Guardrails</h1>
 <li>RTC time is in a valid range (<span class="tt">2024-01-01 &lt;= rtc &lt; 2035-01-01</span>)</li>
 </ul>
 <p>If any check fails, firmware logs and falls back to existing ULP/STOP behavior.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md233"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md234"></a>
 Alarm Arming</h1>
 <p>Before programming the new alarm, stale AB1805 interrupt state is cleared by direct register operations from application code (no library edits):</p><ul>
 <li>clear status register pending bits</li>
@@ -134,7 +134,7 @@ Alarm Arming</h1>
 <li><span class="tt">ab1805.interruptAtTime(wakeTime)</span></li>
 </ul>
 <p>No countdown timer path is used for this long-sleep hibernate mode.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md234"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md235"></a>
 Retained Diagnostics</h1>
 <p>Retained fields capture hibernate scheduling and validation:</p><ul>
 <li><span class="tt"><a class="el" href="_generalized-_core-_counter_8cpp.html#a792122b4c6d2cea073191a8ba08f25da">retainedHibernateRtcBefore</a></span></li>
@@ -147,7 +147,7 @@ Retained Diagnostics</h1>
 <li>compute <span class="tt">actualSleep = rtcAfter - <a class="el" href="_generalized-_core-_counter_8cpp.html#a792122b4c6d2cea073191a8ba08f25da">retainedHibernateRtcBefore</a></span></li>
 <li>compute <span class="tt">sleepError = actualSleep - <a class="el" href="_generalized-_core-_counter_8cpp.html#a1acf3f9be36732fcde2ee33935a23d6d">retainedHibernateRequestedSleep</a></span></li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md235"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md236"></a>
 Startup Status Payload</h1>
 <p>Hibernate fields are included only for confirmed hibernate alarm wake events:</p><ul>
 <li><span class="tt">sleepMode: "hibernate"</span></li>
@@ -157,7 +157,7 @@ Startup Status Payload</h1>
 <li><span class="tt">hibernateCount</span></li>
 </ul>
 <p>This avoids noise for normal wakes.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md236"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md237"></a>
 Rollback</h1>
 <p>Immediate rollback is ledger-only:</p><ul>
 <li>set <span class="tt">modes.enableHibernateSleep=false</span></li>

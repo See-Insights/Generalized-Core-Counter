@@ -1,7 +1,7 @@
 var searchData=
 [
-  ['3_0',['Days 1-3',['../md_docs_2v11-soak-plan.html#autotoc_md333',1,'']]],
-  ['3_20—_20cloud_20disconnect_20budget_20exceeded_1',['Test 3 — Cloud Disconnect Budget Exceeded',['../md_docs_2bench-validation.html#autotoc_md203',1,'']]],
+  ['3_0',['Days 1-3',['../md_docs_2v11-soak-plan.html#autotoc_md334',1,'']]],
+  ['3_20—_20cloud_20disconnect_20budget_20exceeded_1',['Test 3 — Cloud Disconnect Budget Exceeded',['../md_docs_2bench-validation.html#autotoc_md204',1,'']]],
   ['3_2012_20–_202026_2001_2013_2',['3.12 – 2026-01-13',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md95',1,'']]],
   ['3_2012_20–_202026_2001_2014_3',['3.12 – 2026-01-14',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md96',1,'']]],
   ['3_2013_20–_202026_2001_2014_4',['3.13 – 2026-01-14',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md97',1,'']]],
@@ -20,8 +20,8 @@ var searchData=
   ['3_2027_20–_202026_2003_2012_17',['3 27 – 2026 03 12',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md74',1,'3.27 – 2026-03-12'],['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md93',1,'3.27 – 2026-03-12'],['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md107',1,'3.27 – 2026-03-12']]],
   ['3_2028_20–_202026_2003_2013_18',['3.28 – 2026-03-13',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md108',1,'']]],
   ['3_2029_20–_202026_2003_2013_19',['3.29 – 2026-03-13',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md109',1,'']]],
-  ['3_20state_20machine_20architecture_20',['3. State Machine Architecture',['../md_docs_2architecture-overview.html#autotoc_md122',1,'']]],
-  ['3_20version_20cpp_20✅_21',['3. Version.cpp ✅',['../md_docs_2releases_2v3_823-implementation-status.html#autotoc_md296',1,'']]],
+  ['3_20state_20machine_20architecture_20',['3. State Machine Architecture',['../md_docs_2architecture-overview.html#autotoc_md123',1,'']]],
+  ['3_20version_20cpp_20✅_21',['3. Version.cpp ✅',['../md_docs_2releases_2v3_823-implementation-status.html#autotoc_md297',1,'']]],
   ['30_22',['10.00 - 2026-04-30',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md58',1,'']]],
-  ['3_3a_20document_20boron_20vs_20photon_202_20sleep_20and_20reset_20behavior_23',['Issue 3: Document Boron vs Photon 2 sleep and reset behavior',['../md_docs_2github-issue-drafts.html#autotoc_md224',1,'']]]
+  ['3_3a_20document_20boron_20vs_20photon_202_20sleep_20and_20reset_20behavior_23',['Issue 3: Document Boron vs Photon 2 sleep and reset behavior',['../md_docs_2github-issue-drafts.html#autotoc_md225',1,'']]]
 ];

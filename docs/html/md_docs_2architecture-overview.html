@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;18</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;19</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -92,8 +92,8 @@ $(function(){initNavTree('md_docs_2architecture-overview.html','',''); });
   <div class="headertitle"><div class="title">Generalized-Core-Counter Architecture Overview </div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p><a class="anchor" id="autotoc_md117"></a></p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md118"></a>
+<div class="textblock"><p><a class="anchor" id="autotoc_md118"></a></p>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md119"></a>
 1. Purpose and Design Goals</h1>
 <p>Generalized-Core-Counter is a reusable firmware platform for low-power Particle-based sensor devices that spend most of their life unattended. The platform is designed to support multiple sensing patterns, multiple radio types, and long-lived deployments without coupling the application to any single sensor or product configuration.</p>
 <p>The firmware is intended to support:</p>
@@ -118,7 +118,7 @@ $(function(){initNavTree('md_docs_2architecture-overview.html','',''); });
 </ul>
 <p>These goals favor predictable behavior over maximizing instantaneous throughput. The platform is optimized for devices that wake, sense, decide, optionally connect, publish, and return to a safe low-power posture.</p>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md120"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md121"></a>
 2. High-Level System Architecture</h1>
 <p>The firmware is organized around a central state machine that coordinates sensing, connectivity, reporting, recovery, and sleep. Sensors and cloud integrations do not drive the application directly; they provide services to the state machine.</p>
 <div class="fragment"><div class="line">       +-------------------+</div>
@@ -172,11 +172,11 @@ $(function(){initNavTree('md_docs_2architecture-overview.html','',''); });
 <li><a class="el" href="class_cloud.html" title="This class is a singleton; you do not create one as a global, on the stack, or with new.">Cloud</a> integration is authoritative for configuration, but not required for local sensing continuity.</li>
 </ul>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md122"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md123"></a>
 3. State Machine Architecture</h1>
 <p>The state machine is the top-level control structure for the firmware. It exists to make wake-cycle behavior explicit, bounded, and observable. Without it, sensing, cloud, and sleep logic would interleave implicitly and become difficult to reason about under battery and connectivity stress.</p>
 <p>Most behavior is intentionally delegated to state handlers instead of living in <span class="tt"><a class="el" href="_generalized-_core-_counter_8cpp.html#afe461d27b9c48d5921c00d521181f12f">loop()</a></span> directly. This keeps the main loop small and makes each phase responsible for a single decision space: initialization, sensing, reporting, connecting, sleeping, updates, or fault handling.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md123"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md124"></a>
 State Responsibilities</h2>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -196,7 +196,7 @@ State Responsibilities</h2>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a6d4ca25a3d420813862ff4e2e874373e">FIRMWARE_UPDATE_STATE</a></span>  </td><td class="markdownTableBodyNone">Hold the cloud session open long enough for OTA-related work without allowing update checks to dominate the normal sleep cadence indefinitely.  </td><td class="markdownTableBodyNone">Connected state detects pending updates or update-related hold-open work.  </td><td class="markdownTableBodyNone">Updates complete, timeout, operator cancel path, or return to <span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aeca4500f6f729608a014643f8c8f4003">IDLE_STATE</a></span>/<span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24">SLEEPING_STATE</a></span>.  </td></tr>
 </table>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md124"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md125"></a>
 State Transition Diagram</h2>
 <div class="fragment"><div class="line">stateDiagram-v2</div>
 <div class="line">    [*] --&gt; INITIALIZATION_STATE</div>
@@ -229,7 +229,7 @@ State Transition Diagram</h2>
 <div class="line">    ERROR_STATE --&gt; [*]: reset / deep power-down</div>
 </div><!-- fragment --><p>The state machine is intentionally conservative about ownership. For example, <span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a549bd89b38411c3eb84cead55c7df867">CONNECTING_STATE</a></span> owns connection attempts, and the long-duration connectivity failsafe is required to defer while that ownership is active. That separation prevents recovery logic from fighting normal connection logic.</p>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md126"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md127"></a>
 4. Sensor Architecture</h1>
 <p>The sensor layer isolates hardware-specific measurement behavior from application policy.</p>
 <p>The primary roles are:</p>
@@ -239,7 +239,7 @@ State Transition Diagram</h2>
 <li><span class="tt"><a class="el" href="class_sensor_manager.html">SensorManager</a></span>: owns the active sensor instance and exposes a single sensing interface to the rest of the firmware</li>
 </ul>
 <p>This design allows the application to reason about sensor readiness and sensor data without depending on PIR-specific or future sensor-specific implementation details.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md127"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md128"></a>
 Architectural Intent</h2>
 <ul>
 <li>Hardware abstraction: state handlers interact with a logical sensor service rather than with raw pins or protocol drivers.</li>
@@ -248,7 +248,7 @@ Architectural Intent</h2>
 <li>Mode specialization: counting and occupancy use the same underlying sensing service, but the state machine interprets the results differently.</li>
 </ul>
 <p>Counting mode treats sensor events as discrete increments. Occupancy mode treats sensor events as state transitions with debounce, occupied duration accumulation, and optional immediate reporting on transitions.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md128"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md129"></a>
 Sensor Interaction Diagram</h2>
 <div class="fragment"><div class="line">flowchart LR</div>
 <div class="line">    A[Configured sensor type] --&gt; B[SensorFactory]</div>
@@ -260,10 +260,10 @@ Sensor Interaction Diagram</h2>
 <div class="line">    E --&gt; H[Measurement behavior]</div>
 </div><!-- fragment --><p>The important boundary is that <a class="el" href="class_sensor_manager.html">SensorManager</a> decides how to speak to the sensor, while the state machine decides what the sensor reading means operationally.</p>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md130"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md131"></a>
 5. Persistent Data Architecture</h1>
 <p>The firmware uses three distinct categories of state, each with a different durability purpose.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md131"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md132"></a>
 Persistent Stores</h2>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -275,7 +275,7 @@ Persistent Stores</h2>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_my_persistent_data_8h.html#a7ccda8a3a0f47702f9fa962899b0a3a1">current</a></span>  </td><td class="markdownTableBodyNone">Runtime domain data that must survive sleep/reset  </td><td class="markdownTableBodyNone">counters, occupancy state, last alert, state-of-charge snapshot, accumulated occupancy totals  </td><td class="markdownTableBodyNone">Device's current operational picture and field-visible health  </td></tr>
 </table>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md132"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md133"></a>
 Persistence Model</h2>
 <ul>
 <li>FRAM-backed persistence: the main durable stores are written through the persistence layer so configuration and operational state survive resets and long deployments.</li>
@@ -288,7 +288,7 @@ Persistence Model</h2>
 <li>Retained variables preserve what happened immediately before the restart.</li>
 <li>Runtime state preserves only what matters while the current wake cycle is still alive.</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md133"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md134"></a>
 Cloud Synchronization Model</h2>
 <p><a class="el" href="class_cloud.html" title="This class is a singleton; you do not create one as a global, on the stack, or with new.">Cloud</a> configuration is authoritative, but it is not applied continuously from the network. Instead, the device synchronizes cloud ledgers during a successful connection window, merges defaults and overrides, applies the result to persistent storage, and then operates locally from persisted values until the next successful sync.</p>
 <p>That decision is important for unattended operation:</p>
@@ -298,10 +298,10 @@ Cloud Synchronization Model</h2>
 <li>recovery and power decisions remain available across resets</li>
 </ul>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md135"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md136"></a>
 6. Cloud Architecture</h1>
 <p>The cloud subsystem separates configuration ingress from telemetry egress.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md136"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md137"></a>
 Roles</h2>
 <ul>
 <li>Particle <a class="el" href="class_cloud.html" title="This class is a singleton; you do not create one as a global, on the stack, or with new.">Cloud</a> provides connection, publish, subscribe, OTA, and ledger transport.</li>
@@ -309,7 +309,7 @@ Roles</h2>
 <li>PublishQueuePosixRK provides a durable queue for outbound event publishes so data is not lost when the device is offline.</li>
 <li>Webhook publishing provides the legacy external integration path for sensor payload delivery.</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md137"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md138"></a>
 Ledger Responsibilities</h2>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -323,7 +323,7 @@ Ledger Responsibilities</h2>
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyNone"><span class="tt">device-data</span>  </td><td class="markdownTableBodyNone">Device to cloud  </td><td class="markdownTableBodyNone">Device  </td><td class="markdownTableBodyNone">Latest structured sensor/telemetry snapshot  </td></tr>
 </table>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md138"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md139"></a>
 Configuration Merge Behavior</h2>
 <p>The device treats product defaults and device overrides as a two-level hierarchy:</p>
 <ol type="1">
@@ -334,7 +334,7 @@ Configuration Merge Behavior</h2>
 <li>Publish <span class="tt">device-status</span> so operators can see the configuration actually in force.</li>
 </ol>
 <p>This architecture is deliberately cloud-authoritative but locally cached. It allows the cloud to remain the source of truth while still permitting long offline intervals.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md139"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md140"></a>
 Telemetry Flow</h2>
 <p>Telemetry uses two parallel paths:</p>
 <ul>
@@ -342,7 +342,7 @@ Telemetry Flow</h2>
 <li>ledger egress for structured device visibility in Particle Console</li>
 </ul>
 <p>The queue-backed webhook path ensures outbound telemetry survives offline periods. The ledger path ensures the cloud can inspect the latest structured status once synchronization resumes.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md140"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md141"></a>
 Sequence Diagram</h2>
 <div class="fragment"><div class="line">sequenceDiagram</div>
 <div class="line">    participant Device</div>
@@ -366,10 +366,10 @@ Sequence Diagram</h2>
 <div class="line">    Device-&gt;&gt;Cloud: disconnect when work and gates complete</div>
 </div><!-- fragment --><p>The sleep gate intentionally waits for queue drain, ledger synchronization, OTA checks, and webhook supervision before allowing radio teardown.</p>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md142"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md143"></a>
 7. Connectivity Architecture</h1>
 <p><a class="el" href="namespace_connectivity.html">Connectivity</a> is treated as a constrained resource, not as a permanently available baseline.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md143"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md144"></a>
 Connection Modes</h2>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -383,7 +383,7 @@ Connection Modes</h2>
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_my_persistent_data_8h.html#a6ed5b36c9cd209c52088cb9029de61b3acdaad1112073e3e2ea032424c38c34e1">DISCONNECTED</a></span>  </td><td class="markdownTableBodyNone">Operate cloud-optional/offline  </td><td class="markdownTableBodyNone">suppresses automatic connection attempts and long-duration connectivity recovery  </td></tr>
 </table>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md144"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md145"></a>
 Radio Lifecycle</h2>
 <p>The radio lifecycle is explicit:</p>
 <ol type="1">
@@ -394,7 +394,7 @@ Radio Lifecycle</h2>
 <li>Tear down cloud and radio state with separate bounded budgets.</li>
 <li>Return to <span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aeca4500f6f729608a014643f8c8f4003">IDLE_STATE</a></span> or <span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8a2805c30ddbcdce962fbc9d45d8fa8a24">SLEEPING_STATE</a></span> depending on the operating mode.</li>
 </ol>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md145"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md146"></a>
 Connect Budgets and Deep Attempts</h2>
 <p>The firmware uses two connection budgets:</p>
 <ul>
@@ -402,7 +402,7 @@ Connect Budgets and Deep Attempts</h2>
 <li>a deeper periodic budget that allows slower modem recovery behavior to complete</li>
 </ul>
 <p>The deeper budget is intentionally not used every cycle. It is permitted periodically or when battery state is healthy enough to spend extra energy on recovery. This limits battery waste while still preserving a path for difficult cellular recoveries.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md146"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md147"></a>
 Disconnect Behavior</h2>
 <p>Disconnect is treated separately from connect because failure modes differ:</p>
 <ul>
@@ -410,7 +410,7 @@ Disconnect Behavior</h2>
 <li>radio power-down has its own budget</li>
 <li>standby behavior is allowed only where it is justified by platform and battery context</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md147"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md148"></a>
 Connectivity Philosophy</h2>
 <ul>
 <li>connect only when necessary</li>
@@ -420,10 +420,10 @@ Connectivity Philosophy</h2>
 </ul>
 <p>This philosophy is the foundation for both the normal connection flow and the higher-level recovery ladder.</p>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md149"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md150"></a>
 8. Power Management Architecture</h1>
 <p>Power management is a policy subsystem, not just a collection of battery reads.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md150"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md151"></a>
 Battery Tiers</h2>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -438,7 +438,7 @@ Battery Tiers</h2>
 <td class="markdownTableBodyNone"><span class="tt">SURVIVAL</span>  </td><td class="markdownTableBodyNone">Protect minimum device life  </td><td class="markdownTableBodyNone">minimal connectivity and suppression of higher-cost recovery actions unless externally powered  </td></tr>
 </table>
 <p>Tier transitions use hysteresis so the firmware does not oscillate between policies when state of charge hovers near a threshold.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md151"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md152"></a>
 Architectural Responsibilities</h2>
 <ul>
 <li>normalize platform-specific battery and power-source telemetry</li>
@@ -448,13 +448,13 @@ Architectural Responsibilities</h2>
 <li>suppress expensive recovery actions when battery state makes them unsafe</li>
 </ul>
 <p>Detailed input-power profile behavior is documented in <a class="el" href="md_docs_2architecture_2power-management.html" title="Power Management Architecture"><span class="tt">docs/architecture/power-management.md</span></a>. The June 2026 Boron PMIC charging root cause is preserved in <a class="el" href="md_docs_2postmortems_22026-06-pmic-charging-root-cause.html" title="2026-06 PMIC Charging Root Cause"><span class="tt">docs/postmortems/2026-06-pmic-charging-root-cause.md</span></a>.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md152"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md153"></a>
 Deployment Scenarios</h2>
 <ul>
 <li>Solar deployments: prioritize bounded connection time, back-off behavior, and survival during poor charging conditions.</li>
 <li>USB-powered or externally powered deployments: allow more aggressive recovery and faster interactive behavior because energy scarcity is lower.</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md153"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md154"></a>
 Sleep and Wake Model</h2>
 <p>The device primarily uses low-power sleep to end the wake cycle. Wake sources include:</p>
 <ul>
@@ -464,7 +464,7 @@ Sleep and Wake Model</h2>
 <li>watchdog or recovery-triggered restart paths when normal flow fails</li>
 </ul>
 <p>The AB1805 RTC provides reliable long-duration timing and also participates in the hardware watchdog and deep power-down path.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md154"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md155"></a>
 Power-State Diagram</h2>
 <div class="fragment"><div class="line">flowchart TD</div>
 <div class="line">    A[Awake: sensing and policy] --&gt; B{Need cloud work?}</div>
@@ -481,10 +481,10 @@ Power-State Diagram</h2>
 <div class="line">    I --&gt; A</div>
 </div><!-- fragment --><p>The key architectural rule is that sleep is not a side effect. It is an explicit state transition informed by sensing, cloud work, and power policy.</p>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md156"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md157"></a>
 9. Recovery and Resiliency Architecture</h1>
 <p>Recovery is a first-class subsystem because unattended devices fail in ways that are gradual, intermittent, and often power-sensitive.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md157"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md158"></a>
 Recovery Philosophy</h2>
 <p>The system follows a staged escalation model:</p>
 <ol type="1">
@@ -494,27 +494,27 @@ Recovery Philosophy</h2>
 <li>Reset only when necessary</li>
 </ol>
 <p>The goal is to preserve useful work and battery life before falling back to disruptive actions.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md158"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md159"></a>
 Recovery Components</h2>
-<h3 class="doxsection"><a class="anchor" id="autotoc_md159"></a>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md160"></a>
 ApplicationWatchdog</h3>
 <p>The software watchdog detects when the main application loop stops making progress for too long. Its role is to catch hangs that violate the intended non-blocking architecture.</p>
-<h3 class="doxsection"><a class="anchor" id="autotoc_md160"></a>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md161"></a>
 AB1805 Hardware Watchdog</h3>
 <p>The AB1805 hardware watchdog is the lower-level backstop. It exists in case the software watchdog or application logic can no longer service itself. This provides recovery even when the CPU remains alive but the firmware is no longer behaving coherently.</p>
-<h3 class="doxsection"><a class="anchor" id="autotoc_md161"></a>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md162"></a>
 ThrashGuard</h3>
 <p><a class="el" href="class_thrash_guard.html">ThrashGuard</a> supervises top-level state progress. It is not a duplicate of the watchdogs; instead, it looks for repeated no-progress behavior inside the normal state machine and responds in graduated steps before full reset.</p>
-<h3 class="doxsection"><a class="anchor" id="autotoc_md162"></a>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md163"></a>
 Boot-Storm Protection</h3>
 <p>Boot-storm logic handles the case where the device repeatedly resets before setup completes and therefore never reaches normal error supervision. It uses retained counters and a holdoff sleep to prevent infinite early-reset loops.</p>
-<h3 class="doxsection"><a class="anchor" id="autotoc_md163"></a>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md164"></a>
 <span class="tt">ERROR_STATE</span> Supervision</h3>
 <p><span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aa07813f3418b83dc769daa78689fb9c3">ERROR_STATE</a></span> is the centralized policy point for alert-driven containment. It decides whether to do nothing, perform a soft reset, or escalate to AB1805 deep power-down based on alert class and recent reset history.</p>
-<h3 class="doxsection"><a class="anchor" id="autotoc_md164"></a>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md165"></a>
 Connectivity Failsafe Supervisor</h3>
 <p>The connectivity failsafe handles a different failure class: the device remains operational but has not successfully reached the Particle cloud for an unusually long time. It persists escalation state so recovery can continue across resets instead of restarting from the lowest rung every time.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md165"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md166"></a>
 Escalation Ladder</h2>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -530,7 +530,7 @@ Escalation Ladder</h2>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyNone">Full application hang  </td><td class="markdownTableBodyNone">loop stops progressing  </td><td class="markdownTableBodyNone">ApplicationWatchdog  </td><td class="markdownTableBodyNone">AB1805 hardware watchdog if needed  </td></tr>
 </table>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md166"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md167"></a>
 Recovery Flow Diagram</h2>
 <div class="fragment"><div class="line">flowchart TD</div>
 <div class="line">    A[Fault or degraded condition detected] --&gt; B{Normal state still making progress?}</div>
@@ -558,7 +558,7 @@ Recovery Flow Diagram</h2>
 <div class="line">    R --&gt; S{Boot completes?}</div>
 <div class="line">    S -- No --&gt; T[Boot-storm holdoff]</div>
 <div class="line">    S -- Yes --&gt; N</div>
-</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md167"></a>
+</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md168"></a>
 Retained Breadcrumbs</h2>
 <p>Retained breadcrumbs record where the firmware was in the lifecycle immediately before a reset or deep recovery event. They are used for attribution, not for normal control flow.</p>
 <p>Their architectural purpose is to answer questions such as:</p>
@@ -567,7 +567,7 @@ Retained Breadcrumbs</h2>
 <li>was a watchdog or connectivity failsafe involved?</li>
 <li>did the device reset before it could publish its own explanation?</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md168"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md169"></a>
 Persisted Recovery State</h2>
 <p>The connectivity failsafe persists its stage, last action time, and action count in <span class="tt"><a class="el" href="_my_persistent_data_8h.html#a5eda319b411fdadc047a6d8c3aad0241">sysStatus</a></span>. That persistence matters because the system is designed to survive across:</p>
 <ul>
@@ -575,7 +575,7 @@ Persisted Recovery State</h2>
 <li>soft resets</li>
 <li>staged recovery attempts separated by long cooldown windows</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md169"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md170"></a>
 Why Recovery Actions Are Staged</h2>
 <p>Staging avoids two common failure patterns in remote devices:</p>
 <ul>
@@ -584,10 +584,10 @@ Why Recovery Actions Are Staged</h2>
 </ul>
 <p>Radio reset is cheaper than full reset. Full reset is cheaper than hard power removal. Persisted staging lets the firmware move upward only when evidence says lower-cost recovery was not enough.</p>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md171"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md172"></a>
 10. Time and Scheduling Architecture</h1>
 <p>Time is treated as an operational dependency because open-hours behavior, report cadence, and overnight sleep decisions all depend on trustworthy local time.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md172"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md173"></a>
 Components</h2>
 <ul>
 <li>AB1805 RTC: durable time base and deep-sleep coordination</li>
@@ -595,7 +595,7 @@ Components</h2>
 <li>LocalTimeRK: conversion from UTC to configured local time zone</li>
 <li><a class="el" href="namespace_local_time_cache.html">LocalTimeCache</a>: cached local-time snapshot so repeated scheduling decisions do not repeatedly pay the full conversion cost</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md173"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md174"></a>
 Architectural Responsibilities</h2>
 <ul>
 <li>determine whether system time is valid enough for open/close-hours policy</li>
@@ -606,7 +606,7 @@ Architectural Responsibilities</h2>
 <p>The firmware intentionally distinguishes between time validity and cloud connectivity. A device may continue operating locally from valid time even when the cloud is temporarily unavailable.</p>
 <p>Open/close-hours logic controls whether the device should remain awake, defer reports, preserve occupancy responsiveness, or take long closed-hours sleep. Overnight behavior is therefore a scheduling policy, not just a sleep duration.</p>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md175"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md176"></a>
 11. Observability and Diagnostics</h1>
 <p>The firmware is designed to explain itself in the field.</p>
 <p>Key observability outputs include:</p>
@@ -628,7 +628,7 @@ Architectural Responsibilities</h2>
 </ul>
 <p>This architecture is intentionally redundant: the device tries to provide both a durable cloud-visible summary and enough local log context to understand why a reset or escalation occurred.</p>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md177"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md178"></a>
 12. Supported Platforms</h1>
 <p>Current supported platforms are:</p>
 <ul>
@@ -649,7 +649,7 @@ Architectural Responsibilities</h2>
 </table>
 <p>The important invariant is that application behavior is expressed in platform-neutral policy terms. Platform-specific APIs are confined to the abstraction layers that know how to implement those policies safely.</p>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md179"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md180"></a>
 13. Repository Layout</h1>
 <p>The repository is organized by responsibility:</p>
 <ul>
@@ -665,7 +665,7 @@ Architectural Responsibilities</h2>
 </ul>
 <p>This layout mirrors architectural domains rather than forcing every feature through a single application file.</p>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md181"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md182"></a>
 14. Architectural Constraints</h1>
 <p>The following rules are structural, not stylistic:</p>
 <ul>
@@ -679,7 +679,7 @@ Architectural Responsibilities</h2>
 </ul>
 <p>Violating these constraints would make the system harder to reason about under exactly the field conditions it is designed to survive.</p>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md183"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md184"></a>
 15. Future Refactoring Roadmap</h1>
 <p>The following extractions are planned after soak:</p>
 <ul>

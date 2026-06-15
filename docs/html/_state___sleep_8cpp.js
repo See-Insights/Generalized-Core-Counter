@@ -9,6 +9,7 @@ var _state___sleep_8cpp =
     [ "anonymous_namespace{State_Sleep.cpp}::clearAb1805StaleAlarmInterrupts", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a0ec7e4894e73fae7b3b3379c92e8378b", null ],
     [ "anonymous_namespace{State_Sleep.cpp}::computeCloudSyncTimeoutMs", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a13e9915406af72c4d32f922a088d826d", null ],
     [ "anonymous_namespace{State_Sleep.cpp}::connectionModeLabel", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#aa507bd767963a02cf16d555d7431c3da", null ],
+    [ "anonymous_namespace{State_Sleep.cpp}::drainSerialBeforeSleep", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#ac564f7575d621f12fd01aa326e2147b3", null ],
     [ "anonymous_namespace{State_Sleep.cpp}::gateBlockerReasonLabel", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#ac97ad6c9d2761efe8d813abc923410f4", null ],
     [ "handleSleepingState", "_state___sleep_8cpp.html#a733df5bda859981b51a039b66edc6a5a", null ],
     [ "anonymous_namespace{State_Sleep.cpp}::isDeviceOsAtLeast6400", "namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#ad193dd0c768b360b4715ed2d34aec4c5", null ],

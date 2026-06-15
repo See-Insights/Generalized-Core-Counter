@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;18</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;19</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -92,9 +92,9 @@ $(function(){initNavTree('md_docs_2bench-validation.html','',''); });
   <div class="headertitle"><div class="title">Bench Validation Checklist (Pre-Field) </div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p><a class="anchor" id="autotoc_md194"></a></p>
+<div class="textblock"><p><a class="anchor" id="autotoc_md195"></a></p>
 <p>This guide validates the <b>power-safety</b> and <b>non-blocking</b> behaviors required for unattended solar/cellular deployments.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md195"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md196"></a>
 Goals</h1>
 <ul>
 <li>Device reaches a <b>sleepable state</b> in all paths.</li>
@@ -102,7 +102,7 @@ Goals</h1>
 <li><span class="tt"><a class="el" href="_generalized-_core-_counter_8cpp.html#afe461d27b9c48d5921c00d521181f12f">loop()</a></span> stays responsive (no long blocking waits).</li>
 <li>Connect/publish failures still lead to <b>bounded-time</b> progress (timeouts + recovery).</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md196"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md197"></a>
 Recommended Test Config (Ledger)</h1>
 <p>Use short budgets on the bench so failures are observable quickly.</p>
 <p>Suggested values (Device ledger <span class="tt">device-settings</span> → <span class="tt">modes</span> / <span class="tt">timing</span>):</p>
@@ -120,7 +120,7 @@ Recommended Test Config (Ledger)</h1>
 <li><span class="tt">timing.openHour</span>: <span class="tt">0</span></li>
 <li><span class="tt">timing.closeHour</span>: <span class="tt">24</span></li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md197"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md198"></a>
 Connectivity Failsafe Bench Build</h1>
 <p>Production builds keep the connectivity failsafe at the normal thresholds:</p>
 <ul>
@@ -155,7 +155,7 @@ Connectivity Failsafe Bench Build</h1>
 <li>Startup status payload includes: <span class="tt">"failsafeCount":0</span>, <span class="tt">"failsafeTest":1</span></li>
 </ul>
 <p>Do not use this flag for production or soak builds unless the short timing is explicitly intended for bench validation.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md198"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md199"></a>
 Disabling Test Mode For Production</h2>
 <ul>
 <li>Production and soak builds must compile with <span class="tt"><a class="el" href="_build_profile_8h.html#ace016f8be71ba4de13d0741f003ce9a1" title="Bench-only override for connectivity failsafe timing.">CONNECTIVITY_FAILSAFE_TEST_MODE</a>=0</span>.</li>
@@ -168,7 +168,7 @@ Disabling Test Mode For Production</h2>
 <li>Confirm boot logs show <span class="tt">FailsafeTest=0</span>.</li>
 <li>Confirm failsafe timing logs show the production values: <span class="tt">stale=43200s</span>, <span class="tt">cooldown=21600s</span>, <span class="tt">jitter=1800s</span>.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md199"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md200"></a>
 Bench Setup</h1>
 <ul>
 <li>Put the device on a <b>bench supply</b> or a known-good LiPo.</li>
@@ -183,7 +183,7 @@ Bench Setup</h1>
 </ul>
 </li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md200"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md201"></a>
 What to Watch in Logs</h1>
 <p>Use your usual serial log view. Key messages to confirm:</p>
 <ul>
@@ -206,7 +206,7 @@ What to Watch in Logs</h1>
 </ul>
 </li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md201"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md202"></a>
 Test 1 — Normal Wake → Connect → Publish → Sleep</h1>
 <p><b>Purpose:</b> Prove the happy path reaches low current sleep and modem powers down.</p>
 <p>Steps:</p>
@@ -221,7 +221,7 @@ Test 1 — Normal Wake → Connect → Publish → Sleep</h1>
 <li>The modem power-down log appears before sleep.</li>
 <li>Current drops to a stable low level after sleep.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md202"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md203"></a>
 Test 2 — Forced Connect Failure (Budget Timeout)</h1>
 <p><b>Purpose:</b> Prove the modem does not stay powered after a failed connect attempt.</p>
 <p>Steps:</p>
@@ -236,7 +236,7 @@ Test 2 — Forced Connect Failure (Budget Timeout)</h1>
 <li>Modem powers down (current drops) while waiting for backoff/reset.</li>
 <li>Device does not sit indefinitely in a “modem on, not connected” state.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md203"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md204"></a>
 Test 3 — Cloud Disconnect Budget Exceeded</h1>
 <p><b>Purpose:</b> Validate bounded disconnect and that you still end up safe.</p>
 <p>Steps:</p>
@@ -251,7 +251,7 @@ Test 3 — Cloud Disconnect Budget Exceeded</h1>
 <li>Device enters <span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aa07813f3418b83dc769daa78689fb9c3">ERROR_STATE</a></span>.</li>
 <li>Modem powers down while in error handling.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md204"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md205"></a>
 Test 4 — Sleep Return / Sleep Not Honored</h1>
 <p><b>Purpose:</b> Detect pathological sleep behavior that can cause rapid wake/sleep battery drain.</p>
 <p>Steps:</p>
@@ -263,7 +263,7 @@ Test 4 — Sleep Return / Sleep Not Honored</h1>
 <ul>
 <li>If a long sleep returns immediately, you should see an alert 16 and transition to <span class="tt"><a class="el" href="_state_machine_8h.html#a5d74787dedbc4e11c1ab15bf487e61f8aa07813f3418b83dc769daa78689fb9c3">ERROR_STATE</a></span>.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md205"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md206"></a>
 Test 5 — Loop Responsiveness (No Blocking)</h1>
 <p><b>Purpose:</b> Confirm no long waits for serial, and loop continues servicing background tasks.</p>
 <p>Steps:</p>
@@ -277,11 +277,11 @@ Test 5 — Loop Responsiveness (No Blocking)</h1>
 <li>No long “startup pause” waiting for serial.</li>
 <li>Device still reaches a sleep state and/or runs its state machine.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md206"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md207"></a>
 Test 6 — PMIC Health Monitoring &amp; Remediation (Boron Only)</h1>
 <p><b>Purpose:</b> Validate PMIC fault detection and smart remediation system.</p>
 <p><b>Platform:</b> Boron only (cellular platforms with BQ24195 PMIC). Photon2/P2/Argon do not have this PMIC and will not execute this code path.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md207"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md208"></a>
 Normal Operation Baseline</h2>
 <p>Steps:</p>
 <ol type="1">
@@ -297,10 +297,10 @@ Normal Operation Baseline</h2>
 <li>No alerts raised</li>
 <li>consecutiveFaults counter stays at 0</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md208"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md209"></a>
 Simulating PMIC Faults (Advanced)</h2>
 <p><b>⚠️ Warning:</b> Some tests require forcing fault conditions. Be prepared to power cycle.</p>
-<h3 class="doxsection"><a class="anchor" id="autotoc_md209"></a>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md210"></a>
 Test 6A — Thermal Fault Detection</h3>
 <p>Steps:</p>
 <ol type="1">
@@ -319,7 +319,7 @@ Test 6A — Thermal Fault Detection</h3>
 <li>Alert 20 raised on thermal shutdown</li>
 <li>Alert auto-clears when temperature normalizes</li>
 </ul>
-<h3 class="doxsection"><a class="anchor" id="autotoc_md210"></a>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md211"></a>
 Test 6B — Charge Timeout Detection</h3>
 <p>This is the most common real-world fault ("stuck charging" with 1Hz amber LED).</p>
 <p>Observation method (field data):</p>
@@ -341,7 +341,7 @@ Test 6B — Charge Timeout Detection</h3>
 <li>1-hour cooldown prevents thrashing (see "in cooldown period" logs)</li>
 <li>Alert clears when charging resumes normally</li>
 </ul>
-<h3 class="doxsection"><a class="anchor" id="autotoc_md211"></a>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md212"></a>
 Test 6C — Remediation Cooldown &amp; Anti-Thrashing</h3>
 <p><b>Purpose:</b> Confirm remediation doesn't thrash with repeated attempts.</p>
 <p>Observation method:</p>
@@ -361,7 +361,7 @@ Test 6C — Remediation Cooldown &amp; Anti-Thrashing</h3>
 <li>Level escalates gradually: 0 → 1 (2+ faults) → 2 (3+ faults)</li>
 <li>Level resets to 0 after successful Level 2 attempt</li>
 </ul>
-<h3 class="doxsection"><a class="anchor" id="autotoc_md212"></a>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md213"></a>
 Test 6D — Remediation Success &amp; Alert Clearing</h3>
 <p><b>Purpose:</b> Confirm alerts clear when charging recovers.</p>
 <p>Steps:</p>
@@ -377,7 +377,7 @@ Test 6D — Remediation Success &amp; Alert Clearing</h3>
 <li>Alert code cleared: <span class="tt">current.get_alertCode() == 0</span></li>
 <li>Subsequent reports show <span class="tt">alerts=0</span> in webhook payload</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md213"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md214"></a>
 PMIC Alert Webhook Integration</h2>
 <p>Verify alerts flow through existing webhook:</p>
 <ol type="1">
@@ -401,16 +401,16 @@ PMIC Alert Webhook Integration</h2>
 <li>Alerts visible in monitoring dashboard</li>
 <li>Alert clears (returns to 0) when charging recovers</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md214"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md215"></a>
 Quick Interpretation of Alerts</h1>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md215"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md216"></a>
 Connectivity Alerts</h2>
 <ul>
 <li><span class="tt">31</span>: connect attempt budget exceeded</li>
 <li><span class="tt">15</span>: disconnect/modem power-down budget exceeded</li>
 <li><span class="tt">16</span>: sleep returned unexpectedly or not honored</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md216"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md217"></a>
 Battery/Charging Alerts (Boron Only)</h2>
 <ul>
 <li><span class="tt">20</span>: <b>PMIC Thermal Shutdown</b> (critical) - charging stopped due to temperature</li>
@@ -418,7 +418,7 @@ Battery/Charging Alerts (Boron Only)</h2>
 <li><span class="tt">22</span>: <b>PMIC Input Fault</b> (major) - VBUS overvoltage detected</li>
 <li><span class="tt">23</span>: <b>PMIC Battery Fault</b> (major) - general charging issue</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md217"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md218"></a>
 If Something Fails</h1>
 <p>Most common failure signatures and what they mean:</p>
 <ul>

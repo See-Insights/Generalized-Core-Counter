@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;18</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;19</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -92,18 +92,18 @@ $(function(){initNavTree('md_docs_2architecture_2power-management.html','',''); 
   <div class="headertitle"><div class="title">Power Management Architecture </div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p><a class="anchor" id="autotoc_md184"></a></p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md185"></a>
+<div class="textblock"><p><a class="anchor" id="autotoc_md185"></a></p>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md186"></a>
 Overview</h1>
 <p>Power management is split between firmware policy and Particle-supported power APIs. <span class="tt"><a class="el" href="class_power_manager.html" title="Singleton that samples platform power telemetry and produces policy guidance.">PowerManager</a></span> chooses the input-power profile from the Device OS power-source classification, and <span class="tt"><a class="el" href="namespace_power_platform.html">PowerPlatform</a></span> translates that profile into a <span class="tt">SystemPowerConfiguration</span>. Device OS then applies the configuration to the platform power stack and, on Boron-class Gen 3 cellular devices, to the BQ24195 PMIC.</p>
 <p>The architecture intentionally avoids direct PMIC register overrides for normal power-source selection. Custom PMIC reads are used for diagnostics and forensics; supported Particle APIs are used for durable charging configuration.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md186"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md187"></a>
 Supported Platforms</h1>
 <ul>
 <li>Boron / Gen 3 cellular PMIC platforms: full power-source detection, fuel gauge reads, charging control, and input-power profile application.</li>
 <li>Non-PMIC or unsupported platforms: report power state where available and use <span class="tt">NotApplicable</span> for PMIC/input-power profile application.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md187"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md188"></a>
 Components</h1>
 <ul>
 <li><span class="tt"><a class="el" href="_power_manager_8cpp.html">src/power/PowerManager.cpp</a></span>: selects the active input profile and records the reason for the decision.</li>
@@ -112,7 +112,7 @@ Components</h1>
 <li>Particle Device OS: classifies the power source and owns the low-level PMIC programming path.</li>
 <li>BQ24195 PMIC: charger and input-power controller used on Boron-class devices.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md188"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md189"></a>
 Power Profiles</h1>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -125,7 +125,7 @@ Power Profiles</h1>
 <td class="markdownTableBodyNone"><span class="tt">NotApplicable</span>  </td><td class="markdownTableBodyRight">n/a  </td><td class="markdownTableBodyRight">n/a  </td><td class="markdownTableBodyRight">n/a  </td><td class="markdownTableBodyRight">n/a  </td><td class="markdownTableBodyNone">unsupported PMIC/platform path  </td><td class="markdownTableBodyNone">Platforms where input-power profiles cannot be applied  </td></tr>
 </table>
 <p><span class="tt"><a class="el" href="_power_manager_8h.html#abc3d13c7b58b63381698ef85e244366fa06b9281e396db002010bde1de57262eb">PowerInputProfile::Auto</a></span> exists in the enum but is not currently selected or applied as an active profile.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md189"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md190"></a>
 Power-Source Selection</h1>
 <p><span class="tt"><a class="el" href="class_power_manager.html" title="Singleton that samples platform power telemetry and produces policy guidance.">PowerManager</a></span> treats the Device OS power-source classification as the source of truth:</p>
 <table class="markdownTable">
@@ -147,7 +147,7 @@ Power-Source Selection</h1>
 <td class="markdownTableBodyNone">unsupported platform  </td><td class="markdownTableBodyNone"><span class="tt">NotApplicable</span>  </td><td class="markdownTableBodyNone">no PMIC input profile support  </td></tr>
 </table>
 <p>For field builds, the configured fallback can use <span class="tt">solarPowerMode</span>; non-field builds fall back to <span class="tt">USB_BENCH</span>. Fallback is only used when the power source is battery, unknown, unavailable, or unsupported. A valid USB classification always selects <span class="tt">USB_BENCH</span>; a valid VIN classification always selects <span class="tt">SOLAR</span>.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md190"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md191"></a>
 Design Rules</h1>
 <ol type="1">
 <li>Never infer the physical power source from the active profile.</li>
@@ -156,12 +156,12 @@ Design Rules</h1>
 <li><span class="tt">VIN</span> is the only Device OS source that selects <span class="tt">SOLAR</span>.</li>
 <li>Any future use of <span class="tt">SystemPowerFeature::USE_VIN_SETTINGS_WITH_USB_HOST</span> requires explicit architectural review.</li>
 </ol>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md191"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md192"></a>
 Critical Warning</h1>
 <p>Do not enable <span class="tt">SystemPowerFeature::USE_VIN_SETTINGS_WITH_USB_HOST</span> for mixed USB/Solar deployments.</p>
 <p>That Device OS feature exists for hardware designs where VIN power can appear as USB host power because the USB peripheral is active without USB providing the actual input supply. When enabled, Device OS can classify a real <span class="tt">USB_HOST</span> condition as <span class="tt">POWER_SOURCE_VIN</span> and apply VIN settings to that source.</p>
 <p>In this firmware, VIN maps to <span class="tt">SOLAR</span>. On Boron / Device OS 6.4.1, enabling <span class="tt">USE_VIN_SETTINGS_WITH_USB_HOST</span> caused a physical USB input to be treated as VIN, which selected the <span class="tt">SOLAR</span> profile. The <span class="tt">SOLAR</span> profile sets VINDPM to 5080 mV. With a USB source near 5.1 V, the PMIC entered input-voltage DPM and throttled charging current to near zero even though the PMIC reported Fast Charge and no fault.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md192"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md193"></a>
 Diagnostics</h1>
 <p>A dangerous signature is:</p>
 <div class="fragment"><div class="line">PowerApply: profile=SOLAR source=VIN</div>
@@ -169,7 +169,7 @@ Diagnostics</h1>
 <div class="line">PMIC DPM active</div>
 <div class="line">Battery SOC declining while USB is attached</div>
 </div><!-- fragment --><p><span class="tt">chg=FastCharge</span> and <span class="tt">fault=0x00</span> do not prove meaningful charge current is flowing. DPM can be active and limiting input current while the charge-state machine still reports Fast Charge.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md193"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md194"></a>
 References</h1>
 <ul>
 <li><span class="tt"><a class="el" href="_power_manager_8cpp.html">src/power/PowerManager.cpp</a></span></li>

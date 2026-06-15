@@ -92,7 +92,7 @@ var NAVTREEINDEX1 =
 "_state___report_8cpp.html#a1ef85fec9be65d21b46ebd2b1a57294a":[17,0,1,5,5,0],
 "_state___report_8cpp_source.html":[17,0,1,5,5],
 "_state___sleep_8cpp.html":[17,0,1,5,6],
-"_state___sleep_8cpp.html#a733df5bda859981b51a039b66edc6a5a":[17,0,1,5,6,6],
+"_state___sleep_8cpp.html#a733df5bda859981b51a039b66edc6a5a":[17,0,1,5,6,7],
 "_state___sleep_8cpp_source.html":[17,0,1,5,6],
 "_state_handlers_8cpp.html":[17,0,1,5,7],
 "_state_handlers_8cpp_source.html":[17,0,1,5,7],

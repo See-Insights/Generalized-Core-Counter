@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['key_20diagnostic_20breakthrough_0',['Key Diagnostic Breakthrough',['../md_docs_2postmortems_22026-06-pmic-charging-root-cause.html#autotoc_md264',1,'']]],
+  ['key_20diagnostic_20breakthrough_0',['Key Diagnostic Breakthrough',['../md_docs_2postmortems_22026-06-pmic-charging-root-cause.html#autotoc_md265',1,'']]],
   ['kgateblockerledger_1',['kGateBlockerLedger',['../namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#a1de56a8bd1d2621ea1abe48305ab1d27',1,'anonymous_namespace{State_Sleep.cpp}']]],
   ['kgateblockerqueue_2',['kGateBlockerQueue',['../namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#aefba2c3e1f6fa82f33ec78f0261b8fda',1,'anonymous_namespace{State_Sleep.cpp}']]],
   ['kgateblockeruninitialized_3',['kGateBlockerUninitialized',['../namespaceanonymous__namespace_02_state___sleep_8cpp_03.html#aa4f80677571b111d9b02e6b473467381',1,'anonymous_namespace{State_Sleep.cpp}']]],
@@ -13,7 +13,7 @@ var searchData=
   ['kloopforensicsversion_10',['kLoopForensicsVersion',['../_generalized-_core-_counter_8cpp.html#a69b5e1b523141afafc34213202477e18',1,'Generalized-Core-Counter.cpp']]],
   ['kloopstageerrorthresholdms_11',['kLoopStageErrorThresholdMs',['../_generalized-_core-_counter_8cpp.html#a236b5df6230c30163d19f7f220617ee1',1,'Generalized-Core-Counter.cpp']]],
   ['kloopstagewarnthresholdms_12',['kLoopStageWarnThresholdMs',['../_generalized-_core-_counter_8cpp.html#a3cce693768d528b04e4969305a208914',1,'Generalized-Core-Counter.cpp']]],
-  ['known_20failure_20signature_13',['Known Failure Signature',['../md_docs_2postmortems_22026-06-pmic-charging-root-cause.html#autotoc_md268',1,'']]],
+  ['known_20failure_20signature_13',['Known Failure Signature',['../md_docs_2postmortems_22026-06-pmic-charging-root-cause.html#autotoc_md269',1,'']]],
   ['known_20limitations_14',['Known Limitations',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md57',1,'']]],
   ['kpowersourcebattery_15',['kPowerSourceBattery',['../namespace_power_diagnostics_1_1anonymous__namespace_02_power_diagnostics_8cpp_03.html#ac47324eb6c2ddba10b67d109ad30fd97',1,'PowerDiagnostics::anonymous_namespace{PowerDiagnostics.cpp}::kPowerSourceBattery'],['../namespaceanonymous__namespace_02_power_manager_8cpp_03.html#a0649531c40a00582eb236b61b94cbfd0',1,'anonymous_namespace{PowerManager.cpp}::kPowerSourceBattery'],['../namespace_power_platform_1_1anonymous__namespace_02_power_platform_8cpp_03.html#acea8c4a4fe81edd1685b7dc2f7a6de5b',1,'PowerPlatform::anonymous_namespace{PowerPlatform.cpp}::kPowerSourceBattery']]],
   ['kpowersourceunknown_16',['kPowerSourceUnknown',['../namespace_power_diagnostics_1_1anonymous__namespace_02_power_diagnostics_8cpp_03.html#afec87a3b0b6c4626247cffdf1335a3a8',1,'PowerDiagnostics::anonymous_namespace{PowerDiagnostics.cpp}::kPowerSourceUnknown'],['../namespace_power_platform_1_1anonymous__namespace_02_power_platform_8cpp_03.html#a769d09f6fbb87fc237e12f19591a7355',1,'PowerPlatform::anonymous_namespace{PowerPlatform.cpp}::kPowerSourceUnknown']]],

@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;18</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;19</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -92,14 +92,14 @@ $(function(){initNavTree('md_docs_2stability-maintainability-review.html','','')
   <div class="headertitle"><div class="title">Stability &amp; Maintainability Review </div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p><a class="anchor" id="autotoc_md309"></a></p>
+<div class="textblock"><p><a class="anchor" id="autotoc_md310"></a></p>
 <p><b>For small-team field-stability focus on See Insights outdoor Particle devices (Boron / Photon 2).</b></p>
 <p>This document refines Grok’s architectural recommendations into practical, low-overhead actions. Prioritized for firmware stability, resiliency, maintainability, and field operations. No source code changes. Focus on documentation, lightweight checks, and narrow issues.</p>
 <p>Current context: Actively testing/releasing v14 (cloud recovery + logging cleanup). Beyond v11 soak.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md310"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md311"></a>
 P0 — Must Do Before Broader Field Rollout</h1>
 <p>Items that could prevent field failures or make recovery/debugging materially safer.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md311"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md312"></a>
 Verify firmware version/release number consistency</h2>
 <ul>
 <li><b>Why it matters</b>: Mismatched version strings across build artifacts, README, CHANGELOG, and source can cause confusion during OTA, debugging, and fleet analysis.</li>
@@ -108,7 +108,7 @@ Verify firmware version/release number consistency</h2>
 <li><b>Estimated effort</b>: Small</li>
 <li><b>GitHub issue?</b>: Yes — “Add release consistency checklist for Particle integer firmware versions”</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md312"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md313"></a>
 Confirm BuildProfile.h defaults are field-safe</h2>
 <ul>
 <li><b>Why it matters</b>: DEV_BUILD=1 and CONNECTIVITY_FAILSAFE_TEST_MODE defaults must not leak into production builds.</li>
@@ -117,7 +117,7 @@ Confirm BuildProfile.h defaults are field-safe</h2>
 <li><b>Estimated effort</b>: Small</li>
 <li><b>GitHub issue?</b>: Yes — “Confirm and document field-safe BuildProfile defaults before v14 rollout”</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md313"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md314"></a>
 Confirm persistent data structure/versioning is documented and migration-safe</h2>
 <ul>
 <li><b>Why it matters</b>: <a class="el" href="_my_persistent_data_8h.html" title="Persistent Data Storage Structures - EEPROM/Retained Memory Management.">MyPersistentData.h</a>/cpp is central; layout changes (e.g., v14 recovery fields) require safe migration for in-field devices.</li>
@@ -126,7 +126,7 @@ Confirm persistent data structure/versioning is documented and migration-safe</h
 <li><b>Estimated effort</b>: Small / Medium</li>
 <li><b>GitHub issue?</b>: Yes — “Document persistent data versioning and migration rules”</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md314"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md315"></a>
 Confirm no local paths, credentials, Wi-Fi SSIDs/passwords, Particle tokens, or device-specific secrets are committed</h2>
 <ul>
 <li><b>Why it matters</b>: Outdoor fleet; any leak compromises security or enables targeted attacks.</li>
@@ -135,7 +135,7 @@ Confirm no local paths, credentials, Wi-Fi SSIDs/passwords, Particle tokens, or 
 <li><b>Estimated effort</b>: Small</li>
 <li><b>GitHub issue?</b>: Yes — “Run and document local secret scan before field rollout”</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md315"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md316"></a>
 Confirm v14 recovery/logging changes are documented in CHANGELOG and release notes</h2>
 <ul>
 <li><b>Why it matters</b>: <a class="el" href="class_cloud.html" title="This class is a singleton; you do not create one as a global, on the stack, or with new.">Cloud</a> recovery and logging cleanup are critical for field resiliency.</li>
@@ -144,10 +144,10 @@ Confirm v14 recovery/logging changes are documented in CHANGELOG and release not
 <li><b>Estimated effort</b>: Small</li>
 <li><b>GitHub issue?</b>: Yes — “Document v14 cloud recovery and logging changes”</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md316"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md317"></a>
 P1 — High Value, Low Overhead</h1>
 <p>Practical for small team.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md317"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md318"></a>
 Add a lightweight build verification command to README</h2>
 <ul>
 <li><b>Why it matters</b>: Reproducible builds reduce "works on my machine" issues.</li>
@@ -156,7 +156,7 @@ Add a lightweight build verification command to README</h2>
 <li><b>Estimated effort</b>: Small</li>
 <li><b>GitHub issue?</b>: Yes — “Add lightweight build verification instructions to README”</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md318"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md319"></a>
 Add a simple GitHub Actions compile check (if practical)</h2>
 <ul>
 <li><b>Why it matters</b>: Catches compile breaks early without full CI.</li>
@@ -165,7 +165,7 @@ Add a simple GitHub Actions compile check (if practical)</h2>
 <li><b>Estimated effort</b>: Medium</li>
 <li><b>GitHub issue?</b>: Defer if setup overhead high; consider later.</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md319"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md320"></a>
 Add a persistent-data migration note</h2>
 <ul>
 <li><b>Why it matters</b>: Supports safe evolution.</li>
@@ -174,7 +174,7 @@ Add a persistent-data migration note</h2>
 <li><b>Estimated effort</b>: Small</li>
 <li><b>GitHub issue?</b>: Combined with P0 item.</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md320"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md321"></a>
 Add a troubleshooting section for reset reasons, hibernate wake behavior, cloud recovery, and Particle OTA events</h2>
 <ul>
 <li><b>Why it matters</b>: Field devices are remote; quick debug info saves time.</li>
@@ -183,7 +183,7 @@ Add a troubleshooting section for reset reasons, hibernate wake behavior, cloud 
 <li><b>Estimated effort</b>: Small / Medium</li>
 <li><b>GitHub issue?</b>: Yes — “Document Boron vs Photon 2 sleep and reset behavior + troubleshooting”</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md321"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md322"></a>
 Document Boron vs Photon 2 sleep behavior differences</h2>
 <ul>
 <li><b>Why it matters</b>: Key to power/resiliency understanding.</li>
@@ -191,7 +191,7 @@ Document Boron vs Photon 2 sleep behavior differences</h2>
 <li><b>Estimated effort</b>: Small</li>
 <li><b>GitHub issue?</b>: Included above.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md322"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md323"></a>
 P2 — Nice Later</h1>
 <p>Valuable but not urgent.</p>
 <ul>
@@ -201,7 +201,7 @@ P2 — Nice Later</h1>
 <li>Deeper platform abstraction cleanup.</li>
 <li>Dashboards (external, not firmware).</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md323"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md324"></a>
 Defer / Do Not Do Now</h1>
 <ul>
 <li>Full CI/CD deployment pipeline.</li>
@@ -212,7 +212,7 @@ Defer / Do Not Do Now</h1>
 <li>Automated OTA rollout system.</li>
 </ul>
 <p>These would add overhead without immediate field risk reduction for the current small-team context.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md324"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md325"></a>
 Recommended Next 5 GitHub Issues</h1>
 <ol type="1">
 <li>“Document persistent data versioning and migration rules”</li>

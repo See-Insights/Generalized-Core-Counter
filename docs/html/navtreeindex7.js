@@ -1,5 +1,8 @@
 var NAVTREEINDEX7 =
 {
+"struct_session_state.html#aca10590c2b3dbbe1c2aa6d1e46d0e6b6":[16,0,24,9],
+"struct_session_state.html#ae0bcfaae63262ccee6e4aec733e6f7e1":[16,0,24,6],
+"struct_session_state.html#af3394279a59294a89ada8607297649be":[16,0,24,3],
 "struct_session_state.html#af7dffe574bae3e71f15882288106f58c":[16,0,24,0],
 "structanonymous__namespace_02_cloud_8cpp_03_1_1_ledger_request_record.html":[15,0,0,0],
 "structanonymous__namespace_02_cloud_8cpp_03_1_1_ledger_request_record.html":[16,0,0,0],

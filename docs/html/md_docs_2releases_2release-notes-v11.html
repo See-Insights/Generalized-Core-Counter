@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;18</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;19</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -92,13 +92,13 @@ $(function(){initNavTree('md_docs_2releases_2release-notes-v11.html','',''); });
   <div class="headertitle"><div class="title">Release Notes: v11.0.1 </div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p><a class="anchor" id="autotoc_md284"></a></p>
+<div class="textblock"><p><a class="anchor" id="autotoc_md285"></a></p>
 <p>Release name: <a class="el" href="namespace_connectivity.html">Connectivity</a> resiliency soak release</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md285"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md286"></a>
 Intent</h1>
 <p>v11.0.1 is the soak-release candidate for the connectivity recovery work that was bench-validated before field rollout. This patch release keeps the production timing model conservative while carrying forward the same firmware behavior under a new release identity that also includes the architecture overview documentation in the published artifact.</p>
 <p>This is a stability and resiliency release. It is not an architectural refactor release.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md286"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md287"></a>
 Highlights</h1>
 <ul>
 <li>Added a persisted long-duration connectivity failsafe with three escalation stages:<ul>
@@ -113,7 +113,7 @@ Highlights</h1>
 <li>Removed the runtime battery-test harness so battery data and connectivity validation no longer share test-only code paths.</li>
 <li>Refreshed release-facing documentation, recovery documentation, and public API comments for operator and collaborator onboarding.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md287"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md288"></a>
 Production Behavior</h1>
 <p>Production timing remains:</p>
 <ul>
@@ -122,7 +122,7 @@ Production Behavior</h1>
 <li>jitter cap: <span class="tt">30m</span></li>
 </ul>
 <p>The bench-only flag <span class="tt"><a class="el" href="_build_profile_8h.html#ace016f8be71ba4de13d0741f003ce9a1" title="Bench-only override for connectivity failsafe timing.">CONNECTIVITY_FAILSAFE_TEST_MODE</a></span> remains default <span class="tt">OFF</span> and is not part of the production soak build.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md288"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md289"></a>
 Bench Validation Summary</h1>
 <p>Bench validation confirmed the entire recovery ladder:</p>
 <ol type="1">
@@ -137,7 +137,7 @@ Bench Validation Summary</h1>
 <li>overnight closed-hours sleep deferral is visible separately from eligibility status</li>
 <li>production behavior remains unchanged when the test flag is disabled</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md289"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md290"></a>
 Deployment Scope</h1>
 <ul>
 <li><span class="tt">1</span> Photon 2 in Singapore</li>
@@ -151,7 +151,7 @@ Deployment Scope</h1>
 <li>wake-cycle length and teardown stability</li>
 <li>any evidence of test-mode leakage into production logs</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md290"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md291"></a>
 Rollback Guidance</h1>
 <p>Rollback is appropriate if any of the following occurs during soak:</p>
 <ul>
@@ -161,7 +161,7 @@ Rollback Guidance</h1>
 <li>platform-specific regressions on Boron, Photon 2, or Argon builds</li>
 </ul>
 <p>Rollback target: previous production release <span class="tt">10.00</span>.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md291"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md292"></a>
 Post-Soak Follow-Up</h1>
 <p>Post-soak work that remains intentionally out of scope for this release:</p>
 <ul>

@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;18</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;19</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -92,12 +92,12 @@ $(function(){initNavTree('md_docs_2postmortems_22026-06-pmic-charging-root-cause
   <div class="headertitle"><div class="title">2026-06 PMIC Charging Root Cause </div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p><a class="anchor" id="autotoc_md259"></a></p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md260"></a>
+<div class="textblock"><p><a class="anchor" id="autotoc_md260"></a></p>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md261"></a>
 Summary</h1>
 <p>Some Boron devices discharged while externally powered over USB. The PMIC reported Fast Charge with no fault, but input-voltage DPM was active and charge current was effectively throttled away.</p>
 <p>The root cause was a power-source classification/configuration mismatch. The firmware repeatedly selected the <span class="tt">SOLAR</span> profile while the physical source was USB. <span class="tt">SOLAR</span> configured VINDPM to 5080 mV, which left almost no headroom for a USB source around 5.1 V.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md261"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md262"></a>
 Symptoms</h1>
 <ul>
 <li>Battery SOC declined while USB power was attached.</li>
@@ -108,7 +108,7 @@ Symptoms</h1>
 <li>Device repeatedly selected the <span class="tt">SOLAR</span> input profile.</li>
 <li>USB source voltage was approximately 5.1 V.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md262"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md263"></a>
 Investigation Timeline</h1>
 <ol type="1">
 <li>Field observations showed battery SOC falling while the device was attached to USB power.</li>
@@ -119,7 +119,7 @@ Investigation Timeline</h1>
 <li>Device OS source review showed that <span class="tt">SystemPowerFeature::USE_VIN_SETTINGS_WITH_USB_HOST</span> can cause USB host power to be reported as <span class="tt">POWER_SOURCE_VIN</span>.</li>
 <li>Removing that feature restored proper <span class="tt">USB_HOST</span> classification, selected <span class="tt">USB_BENCH</span>, and normal USB charging resumed.</li>
 </ol>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md263"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md264"></a>
 Evidence Collected</h1>
 <ul>
 <li>Power diagnostics consistently reported <span class="tt">prof=SOLAR</span>, <span class="tt">vbus=USB</span>, <span class="tt">src=1</span>, <span class="tt">chg=2</span>, and <span class="tt">fault=0x00</span>.</li>
@@ -129,14 +129,14 @@ Evidence Collected</h1>
 <li>The same hardware charged when the input was raised from approximately 5.1 V to 6.1 V.</li>
 <li>After removing <span class="tt">USE_VIN_SETTINGS_WITH_USB_HOST</span>, Device OS reported USB host power correctly and the firmware selected <span class="tt">USB_BENCH</span>.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md264"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md265"></a>
 Key Diagnostic Breakthrough</h1>
 <p>The 5.1 V to 6.1 V bench-supply test proved the PMIC, battery, fuel gauge, and charge path were functional. The failure depended on input-voltage headroom. That pointed to the configured VINDPM threshold and DPM behavior rather than a battery fault, PMIC fault, or fuel-gauge reporting error.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md265"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md266"></a>
 Root Cause</h1>
 <p><span class="tt">SystemPowerFeature::USE_VIN_SETTINGS_WITH_USB_HOST</span> was enabled in the solar power configuration. On Boron / Device OS 6.4.1, that feature can remap a real USB host source to <span class="tt">POWER_SOURCE_VIN</span>.</p>
 <p>The firmware interpreted <span class="tt">POWER_SOURCE_VIN</span> as solar/VIN power and applied the <span class="tt">SOLAR</span> profile. <span class="tt">SOLAR</span> set VINDPM to 5080 mV. With a real USB input around 5.1 V, the PMIC entered DPM and throttled charge current to near zero. The PMIC still reported Fast Charge and no fault, which made the failure look healthy unless DPM and actual current were considered.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md266"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md267"></a>
 Fix Implemented</h1>
 <ul>
 <li>Removed <span class="tt">SystemPowerFeature::USE_VIN_SETTINGS_WITH_USB_HOST</span> from the default <span class="tt">SOLAR</span> profile.</li>
@@ -145,7 +145,7 @@ Fix Implemented</h1>
 <li>Kept VIN classification mapped to <span class="tt">SOLAR</span>.</li>
 <li>Avoided direct PMIC register overrides and periodic profile refresh logic.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md267"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md268"></a>
 Validation</h1>
 <ul>
 <li>USB power was classified as <span class="tt">USB_HOST</span> after the fix.</li>
@@ -154,14 +154,14 @@ Validation</h1>
 <li>DPM no longer prevented USB charging.</li>
 <li>Solar/VIN still selects the <span class="tt">SOLAR</span> profile when Device OS reports <span class="tt">POWER_SOURCE_VIN</span>.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md268"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md269"></a>
 Known Failure Signature</h1>
 <div class="fragment"><div class="line">PowerApply profile=SOLAR</div>
 <div class="line">PowerDiag vbus=USB chg=2 fault=0x00</div>
 <div class="line">PMIC DPM active</div>
 <div class="line">Battery SOC declining</div>
 </div><!-- fragment --><p>Interpretation: USB source misclassified as VIN, causing the <span class="tt">SOLAR</span> profile and 5080 mV VINDPM threshold to be applied to physical USB power.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md269"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md270"></a>
 Lessons Learned</h1>
 <ul>
 <li>PMIC Fast Charge state does not guarantee useful charge current.</li>
@@ -170,7 +170,7 @@ Lessons Learned</h1>
 <li>Profile names are policy labels, not physical source measurements.</li>
 <li>Avoid firmware-side PMIC register overrides when Particle-supported APIs can express the required configuration.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md270"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md271"></a>
 Future Guidance</h1>
 <ul>
 <li>Do not enable <span class="tt">USE_VIN_SETTINGS_WITH_USB_HOST</span> for mixed USB/Solar deployments.</li>

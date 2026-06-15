@@ -515,3 +515,6 @@ This release fundamentally restructures device configuration to use four indepen
 ## 18 – 2026-06-11
 - Watchdog forensics hard fault fix
 
+## 19 – 2026-06-15
+- addressed power management issues particularly on USB power
+

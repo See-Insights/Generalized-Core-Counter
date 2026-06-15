@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;18</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;19</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -92,10 +92,10 @@ $(function(){initNavTree('md_docs_2v14-field-rollout-checklist.html','',''); });
   <div class="headertitle"><div class="title">v14 Field Rollout Checklist </div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p><a class="anchor" id="autotoc_md337"></a></p>
+<div class="textblock"><p><a class="anchor" id="autotoc_md338"></a></p>
 <p><b>Small-team, field-focused checklist for See Insights outdoor Particle devices (Boron / Photon 2).</b></p>
 <p>Use this before broader v14 deployment.</p>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md338"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md339"></a>
 Release Identity</h1>
 <ul class="check">
 <li class="unchecked">Confirm Particle integer release version is set to v14 in source.</li>
@@ -106,7 +106,7 @@ Release Identity</h1>
 <ul class="check">
 <li class="unchecked">Confirm release notes describe cloud recovery improvements, logging cleanup, and any sleep-related changes.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md339"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md340"></a>
 Build Profile Safety</h1>
 <ul class="check">
 <li class="unchecked">Confirm <span class="tt"><a class="el" href="_build_profile_8h.html#a1c8895ff02f86bdd856ef0110a1a7a47" title="Set to 1 for developer builds.">DEV_BUILD</a>=0</span> for this field release (<span class="tt"><a class="el" href="_build_profile_8h.html" title="Build-profile guardrails for serial/debug waits.">src/BuildProfile.h</a></span>).</li>
@@ -123,7 +123,7 @@ Build Profile Safety</h1>
 <ul class="check">
 <li class="unchecked">Confirm production build flags / command are documented in <a class="el" href="_r_e_a_d_m_e_8md.html">README.md</a> or release notes.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md340"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md341"></a>
 Persistent Data Safety</h1>
 <ul class="check">
 <li class="unchecked">Confirm any retained/persistent data layout changes are documented.</li>
@@ -137,7 +137,7 @@ Persistent Data Safety</h1>
 <ul class="check">
 <li class="unchecked">Confirm reset/status payload includes enough information to diagnose migration problems.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md341"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md342"></a>
 Secret / Local Data Hygiene</h1>
 <ul class="check">
 <li class="unchecked">Confirm no Wi-Fi passwords, Particle tokens, local paths, private device IDs, or customer-specific secrets are committed.</li>
@@ -148,7 +148,7 @@ Secret / Local Data Hygiene</h1>
 <ul class="check">
 <li class="unchecked">Confirm a local secret scan was run before this release (document result in release notes).</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md342"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md343"></a>
 Platform Behavior</h1>
 <ul class="check">
 <li class="unchecked">Document Boron vs Photon 2 sleep behavior:<ul>
@@ -161,7 +161,7 @@ Platform Behavior</h1>
 <ul class="check">
 <li class="unchecked">Confirm field operators understand that Photon 2 hibernate wake may appear as a reset but is expected.</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md343"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md344"></a>
 Operational Validation</h1>
 <ul class="check">
 <li class="unchecked">Confirm clean logs show one-line REPORT output.</li>
@@ -178,7 +178,7 @@ Operational Validation</h1>
 <ul class="check">
 <li class="unchecked">Confirm at least one successful v14 report after OTA per device (during soak).</li>
 </ul>
-<h1 class="doxsection"><a class="anchor" id="autotoc_md344"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md345"></a>
 Rollback / Recovery</h1>
 <ul class="check">
 <li class="unchecked">Confirm previous stable release is available for rollback.</li>
