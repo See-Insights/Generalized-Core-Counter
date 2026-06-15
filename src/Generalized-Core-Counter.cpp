@@ -622,7 +622,18 @@ void setLoopStage(LoopStage stage) {
 
 const unsigned long resetWait = 30000;      // Error state dwell before reset
 
-
+/**
+ * @brief Initializes all system components and prepares device for operational state.
+ *
+ * Orchestrates boot-time initialization across power management, time synchronization,
+ * persistent storage, sensor hardware, and cloud connectivity domains. Captures forensic
+ * state from previous session and applies boot-storm countermeasures if needed.
+ *
+ * @note Transitions to IDLE_STATE unless boot conditions (button press, OTA update,
+ *       invalid config/time) force CONNECTING_STATE for immediate cloud access.
+ *
+ * @see docs/architecture/startup-sequence.md for detailed initialization phases
+ */
 void setup() {
   ensureRetainedLoopForensicsInitialized();
 
@@ -858,9 +869,6 @@ void setup() {
   if (sysStatus.get_testConnectionDurationOverride() == 0) {
     sysStatus.set_testConnectionDurationOverride(0xFFFF);  // Disabled (max uint16_t)
   }
-  
-  // Uncomment the following line to run unit tests on boot
-  // Cloud::testBatteryBackoffLogic();
 
   // Testing: clear sticky sleep-failure alert to avoid reset/deep-power loops.
   if (current.get_alertCode() == 16) {
@@ -1362,6 +1370,20 @@ static void appWatchdogHandler() {
 
 // ===== Policy and publishing helpers =====
 
+/**
+ * @brief Calculates battery tier and downgrades connection mode when critically low.
+ *
+ * Maps state-of-charge to HEALTHY/CONSERVING/CRITICAL/SURVIVAL tiers with hysteresis
+ * to prevent thrashing. Automatically downgrades occupancy device connection modes
+ * (CONNECTED → INTERMITTENT, INTERMITTENT_KEEP_ALIVE → INTERMITTENT) to preserve
+ * battery life during poor solar conditions.
+ *
+ * @param currentSoC Battery state of charge percentage (0.0 - 100.0)
+ * @return BatteryTier Current battery health tier
+ *
+ * @note Downgrades are sticky - device will not auto-upgrade even if SoC recovers.
+ *       Critical for preventing premature battery death in remote solar deployments.
+ */
 BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC) {
   BatteryTier newTier = Cloud::calculateBatteryTier(currentSoC);
   uint8_t prevTierValue = sysStatus.get_currentBatteryTier();
@@ -1567,6 +1589,15 @@ static bool isAutoClearAfterReportAlert(int alertCode) {
   }
 }
 
+/**
+ * @brief Publishes hourly sensor data and device telemetry to the cloud.
+ *
+ * Queues a comprehensive JSON payload containing counts, occupancy metrics, battery state,
+ * connectivity health, and diagnostics. Uses current timestamp in occupancy mode for
+ * real-time updates; uses end-of-hour timestamp in counting mode for bucketed aggregation.
+ *
+ * @note Does not perform immediate publish - queued for delivery during CONNECTING_STATE.
+ */
 void publishData() {
   // Legacy Ubidots context strings describing battery state
   static const char *batteryContext[7] = {
@@ -1735,6 +1766,16 @@ void publishData() {
  * after the next successful cloud connection, even if called
  * before the radio is brought up.
  */
+
+/**
+ * @brief Publishes comprehensive boot forensics for post-mortem incident analysis.
+ *
+ * Includes reset reason, watchdog state, connectivity failsafe history, alert codes,
+ * heap usage, and PMIC anomalies. Critical for diagnosing unexpected resets in field
+ * deployments without physical device access.
+ *
+ * @note Large payload (~896 bytes). Called once during setup(); queued for first connection.
+ */
 void publishStartupStatus() {
   char status[896];
 
@@ -1829,6 +1870,15 @@ void publishStartupStatus() {
   PublishQueuePosix::instance().publish("status", status, PRIVATE);
 }
 
+/**
+ * @brief Publishes detailed watchdog timeout forensic snapshot after WDT reset.
+ *
+ * Extracts retained loop forensic data (breadcrumb, stage, elapsed time, queue depth,
+ * connection age) to pinpoint exactly where the main loop stalled. Essential for
+ * diagnosing watchdog timeout root causes in production.
+ *
+ * @note Only called if reset reason is watchdog timeout. Forensic data captured from FRAM.
+ */
 void publishWatchdogForensics() {
   char payload[192];
   const LoopStage stage = static_cast<LoopStage>(startupPreviousLoopStage);
@@ -2006,6 +2056,19 @@ void clearConnectivityFailsafeRecovery(const char *reason) {
   Log.info("Failsafe: cleared reason=%s", reason ? reason : "unknown");
 }
 
+/**
+ * @brief Monitors connection health and triggers escalating recovery when stale.
+ *
+ * Implements 3-stage recovery when connection attempts exceed policy thresholds:
+ * Stage 1 (radio reset), Stage 2 (system reset), Stage 3 (deep power-down, Boron only).
+ * Prevents indefinite modem-on battery drain and recovers from radio firmware wedges.
+ *
+ * Defers action if disconnected, firmware updating, time invalid, recently connected,
+ * within cooldown period, or jitter delay not elapsed (prevents fleet-wide simultaneous resets).
+ *
+ * @note Stage 3 deep power-down will not wake for hours/days - last resort only.
+ * @see docs/architecture/connectivity-failsafe.md for escalation timing and policy details
+ */
 void connectivityFailsafeSupervisor() {
   if (sysStatus.get_connectionMode() == DISCONNECTED) {
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
@@ -2157,19 +2220,6 @@ void dailyCleanup() {
   }
   
   Log.info("Running Daily Cleanup");
-  
-  // Automatic low-power mode activation on low battery:
-  // When state of charge drops to 65% or below, the device should transition
-  // to LOW_POWER mode to preserve remaining battery. This typically happens
-  // when solar charging is insufficient for current operating mode.
-  // TODO: Implement automatic operatingMode transition via setOperatingMode()
-  // function (from Particle_Functions) to switch from CONNECTED (mode 0) to
-  // LOW_POWER (mode 1) when battery threshold is crossed. Current implementation
-  // has this logic disabled (setLowPowerMode commented out) pending testing.
-  if (sysStatus.get_solarPowerMode() || current.get_stateOfCharge() <= 65) {
-    // Automatic power mode adjustment needed here
-    // setLowPowerMode("1");  // Commented pending implementation validation
-  }
   
   current.resetEverything(); // Zero the counts for the new day
 }
