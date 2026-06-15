@@ -200,6 +200,8 @@ The project is successful when:
 
 # Design Rules For AI Assistants
 
+**Important:** AI agents should follow the development workflow defined in `AI_DEVELOPMENT_WORKFLOW.md`.
+
 When proposing changes:
 
 1. Do not sacrifice reliability for elegance.
