@@ -23,7 +23,8 @@
     "sensorMode": 0,
     "connectionMode": 0,
     "reportingMode": 0,
-    "samplingMode": 0
+    "samplingMode": 0,
+    "enableHibernateSleep": false
   },
   "reporting": {
     "webhook": {

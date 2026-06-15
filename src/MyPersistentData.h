@@ -227,7 +227,7 @@ public:
 		// ********** Test Mode Overrides **********
 		float reservedFloat0;                             // Reserved to preserve persistent layout after battery test removal
 		uint16_t testConnectionDurationOverride;          // Test mode: connection duration override (0xFFFF = disabled, 0-999 = override value in seconds)
-		uint8_t reservedByte0;                            // Reserved to preserve persistent layout after battery test removal
+		uint8_t reservedByte0;                            // Stored as enableHibernateSleep flag (0/1) while preserving persistent layout
 
 		// ********** Webhook Configuration **********
 		char webhookName[64];                             // Webhook event name from cloud config
@@ -236,6 +236,12 @@ public:
 		uint8_t connectivityRecoveryStage;               // 0=none, 1=radio reset, 2=system reset, 3=deep power down
 		time_t lastConnectivityRecoveryAction;           // Last time the connectivity failsafe acted or deferred
 		uint8_t connectivityRecoveryCount;               // Count of connectivity failsafe recovery actions since last good connect
+		uint16_t watchdogResetCount;                     // Count of watchdog-related resets observed across boots
+		uint8_t lastWatchdogBreadcrumb;                  // Last retained app breadcrumb observed on a watchdog boot
+		uint32_t lastWatchdogUptimeMs;                   // millis() value recorded with the last watchdog breadcrumb
+		uint32_t lastWatchdogResetReasonData;            // System.resetReasonData() from the last watchdog boot
+		bool hasValidLedgerConfig;                       // True once at least one complete, valid ledger configuration has been applied
+		uint8_t configSource;                            // Config::Source enum persisted for diagnostics
 
 	};
 
@@ -360,6 +366,8 @@ public:
 
 	uint16_t get_modemOffBudgetSec() const;
 	void set_modemOffBudgetSec(uint16_t value);
+	bool get_enableHibernateSleep() const;
+	void set_enableHibernateSleep(bool value);
 
 	uint8_t get_currentBatteryTier() const;
 	void set_currentBatteryTier(uint8_t value);
@@ -412,6 +420,18 @@ public:
 	 * @param value Recovery action count to store
 	 */
 	void set_connectivityRecoveryCount(uint8_t value);
+	uint16_t get_watchdogResetCount() const;
+	void set_watchdogResetCount(uint16_t value);
+	uint8_t get_lastWatchdogBreadcrumb() const;
+	void set_lastWatchdogBreadcrumb(uint8_t value);
+	uint32_t get_lastWatchdogUptimeMs() const;
+	void set_lastWatchdogUptimeMs(uint32_t value);
+	uint32_t get_lastWatchdogResetReasonData() const;
+	void set_lastWatchdogResetReasonData(uint32_t value);
+	bool get_hasValidLedgerConfig() const;
+	void set_hasValidLedgerConfig(bool value);
+	uint8_t get_configSource() const;
+	void set_configSource(uint8_t value);
 
 	//Members here are internal only and therefore protected
 protected:

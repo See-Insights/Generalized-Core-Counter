@@ -23,6 +23,17 @@ enum FailsafeDeferReason : uint8_t {
 	FAILSAFE_DEFER_CLOSED_HOURS_LONG_SLEEP = 6,
 };
 
+enum LoopStage : uint8_t {
+	LOOP_STAGE_NONE = 0,
+	LOOP_STAGE_STATE_HANDLER = 1,
+	LOOP_STAGE_CLOUD_LOOP = 2,
+	LOOP_STAGE_PUBLISH_QUEUE = 3,
+	LOOP_STAGE_DIAGNOSTICS = 4,
+	LOOP_STAGE_IDLE_PROCESSING = 5,
+	LOOP_STAGE_SLEEP_PREP = 6,
+	LOOP_STAGE_CONNECTIVITY = 7,
+};
+
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
 // No behavioral changes were made.
@@ -70,11 +81,32 @@ BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC);
 void setAppBreadcrumb(uint8_t code);
 
 /**
+ * @brief Stores the active loop stage for watchdog forensics.
+ *
+ * @param stage Current high-level loop stage
+ */
+void setLoopStage(LoopStage stage);
+
+// Retained hibernate diagnostics (Boron RTC-alarm hibernate path)
+extern retained time_t retainedHibernateRtcBefore;
+extern retained time_t retainedHibernateWakeTime;
+extern retained uint32_t retainedHibernateRequestedSleep;
+extern retained uint32_t retainedHibernateCount;
+extern retained bool retainedHibernatePending;
+
+/**
  * @brief Clears persisted connectivity failsafe state after successful recovery.
  *
  * @param reason Short log label describing why recovery state was cleared
  */
 void clearConnectivityFailsafeRecovery(const char *reason);
+
+/**
+ * @brief Logs a compact time/park-hours diagnostic snapshot.
+ *
+ * @param isOpen Current open-hours decision
+ */
+void logTimeDiag(bool isOpen);
 
 /**
  * @brief Returns true when CONNECTING_STATE still owns an in-budget connect attempt.
@@ -141,4 +173,88 @@ inline void logUnoccupiedEvent(const char *reason,
 					 (unsigned long)sessionSeconds,
 					 (unsigned long)totalSeconds,
 					 report ? 1 : 0);
+}
+
+/**
+ * @brief Result of safely closing an occupancy session.
+ */
+struct OccupancyCloseResult {
+	bool valid = false;
+	uint32_t sessionSeconds = 0;
+	uint32_t totalSeconds = 0;
+};
+
+/**
+ * @brief Safely closes the current occupancy session and guards wrapped time math.
+ *
+ * Unsigned subtraction of Time.now() - occupancyStartTime can wrap into a huge
+ * bogus duration if the stored start time is zero or in the future.
+ *
+ * @param path Short caller label for anomaly logs
+ * @return Close result including the session duration and new total on valid close
+ */
+inline OccupancyCloseResult closeOccupancySessionSafely(const char *path) {
+	OccupancyCloseResult result;
+	const bool occupied = current.get_occupied();
+	const int8_t alertCode = current.get_alertCode();
+	const bool timeValid = Time.isValid();
+	const time_t now = Time.now();
+	const time_t start = current.get_occupancyStartTime();
+	const uint32_t previousTotal = current.get_totalOccupiedSeconds();
+	result.totalSeconds = previousTotal;
+
+	bool durationComputable = false;
+	long long rawSessionSeconds = 0;
+	uint32_t sessionSeconds = 0;
+	bool invalid = !timeValid || start == 0;
+
+	if (timeValid && start != 0) {
+		time_t effectiveStart = start;
+		if (start > now && start <= now + 5) {
+			effectiveStart = now;
+		}
+		rawSessionSeconds = (long long)now - (long long)effectiveStart;
+		durationComputable = true;
+	}
+
+	if (timeValid && start > now + 5) {
+		invalid = true;
+	}
+
+	if (!invalid && durationComputable) {
+		sessionSeconds = (uint32_t)rawSessionSeconds;
+		const uint32_t newTotal = previousTotal + sessionSeconds;
+		if (sessionSeconds > 86400UL || newTotal > 86400UL) {
+			invalid = true;
+		} else {
+			current.set_totalOccupiedSeconds(newTotal);
+			result.valid = true;
+			result.sessionSeconds = sessionSeconds;
+			result.totalSeconds = newTotal;
+		}
+	} else if (!invalid) {
+		invalid = true;
+	}
+
+	if (invalid) {
+		char sessionBuf[24];
+		if (durationComputable) {
+			snprintf(sessionBuf, sizeof(sessionBuf), "%lld", rawSessionSeconds);
+		} else {
+			strncpy(sessionBuf, "na", sizeof(sessionBuf));
+			sessionBuf[sizeof(sessionBuf) - 1] = '\0';
+		}
+		Log.warn("OccAnom: path=%s now=%lu start=%lu prev=%lu dur=%s occ=%d alert=%d",
+					 path ? path : "?",
+					 (unsigned long)now,
+					 (unsigned long)start,
+					 (unsigned long)previousTotal,
+					 sessionBuf,
+					 occupied ? 1 : 0,
+					 (int)alertCode);
+	}
+
+	current.set_occupied(false);
+	current.set_occupancyStartTime(0);
+	return result;
 }

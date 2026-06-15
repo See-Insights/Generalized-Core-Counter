@@ -114,6 +114,8 @@ const char *profileSelectionReasonLabel(PowerProfileSelectionReason reason) {
     return "battery_keep_last";
   case PowerProfileSelectionReason::BatteryFallback:
     return "battery_fallback";
+  case PowerProfileSelectionReason::UnknownSourceKeepLast:
+    return "unknown_source_keep_last";
   case PowerProfileSelectionReason::UnknownSourceFallback:
     return "unknown_source_fallback";
   case PowerProfileSelectionReason::UnsupportedPlatform:

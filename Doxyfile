@@ -2,14 +2,14 @@
 
 PROJECT_NAME           = "Generalized-Core-Counter"
 PROJECT_BRIEF          = "Particle-based generalized core counter firmware"
-PROJECT_NUMBER         = "11.0.0"
+PROJECT_NUMBER         = "19"
 
 # Where to put generated docs
 OUTPUT_DIRECTORY       = docs
 CREATE_SUBDIRS         = NO
 
 # Input sources
-INPUT                  = src README.md RELEASE_NOTES_v11.md docs/*.md
+INPUT                  = src README.md CHANGELOG.md docs
 RECURSIVE              = YES
 FILE_PATTERNS          = *.h \
                          *.cpp \

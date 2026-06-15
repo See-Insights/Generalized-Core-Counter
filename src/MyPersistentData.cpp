@@ -34,6 +34,7 @@
 
 #include "MyPersistentData.h"
 #include "BuildProfile.h"
+#include "Config.h"
 
 // Forward declaration for safe diagnostic publishing (defined in Generalized-Core-Counter.cpp)
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE);
@@ -85,8 +86,7 @@ bool sysStatusData::validate(size_t dataSize) {
             valid = false;
         }
 
-        // closeTime is allowed to be 24 as a sentinel for "always open"
-        if (sysStatus.get_closeTime() > 24) {
+        if (sysStatus.get_closeTime() > 23) {
             Log.info("data not valid close time =%d", sysStatus.get_closeTime());
             valid = false;
         }
@@ -99,6 +99,11 @@ bool sysStatusData::validate(size_t dataSize) {
 
         if (sysStatus.get_connectivityRecoveryStage() > 3) {
             Log.info("data not valid connectivity recovery stage =%d", sysStatus.get_connectivityRecoveryStage());
+            valid = false;
+        }
+
+        if (sysStatus.getValue<uint8_t>(offsetof(SysData,reservedByte0)) > 1) {
+            Log.info("data not valid enable hibernate flag");
             valid = false;
         }
     }
@@ -120,10 +125,11 @@ void sysStatusData::initialize() {
     sysStatus.set_lowBatteryMode(false);
     sysStatus.set_solarPowerMode(FIELD_BUILD ? true : false);
     sysStatus.set_lowPowerMode(false);          // Legacy flag - kept for storage compatibility
-    sysStatus.set_timeZoneStr("SGT-8");        // Default to Singapore Time (POSIX TZ string for UTC+8, no DST)
+    sysStatus.set_timeZoneStr(Config::DEFAULT_TIMEZONE);
     sysStatus.set_sensorType(1);                // PIR sensor
-    sysStatus.set_openTime(0);
-    sysStatus.set_closeTime(24);                                           // New standard with v20
+    sysStatus.set_openTime(Config::DEFAULT_OPEN_HOUR);
+    sysStatus.set_closeTime(Config::DEFAULT_CLOSE_HOUR);
+    sysStatus.set_reportingInterval(Config::DEFAULT_REPORT_INTERVAL_SEC);
     sysStatus.set_lastConnectionDuration(0);                               // New measure
     sysStatus.set_lastDailyCleanup(0);                                     // No cleanup has run yet
     
@@ -134,12 +140,19 @@ void sysStatusData::initialize() {
     sysStatus.set_samplingMode(INTERRUPT);                                 // Default to interrupt-driven
     sysStatus.set_verboseTimeoutMin(60);                                   // Default 60 min verbose timeout
     sysStatus.set_verboseModeStartTime(0);                                 // Verbose mode not active
-    sysStatus.set_connectAttemptBudgetSec(300);                            // Default 300s (5 minutes) max connect attempt per wake
-    sysStatus.set_cloudDisconnectBudgetSec(15);                            // Default 15s max wait for cloud disconnect
-    sysStatus.set_modemOffBudgetSec(30);                                   // Default 30s max wait for modem power-down
+    sysStatus.set_connectAttemptBudgetSec(Config::DEFAULT_CONNECT_ATTEMPT_BUDGET_SEC);
+    sysStatus.set_cloudDisconnectBudgetSec(Config::DEFAULT_CLOUD_DISCONNECT_BUDGET_SEC);
+    sysStatus.set_modemOffBudgetSec(Config::DEFAULT_MODEM_OFF_BUDGET_SEC);
+    sysStatus.set_enableHibernateSleep(false);
     sysStatus.set_connectivityRecoveryStage(0);
     sysStatus.set_lastConnectivityRecoveryAction(0);
     sysStatus.set_connectivityRecoveryCount(0);
+    sysStatus.set_watchdogResetCount(0);
+    sysStatus.set_lastWatchdogBreadcrumb(0);
+    sysStatus.set_lastWatchdogUptimeMs(0);
+    sysStatus.set_lastWatchdogResetReasonData(0);
+    sysStatus.set_hasValidLedgerConfig(false);
+    sysStatus.set_configSource((uint8_t)Config::CONFIG_SOURCE_DEFAULT);
 }
 
 uint8_t sysStatusData::get_structuresVersion() const {
@@ -356,6 +369,13 @@ void sysStatusData::set_modemOffBudgetSec(uint16_t value) {
     setValue<uint16_t>(offsetof(SysData,modemOffBudgetSec), value);
 }
 
+bool sysStatusData::get_enableHibernateSleep() const {
+    return getValue<uint8_t>(offsetof(SysData,reservedByte0)) != 0;
+}
+void sysStatusData::set_enableHibernateSleep(bool value) {
+    setValue<uint8_t>(offsetof(SysData,reservedByte0), value ? 1 : 0);
+}
+
 uint8_t sysStatusData::get_currentBatteryTier() const {
     return getValue<uint8_t>(offsetof(SysData,currentBatteryTier));
 }
@@ -426,6 +446,48 @@ void sysStatusData::set_connectivityRecoveryCount(uint8_t value) {
     setValue<uint8_t>(offsetof(SysData,connectivityRecoveryCount), value);
 }
 
+uint16_t sysStatusData::get_watchdogResetCount() const {
+    return getValue<uint16_t>(offsetof(SysData,watchdogResetCount));
+}
+void sysStatusData::set_watchdogResetCount(uint16_t value) {
+    setValue<uint16_t>(offsetof(SysData,watchdogResetCount), value);
+}
+
+uint8_t sysStatusData::get_lastWatchdogBreadcrumb() const {
+    return getValue<uint8_t>(offsetof(SysData,lastWatchdogBreadcrumb));
+}
+void sysStatusData::set_lastWatchdogBreadcrumb(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,lastWatchdogBreadcrumb), value);
+}
+
+uint32_t sysStatusData::get_lastWatchdogUptimeMs() const {
+    return getValue<uint32_t>(offsetof(SysData,lastWatchdogUptimeMs));
+}
+void sysStatusData::set_lastWatchdogUptimeMs(uint32_t value) {
+    setValue<uint32_t>(offsetof(SysData,lastWatchdogUptimeMs), value);
+}
+
+uint32_t sysStatusData::get_lastWatchdogResetReasonData() const {
+    return getValue<uint32_t>(offsetof(SysData,lastWatchdogResetReasonData));
+}
+void sysStatusData::set_lastWatchdogResetReasonData(uint32_t value) {
+    setValue<uint32_t>(offsetof(SysData,lastWatchdogResetReasonData), value);
+}
+
+bool sysStatusData::get_hasValidLedgerConfig() const {
+    return getValue<bool>(offsetof(SysData,hasValidLedgerConfig));
+}
+void sysStatusData::set_hasValidLedgerConfig(bool value) {
+    setValue<bool>(offsetof(SysData,hasValidLedgerConfig), value);
+}
+
+uint8_t sysStatusData::get_configSource() const {
+    return getValue<uint8_t>(offsetof(SysData,configSource));
+}
+void sysStatusData::set_configSource(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,configSource), value);
+}
+
 // End of sysStatusData class
 
 // *****************  Sensor Config Storage Object *******************
@@ -473,6 +535,12 @@ void sensorConfigData::initialize() {
     PersistentDataFile::initialize();
 
     Log.info("Current Data Initialized");
+
+    sensorConfig.set_sensorType(1);
+    sensorConfig.set_sensorSetting1(Config::DEFAULT_OCCUPANCY_DEBOUNCE_MS);
+    sensorConfig.set_sensorSetting2(0);
+    sensorConfig.set_sensorSetting3(0);
+    sensorConfig.set_sensorSetting4(0);
 
     // If you manually update fields here, be sure to update the hash
     updateHash();

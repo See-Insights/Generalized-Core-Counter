@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;19</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -98,6 +98,18 @@ $(function(){initNavTree('class_cloud.html','','class_cloud-members'); });
 
 <p><code>#include &lt;<a class="el" href="_cloud_8h_source.html">Cloud.h</a>&gt;</code></p>
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 id="header-nested-classes" class="groupheader"><a id="nested-classes" name="nested-classes"></a>
+Classes</h2></td></tr>
+<tr class="memitem:LedgerSyncDiagnostics" id="r_LedgerSyncDiagnostics"><td class="memItemLeft">struct &#160;</td><td class="memItemRight"><a class="el" href="struct_cloud_1_1_ledger_sync_diagnostics.html">LedgerSyncDiagnostics</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Snapshot output-ledger sync state for diagnostics.  <a href="struct_cloud_1_1_ledger_sync_diagnostics.html#details">More...</a><br /></td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 id="header-pub-types" class="groupheader"><a id="pub-types" name="pub-types"></a>
+Public Types</h2></td></tr>
+<tr class="memitem:a1ccde2ac5461640e74f6e7b60f77c5ca" id="r_a1ccde2ac5461640e74f6e7b60f77c5ca"><td class="memItemLeft">enum &#160;</td><td class="memItemRight"><a class="el" href="#a1ccde2ac5461640e74f6e7b60f77c5ca">LedgerRequestKind</a> : uint8_t { <a class="el" href="#a1ccde2ac5461640e74f6e7b60f77c5caa69f0c375a40b636fd42d996922152765">LEDGER_REQUEST_KIND_UNKNOWN</a> = 0
+, <a class="el" href="#a1ccde2ac5461640e74f6e7b60f77c5caab862fea83c4b1b607b09229db38625d0">LEDGER_REQUEST_KIND_STATUS</a> = 1
+, <a class="el" href="#a1ccde2ac5461640e74f6e7b60f77c5caa48913da3968739b354b4214bad39bfdc">LEDGER_REQUEST_KIND_DATA</a> = 2
+ }</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-methods" class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:abd1e7289193949f93905243f7fb848cf" id="r_abd1e7289193949f93905243f7fb848cf"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#abd1e7289193949f93905243f7fb848cf">areLedgersSynced</a> () const</td></tr>
@@ -106,16 +118,31 @@ Public Member Functions</h2></td></tr>
 <tr class="memdesc:ad4f5a131e2d2e3c2349d03e892ff40ab"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get the webhook event name for data publishing.  <br /></td></tr>
 <tr class="memitem:a48e3ac0c1a13d4186d87047e2359bf24" id="r_a48e3ac0c1a13d4186d87047e2359bf24"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a48e3ac0c1a13d4186d87047e2359bf24">hasPendingOutputLedgerSync</a> () const</td></tr>
 <tr class="memdesc:a48e3ac0c1a13d4186d87047e2359bf24"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check whether any device-to-cloud ledger work is still pending.  <br /></td></tr>
+<tr class="memitem:a28b50a243f880a3c70355f151f0f7904" id="r_a28b50a243f880a3c70355f151f0f7904"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a28b50a243f880a3c70355f151f0f7904">isLedgerPointerTracked</a> (const void *ptr) const</td></tr>
+<tr class="memdesc:a28b50a243f880a3c70355f151f0f7904"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check whether the request tracker already has an active entry for a ledger object pointer.  <br /></td></tr>
+<tr class="memitem:aee2b9cc3074b1c143ef6d126053c189a" id="r_aee2b9cc3074b1c143ef6d126053c189a"><td class="memItemLeft"><a class="el" href="struct_cloud_1_1_ledger_sync_diagnostics.html">LedgerSyncDiagnostics</a>&#160;</td><td class="memItemRight"><a class="el" href="#aee2b9cc3074b1c143ef6d126053c189a">ledgerSyncDiagnostics</a> () const</td></tr>
 <tr class="memitem:a82b4714d5ad360e54ad9bece976b3860" id="r_a82b4714d5ad360e54ad9bece976b3860"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a82b4714d5ad360e54ad9bece976b3860">loadConfigurationFromCloud</a> ()</td></tr>
 <tr class="memdesc:a82b4714d5ad360e54ad9bece976b3860"><td class="mdescLeft">&#160;</td><td class="mdescRight">Load and apply configuration from cloud ledgers.  <br /></td></tr>
+<tr class="memitem:aee1ad8b89f4ee82f7d2b0a850b9bdcbb" id="r_aee1ad8b89f4ee82f7d2b0a850b9bdcbb"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#aee1ad8b89f4ee82f7d2b0a850b9bdcbb">logLedgerConnectState</a> () const</td></tr>
+<tr class="memdesc:aee1ad8b89f4ee82f7d2b0a850b9bdcbb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Log current active ledger request state on a new cloud connection.  <br /></td></tr>
+<tr class="memitem:a2054a2955f6235fb0da1d8d4d66e7499" id="r_a2054a2955f6235fb0da1d8d4d66e7499"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a2054a2955f6235fb0da1d8d4d66e7499">logLedgerFailure</a> (int rc) const</td></tr>
+<tr class="memdesc:a2054a2955f6235fb0da1d8d4d66e7499"><td class="mdescLeft">&#160;</td><td class="mdescRight">Log active ledger request state for a ledger failure return code.  <br /></td></tr>
+<tr class="memitem:a8a39f199b45227cd18ed4d34a71a267e" id="r_a8a39f199b45227cd18ed4d34a71a267e"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a8a39f199b45227cd18ed4d34a71a267e">logLedgerSleepState</a> () const</td></tr>
+<tr class="memdesc:a8a39f199b45227cd18ed4d34a71a267e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Log active ledger request state before entering sleep.  <br /></td></tr>
 <tr class="memitem:ab6354f2706aa556f0fb0ee8a625c722c" id="r_ab6354f2706aa556f0fb0ee8a625c722c"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#ab6354f2706aa556f0fb0ee8a625c722c">loop</a> ()</td></tr>
 <tr class="memdesc:ab6354f2706aa556f0fb0ee8a625c722c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Service deferred cloud work; call from main loop.  <br /></td></tr>
-<tr class="memitem:a832b2fee272f68202c5877a0b2fee7c0" id="r_a832b2fee272f68202c5877a0b2fee7c0"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a832b2fee272f68202c5877a0b2fee7c0">publishDataToLedger</a> ()</td></tr>
-<tr class="memdesc:a832b2fee272f68202c5877a0b2fee7c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Publish latest sensor data to device-data ledger.  <br /></td></tr>
+<tr class="memitem:a18ca0dbb057caa53081ade60ae2f8b8a" id="r_a18ca0dbb057caa53081ade60ae2f8b8a"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a18ca0dbb057caa53081ade60ae2f8b8a">noteLedgerSyncComplete</a> (<a class="el" href="#a1ccde2ac5461640e74f6e7b60f77c5ca">LedgerRequestKind</a> kind, const <a class="el" href="struct_cloud_1_1_ledger_sync_diagnostics.html">LedgerSyncDiagnostics</a> &amp;before, const <a class="el" href="struct_cloud_1_1_ledger_sync_diagnostics.html">LedgerSyncDiagnostics</a> &amp;after)</td></tr>
+<tr class="memdesc:a18ca0dbb057caa53081ade60ae2f8b8a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Record completion of a ledger sync request.  <br /></td></tr>
+<tr class="memitem:a0f9c6d203e2bf041a6b9f5578e2ef105" id="r_a0f9c6d203e2bf041a6b9f5578e2ef105"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a0f9c6d203e2bf041a6b9f5578e2ef105">noteLedgerSyncFail</a> (uint32_t seq, int error)</td></tr>
+<tr class="memdesc:a0f9c6d203e2bf041a6b9f5578e2ef105"><td class="mdescLeft">&#160;</td><td class="mdescRight">Record failure of a previously-issued ledger sync request.  <br /></td></tr>
+<tr class="memitem:a422da1f0cd72eb35300959b81b1dd141" id="r_a422da1f0cd72eb35300959b81b1dd141"><td class="memItemLeft">uint32_t&#160;</td><td class="memItemRight"><a class="el" href="#a422da1f0cd72eb35300959b81b1dd141">noteLedgerSyncRequest</a> (<a class="el" href="#a1ccde2ac5461640e74f6e7b60f77c5ca">LedgerRequestKind</a> kind, const char *source, const void *ptr)</td></tr>
+<tr class="memdesc:a422da1f0cd72eb35300959b81b1dd141"><td class="mdescLeft">&#160;</td><td class="mdescRight">Record a ledger sync request that has been accepted locally.  <br /></td></tr>
+<tr class="memitem:ac134bd6eda8e682cac6085fe12edc4d3" id="r_ac134bd6eda8e682cac6085fe12edc4d3"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ac134bd6eda8e682cac6085fe12edc4d3">publishDataToLedger</a> (const char *source=&quot;Unknown&quot;)</td></tr>
+<tr class="memdesc:ac134bd6eda8e682cac6085fe12edc4d3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Publish latest sensor data to device-data ledger.  <br /></td></tr>
 <tr class="memitem:a7f2f52213a6074b5829aa196ef2f3b15" id="r_a7f2f52213a6074b5829aa196ef2f3b15"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a7f2f52213a6074b5829aa196ef2f3b15">setup</a> ()</td></tr>
 <tr class="memdesc:a7f2f52213a6074b5829aa196ef2f3b15"><td class="mdescLeft">&#160;</td><td class="mdescRight">Perform setup operations; call this from global application <a class="el" href="#a7f2f52213a6074b5829aa196ef2f3b15" title="Perform setup operations; call this from global application setup().">setup()</a>.  <br /></td></tr>
-<tr class="memitem:a27758d9343f1531651c739f13ff6006b" id="r_a27758d9343f1531651c739f13ff6006b"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a27758d9343f1531651c739f13ff6006b">writeDeviceStatusToCloud</a> ()</td></tr>
-<tr class="memdesc:a27758d9343f1531651c739f13ff6006b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Write current device configuration to device-status ledger.  <br /></td></tr>
+<tr class="memitem:aacb8eae6febbe83b39959e80b7983bb9" id="r_aacb8eae6febbe83b39959e80b7983bb9"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#aacb8eae6febbe83b39959e80b7983bb9">writeDeviceStatusToCloud</a> (const char *source=&quot;Unknown&quot;)</td></tr>
+<tr class="memdesc:aacb8eae6febbe83b39959e80b7983bb9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Write current device configuration to device-status ledger.  <br /></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-static-methods" class="groupheader"><a id="pub-static-methods" name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
@@ -151,7 +178,29 @@ Static Protected Attributes</h2></td></tr>
 <p>From global application setup you must call: <a class="el" href="#aa44ce3e3d2500cdca692c67458f81364" title="Gets the singleton instance of this class, allocating it if necessary.">Cloud::instance()</a>.<a class="el" href="#a7f2f52213a6074b5829aa196ef2f3b15" title="Perform setup operations; call this from global application setup().">setup()</a>; </p>
 
 <p class="definition">Definition at line <a class="el" href="_cloud_8h_source.html#l00048">48</a> of file <a class="el" href="_cloud_8h_source.html">Cloud.h</a>.</p>
-</div><a name="doc-constructors" id="doc-constructors"></a><h2 id="header-doc-constructors" class="groupheader">Constructor &amp; Destructor Documentation</h2>
+</div><a name="doc-enum-members" id="doc-enum-members"></a><h2 id="header-doc-enum-members" class="groupheader">Member Enumeration Documentation</h2>
+<a id="a1ccde2ac5461640e74f6e7b60f77c5ca" name="a1ccde2ac5461640e74f6e7b60f77c5ca"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1ccde2ac5461640e74f6e7b60f77c5ca">&#9670;&#160;</a></span>LedgerRequestKind</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum <a class="el" href="#a1ccde2ac5461640e74f6e7b60f77c5ca">Cloud::LedgerRequestKind</a> : uint8_t</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="a1ccde2ac5461640e74f6e7b60f77c5caa69f0c375a40b636fd42d996922152765" name="a1ccde2ac5461640e74f6e7b60f77c5caa69f0c375a40b636fd42d996922152765"></a>LEDGER_REQUEST_KIND_UNKNOWN&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a1ccde2ac5461640e74f6e7b60f77c5caab862fea83c4b1b607b09229db38625d0" name="a1ccde2ac5461640e74f6e7b60f77c5caab862fea83c4b1b607b09229db38625d0"></a>LEDGER_REQUEST_KIND_STATUS&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a1ccde2ac5461640e74f6e7b60f77c5caa48913da3968739b354b4214bad39bfdc" name="a1ccde2ac5461640e74f6e7b60f77c5caa48913da3968739b354b4214bad39bfdc"></a>LEDGER_REQUEST_KIND_DATA&#160;</td><td class="fielddoc"></td></tr>
+</table>
+
+<p class="definition">Definition at line <a class="el" href="_cloud_8h_source.html#l00050">50</a> of file <a class="el" href="_cloud_8h_source.html">Cloud.h</a>.</p>
+
+</div>
+</div>
+<a name="doc-constructors" id="doc-constructors"></a><h2 id="header-doc-constructors" class="groupheader">Constructor &amp; Destructor Documentation</h2>
 <a id="af5b5031e09251a860c35e82e96bd1eef" name="af5b5031e09251a860c35e82e96bd1eef"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#af5b5031e09251a860c35e82e96bd1eef">&#9670;&#160;</a></span>Cloud() <span class="overload">[1/2]</span></h2>
 
@@ -178,9 +227,9 @@ Static Protected Attributes</h2></td></tr>
 <p>The constructor is protected because the class is a singleton. </p>
 <p>Use <a class="el" href="#aa44ce3e3d2500cdca692c67458f81364" title="Gets the singleton instance of this class, allocating it if necessary.">Cloud::instance()</a> to instantiate the singleton. </p>
 
-<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00024">24</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00187">187</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="#a29bcce74614bcaf5f6eaf64ddd14d321">Cloud()</a>, <a class="el" href="_cloud_8cpp_source.html#l00017">instance()</a>, and <a class="el" href="#a89d68dd84add935e621be4b7b380192a">operator=()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="#a29bcce74614bcaf5f6eaf64ddd14d321">Cloud()</a>, <a class="el" href="_cloud_8cpp_source.html#l00180">instance()</a>, and <a class="el" href="#a89d68dd84add935e621be4b7b380192a">operator=()</a>.</p>
 
 </div>
 </div>
@@ -209,7 +258,7 @@ Static Protected Attributes</h2></td></tr>
 
 <p>The destructor is protected because the class is a singleton and cannot be deleted. </p>
 
-<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00032">32</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00196">196</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
 
 </div>
 </div>
@@ -238,7 +287,7 @@ Static Protected Attributes</h2></td></tr>
 
 <p>This class is a singleton and cannot be copied. </p>
 
-<p class="reference">References <a class="el" href="_cloud_8cpp_source.html#l00024">Cloud()</a>.</p>
+<p class="reference">References <a class="el" href="_cloud_8cpp_source.html#l00187">Cloud()</a>.</p>
 
 </div>
 </div>
@@ -262,11 +311,11 @@ Static Protected Attributes</h2></td></tr>
 <p>Returns true immediately once both cloud-input ledgers have synced. If neither ledger has synced after the connection window expires, the helper treats them as intentionally empty and also returns true. Partial sync after the timeout is treated as a real failure and returns false.</p>
 <dl class="section return"><dt>Returns</dt><dd>true if the current connection has satisfied ledger readiness rules </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_ledger_client_8cpp_source.html#l00080">80</a> of file <a class="el" href="_ledger_client_8cpp_source.html">LedgerClient.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_ledger_client_8cpp_source.html#l00092">92</a> of file <a class="el" href="_ledger_client_8cpp_source.html">LedgerClient.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_connectivity_policy_8h_source.html#l00169">ConnectivityPolicy::LEDGER_SYNC_TIMEOUT_MS</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00139">handleConnectingState()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00209">handleConnectingState()</a>, and <a class="el" href="_state___sleep_8cpp_source.html#l00314">handleSleepingState()</a>.</p>
 
 </div>
 </div>
@@ -312,7 +361,7 @@ Static Protected Attributes</h2></td></tr>
 
 <p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00113">TIER_CONSERVING</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00114">TIER_CRITICAL</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00112">TIER_HEALTHY</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00115">TIER_SURVIVAL</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00987">applyBatteryAwareConnectionModePolicy()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00216">anonymous_namespace{Generalized-Core-Counter.cpp}::currentBatteryTierForFailsafe()</a>, and <a class="el" href="_battery_backoff_8cpp_source.html#l00098">testBatteryBackoffLogic()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01365">applyBatteryAwareConnectionModePolicy()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00308">anonymous_namespace{Generalized-Core-Counter.cpp}::currentBatteryTierForFailsafe()</a>, and <a class="el" href="_battery_backoff_8cpp_source.html#l00098">testBatteryBackoffLogic()</a>.</p>
 
 </div>
 </div>
@@ -429,11 +478,11 @@ Static Protected Attributes</h2></td></tr>
 </ol>
 <dl class="section return"><dt>Returns</dt><dd>Pointer to a stable webhook event name string </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00042">42</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00547">547</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
 
 <p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00054">COUNTING</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00056">MEASUREMENT</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00055">OCCUPANCY</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01148">publishData()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01570">publishData()</a>.</p>
 
 </div>
 </div>
@@ -456,9 +505,9 @@ Static Protected Attributes</h2></td></tr>
 <p>This includes deferred device-status writes that have not yet been issued and accepted local writes whose cloud synchronization has not completed.</p>
 <dl class="section return"><dt>Returns</dt><dd>true if device-data/device-status ledger work is still pending </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_ledger_client_8cpp_source.html#l00071">71</a> of file <a class="el" href="_ledger_client_8cpp_source.html">LedgerClient.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_ledger_client_8cpp_source.html#l00083">83</a> of file <a class="el" href="_ledger_client_8cpp_source.html">LedgerClient.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00314">handleSleepingState()</a>.</p>
 
 </div>
 </div>
@@ -488,11 +537,57 @@ Static Protected Attributes</h2></td></tr>
 <p>Gets the singleton instance of this class, allocating it if necessary. </p>
 <p>Use <a class="el" href="#aa44ce3e3d2500cdca692c67458f81364" title="Gets the singleton instance of this class, allocating it if necessary.">Cloud::instance()</a> to instantiate the singleton. </p>
 
-<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00017">17</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00180">180</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_cloud_8h_source.html#l00357">_instance</a>, and <a class="el" href="_cloud_8cpp_source.html#l00024">Cloud()</a>.</p>
+<p class="reference">References <a class="el" href="_cloud_8h_source.html#l00424">_instance</a>, and <a class="el" href="_cloud_8cpp_source.html#l00187">Cloud()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00139">handleConnectingState()</a>, <a class="el" href="_state___connect_8cpp_source.html#l00394">handleFirmwareUpdateState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00163">handleSleepingState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00876">loop()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01148">publishData()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00209">handleConnectingState()</a>, <a class="el" href="_state___connect_8cpp_source.html#l00715">handleFirmwareUpdateState()</a>, <a class="el" href="_state___sleep_8cpp_source.html#l00314">handleSleepingState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01128">loop()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01570">publishData()</a>, <a class="el" href="_device_status_publisher_8cpp_source.html#l00287">publishDataToLedger()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00626">setup()</a>, and <a class="el" href="_device_status_publisher_8cpp_source.html#l00023">writeDeviceStatusToCloud()</a>.</p>
+
+</div>
+</div>
+<a id="a28b50a243f880a3c70355f151f0f7904" name="a28b50a243f880a3c70355f151f0f7904"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a28b50a243f880a3c70355f151f0f7904">&#9670;&#160;</a></span>isLedgerPointerTracked()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool Cloud::isLedgerPointerTracked </td>
+          <td>(</td>
+          <td class="paramtype">const void *</td>          <td class="paramname"><span class="paramname"><em>ptr</em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Check whether the request tracker already has an active entry for a ledger object pointer. </p>
+
+<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00233">233</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_device_status_publisher_8cpp_source.html#l00287">publishDataToLedger()</a>, and <a class="el" href="_device_status_publisher_8cpp_source.html#l00023">writeDeviceStatusToCloud()</a>.</p>
+
+</div>
+</div>
+<a id="aee2b9cc3074b1c143ef6d126053c189a" name="aee2b9cc3074b1c143ef6d126053c189a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aee2b9cc3074b1c143ef6d126053c189a">&#9670;&#160;</a></span>ledgerSyncDiagnostics()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_cloud_1_1_ledger_sync_diagnostics.html">Cloud::LedgerSyncDiagnostics</a> Cloud::ledgerSyncDiagnostics </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00199">199</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_cloud_8h_source.html#l00125">Cloud::LedgerSyncDiagnostics::dataInflight</a>, <a class="el" href="_cloud_8h_source.html#l00127">Cloud::LedgerSyncDiagnostics::inflight</a>, <a class="el" href="_cloud_8h_source.html#l00120">Cloud::LedgerSyncDiagnostics::pendingCount</a>, <a class="el" href="_cloud_8h_source.html#l00123">Cloud::LedgerSyncDiagnostics::pendingDeviceDataSync</a>, <a class="el" href="_cloud_8h_source.html#l00122">Cloud::LedgerSyncDiagnostics::pendingDeviceStatusSync</a>, <a class="el" href="_cloud_8h_source.html#l00121">Cloud::LedgerSyncDiagnostics::pendingStatusPublish</a>, <a class="el" href="_cloud_8h_source.html#l00124">Cloud::LedgerSyncDiagnostics::statusInflight</a>, and <a class="el" href="_cloud_8h_source.html#l00126">Cloud::LedgerSyncDiagnostics::syncing</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00314">handleSleepingState()</a>, <a class="el" href="_device_status_publisher_8cpp_source.html#l00287">publishDataToLedger()</a>, and <a class="el" href="_device_status_publisher_8cpp_source.html#l00023">writeDeviceStatusToCloud()</a>.</p>
 
 </div>
 </div>
@@ -515,9 +610,78 @@ Static Protected Attributes</h2></td></tr>
 <p>Reads merged configuration from default-settings (Product scope) and device-settings (Device scope), with device settings overriding defaults.</p>
 <dl class="section return"><dt>Returns</dt><dd>true if configuration was successfully applied </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00035">35</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00534">534</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00139">handleConnectingState()</a>, and <a class="el" href="_state___connect_8cpp_source.html#l00394">handleFirmwareUpdateState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00209">handleConnectingState()</a>, and <a class="el" href="_state___connect_8cpp_source.html#l00715">handleFirmwareUpdateState()</a>.</p>
+
+</div>
+</div>
+<a id="aee1ad8b89f4ee82f7d2b0a850b9bdcbb" name="aee1ad8b89f4ee82f7d2b0a850b9bdcbb"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aee1ad8b89f4ee82f7d2b0a850b9bdcbb">&#9670;&#160;</a></span>logLedgerConnectState()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Cloud::logLedgerConnectState </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Log current active ledger request state on a new cloud connection. </p>
+
+<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00402">402</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___connect_8cpp_source.html#l00209">handleConnectingState()</a>.</p>
+
+</div>
+</div>
+<a id="a2054a2955f6235fb0da1d8d4d66e7499" name="a2054a2955f6235fb0da1d8d4d66e7499"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2054a2955f6235fb0da1d8d4d66e7499">&#9670;&#160;</a></span>logLedgerFailure()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Cloud::logLedgerFailure </td>
+          <td>(</td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>rc</em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Log active ledger request state for a ledger failure return code. </p>
+
+<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00446">446</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_cloud_8cpp_source.html#l00369">noteLedgerSyncFail()</a>.</p>
+
+</div>
+</div>
+<a id="a8a39f199b45227cd18ed4d34a71a267e" name="a8a39f199b45227cd18ed4d34a71a267e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a8a39f199b45227cd18ed4d34a71a267e">&#9670;&#160;</a></span>logLedgerSleepState()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Cloud::logLedgerSleepState </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Log active ledger request state before entering sleep. </p>
+
+<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00419">419</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_state___sleep_8cpp_source.html#l00314">handleSleepingState()</a>.</p>
 
 </div>
 </div>
@@ -539,11 +703,105 @@ Static Protected Attributes</h2></td></tr>
 <p>Service deferred cloud work; call from main loop. </p>
 <p>Used to keep any ledger/status publishing out of callback context and to avoid stacking multiple expensive operations in a single <a class="el" href="#ab6354f2706aa556f0fb0ee8a625c722c" title="Service deferred cloud work; call from main loop.">loop()</a> iteration. </p>
 
-<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00070">70</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00575">575</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_device_status_publisher_8cpp_source.html#l00007">writeDeviceStatusToCloud()</a>.</p>
+<p class="reference">References <a class="el" href="_device_status_publisher_8cpp_source.html#l00023">writeDeviceStatusToCloud()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00876">loop()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01128">loop()</a>.</p>
+
+</div>
+</div>
+<a id="a18ca0dbb057caa53081ade60ae2f8b8a" name="a18ca0dbb057caa53081ade60ae2f8b8a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a18ca0dbb057caa53081ade60ae2f8b8a">&#9670;&#160;</a></span>noteLedgerSyncComplete()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Cloud::noteLedgerSyncComplete </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="#a1ccde2ac5461640e74f6e7b60f77c5ca">LedgerRequestKind</a></td>          <td class="paramname"><span class="paramname"><em>kind</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="struct_cloud_1_1_ledger_sync_diagnostics.html">LedgerSyncDiagnostics</a> &amp;</td>          <td class="paramname"><span class="paramname"><em>before</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="struct_cloud_1_1_ledger_sync_diagnostics.html">LedgerSyncDiagnostics</a> &amp;</td>          <td class="paramname"><span class="paramname"><em>after</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Record completion of a ledger sync request. </p>
+
+<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00321">321</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_cloud_8h_source.html#l00127">Cloud::LedgerSyncDiagnostics::inflight</a>, <a class="el" href="_cloud_8h_source.html#l00120">Cloud::LedgerSyncDiagnostics::pendingCount</a>, and <a class="el" href="_cloud_8h_source.html#l00126">Cloud::LedgerSyncDiagnostics::syncing</a>.</p>
+
+</div>
+</div>
+<a id="a0f9c6d203e2bf041a6b9f5578e2ef105" name="a0f9c6d203e2bf041a6b9f5578e2ef105"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0f9c6d203e2bf041a6b9f5578e2ef105">&#9670;&#160;</a></span>noteLedgerSyncFail()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Cloud::noteLedgerSyncFail </td>
+          <td>(</td>
+          <td class="paramtype">uint32_t</td>          <td class="paramname"><span class="paramname"><em>seq</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>error</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Record failure of a previously-issued ledger sync request. </p>
+
+<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00369">369</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_cloud_8cpp_source.html#l00446">logLedgerFailure()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_device_status_publisher_8cpp_source.html#l00287">publishDataToLedger()</a>, and <a class="el" href="_device_status_publisher_8cpp_source.html#l00023">writeDeviceStatusToCloud()</a>.</p>
+
+</div>
+</div>
+<a id="a422da1f0cd72eb35300959b81b1dd141" name="a422da1f0cd72eb35300959b81b1dd141"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a422da1f0cd72eb35300959b81b1dd141">&#9670;&#160;</a></span>noteLedgerSyncRequest()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint32_t Cloud::noteLedgerSyncRequest </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="#a1ccde2ac5461640e74f6e7b60f77c5ca">LedgerRequestKind</a></td>          <td class="paramname"><span class="paramname"><em>kind</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const char *</td>          <td class="paramname"><span class="paramname"><em>source</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const void *</td>          <td class="paramname"><span class="paramname"><em>ptr</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Record a ledger sync request that has been accepted locally. </p>
+<p>Returns the monotonic request sequence number used in the diagnostic logs. </p>
+
+<p class="definition">Definition at line <a class="el" href="_cloud_8cpp_source.html#l00247">247</a> of file <a class="el" href="_cloud_8cpp_source.html">Cloud.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_device_status_publisher_8cpp_source.html#l00287">publishDataToLedger()</a>, and <a class="el" href="_device_status_publisher_8cpp_source.html#l00023">writeDeviceStatusToCloud()</a>.</p>
 
 </div>
 </div>
@@ -572,12 +830,12 @@ Static Protected Attributes</h2></td></tr>
 
 <p>This class is a singleton and cannot be copied. </p>
 
-<p class="reference">References <a class="el" href="_cloud_8cpp_source.html#l00024">Cloud()</a>.</p>
+<p class="reference">References <a class="el" href="_cloud_8cpp_source.html#l00187">Cloud()</a>.</p>
 
 </div>
 </div>
-<a id="a832b2fee272f68202c5877a0b2fee7c0" name="a832b2fee272f68202c5877a0b2fee7c0"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a832b2fee272f68202c5877a0b2fee7c0">&#9670;&#160;</a></span>publishDataToLedger()</h2>
+<a id="ac134bd6eda8e682cac6085fe12edc4d3" name="ac134bd6eda8e682cac6085fe12edc4d3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac134bd6eda8e682cac6085fe12edc4d3">&#9670;&#160;</a></span>publishDataToLedger()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -585,7 +843,7 @@ Static Protected Attributes</h2></td></tr>
         <tr>
           <td class="memname">bool Cloud::publishDataToLedger </td>
           <td>(</td>
-          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td class="paramtype">const char *</td>          <td class="paramname"><span class="paramname"><em>source</em></span><span class="paramdefsep"> = </span><span class="paramdefval">&quot;Unknown&quot;</span></td><td>)</td>
           <td></td>
         </tr>
       </table>
@@ -595,11 +853,11 @@ Static Protected Attributes</h2></td></tr>
 <p>Updates the Device→Cloud ledger with current sensor readings, making data visible in Particle Console even when device is offline. A successful return means the local ledger accepted the write; cloud sync may still be pending.</p>
 <dl class="section return"><dt>Returns</dt><dd>true if successful </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_device_status_publisher_8cpp_source.html#l00147">147</a> of file <a class="el" href="_device_status_publisher_8cpp_source.html">DeviceStatusPublisher.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_device_status_publisher_8cpp_source.html#l00287">287</a> of file <a class="el" href="_device_status_publisher_8cpp_source.html">DeviceStatusPublisher.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00054">COUNTING</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00055">OCCUPANCY</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
+<p class="reference">References <a class="el" href="_my_persistent_data_8h_source.html#l00054">COUNTING</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00041">current</a>, <a class="el" href="_cloud_8h_source.html#l00127">Cloud::LedgerSyncDiagnostics::inflight</a>, <a class="el" href="_cloud_8cpp_source.html#l00180">instance()</a>, <a class="el" href="_cloud_8cpp_source.html#l00233">isLedgerPointerTracked()</a>, <a class="el" href="_cloud_8h_source.html#l00053">LEDGER_REQUEST_KIND_DATA</a>, <a class="el" href="_cloud_8cpp_source.html#l00199">ledgerSyncDiagnostics()</a>, <a class="el" href="_cloud_8cpp_source.html#l00369">noteLedgerSyncFail()</a>, <a class="el" href="_cloud_8cpp_source.html#l00247">noteLedgerSyncRequest()</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00055">OCCUPANCY</a>, <a class="el" href="_cloud_8h_source.html#l00120">Cloud::LedgerSyncDiagnostics::pendingCount</a>, <a class="el" href="_cloud_8h_source.html#l00126">Cloud::LedgerSyncDiagnostics::syncing</a>, and <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01148">publishData()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01570">publishData()</a>.</p>
 
 </div>
 </div>
@@ -623,7 +881,7 @@ Static Protected Attributes</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_ledger_client_8cpp_source.html#l00026">26</a> of file <a class="el" href="_ledger_client_8cpp_source.html">LedgerClient.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00626">setup()</a>.</p>
 
 </div>
 </div>
@@ -661,8 +919,8 @@ Static Protected Attributes</h2></td></tr>
 
 </div>
 </div>
-<a id="a27758d9343f1531651c739f13ff6006b" name="a27758d9343f1531651c739f13ff6006b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a27758d9343f1531651c739f13ff6006b">&#9670;&#160;</a></span>writeDeviceStatusToCloud()</h2>
+<a id="aacb8eae6febbe83b39959e80b7983bb9" name="aacb8eae6febbe83b39959e80b7983bb9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aacb8eae6febbe83b39959e80b7983bb9">&#9670;&#160;</a></span>writeDeviceStatusToCloud()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -670,7 +928,7 @@ Static Protected Attributes</h2></td></tr>
         <tr>
           <td class="memname">bool Cloud::writeDeviceStatusToCloud </td>
           <td>(</td>
-          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td class="paramtype">const char *</td>          <td class="paramname"><span class="paramname"><em>source</em></span><span class="paramdefsep"> = </span><span class="paramdefval">&quot;Unknown&quot;</span></td><td>)</td>
           <td></td>
         </tr>
       </table>
@@ -680,11 +938,11 @@ Static Protected Attributes</h2></td></tr>
 <p>Updates Device→Cloud ledger with current configuration for Console visibility. A successful return means the local ledger accepted the write; cloud sync may still be pending.</p>
 <dl class="section return"><dt>Returns</dt><dd>true if successful </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="_device_status_publisher_8cpp_source.html#l00007">7</a> of file <a class="el" href="_device_status_publisher_8cpp_source.html">DeviceStatusPublisher.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_device_status_publisher_8cpp_source.html#l00023">23</a> of file <a class="el" href="_device_status_publisher_8cpp_source.html">DeviceStatusPublisher.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_wake_cycle_stats_8cpp_source.html#l00012">Observability::cycleStats()</a>, <a class="el" href="_version_8cpp_source.html#l00006">FIRMWARE_VERSION</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00043">sensorConfig</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, and <a class="el" href="_wake_cycle_stats_8cpp_source.html#l00091">Observability::toString()</a>.</p>
+<p class="reference">References <a class="el" href="_wake_cycle_stats_8cpp_source.html#l00012">Observability::cycleStats()</a>, <a class="el" href="_version_8cpp_source.html#l00006">FIRMWARE_VERSION</a>, <a class="el" href="_cloud_8h_source.html#l00127">Cloud::LedgerSyncDiagnostics::inflight</a>, <a class="el" href="_cloud_8cpp_source.html#l00180">instance()</a>, <a class="el" href="_cloud_8cpp_source.html#l00233">isLedgerPointerTracked()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00030">lastPmicAnomalyChargeStatus</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00031">lastPmicAnomalyPowerSource</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00029">lastPmicAnomalySoc</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00032">lastPmicAnomalyVbusStatus</a>, <a class="el" href="_cloud_8h_source.html#l00052">LEDGER_REQUEST_KIND_STATUS</a>, <a class="el" href="_cloud_8cpp_source.html#l00199">ledgerSyncDiagnostics()</a>, <a class="el" href="_cloud_8cpp_source.html#l00369">noteLedgerSyncFail()</a>, <a class="el" href="_cloud_8cpp_source.html#l00247">noteLedgerSyncRequest()</a>, <a class="el" href="_cloud_8h_source.html#l00120">Cloud::LedgerSyncDiagnostics::pendingCount</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00033">pmicAnomalyActive</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00078">pmicAnomalyAgeSec()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00026">pmicAnomalyCount</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00043">sensorConfig</a>, <a class="el" href="_cloud_8h_source.html#l00126">Cloud::LedgerSyncDiagnostics::syncing</a>, <a class="el" href="_my_persistent_data_8h_source.html#l00042">sysStatus</a>, and <a class="el" href="_wake_cycle_stats_8cpp_source.html#l00091">Observability::toString()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_cloud_8cpp_source.html#l00070">loop()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_cloud_8cpp_source.html#l00575">loop()</a>.</p>
 
 </div>
 </div>
@@ -712,9 +970,9 @@ Static Protected Attributes</h2></td></tr>
 <p>Singleton instance of this class. </p>
 <p>The object pointer to this class is stored here. It's NULL at system boot. </p>
 
-<p class="definition">Definition at line <a class="el" href="_cloud_8h_source.html#l00357">357</a> of file <a class="el" href="_cloud_8h_source.html">Cloud.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_cloud_8h_source.html#l00424">424</a> of file <a class="el" href="_cloud_8h_source.html">Cloud.h</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_cloud_8cpp_source.html#l00017">instance()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_cloud_8cpp_source.html#l00180">instance()</a>.</p>
 
 </div>
 </div>

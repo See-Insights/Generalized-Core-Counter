@@ -50,7 +50,6 @@ void userSwitchISR();
 struct SessionState {
   bool firstConnectionObserved = false;
   bool firstConnectionQueueDrainedLogged = false;
-  bool hibernateDisabledForSession = false;
   bool suppressAlert40ThisSession = false;
   bool awaitingWebhookResponse = false;
   bool webhookExpectedOnConnect = false;   // We queued a webhook publish and should start a response window on next cloud connect
@@ -79,6 +78,25 @@ extern unsigned long connectedStartMs;
 extern SessionState session;
 
 /**
+ * @brief Refreshes the awake watchdog while the firmware is intentionally running.
+ */
+void serviceAwakeWatchdog();
+
+/**
+ * @brief Prepares the awake watchdog for an intended sleep transition.
+ *
+ * @param context Short log label for the sleep site
+ */
+void pauseAwakeWatchdogForSleep(const char *context);
+
+/**
+ * @brief Restores the awake watchdog after a sleep return path.
+ *
+ * @param context Short log label for the wake site
+ */
+void restoreAwakeWatchdogAfterWake(const char *context);
+
+/**
  * @brief Returns true when the local-time snapshot is inside configured open hours.
  *
  * @return true when the device should behave as within operating hours
@@ -96,6 +114,14 @@ int secondsUntilNextOpen();
  * @brief Publishes or logs the most recent state transition.
  */
 void publishStateTransition();
+
+/**
+ * @brief Requests a top-level state transition with a concise log breadcrumb.
+ *
+ * @param newState Target state for the next main-loop dispatch
+ * @param reason Short reason label for field logs
+ */
+void transitionTo(State newState, const char *reason);
 
 /**
  * @brief Runs once-per-day maintenance work after time is available.

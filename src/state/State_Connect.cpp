@@ -1,5 +1,5 @@
 #include "state/State_Common.h"
-#include "Config.h"
+#include "../Config.h"
 #include "cloud/Cloud.h"
 #include "DeviceInfoLedger.h"
 #include "MyPersistentData.h"
@@ -19,6 +19,76 @@
 namespace {
 
 constexpr uint8_t MODEM_UNSTABLE_CONNECT_TIMEOUT_THRESHOLD = 2;
+
+enum class ConnAcquirePhase : uint8_t {
+  CELLULAR_ACQUIRE = 0,
+  NETWORK_ACQUIRE,
+  CLOUD_ACQUIRE,
+  CONNECTED,
+};
+
+const char *connAcquirePhaseLabel(ConnAcquirePhase phase) {
+  switch (phase) {
+  case ConnAcquirePhase::CELLULAR_ACQUIRE:
+    return "CELLULAR_ACQUIRE";
+  case ConnAcquirePhase::NETWORK_ACQUIRE:
+    return "NETWORK_ACQUIRE";
+  case ConnAcquirePhase::CLOUD_ACQUIRE:
+    return "CLOUD_ACQUIRE";
+  case ConnAcquirePhase::CONNECTED:
+    return "CONNECTED";
+  default:
+    return "?";
+  }
+}
+
+ConnAcquirePhase classifyConnAcquirePhase(bool cellularReady,
+                                          bool networkReady,
+                                          bool cloudConnected) {
+  if (cloudConnected) {
+    return ConnAcquirePhase::CONNECTED;
+  }
+  if (!cellularReady) {
+    return ConnAcquirePhase::CELLULAR_ACQUIRE;
+  }
+  if (!networkReady) {
+    return ConnAcquirePhase::NETWORK_ACQUIRE;
+  }
+  return ConnAcquirePhase::CLOUD_ACQUIRE;
+}
+
+void sampleConnectionSignal(int &strengthPct, int &qualityPct, bool &valid) {
+  valid = false;
+  strengthPct = -1;
+  qualityPct = -1;
+#if Wiring_Cellular
+  CellularSignal sig = Cellular.RSSI();
+  strengthPct = (int)(sig.getStrength() + 0.5f);
+  qualityPct = (int)(sig.getQuality() + 0.5f);
+  valid = true;
+#elif Wiring_WiFi
+  WiFiSignal sig = WiFi.RSSI();
+  strengthPct = (int)(sig.getStrength() + 0.5f);
+  qualityPct = (int)(sig.getQuality() + 0.5f);
+  valid = true;
+#endif
+}
+
+void requestCloudAcquireStage1Recovery() {
+  Connectivity::requestCloudDisconnectOnly();
+  Particle.connect();
+}
+
+void requestCloudAcquireStage2Recovery() {
+#if Wiring_Cellular
+  Connectivity::requestRadioPowerOff();
+  Cellular.on();
+  Particle.connect();
+#else
+  Particle.disconnect();
+  Particle.connect();
+#endif
+}
 
 struct ConnectBudgetContext {
   unsigned long budgetMs = ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS;
@@ -137,15 +207,30 @@ static const unsigned long firmwareUpdateMaxMs = ConnectivityPolicy::FIRMWARE_UP
  *          field behaviour can be analysed from device-status data.
  */
 void handleConnectingState() {
+  setLoopStage(LOOP_STAGE_CONNECTIVITY);
+
   static unsigned long connectionStartTimeStamp; // When this connect attempt started
   static bool lastEnteredFromReporting = false;  // Whether we came from REPORTING_STATE
   static bool connectRequested = false;
   static bool postConnectDone = false;
   static unsigned long budgetMs = ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS; // Connection timeout budget
+  static bool deepAttemptThisConnect = false;
   static unsigned long lastConnectHeartbeatMs = 0;
-  static unsigned long lastConnectStatusLogMs = 0;
+  static unsigned long lastConnDiagLogMs = 0;
+  static bool connPhaseInitialized = false;
+  static ConnAcquirePhase lastConnPhase = ConnAcquirePhase::CELLULAR_ACQUIRE;
+  static unsigned long phaseStartMs = 0;
+  static uint32_t connPhaseCellMs = 0;
+  static uint32_t connPhaseNetMs = 0;
+  static uint32_t connPhaseCloudMs = 0;
+  static uint8_t cloudRecoverStage = 0;
+  static uint8_t cloudRecoverCount = 0;
+  static bool cloudRecoverStage1Done = false;
+  static bool cloudRecoverStage2Done = false;
   constexpr unsigned long CONNECT_HEARTBEAT_MS = 30000UL;
-  constexpr unsigned long CONNECT_STATUS_LOG_MS = 60000UL;
+  constexpr unsigned long CONNECT_DIAG_LOG_MS = 30000UL;
+  constexpr unsigned long CLOUD_RECOVER_STAGE1_MS = 60000UL;
+  constexpr unsigned long CLOUD_RECOVER_STAGE2_MS = 120000UL;
 
   if (state != oldState) {
     publishStateTransition();
@@ -154,8 +239,19 @@ void handleConnectingState() {
     connectionStartTimeStamp = millis();
     connectRequested = false;
     postConnectDone = false;
+    deepAttemptThisConnect = false;
     lastConnectHeartbeatMs = 0;
-    lastConnectStatusLogMs = 0;
+    lastConnDiagLogMs = 0;
+    connPhaseInitialized = false;
+    lastConnPhase = ConnAcquirePhase::CELLULAR_ACQUIRE;
+    phaseStartMs = connectionStartTimeStamp;
+    connPhaseCellMs = 0;
+    connPhaseNetMs = 0;
+    connPhaseCloudMs = 0;
+    cloudRecoverStage = 0;
+    cloudRecoverCount = 0;
+    cloudRecoverStage1Done = false;
+    cloudRecoverStage2Done = false;
 
     // ********** Connection Budget with Periodic Deep Attempts **********
     // Per Particle cellular docs: Must allow at least 5 minutes for IMSI cycling,
@@ -165,6 +261,7 @@ void handleConnectingState() {
     
     const ConnectBudgetContext budgetContext = evaluateConnectBudget();
     budgetMs = budgetContext.budgetMs;
+    deepAttemptThisConnect = budgetContext.allowDeepAttempt;
     if (budgetContext.configuredBudgetBelowMinimum) {
       Log.warn("Configured budget %us below 120s minimum, using 300s default",
                budgetContext.configuredBudgetSec);
@@ -174,19 +271,32 @@ void handleConnectingState() {
       // Every 4th attempt (counter 0-3, resets at 3) OR when battery >50%,
       // allow 11 minutes for full modem reset
       if (budgetContext.attemptCounter >= ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD) {
+#if ENABLE_CONNECT_DECISION_TRACE
         Log.info("Deep connection attempt #%d - allowing 11 min for modem reset",
                  budgetContext.attemptCounter + 1);
+#endif
         sysStatus.set_connectionAttemptCounter(0);  // Reset counter after deep attempt
       } else {
+#if ENABLE_CONNECT_DECISION_TRACE
         Log.info("Healthy battery (%.1f%%) - allowing 11 min connection budget",
                  (double)budgetContext.currentSoC);
+#endif
       }
     } else {
+#if ENABLE_CONNECT_DECISION_TRACE
       Log.trace("Normal connection attempt #%d - 5 min budget",
                 budgetContext.attemptCounter + 1);
+#endif
     }
 
     armActiveConnectAttempt(budgetMs);
+
+  #if ENABLE_CONNECT_TRACE
+    Log.info("CloudRecoverCfg: stage1=%lus stage2=%lus budget=%lus",
+       (unsigned long)(CLOUD_RECOVER_STAGE1_MS / 1000UL),
+       (unsigned long)(CLOUD_RECOVER_STAGE2_MS / 1000UL),
+       (unsigned long)(budgetMs / 1000UL));
+  #endif
 
     // Observability: record connect attempt type + final effective budget.
     {
@@ -202,6 +312,55 @@ void handleConnectingState() {
 
   unsigned long elapsedMs = millis() - connectionStartTimeStamp;
   sysStatus.set_lastConnectionDuration(int(elapsedMs / 1000));
+
+  bool cellularReady = true;
+#if Wiring_Cellular
+  cellularReady = Cellular.ready();
+#endif
+  const bool networkReady = Network.ready();
+  const bool cloudConnected = Particle.connected();
+  const ConnAcquirePhase currentConnPhase =
+      classifyConnAcquirePhase(cellularReady, networkReady, cloudConnected);
+  const unsigned long phaseNowMs = millis();
+  const unsigned long phaseElapsedMs = phaseNowMs - phaseStartMs;
+  unsigned long cloudAcquireElapsedMs = connPhaseCloudMs;
+  if (currentConnPhase == ConnAcquirePhase::CLOUD_ACQUIRE) {
+    cloudAcquireElapsedMs = phaseElapsedMs;
+  }
+
+  auto addPhaseElapsed = [&](ConnAcquirePhase phase, uint32_t deltaMs) {
+    switch (phase) {
+    case ConnAcquirePhase::CELLULAR_ACQUIRE:
+      connPhaseCellMs += deltaMs;
+      break;
+    case ConnAcquirePhase::NETWORK_ACQUIRE:
+      connPhaseNetMs += deltaMs;
+      break;
+    case ConnAcquirePhase::CLOUD_ACQUIRE:
+      connPhaseCloudMs += deltaMs;
+      break;
+    case ConnAcquirePhase::CONNECTED:
+      break;
+    }
+  };
+
+  if (!connPhaseInitialized) {
+    connPhaseInitialized = true;
+    lastConnPhase = currentConnPhase;
+    phaseStartMs = phaseNowMs;
+  } else if (currentConnPhase != lastConnPhase) {
+    const uint32_t phaseDeltaMs = (uint32_t)(phaseNowMs - phaseStartMs);
+    addPhaseElapsed(lastConnPhase, phaseDeltaMs);
+#if ENABLE_CONNECT_TRACE
+    Log.info("ConnPhase: %s->%s elapsed=%lu phaseElapsed=%lu",
+             connAcquirePhaseLabel(lastConnPhase),
+             connAcquirePhaseLabel(currentConnPhase),
+             (unsigned long)elapsedMs,
+             (unsigned long)phaseDeltaMs);
+#endif
+    lastConnPhase = currentConnPhase;
+    phaseStartMs = phaseNowMs;
+  }
 
   if (!connectRequested) {
     // Log signal strength at start of connection attempt for field
@@ -228,26 +387,144 @@ void handleConnectingState() {
     Observability::cycleStats().markConnectRequested(connectionStartTimeStamp);
   }
 
+  if (state == CONNECTING_STATE && connectRequested && !cloudConnected &&
+      currentConnPhase == ConnAcquirePhase::CLOUD_ACQUIRE) {
+    const bool stage1WasDoneAtLoopStart = cloudRecoverStage1Done;
+    if (!cloudRecoverStage1Done && phaseElapsedMs >= CLOUD_RECOVER_STAGE1_MS) {
+      cloudRecoverStage1Done = true;
+      cloudRecoverStage = 1;
+      cloudRecoverCount = 1;
+      Log.warn("CloudRecover: stage=1 action=particle-reconnect phaseElapsed=%lu elapsed=%lu",
+               (unsigned long)phaseElapsedMs,
+               (unsigned long)elapsedMs);
+      requestCloudAcquireStage1Recovery();
+      lastConnectHeartbeatMs = phaseNowMs;
+      lastConnDiagLogMs = phaseNowMs;
+    }
+
+    if (stage1WasDoneAtLoopStart && !cloudRecoverStage2Done &&
+        phaseElapsedMs >= CLOUD_RECOVER_STAGE2_MS) {
+      cloudRecoverStage2Done = true;
+      cloudRecoverStage = 2;
+      cloudRecoverCount = 2;
+      Log.warn("CloudRecover: stage=2 action=network-reset phaseElapsed=%lu elapsed=%lu",
+               (unsigned long)phaseElapsedMs,
+               (unsigned long)elapsedMs);
+      requestCloudAcquireStage2Recovery();
+      lastConnectHeartbeatMs = phaseNowMs;
+      lastConnDiagLogMs = phaseNowMs;
+    }
+  }
+
   // Keep ThrashGuard informed during intentional long cellular connects.
   // Heartbeat is emitted only while the connect attempt is active and still
   // within the selected budget, so genuine over-budget stalls still timeout.
-  if (state == CONNECTING_STATE && connectRequested && !Particle.connected() && elapsedMs < budgetMs) {
+  if (state == CONNECTING_STATE && connectRequested && !cloudConnected && elapsedMs < budgetMs) {
     const unsigned long nowMs = millis();
     if (lastConnectHeartbeatMs == 0 || (nowMs - lastConnectHeartbeatMs) >= CONNECT_HEARTBEAT_MS) {
       thrashGuard.markProgress("CONNECT_WAIT");
       lastConnectHeartbeatMs = nowMs;
     }
-    if (elapsedMs >= CONNECT_STATUS_LOG_MS &&
-      (lastConnectStatusLogMs == 0 || (nowMs - lastConnectStatusLogMs) >= CONNECT_STATUS_LOG_MS)) {
-      Log.info("CONNECTING: waiting for cloud (%lu/%lu ms)",
-               (unsigned long)elapsedMs,
-               (unsigned long)budgetMs);
-      lastConnectStatusLogMs = nowMs;
+    if (lastConnDiagLogMs == 0 || (nowMs - lastConnDiagLogMs) >= CONNECT_DIAG_LOG_MS) {
+      int sigStrength = -1;
+      int sigQuality = -1;
+      bool sigValid = false;
+      sampleConnectionSignal(sigStrength, sigQuality, sigValid);
+  #if ENABLE_CONNECT_TRACE
+      const uint16_t queueDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
+      const bool standbyRequested =
+          (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) &&
+          isWithinOpenHours();
+      const bool standbyEffective = standbyRequested && !session.modemStandbySuppressed;
+  #else
+      (void)sigStrength;
+      (void)sigQuality;
+      (void)sigValid;
+      (void)deepAttemptThisConnect;
+  #endif
+
+      if (sigValid) {
+    #if ENABLE_CONNECT_TRACE
+        Log.info("ConnDiag: elapsed=%lu/%lu phase=%s phaseElapsed=%lu cell=%d net=%d cloud=%d sig=%d/%d heap=%lu q=%u deep=%d standby=%d/%d",
+                 (unsigned long)elapsedMs,
+                 (unsigned long)budgetMs,
+                 connAcquirePhaseLabel(currentConnPhase),
+           (unsigned long)phaseElapsedMs,
+                 cellularReady ? 1 : 0,
+                 networkReady ? 1 : 0,
+                 cloudConnected ? 1 : 0,
+                 sigStrength,
+                 sigQuality,
+                 (unsigned long)System.freeMemory(),
+                 (unsigned)queueDepth,
+                 deepAttemptThisConnect ? 1 : 0,
+                 standbyRequested ? 1 : 0,
+                 standbyEffective ? 1 : 0);
+#endif
+      } else {
+#if ENABLE_CONNECT_TRACE
+        Log.info("ConnDiag: elapsed=%lu/%lu phase=%s phaseElapsed=%lu cell=%d net=%d cloud=%d sig=na heap=%lu q=%u deep=%d standby=%d/%d",
+                 (unsigned long)elapsedMs,
+                 (unsigned long)budgetMs,
+                 connAcquirePhaseLabel(currentConnPhase),
+           (unsigned long)phaseElapsedMs,
+                 cellularReady ? 1 : 0,
+                 networkReady ? 1 : 0,
+                 cloudConnected ? 1 : 0,
+                 (unsigned long)System.freeMemory(),
+                 (unsigned)queueDepth,
+                 deepAttemptThisConnect ? 1 : 0,
+                 standbyRequested ? 1 : 0,
+                 standbyEffective ? 1 : 0);
+#endif
+      }
+      lastConnDiagLogMs = nowMs;
     }
   }
 
-  if (Particle.connected()) {
+  if (cloudConnected) {
     if (!postConnectDone) {
+      const uint32_t phaseDeltaMs = (uint32_t)(millis() - phaseStartMs);
+      addPhaseElapsed(lastConnPhase, phaseDeltaMs);
+
+      if (cloudRecoverCount > 0) {
+        Log.info("CloudRecover: success stage=%u elapsed=%lu cloudMs=%lu",
+                 (unsigned)cloudRecoverStage,
+                 (unsigned long)elapsedMs,
+                 (unsigned long)cloudAcquireElapsedMs);
+      }
+
+      int summarySigStrength = -1;
+      int summarySigQuality = -1;
+      bool summarySigValid = false;
+      sampleConnectionSignal(summarySigStrength, summarySigQuality, summarySigValid);
+      const uint16_t summaryQueueDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
+      if (summarySigValid) {
+        Log.info("ConnSummary: ok elapsed=%lu last=%s cellMs=%lu netMs=%lu cloudMs=%lu cloudRecoverStage=%u cloudRecoverCount=%u sig=%d/%d heap=%lu q=%u",
+                 (unsigned long)elapsedMs,
+                 connAcquirePhaseLabel(lastConnPhase),
+                 (unsigned long)connPhaseCellMs,
+                 (unsigned long)connPhaseNetMs,
+                 (unsigned long)connPhaseCloudMs,
+                 (unsigned)cloudRecoverStage,
+                 (unsigned)cloudRecoverCount,
+                 summarySigStrength,
+                 summarySigQuality,
+                 (unsigned long)System.freeMemory(),
+                 (unsigned)summaryQueueDepth);
+      } else {
+        Log.info("ConnSummary: ok elapsed=%lu last=%s cellMs=%lu netMs=%lu cloudMs=%lu cloudRecoverStage=%u cloudRecoverCount=%u sig=na heap=%lu q=%u",
+                 (unsigned long)elapsedMs,
+                 connAcquirePhaseLabel(lastConnPhase),
+                 (unsigned long)connPhaseCellMs,
+                 (unsigned long)connPhaseNetMs,
+                 (unsigned long)connPhaseCloudMs,
+                 (unsigned)cloudRecoverStage,
+                 (unsigned)cloudRecoverCount,
+                 (unsigned long)System.freeMemory(),
+                 (unsigned)summaryQueueDepth);
+      }
+
       thrashGuard.markProgress("CLOUD_CONNECTED");
       setAppBreadcrumb(7);
       connectedStartMs = millis();
@@ -281,11 +558,14 @@ void handleConnectingState() {
         current.set_alertCode(0);
       }
       measure.batteryState();
+      
       if (sysStatus.get_verboseMode()) {
         char data[64];
         snprintf(data, sizeof(data), "Connected in %i secs", sysStatus.get_lastConnectionDuration());
         publishDiagnosticSafe("Cellular", data, PRIVATE);
       }
+
+      Cloud::instance().logLedgerConnectState();
 
       bool configOk = Cloud::instance().loadConfigurationFromCloud();
       if (!configOk) {
@@ -303,7 +583,7 @@ void handleConnectingState() {
 
       bool ledgerPublishOk = true;
       if (!lastEnteredFromReporting) {
-        if (!Cloud::instance().publishDataToLedger()) {
+        if (!Cloud::instance().publishDataToLedger("ConnectState")) {
           current.raiseAlert(42); // data ledger publish failure
           ledgerPublishOk = false;
         }
@@ -361,18 +641,59 @@ void handleConnectingState() {
     clearActiveConnectAttempt();
 
     if (System.updatesPending()) {
-      state = FIRMWARE_UPDATE_STATE;
+      transitionTo(FIRMWARE_UPDATE_STATE, "updates-pending");
     } else if (session.returnToSleepAfterReport) {
       // After reporting occupied state in low-power mode, return to sleep to check debounce timeout
       session.returnToSleepAfterReport = false;
-      state = SLEEPING_STATE;
+      transitionTo(SLEEPING_STATE, "return-to-sleep-after-report");
     } else {
-      state = IDLE_STATE;
+      transitionTo(IDLE_STATE, "connect-complete");
     }
     return;
   }
 
   if (elapsedMs > budgetMs) {
+    const uint32_t phaseDeltaMs = (uint32_t)(millis() - phaseStartMs);
+    addPhaseElapsed(lastConnPhase, phaseDeltaMs);
+
+    if (cloudRecoverCount > 0) {
+      Log.warn("CloudRecover: exhausted stage=%u elapsed=%lu cloudMs=%lu",
+               (unsigned)cloudRecoverStage,
+               (unsigned long)elapsedMs,
+               (unsigned long)cloudAcquireElapsedMs);
+    }
+
+    int summarySigStrength = -1;
+    int summarySigQuality = -1;
+    bool summarySigValid = false;
+    sampleConnectionSignal(summarySigStrength, summarySigQuality, summarySigValid);
+    const uint16_t summaryQueueDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
+    if (summarySigValid) {
+      Log.warn("ConnSummary: fail elapsed=%lu last=%s cellMs=%lu netMs=%lu cloudMs=%lu cloudRecoverStage=%u cloudRecoverCount=%u sig=%d/%d heap=%lu q=%u",
+               (unsigned long)elapsedMs,
+               connAcquirePhaseLabel(lastConnPhase),
+               (unsigned long)connPhaseCellMs,
+               (unsigned long)connPhaseNetMs,
+               (unsigned long)connPhaseCloudMs,
+               (unsigned)cloudRecoverStage,
+               (unsigned)cloudRecoverCount,
+               summarySigStrength,
+               summarySigQuality,
+               (unsigned long)System.freeMemory(),
+               (unsigned)summaryQueueDepth);
+    } else {
+      Log.warn("ConnSummary: fail elapsed=%lu last=%s cellMs=%lu netMs=%lu cloudMs=%lu cloudRecoverStage=%u cloudRecoverCount=%u sig=na heap=%lu q=%u",
+               (unsigned long)elapsedMs,
+               connAcquirePhaseLabel(lastConnPhase),
+               (unsigned long)connPhaseCellMs,
+               (unsigned long)connPhaseNetMs,
+               (unsigned long)connPhaseCloudMs,
+               (unsigned)cloudRecoverStage,
+               (unsigned)cloudRecoverCount,
+               (unsigned long)System.freeMemory(),
+               (unsigned)summaryQueueDepth);
+    }
+
     Log.warn("Connect: fail elapsed=%lums budget=%lums heap=%lu",
              (unsigned long)elapsedMs,
              (unsigned long)budgetMs,
@@ -386,7 +707,7 @@ void handleConnectingState() {
     current.raiseAlert(31);
     Connectivity::requestFullDisconnectAndRadioOff();
     clearActiveConnectAttempt();
-    state = SLEEPING_STATE;
+    transitionTo(SLEEPING_STATE, "connect-timeout");
   }
 }
 
@@ -396,12 +717,14 @@ void handleFirmwareUpdateState() {
   // Particle Wake-Publish-Sleep example behaviour: bound the time
   // spent waiting for an update before going back to sleep.
   static unsigned long firmwareUpdateStartMs = 0;
+  static bool configLoadedInUpdateMode = false;
 
   if (state != oldState) {
     publishStateTransition();
     Log.info("Entering FIRMWARE_UPDATE_STATE - keeping device connected for updates");
 
     firmwareUpdateStartMs = millis();
+    configLoadedInUpdateMode = false;
 
     // Ensure cloud connection is requested
     if (!Particle.connected()) {
@@ -411,7 +734,6 @@ void handleFirmwareUpdateState() {
 
   // Once connected, ensure configuration is loaded at least once
   if (Particle.connected()) {
-    static bool configLoadedInUpdateMode = false;
     if (!configLoadedInUpdateMode) {
       Log.info("Connected in FIRMWARE_UPDATE_STATE - loading configuration from cloud");
       Cloud::instance().loadConfigurationFromCloud();
@@ -422,7 +744,7 @@ void handleFirmwareUpdateState() {
     if (!System.updatesPending()) {
       Log.info("No updates pending - leaving FIRMWARE_UPDATE_STATE to IDLE_STATE");
       configLoadedInUpdateMode = false;
-      state = IDLE_STATE;
+      transitionTo(IDLE_STATE, "firmware-update-complete");
       return;
     }
   }
@@ -430,7 +752,7 @@ void handleFirmwareUpdateState() {
   // Optional escape hatch: user button can also exit update mode
   if (!digitalRead(BUTTON_PIN)) { // Active-low user button
     Log.info("User button pressed - exiting FIRMWARE_UPDATE_STATE to IDLE_STATE");
-    state = IDLE_STATE;
+    transitionTo(IDLE_STATE, "firmware-update-button-exit");
     return;
   }
 
@@ -441,6 +763,6 @@ void handleFirmwareUpdateState() {
   if (firmwareUpdateStartMs != 0 && (millis() - firmwareUpdateStartMs) > firmwareUpdateMaxMs) {
     Log.info("Firmware update timed out after %lu ms in FIRMWARE_UPDATE_STATE - transitioning to SLEEPING_STATE",
              (unsigned long)(millis() - firmwareUpdateStartMs));
-    state = SLEEPING_STATE;
+    transitionTo(SLEEPING_STATE, "firmware-update-timeout");
   }
 }

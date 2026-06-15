@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;19</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -119,6 +119,8 @@ Static Public Member Functions</h2></td></tr>
 <tr class="memdesc:a73f362406055e8295988b332e2838ac0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts availability enum values to stable log labels.  <br /></td></tr>
 <tr class="memitem:ace81f8b3c45ef2d5602d1689ab987ae8" id="r_ace81f8b3c45ef2d5602d1689ab987ae8"><td class="memItemLeft">static const char *&#160;</td><td class="memItemRight"><a class="el" href="#ace81f8b3c45ef2d5602d1689ab987ae8">batteryContextLabel</a> (<a class="el" href="_power_manager_8h.html#aeae7c5d74e7921e5b5667c8c7981ef65">PowerBatteryContext</a> context)</td></tr>
 <tr class="memdesc:ace81f8b3c45ef2d5602d1689ab987ae8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts battery-context enum values to stable log labels.  <br /></td></tr>
+<tr class="memitem:a3d88b6597144e6481bd0bdf72f7ad0b5" id="r_a3d88b6597144e6481bd0bdf72f7ad0b5"><td class="memItemLeft">static const char *&#160;</td><td class="memItemRight"><a class="el" href="#a3d88b6597144e6481bd0bdf72f7ad0b5">compactProfileLabel</a> (<a class="el" href="_power_manager_8h.html#abc3d13c7b58b63381698ef85e244366f">PowerInputProfile</a> profile)</td></tr>
+<tr class="memdesc:a3d88b6597144e6481bd0bdf72f7ad0b5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts power input profile to compact log label.  <br /></td></tr>
 <tr class="memitem:a5d0843afb9ac80b49b8a2fc05842477a" id="r_a5d0843afb9ac80b49b8a2fc05842477a"><td class="memItemLeft">static const char *&#160;</td><td class="memItemRight"><a class="el" href="#a5d0843afb9ac80b49b8a2fc05842477a">inputProfileLabel</a> (<a class="el" href="_power_manager_8h.html#abc3d13c7b58b63381698ef85e244366f">PowerInputProfile</a> profile)</td></tr>
 <tr class="memdesc:a5d0843afb9ac80b49b8a2fc05842477a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts input-profile enum values to stable log labels.  <br /></td></tr>
 <tr class="memitem:a9bc8cf4dd6766c47d745109a1e0e2448" id="r_a9bc8cf4dd6766c47d745109a1e0e2448"><td class="memItemLeft">static <a class="el" href="class_power_manager.html">PowerManager</a> &amp;&#160;</td><td class="memItemRight"><a class="el" href="#a9bc8cf4dd6766c47d745109a1e0e2448">instance</a> ()</td></tr>
@@ -133,7 +135,7 @@ Static Public Member Functions</h2></td></tr>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Singleton that samples platform power telemetry and produces policy guidance. </p>
 
-<p class="definition">Definition at line <a class="el" href="_power_manager_8h_source.html#l00153">153</a> of file <a class="el" href="_power_manager_8h_source.html">PowerManager.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_power_manager_8h_source.html#l00154">154</a> of file <a class="el" href="_power_manager_8h_source.html">PowerManager.h</a>.</p>
 </div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
 <a id="a73f362406055e8295988b332e2838ac0" name="a73f362406055e8295988b332e2838ac0"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a73f362406055e8295988b332e2838ac0">&#9670;&#160;</a></span>availabilityLabel()</h2>
@@ -233,6 +235,46 @@ Static Public Member Functions</h2></td></tr>
 
 </div>
 </div>
+<a id="a3d88b6597144e6481bd0bdf72f7ad0b5" name="a3d88b6597144e6481bd0bdf72f7ad0b5"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3d88b6597144e6481bd0bdf72f7ad0b5">&#9670;&#160;</a></span>compactProfileLabel()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">const char * PowerManager::compactProfileLabel </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="_power_manager_8h.html#abc3d13c7b58b63381698ef85e244366f">PowerInputProfile</a></td>          <td class="paramname"><span class="paramname"><em>profile</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Converts power input profile to compact log label. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">profile</td><td>Profile enum to stringify </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Stable C string label (e.g. "USB", "SOLAR") </dd></dl>
+
+<p class="definition">Definition at line <a class="el" href="_power_manager_8cpp_source.html#l00069">69</a> of file <a class="el" href="_power_manager_8cpp_source.html">PowerManager.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_power_manager_8h_source.html#l00052">NotApplicable</a>, <a class="el" href="_power_manager_8h_source.html#l00050">Solar35W</a>, and <a class="el" href="_power_manager_8h_source.html#l00049">UsbBench</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>, and <a class="el" href="_power_manager_8cpp_source.html#l00100">refreshInputProfile()</a>.</p>
+
+</div>
+</div>
 <a id="a4357663f73ba510f1ac2f3d77e939604" name="a4357663f73ba510f1ac2f3d77e939604"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a4357663f73ba510f1ac2f3d77e939604">&#9670;&#160;</a></span>hasFuelGauge()</h2>
 
@@ -275,7 +317,7 @@ Static Public Member Functions</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_power_manager_8cpp_source.html#l00181">181</a> of file <a class="el" href="_power_manager_8cpp_source.html">PowerManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_power_manager_8h_source.html#l00073">PowerCapabilities::hasPmic</a>.</p>
+<p class="reference">References <a class="el" href="_power_manager_8h_source.html#l00074">PowerCapabilities::hasPmic</a>.</p>
 
 </div>
 </div>
@@ -347,7 +389,7 @@ Static Public Member Functions</h2></td></tr>
 
 <p class="reference">References <a class="el" href="_power_manager_8cpp_source.html#l00082">instance()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">SensorManager::batteryState()</a>, <a class="el" href="_power_manager_8cpp_source.html#l00082">instance()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>, <a class="el" href="_power_manager_8cpp_source.html#l00082">instance()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l01680">SensorManager::runPmicChargeCycleTest()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00626">setup()</a>.</p>
 
 </div>
 </div>
@@ -371,7 +413,7 @@ Static Public Member Functions</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_power_manager_8cpp_source.html#l00173">173</a> of file <a class="el" href="_power_manager_8cpp_source.html">PowerManager.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">SensorManager::batteryState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l01680">SensorManager::runPmicChargeCycleTest()</a>.</p>
 
 </div>
 </div>
@@ -411,7 +453,7 @@ Static Public Member Functions</h2></td></tr>
 
 <p class="reference">References <a class="el" href="_power_diagnostics_8cpp_source.html#l00086">PowerDiagnostics::powerSourceLabel()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">SensorManager::batteryState()</a>, and <a class="el" href="_power_manager_8cpp_source.html#l00100">refreshInputProfile()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>, and <a class="el" href="_power_manager_8cpp_source.html#l00100">refreshInputProfile()</a>.</p>
 
 </div>
 </div>
@@ -451,6 +493,8 @@ Static Public Member Functions</h2></td></tr>
 
 <p class="reference">References <a class="el" href="_power_diagnostics_8cpp_source.html#l00105">PowerDiagnostics::profileSelectionReasonLabel()</a>.</p>
 
+<p class="reference">Referenced by <a class="el" href="_power_manager_8cpp_source.html#l00100">refreshInputProfile()</a>.</p>
+
 </div>
 </div>
 <a id="ac83db269b7c7f935e727b55e66d65ef9" name="ac83db269b7c7f935e727b55e66d65ef9"></a>
@@ -473,9 +517,9 @@ Static Public Member Functions</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_power_manager_8cpp_source.html#l00100">100</a> of file <a class="el" href="_power_manager_8cpp_source.html">PowerManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_power_manager_8h_source.html#l00134">PowerReport::activeInputProfile</a>, <a class="el" href="_power_platform_8h_source.html#l00020">PowerPlatform::PowerConfigurationApplyResult::applied</a>, <a class="el" href="_power_platform_8cpp_source.html#l00174">PowerPlatform::applyInputProfile()</a>, <a class="el" href="_power_manager_8h_source.html#l00130">PowerReport::capabilities</a>, <a class="el" href="_power_platform_8cpp_source.html#l00095">PowerPlatform::detectCapabilities()</a>, <a class="el" href="_power_manager_8h_source.html#l00017">Fallback</a>, <a class="el" href="_power_manager_8h_source.html#l00079">PowerCapabilities::hasPmicPowerConfiguration</a>, <a class="el" href="_power_manager_8h_source.html#l00135">PowerReport::inputProfileReason</a>, <a class="el" href="_power_manager_8h_source.html#l00137">PowerReport::inputProfileStatus</a>, <a class="el" href="_power_manager_8h_source.html#l00052">NotApplicable</a>, <a class="el" href="_power_manager_8h_source.html#l00016">NotAvailable</a>, <a class="el" href="_power_manager_8h_source.html#l00138">PowerReport::powerConfigurationResult</a>, <a class="el" href="_power_manager_8h_source.html#l00096">PowerReading::powerSource</a>, <a class="el" href="_power_manager_8cpp_source.html#l00205">powerSourceLabel()</a>, <a class="el" href="_power_manager_8h_source.html#l00097">PowerReading::powerSourceStatus</a>, <a class="el" href="_power_manager_8h_source.html#l00131">PowerReport::reading</a>, <a class="el" href="_power_platform_8cpp_source.html#l00143">PowerPlatform::readPowerSource()</a>, <a class="el" href="_power_platform_8h_source.html#l00011">PowerPlatform::PowerSourceSnapshot::source</a>, <a class="el" href="_power_platform_8h_source.html#l00012">PowerPlatform::PowerSourceSnapshot::status</a>, <a class="el" href="_power_platform_8h_source.html#l00021">PowerPlatform::PowerConfigurationApplyResult::systemResult</a>, <a class="el" href="_power_manager_8h_source.html#l00059">Unknown</a>, <a class="el" href="_power_manager_8h_source.html#l00065">UnsupportedPlatform</a>, <a class="el" href="_power_manager_8h_source.html#l00014">Valid</a>, and <a class="el" href="_power_manager_8h_source.html#l00129">PowerReport::valid</a>.</p>
+<p class="reference">References <a class="el" href="_power_manager_8h_source.html#l00135">PowerReport::activeInputProfile</a>, <a class="el" href="_power_platform_8h_source.html#l00020">PowerPlatform::PowerConfigurationApplyResult::applied</a>, <a class="el" href="_power_platform_8cpp_source.html#l00183">PowerPlatform::applyInputProfile()</a>, <a class="el" href="_power_manager_8h_source.html#l00131">PowerReport::capabilities</a>, <a class="el" href="_power_manager_8cpp_source.html#l00069">compactProfileLabel()</a>, <a class="el" href="_power_platform_8cpp_source.html#l00104">PowerPlatform::detectCapabilities()</a>, <a class="el" href="_power_manager_8h_source.html#l00017">Fallback</a>, <a class="el" href="_power_manager_8h_source.html#l00080">PowerCapabilities::hasPmicPowerConfiguration</a>, <a class="el" href="_power_manager_8h_source.html#l00136">PowerReport::inputProfileReason</a>, <a class="el" href="_power_manager_8h_source.html#l00138">PowerReport::inputProfileStatus</a>, <a class="el" href="_power_manager_8h_source.html#l00052">NotApplicable</a>, <a class="el" href="_power_manager_8h_source.html#l00016">NotAvailable</a>, <a class="el" href="_power_manager_8h_source.html#l00139">PowerReport::powerConfigurationResult</a>, <a class="el" href="_power_manager_8h_source.html#l00097">PowerReading::powerSource</a>, <a class="el" href="_power_manager_8cpp_source.html#l00205">powerSourceLabel()</a>, <a class="el" href="_power_manager_8h_source.html#l00098">PowerReading::powerSourceStatus</a>, <a class="el" href="_power_manager_8cpp_source.html#l00209">profileSelectionReasonLabel()</a>, <a class="el" href="_power_manager_8h_source.html#l00132">PowerReport::reading</a>, <a class="el" href="_power_platform_8cpp_source.html#l00152">PowerPlatform::readPowerSource()</a>, <a class="el" href="_power_platform_8h_source.html#l00011">PowerPlatform::PowerSourceSnapshot::source</a>, <a class="el" href="_power_platform_8h_source.html#l00012">PowerPlatform::PowerSourceSnapshot::status</a>, <a class="el" href="_power_platform_8h_source.html#l00021">PowerPlatform::PowerConfigurationApplyResult::systemResult</a>, <a class="el" href="_power_manager_8h_source.html#l00059">Unknown</a>, <a class="el" href="_power_manager_8h_source.html#l00066">UnsupportedPlatform</a>, <a class="el" href="_power_manager_8h_source.html#l00014">Valid</a>, and <a class="el" href="_power_manager_8h_source.html#l00130">PowerReport::valid</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_power_manager_8cpp_source.html#l00092">setup()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>, <a class="el" href="_power_manager_8cpp_source.html#l00092">setup()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00626">setup()</a>.</p>
 
 </div>
 </div>
@@ -499,9 +543,9 @@ Static Public Member Functions</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_power_manager_8cpp_source.html#l00092">92</a> of file <a class="el" href="_power_manager_8cpp_source.html">PowerManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_power_platform_8cpp_source.html#l00095">PowerPlatform::detectCapabilities()</a>, and <a class="el" href="_power_manager_8cpp_source.html#l00100">refreshInputProfile()</a>.</p>
+<p class="reference">References <a class="el" href="_power_platform_8cpp_source.html#l00104">PowerPlatform::detectCapabilities()</a>, and <a class="el" href="_power_manager_8cpp_source.html#l00100">refreshInputProfile()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00504">setup()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l00626">setup()</a>.</p>
 
 </div>
 </div>

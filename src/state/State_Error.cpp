@@ -1,5 +1,5 @@
 #include "state/State_Common.h"
-#include "Config.h"
+#include "../Config.h"
 #include "cloud/Cloud.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
@@ -145,7 +145,7 @@ void handleErrorState() {
     // No automatic recovery; return to IDLE so the normal state machine
     // can continue and we rely on future hourly reports to surface the
     // issue.
-    state = IDLE_STATE;
+    transitionTo(IDLE_STATE, "error-no-recovery");
     break;
 
   case 2:
@@ -169,7 +169,7 @@ void handleErrorState() {
 
   default:
     // Should not happen, but don't get stuck here.
-    state = IDLE_STATE;
+    transitionTo(IDLE_STATE, "error-unknown-resolution");
     break;
   }
 }

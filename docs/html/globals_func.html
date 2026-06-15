@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;19</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -101,6 +101,7 @@ $(function(){initNavTree('globals_func.html','',''); });
 <h3 class="doxsection"><a id="index_c" name="index_c"></a>- c -</h3><ul>
 <li>claimFailsafeDeferLog()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a4f03886ca8de88b6acd699592b4a21dd">Generalized-Core-Counter.cpp</a>, <a class="el" href="_state___common_8h.html#a4f03886ca8de88b6acd699592b4a21dd">State_Common.h</a></li>
 <li>clearConnectivityFailsafeRecovery()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#adfdc96a561bfc48d07fd89fa97b22d67">Generalized-Core-Counter.cpp</a>, <a class="el" href="_state___common_8h.html#adfdc96a561bfc48d07fd89fa97b22d67">State_Common.h</a></li>
+<li>closeOccupancySessionSafely()&#160;:&#160;<a class="el" href="_state___common_8h.html#ad78ff6c2e3d0107dbb0a1bff1279afaf">State_Common.h</a></li>
 <li>connectivityFailsafeSupervisor()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a486ab2d02bfb46e426cb76c2f5cfd898">Generalized-Core-Counter.cpp</a></li>
 </ul>
 
@@ -111,6 +112,7 @@ $(function(){initNavTree('globals_func.html','',''); });
 
 
 <h3 class="doxsection"><a id="index_e" name="index_e"></a>- e -</h3><ul>
+<li>ensureRetainedLoopForensicsInitialized()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a1742e345b15d693369f61865425a3a06">Generalized-Core-Counter.cpp</a></li>
 <li>ensureSensorEnabled()&#160;:&#160;<a class="el" href="_state___common_8h.html#a26af5a78d8cca160ca913b5e91a224d6">State_Common.h</a>, <a class="el" href="_state___idle_8cpp.html#a26af5a78d8cca160ca913b5e91a224d6">State_Idle.cpp</a></li>
 </ul>
 
@@ -139,11 +141,18 @@ $(function(){initNavTree('globals_func.html','',''); });
 
 
 <h3 class="doxsection"><a id="index_l" name="index_l"></a>- l -</h3><ul>
-<li>logConnectivityFailsafeBootDiagnostics()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a735f250ffda5d1ab86655b3e753870f9">Generalized-Core-Counter.cpp</a></li>
 <li>logHandler()&#160;:&#160;<a class="el" href="_particle___functions_8cpp.html#a06b34657106d9fa5651bed2558ee82fc">Particle_Functions.cpp</a></li>
 <li>logOccupiedEvent()&#160;:&#160;<a class="el" href="_state___common_8h.html#afbe3db679f15b8c6ca6b4774dfb6e66f">State_Common.h</a></li>
+<li>logTimeDiag()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a5079e83223d3a85aa51b3d6e201629f1">Generalized-Core-Counter.cpp</a>, <a class="el" href="_state___common_8h.html#a5079e83223d3a85aa51b3d6e201629f1">State_Common.h</a></li>
 <li>logUnoccupiedEvent()&#160;:&#160;<a class="el" href="_state___common_8h.html#a3891aaf3a866003a6cb520753f738a32">State_Common.h</a></li>
 <li>loop()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#afe461d27b9c48d5921c00d521181f12f">Generalized-Core-Counter.cpp</a></li>
+<li>loopStageForensicName()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a85e6e78b8a5252ace585934f6095018c">Generalized-Core-Counter.cpp</a></li>
+<li>loopStageName()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a9593c13e4ce1d37668de72dd19c2d691">Generalized-Core-Counter.cpp</a></li>
+</ul>
+
+
+<h3 class="doxsection"><a id="index_n" name="index_n"></a>- n -</h3><ul>
+<li>noteLoopStageDuration()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#acf049f4a92afd182d6bef1914c7dba96">Generalized-Core-Counter.cpp</a></li>
 </ul>
 
 
@@ -153,18 +162,30 @@ $(function(){initNavTree('globals_func.html','',''); });
 
 
 <h3 class="doxsection"><a id="index_p" name="index_p"></a>- p -</h3><ul>
-<li>PRODUCT_VERSION()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a4862bd2597cc57f8dcb8fafdbe0d1472">Generalized-Core-Counter.cpp</a></li>
+<li>pauseAwakeWatchdogForSleep()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#af1086cfd235108835a9e8619724e9f6f">Generalized-Core-Counter.cpp</a>, <a class="el" href="_state_machine_8h.html#af1086cfd235108835a9e8619724e9f6f">StateMachine.h</a></li>
+<li>pmicAnomalyAgeSec()&#160;:&#160;<a class="el" href="_sensor_manager_8cpp.html#a66e83d6a847a084efc915983eb0efa8f">SensorManager.cpp</a>, <a class="el" href="_sensor_manager_8h.html#a66e83d6a847a084efc915983eb0efa8f">SensorManager.h</a></li>
+<li>PRODUCT_VERSION()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a4814606ff196af44b54a1ca576f11417">Generalized-Core-Counter.cpp</a></li>
 <li>publishData()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a6e8d6c80794e3a266d4ef6b976e9c27c">Generalized-Core-Counter.cpp</a>, <a class="el" href="_state___common_8h.html#a6e8d6c80794e3a266d4ef6b976e9c27c">State_Common.h</a>, <a class="el" href="_state_machine_8h.html#a6e8d6c80794e3a266d4ef6b976e9c27c">StateMachine.h</a></li>
 <li>publishDiagnosticSafe()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a5b6d4035a9304bc53863ee513f708b0d">Generalized-Core-Counter.cpp</a>, <a class="el" href="_my_persistent_data_8cpp.html#ab7e9803d96548944e5e40d23163484c6">MyPersistentData.cpp</a>, <a class="el" href="_state___common_8h.html#a5b6d4035a9304bc53863ee513f708b0d">State_Common.h</a></li>
 <li>publishStartupStatus()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a3b52d4e2736530265377e967979feaf9">Generalized-Core-Counter.cpp</a></li>
 <li>publishStateTransition()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#afb2932b86bac021e349213b370798543">Generalized-Core-Counter.cpp</a>, <a class="el" href="_state_machine_8h.html#afb2932b86bac021e349213b370798543">StateMachine.h</a></li>
+<li>publishWatchdogForensics()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a523918fa17d84a1e15b15cbb4be92754">Generalized-Core-Counter.cpp</a></li>
+</ul>
+
+
+<h3 class="doxsection"><a id="index_r" name="index_r"></a>- r -</h3><ul>
+<li>refreshRetainedLoopForensics()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#af5076de20c093dbe2488de66c5507619">Generalized-Core-Counter.cpp</a></li>
+<li>resetRetainedLoopForensics()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#ad22fcfe5e116ad654a9b926f5067cbbd">Generalized-Core-Counter.cpp</a></li>
+<li>restoreAwakeWatchdogAfterWake()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a078231b7793d30858efbccc85f37efab">Generalized-Core-Counter.cpp</a>, <a class="el" href="_state_machine_8h.html#a078231b7793d30858efbccc85f37efab">StateMachine.h</a></li>
 </ul>
 
 
 <h3 class="doxsection"><a id="index_s" name="index_s"></a>- s -</h3><ul>
 <li>secondsUntilNextOpen()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a4a15e91d0d4e7c61469be195601b2fe8">Generalized-Core-Counter.cpp</a>, <a class="el" href="_state_machine_8h.html#a4a15e91d0d4e7c61469be195601b2fe8">StateMachine.h</a></li>
 <li>sensorISR()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#ada98fd6c3ac770e6a604ce883e8b7966">Generalized-Core-Counter.cpp</a></li>
+<li>serviceAwakeWatchdog()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a27185aecd3a2c78bb67a1e8c28393337">Generalized-Core-Counter.cpp</a>, <a class="el" href="_state_machine_8h.html#a27185aecd3a2c78bb67a1e8c28393337">StateMachine.h</a></li>
 <li>setAppBreadcrumb()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#ae8d84ddf273ffd2dad8fa8fa39191914">Generalized-Core-Counter.cpp</a>, <a class="el" href="_state___common_8h.html#ae8d84ddf273ffd2dad8fa8fa39191914">State_Common.h</a></li>
+<li>setLoopStage()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a7d0e7deb737425ddcb0ea69b5d730e97">Generalized-Core-Counter.cpp</a>, <a class="el" href="_state___common_8h.html#a7d0e7deb737425ddcb0ea69b5d730e97">State_Common.h</a></li>
 <li>setup()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a4fc01d736fe50cf5b977f755b675f11d">Generalized-Core-Counter.cpp</a></li>
 <li>signalLED()&#160;:&#160;<a class="el" href="device__pinout_8cpp.html#ad63999ac220a78e60d4555051748e5b3">device_pinout.cpp</a>, <a class="el" href="device__pinout_8h.html#a16375361a9346562cfb7754eaa39446c">device_pinout.h</a></li>
 <li>signalLEDStatus()&#160;:&#160;<a class="el" href="device__pinout_8cpp.html#ab375e3936269f4b236b7d91f75c494d7">device_pinout.cpp</a>, <a class="el" href="device__pinout_8h.html#ab375e3936269f4b236b7d91f75c494d7">device_pinout.h</a></li>
@@ -175,9 +196,15 @@ $(function(){initNavTree('globals_func.html','',''); });
 </ul>
 
 
+<h3 class="doxsection"><a id="index_t" name="index_t"></a>- t -</h3><ul>
+<li>transitionTo()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a4dfe0502b724c13426dd6f8750f6b9c4">Generalized-Core-Counter.cpp</a>, <a class="el" href="_state_machine_8h.html#a4dfe0502b724c13426dd6f8750f6b9c4">StateMachine.h</a></li>
+</ul>
+
+
 <h3 class="doxsection"><a id="index_u" name="index_u"></a>- u -</h3><ul>
 <li>UbidotsHandler()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#ad46915a4f3e89ba9e29e19720677db47">Generalized-Core-Counter.cpp</a></li>
 <li>updateOccupancyState()&#160;:&#160;<a class="el" href="_state___modes_8cpp.html#a919a6ea69a40d3a3e3a6aec0645e29c9">State_Modes.cpp</a>, <a class="el" href="_state_handlers_8h.html#a919a6ea69a40d3a3e3a6aec0645e29c9">StateHandlers.h</a></li>
+<li>updateRetainedValue()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a6c6986aae323751fc811187b24399710">Generalized-Core-Counter.cpp</a></li>
 <li>userSwitchISR()&#160;:&#160;<a class="el" href="_generalized-_core-_counter_8cpp.html#a1282f5e7e112ee067260b2fc2b5685fd">Generalized-Core-Counter.cpp</a>, <a class="el" href="_state_machine_8h.html#a1282f5e7e112ee067260b2fc2b5685fd">StateMachine.h</a></li>
 </ul>
 </div><!-- contents -->

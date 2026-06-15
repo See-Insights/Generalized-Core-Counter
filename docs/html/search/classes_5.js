@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['thrashguard_0',['ThrashGuard',['../class_thrash_guard.html',1,'']]]
+  ['retainedloopforensics_0',['RetainedLoopForensics',['../struct_retained_loop_forensics.html',1,'']]]
 ];

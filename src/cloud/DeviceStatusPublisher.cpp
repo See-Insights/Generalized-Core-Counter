@@ -1,10 +1,57 @@
+#include "../Config.h"
 #include "cloud/Cloud.h"
 #include "observability/WakeCycleStats.h"
+#include "sensors/SensorManager.h"
 
 // External firmware version string (defined in Version.cpp)
 extern const char* FIRMWARE_VERSION;
 
-bool Cloud::writeDeviceStatusToCloud() {
+namespace {
+
+bool ledgerHasUnsyncedWriteForDiag(const Ledger &ledger) {
+    const int64_t lastUpdatedMs = ledger.lastUpdated();
+    if (lastUpdatedMs <= 0) {
+        return false;
+    }
+
+    const int64_t lastSyncedMs = ledger.lastSynced();
+    return lastSyncedMs <= 0 || lastSyncedMs < lastUpdatedMs;
+}
+
+} // namespace
+
+bool Cloud::writeDeviceStatusToCloud(const char *source) {
+    const char *issueSource = (source && source[0] != '\0') ? source : "Unknown";
+#if !ENABLE_LEDGER_TRACE
+    (void)issueSource;
+#endif
+
+    auto pendingLedgerOpsForDiag = [&]() -> uint16_t {
+        uint16_t pending = 0;
+        if (pendingStatusPublish) {
+            pending++;
+        }
+        if (pendingDeviceStatusSync || ledgerHasUnsyncedWriteForDiag(deviceStatusLedger)) {
+            pending++;
+        }
+        if (pendingDeviceDataSync || ledgerHasUnsyncedWriteForDiag(deviceDataLedger)) {
+            pending++;
+        }
+        return pending;
+    };
+
+    auto cellularReadyForDiag = [&]() -> int {
+#if Wiring_Cellular
+        return Cellular.ready() ? 1 : 0;
+#else
+        return 0;
+#endif
+    };
+#if !ENABLE_LEDGER_TRACE
+    (void)pendingLedgerOpsForDiag;
+    (void)cellularReadyForDiag;
+#endif
+
     // Build current configuration as JSON (base status).
     // IMPORTANT: This base JSON is used for change detection so we do not
     // increase cloud writes in the field.
@@ -47,6 +94,7 @@ bool Cloud::writeDeviceStatusToCloud() {
     writerBase.name("connectionMode").value((int)sysStatus.get_connectionMode());
     writerBase.name("reportingMode").value((int)sysStatus.get_reportingMode());
     writerBase.name("samplingMode").value((int)sysStatus.get_samplingMode());
+    writerBase.name("enableHibernateSleep").value(sysStatus.get_enableHibernateSleep());
     writerBase.endObject();
     writerBase.endObject();
 
@@ -64,7 +112,7 @@ bool Cloud::writeDeviceStatusToCloud() {
 
     // Publish payload: base status + optional per-cycle diagnostics.
     // This does NOT affect change detection, so it won't increase publish rate.
-    char bufferPublish[640];
+    char bufferPublish[896];
     JSONBufferWriter writer(bufferPublish, sizeof(bufferPublish));
     writer.beginObject();
 
@@ -98,7 +146,18 @@ bool Cloud::writeDeviceStatusToCloud() {
     writer.name("connectionMode").value((int)sysStatus.get_connectionMode());
     writer.name("reportingMode").value((int)sysStatus.get_reportingMode());
     writer.name("samplingMode").value((int)sysStatus.get_samplingMode());
+    writer.name("enableHibernateSleep").value(sysStatus.get_enableHibernateSleep());
     writer.endObject();
+
+#if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
+    writer.name("pmicAnomalyCount").value((int)pmicAnomalyCount);
+    writer.name("lastPmicAnomalySoc").value((double)lastPmicAnomalySoc, 2);
+    writer.name("lastPmicAnomalyChargeStatus").value((int)lastPmicAnomalyChargeStatus);
+    writer.name("lastPmicAnomalyAgeSec").value((unsigned long)pmicAnomalyAgeSec());
+    writer.name("lastPmicAnomalyPowerSource").value((int)lastPmicAnomalyPowerSource);
+    writer.name("lastPmicAnomalyVbusStatus").value((int)lastPmicAnomalyVbusStatus);
+    writer.name("pmicAnomalyActive").value(pmicAnomalyActive ? 1 : 0);
+#endif
 
     // Optional: piggyback last completed wake-cycle stats for field diagnostics.
     // This is only included when we are already publishing device-status (config changed).
@@ -129,22 +188,134 @@ bool Cloud::writeDeviceStatusToCloud() {
     bufferPublish[writer.dataSize()] = '\0';
 
     LedgerData data = LedgerData::fromJSON(bufferPublish);
+
+    const unsigned long startMs = millis();
+#if ENABLE_LEDGER_TRACE
+    Log.info("LedgerDiag: start pending=%u cloud=%d cell=%d heap=%lu",
+             (unsigned)pendingLedgerOpsForDiag(),
+             Particle.connected() ? 1 : 0,
+             cellularReadyForDiag(),
+             (unsigned long)System.freeMemory());
+#endif
+
+    const Cloud::LedgerSyncDiagnostics attemptDiagnostics = Cloud::instance().ledgerSyncDiagnostics();
+    const bool trackedBefore = Cloud::instance().isLedgerPointerTracked(&deviceStatusLedger);
+#if ENABLE_LEDGER_TRACE
+    Log.info("LedgerIssueAttempt: source=%s ptr=%p tracked=%d syncing=%d inflight=%d",
+             issueSource,
+             &deviceStatusLedger,
+             trackedBefore ? 1 : 0,
+             attemptDiagnostics.syncing ? 1 : 0,
+             attemptDiagnostics.inflight ? 1 : 0);
+#else
+    (void)trackedBefore;
+    (void)attemptDiagnostics;
+#endif
+
+    const uint32_t requestSeq = Cloud::instance().noteLedgerSyncRequest(
+        Cloud::LEDGER_REQUEST_KIND_STATUS,
+        source,
+        &deviceStatusLedger);
+
+    if (requestSeq == 0) {
+        const Cloud::LedgerSyncDiagnostics resultDiagnostics = Cloud::instance().ledgerSyncDiagnostics();
+#if ENABLE_LEDGER_TRACE
+        Log.info("LedgerIssueResult: source=%s ptr=%p createdTracker=%d pending=%u syncing=%d inflight=%d",
+                 issueSource,
+                 &deviceStatusLedger,
+                 0,
+                 (unsigned)resultDiagnostics.pendingCount,
+                 resultDiagnostics.syncing ? 1 : 0,
+                 resultDiagnostics.inflight ? 1 : 0);
+#else
+        (void)resultDiagnostics;
+#endif
+        // Keep pendingStatusPublish set so the deferred status update can retry
+        // once the in-flight ledger write has completed.
+        return false;
+    }
+
     int result = deviceStatusLedger.set(data);
+
+    const Cloud::LedgerSyncDiagnostics resultDiagnostics = Cloud::instance().ledgerSyncDiagnostics();
+#if ENABLE_LEDGER_TRACE
+    Log.info("LedgerIssueResult: source=%s ptr=%p createdTracker=%d pending=%u syncing=%d inflight=%d",
+             issueSource,
+             &deviceStatusLedger,
+             requestSeq ? 1 : 0,
+             (unsigned)resultDiagnostics.pendingCount,
+             resultDiagnostics.syncing ? 1 : 0,
+             resultDiagnostics.inflight ? 1 : 0);
+#else
+    (void)resultDiagnostics;
+#endif
+
+    const unsigned long elapsedMs = millis() - startMs;
+#if !ENABLE_LEDGER_TRACE
+    (void)elapsedMs;
+#endif
 
     if (result == SYSTEM_ERROR_NONE) {
         pendingDeviceStatusSync = true;
+#if ENABLE_LEDGER_TRACE
+        Log.info("LedgerDiag: success elapsed=%lu pending=%u heap=%lu",
+                 elapsedMs,
+                 (unsigned)pendingLedgerOpsForDiag(),
+                 (unsigned long)System.freeMemory());
+#endif
         // Preserve base-status change detection so per-cycle fields don't
         // force additional device-status publishes.
         strncpy(lastPublishedStatus, bufferBase, sizeof(lastPublishedStatus) - 1);
         lastPublishedStatus[sizeof(lastPublishedStatus) - 1] = '\0';
         return true;
     } else {
+        Cloud::instance().noteLedgerSyncFail(requestSeq, result);
+#if ENABLE_LEDGER_TRACE
+        Log.warn("LedgerDiag: fail rc=%d elapsed=%lu pending=%u cloud=%d cell=%d heap=%lu",
+                 result,
+                 elapsedMs,
+                 (unsigned)pendingLedgerOpsForDiag(),
+                 Particle.connected() ? 1 : 0,
+                 cellularReadyForDiag(),
+                 (unsigned long)System.freeMemory());
+#endif
         Log.warn("Failed to publish device status: %d", result);
         return false;
     }
 }
 
-bool Cloud::publishDataToLedger() {
+bool Cloud::publishDataToLedger(const char *source) {
+    const char *issueSource = (source && source[0] != '\0') ? source : "Unknown";
+#if !ENABLE_LEDGER_TRACE
+    (void)issueSource;
+#endif
+
+    auto pendingLedgerOpsForDiag = [&]() -> uint16_t {
+        uint16_t pending = 0;
+        if (pendingStatusPublish) {
+            pending++;
+        }
+        if (pendingDeviceStatusSync || ledgerHasUnsyncedWriteForDiag(deviceStatusLedger)) {
+            pending++;
+        }
+        if (pendingDeviceDataSync || ledgerHasUnsyncedWriteForDiag(deviceDataLedger)) {
+            pending++;
+        }
+        return pending;
+    };
+
+    auto cellularReadyForDiag = [&]() -> int {
+#if Wiring_Cellular
+        return Cellular.ready() ? 1 : 0;
+#else
+        return 0;
+#endif
+    };
+#if !ENABLE_LEDGER_TRACE
+    (void)pendingLedgerOpsForDiag;
+    (void)cellularReadyForDiag;
+#endif
+
     char buffer[512];
     JSONBufferWriter writer(buffer, sizeof(buffer));
     const unsigned long freeHeap = System.freeMemory();
@@ -189,22 +360,102 @@ bool Cloud::publishDataToLedger() {
     buffer[writer.dataSize()] = '\0';
     
     LedgerData data = LedgerData::fromJSON(buffer);
+
+    const unsigned long startMs = millis();
+#if ENABLE_LEDGER_TRACE
+    Log.info("LedgerDiag: start pending=%u cloud=%d cell=%d heap=%lu",
+             (unsigned)pendingLedgerOpsForDiag(),
+             Particle.connected() ? 1 : 0,
+             cellularReadyForDiag(),
+             (unsigned long)System.freeMemory());
+#endif
+
+    const Cloud::LedgerSyncDiagnostics attemptDiagnostics = Cloud::instance().ledgerSyncDiagnostics();
+    const bool trackedBefore = Cloud::instance().isLedgerPointerTracked(&deviceDataLedger);
+#if ENABLE_LEDGER_TRACE
+    Log.info("LedgerIssueAttempt: source=%s ptr=%p tracked=%d syncing=%d inflight=%d",
+             issueSource,
+             &deviceDataLedger,
+             trackedBefore ? 1 : 0,
+             attemptDiagnostics.syncing ? 1 : 0,
+             attemptDiagnostics.inflight ? 1 : 0);
+#else
+    (void)trackedBefore;
+    (void)attemptDiagnostics;
+#endif
+
+    const uint32_t requestSeq = Cloud::instance().noteLedgerSyncRequest(
+        Cloud::LEDGER_REQUEST_KIND_DATA,
+        source,
+        &deviceDataLedger);
+
+    if (requestSeq == 0) {
+        const Cloud::LedgerSyncDiagnostics resultDiagnostics = Cloud::instance().ledgerSyncDiagnostics();
+#if ENABLE_LEDGER_TRACE
+        Log.info("LedgerIssueResult: source=%s ptr=%p createdTracker=%d pending=%u syncing=%d inflight=%d",
+                 issueSource,
+                 &deviceDataLedger,
+                 0,
+                 (unsigned)resultDiagnostics.pendingCount,
+                 resultDiagnostics.syncing ? 1 : 0,
+                 resultDiagnostics.inflight ? 1 : 0);
+#else
+        (void)resultDiagnostics;
+#endif
+        return true;
+    }
+
     int result = deviceDataLedger.set(data);
+
+    const Cloud::LedgerSyncDiagnostics resultDiagnostics = Cloud::instance().ledgerSyncDiagnostics();
+#if ENABLE_LEDGER_TRACE
+    Log.info("LedgerIssueResult: source=%s ptr=%p createdTracker=%d pending=%u syncing=%d inflight=%d",
+             issueSource,
+             &deviceDataLedger,
+             requestSeq ? 1 : 0,
+             (unsigned)resultDiagnostics.pendingCount,
+             resultDiagnostics.syncing ? 1 : 0,
+             resultDiagnostics.inflight ? 1 : 0);
+#else
+    (void)resultDiagnostics;
+#endif
+
+    const unsigned long elapsedMs = millis() - startMs;
+#if !ENABLE_LEDGER_TRACE
+    (void)elapsedMs;
+#endif
     
     if (result == SYSTEM_ERROR_NONE) {
         pendingDeviceDataSync = true;
+#if ENABLE_LEDGER_TRACE
+        Log.info("LedgerDiag: success elapsed=%lu pending=%u heap=%lu",
+                 elapsedMs,
+                 (unsigned)pendingLedgerOpsForDiag(),
+                 (unsigned long)System.freeMemory());
+#endif
         return true;
     } else {
+        Cloud::instance().noteLedgerSyncFail(requestSeq, result);
+#if ENABLE_LEDGER_TRACE
+        Log.warn("LedgerDiag: fail rc=%d elapsed=%lu pending=%u cloud=%d cell=%d heap=%lu",
+                 result,
+                 elapsedMs,
+                 (unsigned)pendingLedgerOpsForDiag(),
+                 Particle.connected() ? 1 : 0,
+                 cellularReadyForDiag(),
+                 (unsigned long)System.freeMemory());
+#endif
         Log.warn("Failed to publish sensor data: %d", result);
         return false;
     }
 }
 
 bool Cloud::hasNonDefaultConfig() {
-    // Check if any current values differ from hardcoded product defaults
-    // This is a simplified check - expand as needed
+    // Check if any current values differ from centralized factory defaults.
     return (sensorConfig.get_sensorType() != 1 || 
-            sensorConfig.get_sensorSetting1() != 5000 ||
-            sysStatus.get_openTime() != 6 ||
-            sysStatus.get_closeTime() != 22);
+            sensorConfig.get_sensorSetting1() != Config::DEFAULT_OCCUPANCY_DEBOUNCE_MS ||
+            strcmp(sysStatus.get_timeZoneStrCStr(), Config::DEFAULT_TIMEZONE) != 0 ||
+            sysStatus.get_openTime() != Config::DEFAULT_OPEN_HOUR ||
+            sysStatus.get_closeTime() != Config::DEFAULT_CLOSE_HOUR ||
+            sysStatus.get_reportingInterval() != Config::DEFAULT_REPORT_INTERVAL_SEC);
 }

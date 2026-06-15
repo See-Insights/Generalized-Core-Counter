@@ -23,11 +23,12 @@
 #include "power/PowerManager.h"
 #include "power/PowerPlatform.h"
 #include "observability/WakeCycleStats.h"
+#include "diagnostics/ConnectivityFailsafeTest.h"
 #include "ThrashGuard.h"
 
 // Firmware version recognized by Particle Product firmware management
 // Bump this integer whenever you cut a new production release.
-PRODUCT_VERSION(11);
+PRODUCT_VERSION(18);
 
 // Hardware abstraction and device-specific pinouts
 #include "device_pinout.h"           // Platform-specific pin definitions
@@ -55,12 +56,6 @@ PRODUCT_VERSION(11);
 // Application metadata
 #include "Version.h"                 // FIRMWARE_VERSION and FIRMWARE_RELEASE_NOTES
 #include "ProjectConfig.h"           // Webhook event name and project constants
-
-#if CONNECTIVITY_FAILSAFE_TEST_MODE
-#warning "CONNECTIVITY_FAILSAFE_TEST_MODE=1 (bench timings enabled)"
-#else
-#warning "CONNECTIVITY_FAILSAFE_TEST_MODE=0 (production timings enabled)"
-#endif
 
 // Forward declarations for firmware metadata referenced from this translation unit.
 extern const char* FIRMWARE_VERSION;
@@ -94,18 +89,22 @@ extern const char* FIRMWARE_RELEASE_NOTES;
  */
 
 // Forward declarations
+#if Wiring_Watchdog
+static void awakeWatchdogExpiredHandler();
+#else
 static void appWatchdogHandler(); // Application watchdog handler
+#endif
 void publishData();           // Publish the data to the cloud
 void userSwitchISR();         // Interrupt for the user switch
 void sensorISR();             // Interrupt for legacy tire-counting sensor
 void dailyCleanup();          // Reset daily counters and housekeeping
 void UbidotsHandler(const char *event, const char *data); // Webhook response handler
 void publishStartupStatus();  // One-time status summary at boot
+void publishWatchdogForensics(); // One-time watchdog forensic snapshot at boot
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE); // Safe diagnostic publish with queue guard
 BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC);
 void clearConnectivityFailsafeRecovery(const char *reason);
 void connectivityFailsafeSupervisor();
-void logConnectivityFailsafeBootDiagnostics();
 
 // ===== Global runtime objects =====
 
@@ -136,6 +135,36 @@ unsigned long connectedStartMs = 0;
 
 namespace {
 
+constexpr unsigned long AWAKE_WATCHDOG_TIMEOUT_MS = 60000UL;
+constexpr unsigned long REPORT_FORENSICS_SLOW_LOG_THRESHOLD_MS = 250UL;
+constexpr unsigned long REPORT_FORENSICS_ABNORMAL_WARN_THRESHOLD_MS = 1000UL;
+
+enum AwakeWatchdogSleepStrategy : uint8_t {
+  AWAKE_WATCHDOG_SLEEP_CONFIG_PAUSE = 0,
+  AWAKE_WATCHDOG_SLEEP_MANUAL_STOP = 1,
+};
+
+#if Wiring_Watchdog
+AwakeWatchdogSleepStrategy awakeWatchdogSleepStrategy =
+#if PLATFORM_ID == PLATFORM_P2 || (defined(PLATFORM_PHOTON2) && PLATFORM_ID == PLATFORM_PHOTON2)
+    AWAKE_WATCHDOG_SLEEP_MANUAL_STOP;
+#else
+    AWAKE_WATCHDOG_SLEEP_CONFIG_PAUSE;
+#endif
+bool awakeWatchdogInitialized = false;
+bool awakeWatchdogStarted = false;
+#endif
+
+const char *awakeWatchdogSleepStrategyName(AwakeWatchdogSleepStrategy strategy) {
+  switch (strategy) {
+  case AWAKE_WATCHDOG_SLEEP_MANUAL_STOP:
+    return "manual-stop";
+  case AWAKE_WATCHDOG_SLEEP_CONFIG_PAUSE:
+  default:
+    return "config-pause";
+  }
+}
+
 enum AppBreadcrumb : uint8_t {
   BREADCRUMB_NONE = 0,
   BREADCRUMB_SETUP_START = 1,
@@ -148,6 +177,21 @@ enum AppBreadcrumb : uint8_t {
   BREADCRUMB_APP_WATCHDOG_RESET = 8,
   BREADCRUMB_CONNECTIVITY_FAILSAFE = 9,
   BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD = 10,
+  BREADCRUMB_REPORT_QUEUE_START = 11,
+  BREADCRUMB_REPORT_QUEUE_DONE = 12,
+  BREADCRUMB_REPORT_LEDGER_START = 13,
+  BREADCRUMB_REPORT_LEDGER_DONE = 14,
+  BREADCRUMB_CLOUD_LOOP_ENTER = 15,
+  BREADCRUMB_CLOUD_LOOP_EXIT = 16,
+  BREADCRUMB_PUBLISH_QUEUE_ENTER = 17,
+  BREADCRUMB_PUBLISH_QUEUE_EXIT = 18,
+  BREADCRUMB_REPORT_POST_LEDGER = 19,
+  BREADCRUMB_REPORT_EXIT = 20,
+  BREADCRUMB_IDLE_ENTRY = 21,
+  BREADCRUMB_SLEEP_GATE_START = 22,
+  BREADCRUMB_SLEEP_GATE_DONE = 23,
+  BREADCRUMB_SLEEP_CONFIG_START = 24,
+  BREADCRUMB_SLEEP_SYSTEM_CALL = 25,
 };
 
 const char *appBreadcrumbName(uint8_t code) {
@@ -172,10 +216,58 @@ const char *appBreadcrumbName(uint8_t code) {
     return "CONN_FAILSAFE";
   case BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD:
     return "CONN_FAILSAFE_HARD";
+  case BREADCRUMB_REPORT_QUEUE_START:
+    return "REPORT_QUEUE_START";
+  case BREADCRUMB_REPORT_QUEUE_DONE:
+    return "REPORT_QUEUE_DONE";
+  case BREADCRUMB_REPORT_LEDGER_START:
+    return "REPORT_LEDGER_START";
+  case BREADCRUMB_REPORT_LEDGER_DONE:
+    return "REPORT_LEDGER_DONE";
+  case BREADCRUMB_CLOUD_LOOP_ENTER:
+    return "CLOUD_LOOP_ENTER";
+  case BREADCRUMB_CLOUD_LOOP_EXIT:
+    return "CLOUD_LOOP_EXIT";
+  case BREADCRUMB_PUBLISH_QUEUE_ENTER:
+    return "PUBLISH_QUEUE_ENTER";
+  case BREADCRUMB_PUBLISH_QUEUE_EXIT:
+    return "PUBLISH_QUEUE_EXIT";
+  case BREADCRUMB_REPORT_POST_LEDGER:
+    return "REPORT_POST_LEDGER";
+  case BREADCRUMB_REPORT_EXIT:
+    return "REPORT_EXIT";
+  case BREADCRUMB_IDLE_ENTRY:
+    return "IDLE_ENTRY";
+  case BREADCRUMB_SLEEP_GATE_START:
+    return "SLEEP_GATE_START";
+  case BREADCRUMB_SLEEP_GATE_DONE:
+    return "SLEEP_GATE_DONE";
+  case BREADCRUMB_SLEEP_CONFIG_START:
+    return "SLEEP_CONFIG_START";
+  case BREADCRUMB_SLEEP_SYSTEM_CALL:
+    return "SLEEP_SYSTEM_CALL";
   default:
     return "NONE";
   }
 }
+
+#if PLATFORM_ID == PLATFORM_BORON
+const char *ab1805WakeReasonName(AB1805::WakeReason reason) {
+  switch (reason) {
+  case AB1805::WakeReason::WATCHDOG:
+    return "WATCHDOG";
+  case AB1805::WakeReason::DEEP_POWER_DOWN:
+    return "DEEP_POWER_DOWN";
+  case AB1805::WakeReason::COUNTDOWN_TIMER:
+    return "COUNTDOWN_TIMER";
+  case AB1805::WakeReason::ALARM:
+    return "ALARM";
+  case AB1805::WakeReason::UNKNOWN:
+  default:
+    return "UNKNOWN";
+  }
+}
+#endif
 
 const char *stateShortName(State value) {
   switch (value) {
@@ -240,8 +332,7 @@ bool connectivityFailsafeHasExternalPower() {
 
 uint32_t connectivityFailsafeJitterSec(uint8_t stage) {
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
-  (void)stage;
-  return 0;
+  return ConnectivityFailsafeTest::jitterSec(stage);
 #else
   if (ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC <= 0) {
     return 0;
@@ -305,155 +396,13 @@ bool claimFailsafeDeferLogLocal(FailsafeDeferReason reason) {
   return true;
 }
 
-#if CONNECTIVITY_FAILSAFE_TEST_MODE
-long connectivityFailsafeAgeSecOrNegative(time_t timestamp) {
-  if (!Time.isValid() || timestamp == 0) {
-    return -1L;
-  }
-
-  const time_t now = Time.now();
-  if (now <= timestamp) {
-    return -1L;
-  }
-  return (long)(now - timestamp);
-}
-
-void formatFailsafeAgeField(char *buffer, size_t bufferSize, time_t timestamp) {
-  const long ageSec = connectivityFailsafeAgeSecOrNegative(timestamp);
-  if (timestamp == 0) {
-    snprintf(buffer, bufferSize, "0");
-  } else if (ageSec >= 0) {
-    snprintf(buffer, bufferSize, "%lds", ageSec);
-  } else {
-    snprintf(buffer, bufferSize, "%ld", (long)timestamp);
+// Drain USB CDC serial buffer before sleep to prevent split log lines (bench testing only)
+void drainSerialBeforeSleep() {
+  if (Serial.isConnected()) {
+    Serial.flush();
+    delay(75);
   }
 }
-
-void formatFailsafeConnectionAgeField(char *buffer, size_t bufferSize, time_t lastConnection) {
-  const long ageSec = connectivityFailsafeAgeSecOrNegative(lastConnection);
-  if (ageSec >= 0) {
-    snprintf(buffer, bufferSize, "%lds", ageSec);
-  } else {
-    snprintf(buffer, bufferSize, "na");
-  }
-}
-
-int plannedClosedHoursSleepSec() {
-  if (!Time.isValid() || isWithinOpenHours()) {
-    return -1;
-  }
-
-  int nightSleepSec = secondsUntilNextOpen();
-  if (nightSleepSec <= 0) {
-    nightSleepSec = 3600;
-  }
-
-  const int maxSleepSec = 546 * 60;
-  if (nightSleepSec > maxSleepSec) {
-    nightSleepSec = maxSleepSec;
-  }
-  return nightSleepSec;
-}
-
-FailsafeDeferReason currentFailsafeEligibilityReason() {
-  if (sysStatus.get_connectionMode() == DISCONNECTED) {
-    return FAILSAFE_DEFER_DISCONNECTED_MODE;
-  }
-
-  if (state == FIRMWARE_UPDATE_STATE || System.updatesPending()) {
-    return FAILSAFE_DEFER_UPDATE_PENDING;
-  }
-
-  if (!Time.isValid()) {
-    return FAILSAFE_DEFER_INVALID_TIME;
-  }
-
-  const time_t lastConnection = sysStatus.get_lastConnection();
-  if (lastConnection == 0) {
-    return FAILSAFE_DEFER_NO_LAST_CONNECTION;
-  }
-
-  const time_t now = Time.now();
-  if (now > lastConnection) {
-    const time_t connectionAgeSec = now - lastConnection;
-    uint8_t currentStage = sysStatus.get_connectivityRecoveryStage();
-    if (currentStage > 3) {
-      currentStage = 0;
-    }
-
-    if (connectionAgeSec >= ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC && currentStage < 3) {
-      time_t lastAction = sysStatus.get_lastConnectivityRecoveryAction();
-      if (lastAction > now) {
-        lastAction = 0;
-      }
-
-      const uint8_t nextStage = currentStage + 1;
-      time_t requiredDelay = ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC;
-      if (nextStage >= 2) {
-        requiredDelay += (time_t)connectivityFailsafeJitterSec(nextStage);
-      }
-
-      const bool cooldownComplete =
-          (currentStage == 0 || lastAction == 0 || (now - lastAction) >= requiredDelay);
-
-      if (cooldownComplete) {
-        const BatteryTier tier = currentBatteryTierForFailsafe();
-        const bool externalPowerPresent = connectivityFailsafeHasExternalPower();
-        const bool lowBatteryHardActionBlocked =
-            nextStage >= 2 && !externalPowerPresent &&
-            (sysStatus.get_lowBatteryMode() || tier == TIER_SURVIVAL);
-
-        if (lowBatteryHardActionBlocked) {
-          return FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED;
-        }
-      }
-    }
-  }
-
-  return FAILSAFE_DEFER_NONE;
-}
-
-void logConnectivityFailsafeBootTestContextLocal() {
-  const int closedSleepSec = plannedClosedHoursSleepSec();
-  if (closedSleepSec >
-      (int)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC) {
-    Log.info("FailsafeTest: closed-hours sleep cap active planned=%ds cap=%lds",
-             closedSleepSec,
-             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC);
-  }
-}
-
-void logConnectivityFailsafeBootDiagnosticsLocal() {
-  char lastActionField[24];
-  char connectionAgeField[24];
-  formatFailsafeAgeField(lastActionField, sizeof(lastActionField),
-                         sysStatus.get_lastConnectivityRecoveryAction());
-  formatFailsafeConnectionAgeField(connectionAgeField, sizeof(connectionAgeField),
-                                   sysStatus.get_lastConnection());
-
-  const FailsafeDeferReason reason = currentFailsafeEligibilityReason();
-  if (reason == FAILSAFE_DEFER_NONE) {
-    Log.info("FailsafeBoot: test=1 stale=%lds cd=%lds jit=%lds stage=%u cnt=%u lastAct=%s connAge=%s eligible=1",
-             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC,
-             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC,
-             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC,
-             (unsigned)sysStatus.get_connectivityRecoveryStage(),
-             (unsigned)sysStatus.get_connectivityRecoveryCount(),
-             lastActionField,
-             connectionAgeField);
-  } else {
-    Log.info("FailsafeBoot: test=1 stale=%lds cd=%lds jit=%lds stage=%u cnt=%u lastAct=%s connAge=%s eligible=0 reason=%s",
-             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC,
-             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC,
-             (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC,
-             (unsigned)sysStatus.get_connectivityRecoveryStage(),
-             (unsigned)sysStatus.get_connectivityRecoveryCount(),
-             lastActionField,
-             connectionAgeField,
-             failsafeDeferReasonNameLocal(reason));
-  }
-}
-#endif
 
 } // namespace
 
@@ -465,14 +414,25 @@ bool claimFailsafeDeferLog(FailsafeDeferReason reason) {
   return claimFailsafeDeferLogLocal(reason);
 }
 
-void logConnectivityFailsafeBootDiagnostics() {
-#if CONNECTIVITY_FAILSAFE_TEST_MODE
-  logConnectivityFailsafeBootDiagnosticsLocal();
-  logConnectivityFailsafeBootTestContextLocal();
-#endif
-}
-
 // ===== Retained boot and breadcrumb state =====
+
+constexpr uint32_t kLoopForensicsMagic = 0x57444631UL;
+constexpr uint8_t kLoopForensicsVersion = 1;
+constexpr unsigned long kLoopStageWarnThresholdMs = 2000UL;
+constexpr unsigned long kLoopStageErrorThresholdMs = 10000UL;
+constexpr unsigned long kLoopForensicsSnapshotIntervalMs = 1000UL;
+
+struct RetainedLoopForensics {
+  uint32_t magic;
+  uint8_t version;
+  uint8_t lastBreadcrumb;
+  uint8_t lastLoopStage;
+  uint8_t currentState;
+  uint16_t publishQueueDepth;
+  uint32_t stageStartMillis;
+  uint32_t lastLoopStageElapsed;
+  uint32_t millisSinceLastCloudConnect;
+};
 
 // Boot-storm guard retained state protects against repeated resets that occur
 // before setup completes and therefore bypass ERROR_STATE protections.
@@ -485,12 +445,174 @@ retained uint8_t bootStormTripCount = 0;
 retained bool bootStormAlertPending = false;
 retained uint8_t appBreadcrumb = BREADCRUMB_NONE;
 retained uint32_t appBreadcrumbMs = 0;
+retained RetainedLoopForensics retainedLoopForensics = {};
+retained time_t retainedHibernateRtcBefore = 0;
+retained time_t retainedHibernateWakeTime = 0;
+retained uint32_t retainedHibernateRequestedSleep = 0;
+retained uint32_t retainedHibernateCount = 0;
+retained bool retainedHibernatePending = false;
 uint8_t startupPreviousBreadcrumb = BREADCRUMB_NONE;
 uint32_t startupPreviousBreadcrumbMs = 0;
+uint8_t startupPreviousLoopStage = LOOP_STAGE_NONE;
+uint32_t startupPreviousLoopStageElapsedMs = 0;
+uint16_t startupPreviousQueueDepth = 0;
+uint32_t startupPreviousMillisSinceLastCloudConnect = 0;
+uint8_t startupPreviousState = INITIALIZATION_STATE;
+bool startupHibernateStatusReady = false;
+const char *startupHibernateWakeReason = "UNKNOWN";
+uint32_t startupHibernateActualSleepSec = 0;
+int32_t startupHibernateSleepErrorSec = 0;
+unsigned long lastLoopForensicsSnapshotMs = 0;
+
+template <typename T>
+bool updateRetainedValue(T &slot, const T &value) {
+  if (slot == value) {
+    return false;
+  }
+  slot = value;
+  return true;
+}
+
+const char *loopStageName(LoopStage stage) {
+  switch (stage) {
+  case LOOP_STAGE_STATE_HANDLER:
+    return "STATE_HANDLER";
+  case LOOP_STAGE_CLOUD_LOOP:
+    return "CLOUD_LOOP";
+  case LOOP_STAGE_PUBLISH_QUEUE:
+    return "PUBLISH_QUEUE";
+  case LOOP_STAGE_DIAGNOSTICS:
+    return "DIAGNOSTICS";
+  case LOOP_STAGE_IDLE_PROCESSING:
+    return "IDLE_PROCESSING";
+  case LOOP_STAGE_SLEEP_PREP:
+    return "SLEEP_PREP";
+  case LOOP_STAGE_CONNECTIVITY:
+    return "CONNECTIVITY";
+  case LOOP_STAGE_NONE:
+  default:
+    return "NONE";
+  }
+}
+
+const char *loopStageForensicName(LoopStage stage) {
+  switch (stage) {
+  case LOOP_STAGE_PUBLISH_QUEUE:
+    return "publish";
+  case LOOP_STAGE_CLOUD_LOOP:
+    return "cloud";
+  case LOOP_STAGE_STATE_HANDLER:
+    return "state";
+  case LOOP_STAGE_DIAGNOSTICS:
+    return "diag";
+  case LOOP_STAGE_CONNECTIVITY:
+    return "connectivity";
+  case LOOP_STAGE_IDLE_PROCESSING:
+    return "idle";
+  case LOOP_STAGE_SLEEP_PREP:
+    return "sleep";
+  case LOOP_STAGE_NONE:
+  default:
+    return "none";
+  }
+}
+
+void resetRetainedLoopForensics() {
+  memset(&retainedLoopForensics, 0, sizeof(retainedLoopForensics));
+  retainedLoopForensics.magic = kLoopForensicsMagic;
+  retainedLoopForensics.version = kLoopForensicsVersion;
+  retainedLoopForensics.lastBreadcrumb = appBreadcrumb;
+  retainedLoopForensics.currentState = (uint8_t)state;
+}
+
+void ensureRetainedLoopForensicsInitialized() {
+  if (retainedLoopForensics.magic != kLoopForensicsMagic ||
+      retainedLoopForensics.version != kLoopForensicsVersion) {
+    resetRetainedLoopForensics();
+  }
+}
+
+void refreshRetainedLoopForensics(bool sampleQueueDepth = true, bool force = false) {
+  ensureRetainedLoopForensicsInitialized();
+  const unsigned long nowMs = millis();
+  const bool sampleDynamic = force ||
+      lastLoopForensicsSnapshotMs == 0 ||
+      (nowMs - lastLoopForensicsSnapshotMs) >= kLoopForensicsSnapshotIntervalMs;
+
+  updateRetainedValue(retainedLoopForensics.lastBreadcrumb, appBreadcrumb);
+  updateRetainedValue(retainedLoopForensics.currentState, (uint8_t)state);
+
+  if (!sampleDynamic) {
+    return;
+  }
+
+  const uint32_t elapsedMs = (retainedLoopForensics.stageStartMillis != 0)
+      ? (uint32_t)(nowMs - retainedLoopForensics.stageStartMillis)
+      : 0UL;
+  updateRetainedValue(retainedLoopForensics.lastLoopStageElapsed, elapsedMs);
+
+  if (sampleQueueDepth) {
+    updateRetainedValue(retainedLoopForensics.publishQueueDepth,
+                        (uint16_t)PublishQueuePosix::instance().getNumEvents());
+  }
+
+  if (connectedStartMs != 0) {
+    updateRetainedValue(retainedLoopForensics.millisSinceLastCloudConnect,
+                        (nowMs >= connectedStartMs) ? (nowMs - connectedStartMs) : 0UL);
+  } else {
+    updateRetainedValue(retainedLoopForensics.millisSinceLastCloudConnect, 0UL);
+  }
+
+  lastLoopForensicsSnapshotMs = nowMs;
+}
+
+void noteLoopStageDuration(bool sampleQueueDepth = true) {
+  const unsigned long nowMs = millis();
+  const unsigned long elapsedMs = (retainedLoopForensics.stageStartMillis != 0)
+      ? (nowMs - retainedLoopForensics.stageStartMillis)
+      : 0UL;
+  const LoopStage stage = static_cast<LoopStage>(retainedLoopForensics.lastLoopStage);
+  const uint16_t queueDepth = sampleQueueDepth
+      ? (uint16_t)PublishQueuePosix::instance().getNumEvents()
+      : retainedLoopForensics.publishQueueDepth;
+  const uint32_t millisSinceLastCloudConnect = (connectedStartMs != 0 && nowMs >= connectedStartMs)
+      ? (uint32_t)(nowMs - connectedStartMs)
+      : 0UL;
+
+  refreshRetainedLoopForensics(sampleQueueDepth, false);
+
+  if (elapsedMs >= kLoopStageErrorThresholdMs) {
+    Log.error("LoopStage: stage=%s elapsed=%lu state=%u q=%u connMs=%lu",
+              loopStageName(stage),
+              elapsedMs,
+              (unsigned)state,
+              (unsigned)queueDepth,
+              (unsigned long)millisSinceLastCloudConnect);
+  } else if (elapsedMs >= kLoopStageWarnThresholdMs) {
+    Log.warn("LoopStage: stage=%s elapsed=%lu state=%u q=%u connMs=%lu",
+             loopStageName(stage),
+             elapsedMs,
+             (unsigned)state,
+             (unsigned)queueDepth,
+             (unsigned long)millisSinceLastCloudConnect);
+  }
+}
 
 void setAppBreadcrumb(uint8_t code) {
   appBreadcrumb = code;
   appBreadcrumbMs = millis();
+  refreshRetainedLoopForensics(false, true);
+}
+
+void setLoopStage(LoopStage stage) {
+  ensureRetainedLoopForensicsInitialized();
+  if (retainedLoopForensics.lastLoopStage == (uint8_t)stage) {
+    return;
+  }
+
+  retainedLoopForensics.lastLoopStage = (uint8_t)stage;
+  retainedLoopForensics.stageStartMillis = millis();
+  refreshRetainedLoopForensics(true, true);
 }
 
 // Short-term webhook monitoring starts only after a successful cloud
@@ -502,12 +624,25 @@ const unsigned long resetWait = 30000;      // Error state dwell before reset
 
 
 void setup() {
+  ensureRetainedLoopForensicsInitialized();
+
   const int reason = System.resetReason();
   const uint32_t reasonData = System.resetReasonData();
   const uint8_t previousBreadcrumb = appBreadcrumb;
   const uint32_t previousBreadcrumbMs = appBreadcrumbMs;
+  const uint8_t previousLoopStage = retainedLoopForensics.lastLoopStage;
+  const uint32_t previousLoopStageElapsed = retainedLoopForensics.lastLoopStageElapsed;
+  const uint16_t previousQueueDepth = retainedLoopForensics.publishQueueDepth;
+  const uint32_t previousMillisSinceLastCloudConnect = retainedLoopForensics.millisSinceLastCloudConnect;
+  const uint8_t previousState = retainedLoopForensics.currentState;
+  const bool watchdogResetDetected = (reason == RESET_REASON_WATCHDOG);
   startupPreviousBreadcrumb = previousBreadcrumb;
   startupPreviousBreadcrumbMs = previousBreadcrumbMs;
+  startupPreviousLoopStage = previousLoopStage;
+  startupPreviousLoopStageElapsedMs = previousLoopStageElapsed;
+  startupPreviousQueueDepth = previousQueueDepth;
+  startupPreviousMillisSinceLastCloudConnect = previousMillisSinceLastCloudConnect;
+  startupPreviousState = previousState;
   setAppBreadcrumb(BREADCRUMB_SETUP_START);
   bootStormLastResetReason = (uint8_t)reason;
   bootStormLastResetReasonData = reasonData;
@@ -566,6 +701,7 @@ void setup() {
     Particle.process();
     SystemSleepConfiguration bootStormSleep;
     bootStormSleep.mode(SystemSleepMode::ULTRA_LOW_POWER).duration(600000UL);
+    drainSerialBeforeSleep();
     System.sleep(bootStormSleep);
     Log.warn("BOOT STORM holdoff sleep returned unexpectedly - continuing boot");
   }
@@ -584,11 +720,55 @@ void setup() {
                                  // safety tip. If we run out of memory a
                                  // System.reset() is done.
 
-  // Application watchdog: reset if loop() doesn't execute within 60 seconds.
-  // This catches state machine hangs, blocking operations, and cellular/cloud
-  // stalls that exceed our non-blocking design intent. The AB1805 hardware
-  // watchdog (124s) provides ultimate backstop if this software watchdog fails.
+  // Awake watchdog: reset if the firmware stops making forward progress while
+  // running normally. Use the Device OS hardware watchdog so intended sleep
+  // does not look like an application hang on P2/Photon 2.
+#if Wiring_Watchdog
+  particle::WatchdogConfiguration awakeWatchdogConfig;
+#if PLATFORM_ID != PLATFORM_P2 && !(defined(PLATFORM_PHOTON2) && PLATFORM_ID == PLATFORM_PHOTON2)
+  const uint32_t awakeWatchdogCaps =
+      awakeWatchdogConfig.capabilities().value() & ~HAL_WATCHDOG_CAPS_SLEEP_RUNNING;
+  awakeWatchdogConfig.capabilities(particle::WatchdogCaps::fromUnderlying(awakeWatchdogCaps));
+#endif
+  awakeWatchdogConfig.timeout(AWAKE_WATCHDOG_TIMEOUT_MS);
+
+  const int awakeWatchdogInitResult = Watchdog.init(awakeWatchdogConfig);
+  int awakeWatchdogNotifyResult = SYSTEM_ERROR_NONE;
+  int awakeWatchdogStartResult = awakeWatchdogInitResult;
+  awakeWatchdogInitialized = (awakeWatchdogInitResult == SYSTEM_ERROR_NONE);
+
+  if (awakeWatchdogInitialized) {
+    awakeWatchdogNotifyResult = Watchdog.onExpired(awakeWatchdogExpiredHandler);
+    awakeWatchdogStartResult = Watchdog.start();
+    awakeWatchdogStarted = Watchdog.started();
+  }
+
+#if ENABLE_SLEEP_TRACE
+  Log.info("AppWDT: armed=%d impl=hw timeout=%lu strat=%s init=%d start=%d notify=%d started=%d",
+           awakeWatchdogStarted ? 1 : 0,
+           AWAKE_WATCHDOG_TIMEOUT_MS,
+           awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
+           awakeWatchdogInitResult,
+           awakeWatchdogStartResult,
+           awakeWatchdogNotifyResult,
+           Watchdog.started() ? 1 : 0);
+#else
+  if (awakeWatchdogInitResult != SYSTEM_ERROR_NONE ||
+      awakeWatchdogNotifyResult != SYSTEM_ERROR_NONE ||
+      awakeWatchdogStartResult != SYSTEM_ERROR_NONE ||
+      !Watchdog.started()) {
+    Log.warn("AppWDT: abnormal strat=%s init=%d start=%d notify=%d started=%d",
+             awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
+             awakeWatchdogInitResult,
+             awakeWatchdogStartResult,
+             awakeWatchdogNotifyResult,
+             Watchdog.started() ? 1 : 0);
+  }
+#endif
+#else
+  // Fallback for platforms without the Device OS hardware watchdog API.
   static ApplicationWatchdog appWatchdog(60000, appWatchdogHandler, 1536);
+#endif
 
   // Subscribe to the Ubidots integration response event so we can track
   // successful webhook deliveries and update lastHookResponse.
@@ -628,6 +808,22 @@ void setup() {
   current.setup();      // Initialize the current status data
   PowerManager::instance().setup();
 
+  if (sysStatus.get_hasValidLedgerConfig()) {
+    Config::markStorageConfigurationLoaded();
+  } else {
+    Config::markFactoryDefaultsActive();
+  }
+
+  if (watchdogResetDetected) {
+    const uint16_t priorWatchdogResetCount = sysStatus.get_watchdogResetCount();
+    if (priorWatchdogResetCount < 0xFFFF) {
+      sysStatus.set_watchdogResetCount((uint16_t)(priorWatchdogResetCount + 1));
+    }
+    sysStatus.set_lastWatchdogBreadcrumb(previousBreadcrumb);
+    sysStatus.set_lastWatchdogUptimeMs(previousBreadcrumbMs);
+    sysStatus.set_lastWatchdogResetReasonData(reasonData);
+  }
+
   // If a boot storm holdoff was triggered on this or the prior boot, surface
   // it as an alert now that persistent current status storage is initialized.
   if (bootStormAlertPending) {
@@ -649,6 +845,7 @@ void setup() {
     // cloud config has not enabled serial logging yet.
     const unsigned long serialWaitStart = millis();
     while (!Serial.isConnected() && (millis() - serialWaitStart) < ConnectivityPolicy::DEBUG_SERIAL_WAIT_TIMEOUT_MS) {
+      serviceAwakeWatchdog();
       Particle.process();
       delay(ConnectivityPolicy::DEBUG_SERIAL_WAIT_POLL_DELAY_MS);
     }
@@ -741,6 +938,11 @@ void setup() {
       .withFileQueueSize(800)
       .setup(); // Initialize the publish queue
 
+  // Queue watchdog forensic event only after PublishQueuePosix setup initializes its mutex.
+  if (watchdogResetDetected) {
+    publishWatchdogForensics();
+  }
+
   // ===== TIME, RTC, AND WATCHDOG CONFIGURATION =====
   // Initialize AB1805 RTC and hardware watchdog, then restore system time if needed
   const bool timeValidBeforeRtc = Time.isValid();
@@ -767,6 +969,41 @@ void setup() {
              rtcReadOk ? "true" : "false");
   }
 
+  startupHibernateStatusReady = false;
+  startupHibernateWakeReason = "UNKNOWN";
+  startupHibernateActualSleepSec = 0;
+  startupHibernateSleepErrorSec = 0;
+#if PLATFORM_ID == PLATFORM_BORON
+  if (retainedHibernatePending) {
+    const AB1805::WakeReason wakeReason = ab1805.getWakeReason();
+    startupHibernateWakeReason = ab1805WakeReasonName(wakeReason);
+    if (reason == RESET_REASON_POWER_MANAGEMENT &&
+        wakeReason == AB1805::WakeReason::ALARM &&
+        rtcReadOk &&
+        retainedHibernateRtcBefore > 0 &&
+        retainedHibernateRequestedSleep > 0 &&
+        rtcTime >= retainedHibernateRtcBefore) {
+      startupHibernateActualSleepSec = (uint32_t)(rtcTime - retainedHibernateRtcBefore);
+      startupHibernateSleepErrorSec = (int32_t)startupHibernateActualSleepSec -
+                                      (int32_t)retainedHibernateRequestedSleep;
+      startupHibernateStatusReady = true;
+
+      Log.info("HibernateWake: reason=%s req=%lu actual=%lu err=%ld count=%lu",
+               startupHibernateWakeReason,
+               (unsigned long)retainedHibernateRequestedSleep,
+               (unsigned long)startupHibernateActualSleepSec,
+               (long)startupHibernateSleepErrorSec,
+               (unsigned long)retainedHibernateCount);
+    } else {
+      Log.info("HibernateWake: pending=1 reason=%d wake=%s rtcOk=%d",
+               reason,
+               startupHibernateWakeReason,
+               rtcReadOk ? 1 : 0);
+    }
+  }
+#endif
+  retainedHibernatePending = false;
+
   Cloud::instance().setup(); // Initialize the cloud functions
 
   // Enqueue a one-time status snapshot so the cloud can see
@@ -789,10 +1026,16 @@ void setup() {
   // This must be configured before we can make any open/close hour decisions.
   const char *tz = sysStatus.get_timeZoneStrCStr();
   if (!tz || tz[0] == '\0') {
-    tz = "SGT-8"; // Fallback default
+    tz = Config::DEFAULT_TIMEZONE;
     sysStatus.set_timeZoneStr(tz);
   }
   LocalTime::instance().withConfig(LocalTimePosixTimezone(tz));
+
+  Config::logDiagnostics("ConfigDiag");
+  if (!Config::isValid(true)) {
+    Log.warn("Config invalid at boot - forcing CONNECTING_STATE for ledger acquisition");
+    state = CONNECTING_STATE;
+  }
 
   // Validate time and configure local time converter
   if (!Time.isValid()) {
@@ -819,6 +1062,15 @@ void setup() {
            appBreadcrumbName(startupPreviousBreadcrumb),
            Time.isValid() ? (isWithinOpenHours() ? 1 : 0) : -1,
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0);
+  if (watchdogResetDetected) {
+    Log.warn("BootWDT: breadcrumb=%s stage=%s elapsed=%lu q=%u state=%u connMs=%lu",
+             appBreadcrumbName(startupPreviousBreadcrumb),
+             loopStageName(static_cast<LoopStage>(startupPreviousLoopStage)),
+             (unsigned long)startupPreviousLoopStageElapsedMs,
+             (unsigned)startupPreviousQueueDepth,
+             (unsigned)startupPreviousState,
+             (unsigned long)startupPreviousMillisSinceLastCloudConnect);
+  }
 
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
   Log.info("Failsafe: test=%d stale=%lds cooldown=%lds jitter=%lds",
@@ -826,7 +1078,7 @@ void setup() {
            (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC,
            (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC,
            (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC);
-  logConnectivityFailsafeBootDiagnostics();
+  ConnectivityFailsafeTest::logBootDiagnostics();
 #endif
 
   // ===== SENSOR ABSTRACTION LAYER =====
@@ -880,10 +1132,18 @@ void loop() {
     bootStormWindowStart = 0;
   }
 
+  setLoopStage(LOOP_STAGE_CONNECTIVITY);
   connectivityFailsafeSupervisor();
+  noteLoopStageDuration(false);
 
   // Main state machine driving sensing, reporting, power management
+  setLoopStage(LOOP_STAGE_STATE_HANDLER);
   switch (state) {
+  case INITIALIZATION_STATE:
+    Log.warn("INITIALIZATION_STATE reached loop - transitioning to IDLE_STATE");
+    transitionTo(IDLE_STATE, "loop-initialization-fallback");
+    break;
+
   case IDLE_STATE:
     handleIdleState();
     break;
@@ -908,7 +1168,9 @@ void loop() {
     handleErrorState();
     break;
   }
+  noteLoopStageDuration(false);
 
+  setLoopStage(LOOP_STAGE_DIAGNOSTICS);
   thrashGuard.loop(state, millis());
 
   ab1805.loop(); // Keeps the RTC synchronized with the device clock
@@ -917,12 +1179,24 @@ void loop() {
   current.loop();
   sysStatus.loop();
   sensorConfig.loop();
+  noteLoopStageDuration(false);
 
   // Service deferred cloud work (ledger status publishes, etc.)
+  setLoopStage(LOOP_STAGE_CLOUD_LOOP);
+  setAppBreadcrumb(BREADCRUMB_CLOUD_LOOP_ENTER);
   Cloud::instance().loop();
+  noteLoopStageDuration();
+  setAppBreadcrumb(BREADCRUMB_CLOUD_LOOP_EXIT);
 
   // Service outgoing publish queue
+  setLoopStage(LOOP_STAGE_PUBLISH_QUEUE);
+  setAppBreadcrumb(BREADCRUMB_PUBLISH_QUEUE_ENTER);
   PublishQueuePosix::instance().loop();
+  noteLoopStageDuration();
+  setAppBreadcrumb(BREADCRUMB_PUBLISH_QUEUE_EXIT);
+
+  setLoopStage(LOOP_STAGE_DIAGNOSTICS);
+  serviceAwakeWatchdog();
 
   // Check for short-term webhook response timeout.
   // Requirement: 20 seconds starting only after a successful cloud connect.
@@ -965,22 +1239,126 @@ void loop() {
   // counts are captured even during long-running operations like cellular
   // connection attempts (which can take minutes) or firmware updates.
   // MEASUREMENT mode is time-based (handled in IDLE only), not interrupt-driven.
-  uint8_t sensorMode = sysStatus.get_sensorMode();
+  uint8_t sensorMode = sysStatus.get_sensorMode(); 
   if (sensorMode == COUNTING) {
     handleCountingMode();  // Count each sensor event
   } else if (sensorMode == OCCUPANCY) {
     handleOccupancyMode(); // Track occupied/unoccupied state
   }
 
+  noteLoopStageDuration();
+
 } // End of loop
 
 // ********** Helper Functions **********
 
+void serviceAwakeWatchdog() {
+#if Wiring_Watchdog
+  if (!awakeWatchdogInitialized) {
+    return;
+  }
+
+  if (Watchdog.started()) {
+    Watchdog.refresh();
+    awakeWatchdogStarted = true;
+  } else {
+    awakeWatchdogStarted = false;
+  }
+#endif
+}
+
+void pauseAwakeWatchdogForSleep(const char *context) {
+#if Wiring_Watchdog
+  if (!awakeWatchdogInitialized) {
+    return;
+  }
+
+  if (awakeWatchdogSleepStrategy == AWAKE_WATCHDOG_SLEEP_MANUAL_STOP) {
+    const int stopResult = Watchdog.stop();
+    awakeWatchdogStarted = Watchdog.started();
+#if ENABLE_SLEEP_TRACE
+    Log.info("AppWDT: sleep ctx=%s action=stop strat=%s rc=%d started=%d",
+             context,
+             awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
+             stopResult,
+             awakeWatchdogStarted ? 1 : 0);
+#else
+    if (stopResult != SYSTEM_ERROR_NONE) {
+      Log.warn("AppWDT: sleep-stop failed ctx=%s strat=%s rc=%d started=%d",
+               context,
+               awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
+               stopResult,
+               awakeWatchdogStarted ? 1 : 0);
+    }
+#endif
+    return;
+  }
+
+  awakeWatchdogStarted = Watchdog.started();
+#if ENABLE_SLEEP_TRACE
+  Log.info("AppWDT: sleep ctx=%s action=auto strat=%s started=%d",
+           context,
+           awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
+           awakeWatchdogStarted ? 1 : 0);
+#else
+  if (!awakeWatchdogStarted) {
+    Log.warn("AppWDT: sleep-auto watchdog-not-started ctx=%s strat=%s",
+             context,
+             awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy));
+  }
+#endif
+#else
+  (void)context;
+#endif
+}
+
+void restoreAwakeWatchdogAfterWake(const char *context) {
+#if Wiring_Watchdog
+  if (!awakeWatchdogInitialized) {
+    return;
+  }
+
+  int startResult = SYSTEM_ERROR_NONE;
+  const bool wasStarted = Watchdog.started();
+  if (!wasStarted) {
+    startResult = Watchdog.start();
+  }
+
+  awakeWatchdogStarted = Watchdog.started();
+
+#if ENABLE_SLEEP_TRACE
+  Log.info("AppWDT: wake ctx=%s action=%s strat=%s rc=%d started=%d",
+           context,
+           wasStarted ? "resume" : "start",
+           awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
+           startResult,
+           awakeWatchdogStarted ? 1 : 0);
+#else
+  if (startResult != SYSTEM_ERROR_NONE || !awakeWatchdogStarted) {
+    Log.warn("AppWDT: wake abnormal ctx=%s action=%s strat=%s rc=%d started=%d",
+             context,
+             wasStarted ? "resume" : "start",
+             awakeWatchdogSleepStrategyName(awakeWatchdogSleepStrategy),
+             startResult,
+             awakeWatchdogStarted ? 1 : 0);
+  }
+#endif
+#else
+  (void)context;
+#endif
+}
+
+#if Wiring_Watchdog
+static void awakeWatchdogExpiredHandler() {
+  setAppBreadcrumb(BREADCRUMB_APP_WATCHDOG_RESET);
+}
+#else
 // ApplicationWatchdog expects a plain function pointer.
 static void appWatchdogHandler() {
   setAppBreadcrumb(BREADCRUMB_APP_WATCHDOG_RESET);
   System.reset();
 }
+#endif
 
 // ===== Policy and publishing helpers =====
 
@@ -1088,6 +1466,10 @@ bool isWithinOpenHours() {
     return true;
   }
 
+  if (!Config::isValid(false)) {
+    return true;
+  }
+
   uint8_t openHour = sysStatus.get_openTime();
   uint8_t closeHour = sysStatus.get_closeTime();
   const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
@@ -1097,11 +1479,51 @@ bool isWithinOpenHours() {
   return openNow;
 }
 
+void logTimeDiag(bool isOpen) {
+  const char *tz = sysStatus.get_timeZoneStrCStr();
+  if (!tz) {
+    tz = "";
+  }
+
+  const bool timeValid = Time.isValid();
+  const time_t epoch = Time.now();
+  struct tm utcTm = {};
+  if (timeValid) {
+    gmtime_r(&epoch, &utcTm);
+  }
+
+  const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
+  const LocalTimeYMD localDate = snapshot.localYmd;
+  const uint32_t localSecondsOfDay = snapshot.localSecondsOfDay;
+  const uint8_t localHour = snapshot.localHour;
+  const uint8_t localMinute = (uint8_t)((localSecondsOfDay / 60UL) % 60UL);
+  const uint8_t localSecond = (uint8_t)(localSecondsOfDay % 60UL);
+
+  Log.info("TimeDiag: tz=%s valid=%d epoch=%lu utc=%04d-%02d-%02d %02d:%02d:%02d local=%04d-%02d-%02d %02d:%02d:%02d open=%d close=%d isOpen=%d",
+           tz,
+           timeValid ? 1 : 0,
+           (unsigned long)epoch,
+           utcTm.tm_year + 1900,
+           utcTm.tm_mon + 1,
+           utcTm.tm_mday,
+           utcTm.tm_hour,
+           utcTm.tm_min,
+           utcTm.tm_sec,
+           localDate.getYear(),
+           localDate.getMonth(),
+           localDate.getDay(),
+           localHour,
+           localMinute,
+           localSecond,
+           (int)sysStatus.get_openTime(),
+           (int)sysStatus.get_closeTime(),
+           isOpen ? 1 : 0);
+}
+
 // Helper to compute seconds until next park opening time (local time)
 int secondsUntilNextOpen() {
-  if (!Time.isValid()) {
-    // Fallback: 1 hour if time is not yet valid
-    return 3600;
+  if (!Time.isValid() || !Config::isValid(false)) {
+    return Config::DEFAULT_REPORT_INTERVAL_SEC;
   }
 
   uint8_t openHour = sysStatus.get_openTime();
@@ -1219,9 +1641,22 @@ void publishData() {
   // Get webhook name from cloud configuration (with fallback to convention)
   const char *webhookName = Cloud::instance().getWebhookName();
 
+  setAppBreadcrumb(BREADCRUMB_REPORT_QUEUE_START);
+  const unsigned long queueStartMs = millis();
   bool queued = PublishQueuePosix::instance().publish(webhookName, data, PRIVATE);
+  const unsigned long queueElapsedMs = millis() - queueStartMs;
+  setAppBreadcrumb(BREADCRUMB_REPORT_QUEUE_DONE);
   if (!queued) {
     Log.warn("Report webhook queue rejected name=%s", webhookName);
+  }
+  if (!queued || queueElapsedMs >= REPORT_FORENSICS_ABNORMAL_WARN_THRESHOLD_MS) {
+    Log.warn("ReportPerf: step=queue ms=%lu queued=%d",
+             queueElapsedMs,
+             queued ? 1 : 0);
+  } else if (ENABLE_PERF_TRACE && queueElapsedMs >= REPORT_FORENSICS_SLOW_LOG_THRESHOLD_MS) {
+    Log.info("ReportPerf: step=queue ms=%lu queued=%d",
+             queueElapsedMs,
+             queued ? 1 : 0);
   }
 
   // General alert lifecycle rule: once an alert has been included in a report
@@ -1249,12 +1684,26 @@ void publishData() {
   }
 
   // Also update device-data ledger with structured JSON snapshot
-  const bool ledgerOk = Cloud::instance().publishDataToLedger();
+  setAppBreadcrumb(BREADCRUMB_REPORT_LEDGER_START);
+  const unsigned long ledgerStartMs = millis();
+  const bool ledgerOk = Cloud::instance().publishDataToLedger("ReportState");
+  const unsigned long ledgerElapsedMs = millis() - ledgerStartMs;
+  setAppBreadcrumb(BREADCRUMB_REPORT_LEDGER_DONE);
+  setAppBreadcrumb(BREADCRUMB_REPORT_POST_LEDGER);
   const char *ledgerState = ledgerOk ? "req" : "err";
   if (!ledgerOk) {
     // Data ledger publish failure; escalate via alert so the error
     // supervisor can decide on corrective action.
     current.raiseAlert(42);
+  }
+  if (!ledgerOk || ledgerElapsedMs >= REPORT_FORENSICS_ABNORMAL_WARN_THRESHOLD_MS) {
+    Log.warn("ReportPerf: step=ledger ms=%lu ok=%d",
+             ledgerElapsedMs,
+             ledgerOk ? 1 : 0);
+  } else if (ENABLE_PERF_TRACE && ledgerElapsedMs >= REPORT_FORENSICS_SLOW_LOG_THRESHOLD_MS) {
+    Log.info("ReportPerf: step=ledger ms=%lu ok=%d",
+             ledgerElapsedMs,
+             ledgerOk ? 1 : 0);
   }
 
   if (sensorMode == OCCUPANCY) {
@@ -1272,6 +1721,8 @@ void publishData() {
              queued ? 1 : 0,
              ledgerState);
   }
+
+  setAppBreadcrumb(BREADCRUMB_REPORT_EXIT);
 }
 
 // ===== Startup status and webhook supervision =====
@@ -1285,7 +1736,7 @@ void publishData() {
  * before the radio is brought up.
  */
 void publishStartupStatus() {
-  char status[416];
+  char status[896];
 
   int resetReason = System.resetReason();
   uint32_t resetReasonData = System.resetReasonData();
@@ -1295,14 +1746,37 @@ void publishStartupStatus() {
   const uint8_t failsafeStage = sysStatus.get_connectivityRecoveryStage();
   const uint8_t failsafeCount = sysStatus.get_connectivityRecoveryCount();
   const time_t failsafeLastAction = sysStatus.get_lastConnectivityRecoveryAction();
+  const uint16_t watchdogResetCount = sysStatus.get_watchdogResetCount();
+  const uint8_t lastWatchdogBreadcrumb = sysStatus.get_lastWatchdogBreadcrumb();
+  const uint32_t lastWatchdogUptimeMs = sysStatus.get_lastWatchdogUptimeMs();
+  const uint32_t lastWatchdogResetReasonData = sysStatus.get_lastWatchdogResetReasonData();
+#if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
+  const uint16_t startupPmicAnomalyCount = pmicAnomalyCount;
+  const float startupLastPmicAnomalySoc = lastPmicAnomalySoc;
+  const uint8_t startupLastPmicAnomalyChargeStatus = lastPmicAnomalyChargeStatus;
+  const uint32_t startupLastPmicAnomalyAgeSec = pmicAnomalyAgeSec();
+  const uint8_t startupLastPmicAnomalyPowerSource = lastPmicAnomalyPowerSource;
+  const uint8_t startupLastPmicAnomalyVbusStatus = lastPmicAnomalyVbusStatus;
+#endif
   const time_t lastConnection = sysStatus.get_lastConnection();
   const long lastConnectionAgeSec =
       (Time.isValid() && lastConnection != 0 && Time.now() > lastConnection)
           ? (long)(Time.now() - lastConnection)
           : -1L;
+  char hibernateFields[192] = "";
+  if (startupHibernateStatusReady) {
+    snprintf(hibernateFields,
+             sizeof(hibernateFields),
+             ",\"sleepMode\":\"hibernate\",\"wakeReason\":\"%s\",\"actualSleep\":%lu,\"sleepError\":%ld,\"hibernateCount\":%lu",
+             startupHibernateWakeReason,
+             (unsigned long)startupHibernateActualSleepSec,
+             (long)startupHibernateSleepErrorSec,
+             (unsigned long)retainedHibernateCount);
+  }
 
+#if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
   snprintf(status, sizeof(status),
-           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d}",
+           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"pmicAnomalyCount\":%u,\"lastPmicAnomalySoc\":%.2f,\"lastPmicAnomalyChargeStatus\":%u,\"lastPmicAnomalyAgeSec\":%lu,\"lastPmicAnomalyPowerSource\":%u,\"lastPmicAnomalyVbusStatus\":%u,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d%s}",
            FIRMWARE_VERSION,
            resetReason,
            (unsigned long)resetReasonData,
@@ -1311,14 +1785,71 @@ void publishStartupStatus() {
            freeHeap,
            (unsigned)startupPreviousBreadcrumb,
            (unsigned long)startupPreviousBreadcrumbMs,
+           (unsigned)watchdogResetCount,
+           (unsigned)lastWatchdogBreadcrumb,
+           (unsigned long)lastWatchdogUptimeMs,
+           (unsigned long)lastWatchdogResetReasonData,
+           (unsigned)startupPmicAnomalyCount,
+           (double)startupLastPmicAnomalySoc,
+           (unsigned)startupLastPmicAnomalyChargeStatus,
+           (unsigned long)startupLastPmicAnomalyAgeSec,
+           (unsigned)startupLastPmicAnomalyPowerSource,
+           (unsigned)startupLastPmicAnomalyVbusStatus,
            (unsigned)failsafeStage,
            (unsigned)failsafeCount,
            (long)failsafeLastAction,
            lastConnectionAgeSec,
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
-           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0);
+           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
+           hibernateFields);
+#else
+  snprintf(status, sizeof(status),
+           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d%s}",
+           FIRMWARE_VERSION,
+           resetReason,
+           (unsigned long)resetReasonData,
+           (int)alertCode,
+           (long)lastAlert,
+           freeHeap,
+           (unsigned)startupPreviousBreadcrumb,
+           (unsigned long)startupPreviousBreadcrumbMs,
+           (unsigned)watchdogResetCount,
+           (unsigned)lastWatchdogBreadcrumb,
+           (unsigned long)lastWatchdogUptimeMs,
+           (unsigned long)lastWatchdogResetReasonData,
+           (unsigned)failsafeStage,
+           (unsigned)failsafeCount,
+           (long)failsafeLastAction,
+           lastConnectionAgeSec,
+           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
+           CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
+           hibernateFields);
+#endif
 
   PublishQueuePosix::instance().publish("status", status, PRIVATE);
+}
+
+void publishWatchdogForensics() {
+  char payload[192];
+  const LoopStage stage = static_cast<LoopStage>(startupPreviousLoopStage);
+
+  const char *resetLabel = "watchdog";
+  if (System.resetReason() != RESET_REASON_WATCHDOG) {
+    resetLabel = "other";
+  }
+
+  snprintf(payload,
+           sizeof(payload),
+           "{\"reset\":\"%s\",\"bc\":%u,\"stage\":\"%s\",\"elapsed\":%lu,\"queue\":%u,\"state\":%u,\"connAge\":%lu}",
+           resetLabel,
+           (unsigned)startupPreviousBreadcrumb,
+           loopStageForensicName(stage),
+           (unsigned long)startupPreviousLoopStageElapsedMs,
+           (unsigned)startupPreviousQueueDepth,
+           (unsigned)startupPreviousState,
+           (unsigned long)startupPreviousMillisSinceLastCloudConnect);
+
+  PublishQueuePosix::instance().publish("watchdog", payload, PRIVATE);
 }
 
 /**
@@ -1437,6 +1968,14 @@ void publishStateTransition() {
   oldState = state;
 }
 
+void transitionTo(State newState, const char *reason) {
+  Log.info("StateReq: %s->%s reason=%s",
+           stateShortName(state),
+           stateShortName(newState),
+           (reason != nullptr) ? reason : "unspecified");
+  state = newState;
+}
+
 // ===== Recovery, failsafe, and maintenance helpers =====
 
 void outOfMemoryHandler(system_event_t event, int param) {
@@ -1470,33 +2009,21 @@ void clearConnectivityFailsafeRecovery(const char *reason) {
 void connectivityFailsafeSupervisor() {
   if (sysStatus.get_connectionMode() == DISCONNECTED) {
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
-    if (claimFailsafeDeferLog(FAILSAFE_DEFER_DISCONNECTED_MODE)) {
-      Log.info("FailsafeDefer: reason=%s mode=%u",
-               failsafeDeferReasonName(FAILSAFE_DEFER_DISCONNECTED_MODE),
-               (unsigned)sysStatus.get_connectionMode());
-    }
+    ConnectivityFailsafeTest::logDeferDisconnectedMode();
 #endif
     return;
   }
 
   if (state == FIRMWARE_UPDATE_STATE || System.updatesPending()) {
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
-    if (claimFailsafeDeferLog(FAILSAFE_DEFER_UPDATE_PENDING)) {
-      Log.info("FailsafeDefer: reason=%s state=%s pending=%d",
-               failsafeDeferReasonName(FAILSAFE_DEFER_UPDATE_PENDING),
-               stateShortName(state),
-               System.updatesPending() ? 1 : 0);
-    }
+    ConnectivityFailsafeTest::logDeferUpdatePending();
 #endif
     return;
   }
 
   if (!Time.isValid()) {
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
-    if (claimFailsafeDeferLog(FAILSAFE_DEFER_INVALID_TIME)) {
-      Log.info("FailsafeDefer: reason=%s",
-               failsafeDeferReasonName(FAILSAFE_DEFER_INVALID_TIME));
-    }
+    ConnectivityFailsafeTest::logDeferInvalidTime();
 #endif
     return;
   }
@@ -1504,10 +2031,7 @@ void connectivityFailsafeSupervisor() {
   const time_t lastConnection = sysStatus.get_lastConnection();
   if (lastConnection == 0) {
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
-    if (claimFailsafeDeferLog(FAILSAFE_DEFER_NO_LAST_CONNECTION)) {
-      Log.info("FailsafeDefer: reason=%s",
-               failsafeDeferReasonName(FAILSAFE_DEFER_NO_LAST_CONNECTION));
-    }
+    ConnectivityFailsafeTest::logDeferNoLastConnection();
 #endif
     return;
   }
@@ -1558,12 +2082,7 @@ void connectivityFailsafeSupervisor() {
 
   if (lowBatteryHardActionBlocked) {
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
-    if (claimFailsafeDeferLog(FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED)) {
-      Log.info("FailsafeDefer: reason=%s stage=%u tier=%s",
-               failsafeDeferReasonName(FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED),
-               (unsigned)nextStage,
-               batteryTierShortName(tier));
-    }
+    ConnectivityFailsafeTest::logDeferLowBatteryHardStageSuppressed(nextStage, tier);
 #else
     Log.info("Failsafe: defer reason=low-battery stage=%u tier=%s",
              (unsigned)nextStage,
@@ -1654,4 +2173,3 @@ void dailyCleanup() {
   
   current.resetEverything(); // Zero the counts for the new day
 }
-

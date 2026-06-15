@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;19</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -99,8 +99,10 @@ $(function(){initNavTree('_sensor_manager_8cpp.html','',''); });
 <code>#include &quot;<a class="el" href="_power_manager_8h_source.html">power/PowerManager.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="_power_platform_8h_source.html">power/PowerPlatform.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="_connectivity_policy_8h_source.html">power/ConnectivityPolicy.h</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="_state_machine_8h_source.html">state/StateMachine.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="_sensor_factory_8h_source.html">sensors/SensorFactory.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="device__pinout_8h_source.html">device_pinout.h</a>&quot;</code><br />
+<code>#include &quot;PublishQueuePosixRK.h&quot;</code><br />
 </div>
 <p><a href="_sensor_manager_8cpp_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
@@ -119,6 +121,7 @@ Functions</h2></td></tr>
 <tr class="memitem:af0d235864131aeeba640193efb977e4e" id="r_af0d235864131aeeba640193efb977e4e"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#af0d235864131aeeba640193efb977e4e">anonymous_namespace{SensorManager.cpp}::batteryVoltageLooksUsable</a> (float vcell)</td></tr>
 <tr class="memitem:afa775b9bbc1b9a7f4007b9b2be366f1f" id="r_afa775b9bbc1b9a7f4007b9b2be366f1f"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#afa775b9bbc1b9a7f4007b9b2be366f1f">anonymous_namespace{SensorManager.cpp}::boundedBatterySettleDelay</a> (unsigned long delayMs)</td></tr>
 <tr class="memitem:a5e3e975006a3ea6d5ce637eef262bc84" id="r_a5e3e975006a3ea6d5ce637eef262bc84"><td class="memItemLeft">float&#160;</td><td class="memItemRight"><a class="el" href="namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a5e3e975006a3ea6d5ce637eef262bc84">anonymous_namespace{SensorManager.cpp}::estimateSocFromVoltage</a> (float voltage)</td></tr>
+<tr class="memitem:a66e83d6a847a084efc915983eb0efa8f" id="r_a66e83d6a847a084efc915983eb0efa8f"><td class="memItemLeft">uint32_t&#160;</td><td class="memItemRight"><a class="el" href="#a66e83d6a847a084efc915983eb0efa8f">pmicAnomalyAgeSec</a> ()</td></tr>
 <tr class="memitem:a452bb1633016be3c71fffc2fe5d5a0d7" id="r_a452bb1633016be3c71fffc2fe5d5a0d7"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a452bb1633016be3c71fffc2fe5d5a0d7">anonymous_namespace{SensorManager.cpp}::probeTmp112Present</a> (uint8_t addr)</td></tr>
 <tr class="memitem:ac35b035463e7a7aecdfbca21700963da" id="r_ac35b035463e7a7aecdfbca21700963da"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#ac35b035463e7a7aecdfbca21700963da">anonymous_namespace{SensorManager.cpp}::shouldLogBatterySample</a> (<a class="el" href="_sensor_manager_8h.html#acd8eeb965a21d464f1d6ed3ded01cc3e">BatterySampleContext</a> sampleContext)</td></tr>
 </table><table class="memberdecls">
@@ -127,7 +130,44 @@ Variables</h2></td></tr>
 <tr class="memitem:a50d7e96994354eb92f9a78fd8264c3f9" id="r_a50d7e96994354eb92f9a78fd8264c3f9"><td class="memItemLeft">const float&#160;</td><td class="memItemRight"><a class="el" href="namespaceanonymous__namespace_02_sensor_manager_8cpp_03.html#a50d7e96994354eb92f9a78fd8264c3f9">anonymous_namespace{SensorManager.cpp}::AUTHORITATIVE_POST_CONNECT_DELTA_THRESHOLD</a> = 20.0f</td></tr>
 <tr class="memitem:aef74f36dc982b031c818fa1eaed04c92" id="r_aef74f36dc982b031c818fa1eaed04c92"><td class="memItemLeft">const char *&#160;</td><td class="memItemRight"><a class="el" href="#aef74f36dc982b031c818fa1eaed04c92">batteryContext</a> [7]</td></tr>
 <tr class="memitem:a8858da7e857adf69b17865a3ab3d322f" id="r_a8858da7e857adf69b17865a3ab3d322f"><td class="memItemLeft">FuelGauge&#160;</td><td class="memItemRight"><a class="el" href="#a8858da7e857adf69b17865a3ab3d322f">fuelGauge</a></td></tr>
+<tr class="memitem:a9318e68eb5a14e9b684a39baa692b5bb" id="r_a9318e68eb5a14e9b684a39baa692b5bb"><td class="memItemLeft">retained uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#a9318e68eb5a14e9b684a39baa692b5bb">lastPmicAnomalyChargeStatus</a> = 0</td></tr>
+<tr class="memitem:a1873568fc46221829d91a9003a2a80c1" id="r_a1873568fc46221829d91a9003a2a80c1"><td class="memItemLeft">retained time_t&#160;</td><td class="memItemRight"><a class="el" href="#a1873568fc46221829d91a9003a2a80c1">lastPmicAnomalyEpoch</a> = 0</td></tr>
+<tr class="memitem:abe871556b6eed8f902c4d5dfcdeabdf5" id="r_abe871556b6eed8f902c4d5dfcdeabdf5"><td class="memItemLeft">retained uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#abe871556b6eed8f902c4d5dfcdeabdf5">lastPmicAnomalyPowerSource</a> = 0</td></tr>
+<tr class="memitem:a288f19cbbf7c424482bd30d91c004095" id="r_a288f19cbbf7c424482bd30d91c004095"><td class="memItemLeft">retained float&#160;</td><td class="memItemRight"><a class="el" href="#a288f19cbbf7c424482bd30d91c004095">lastPmicAnomalySoc</a> = 0.0f</td></tr>
+<tr class="memitem:a195bce92398e1f883e9b45e8fae03b99" id="r_a195bce92398e1f883e9b45e8fae03b99"><td class="memItemLeft">retained uint32_t&#160;</td><td class="memItemRight"><a class="el" href="#a195bce92398e1f883e9b45e8fae03b99">lastPmicAnomalyUptimeMs</a> = 0</td></tr>
+<tr class="memitem:aa293bed84da237c6e48d63b3a2c496ba" id="r_aa293bed84da237c6e48d63b3a2c496ba"><td class="memItemLeft">retained uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#aa293bed84da237c6e48d63b3a2c496ba">lastPmicAnomalyVbusStatus</a> = 0</td></tr>
+<tr class="memitem:afba24b9114ea2b1b23c79abf6ffab79e" id="r_afba24b9114ea2b1b23c79abf6ffab79e"><td class="memItemLeft">retained time_t&#160;</td><td class="memItemRight"><a class="el" href="#afba24b9114ea2b1b23c79abf6ffab79e">lastTrendEpoch</a> = 0</td></tr>
+<tr class="memitem:aa3bcdefcdd5b5fcf622e667e5619ee8b" id="r_aa3bcdefcdd5b5fcf622e667e5619ee8b"><td class="memItemLeft">retained float&#160;</td><td class="memItemRight"><a class="el" href="#aa3bcdefcdd5b5fcf622e667e5619ee8b">lastTrendSoc</a> = -999.0f</td></tr>
+<tr class="memitem:aa2981ffe6f840a5e9701eb7eb15a625d" id="r_aa2981ffe6f840a5e9701eb7eb15a625d"><td class="memItemLeft">retained float&#160;</td><td class="memItemRight"><a class="el" href="#aa2981ffe6f840a5e9701eb7eb15a625d">lastTrendVcell</a> = -999.0f</td></tr>
+<tr class="memitem:a98ab1817dfc8d4cd547b8797d5a4b48e" id="r_a98ab1817dfc8d4cd547b8797d5a4b48e"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a98ab1817dfc8d4cd547b8797d5a4b48e">pmicAnomalyActive</a> = false</td></tr>
+<tr class="memitem:a4e485e9c12df5bc38b61fb52ea09fdd6" id="r_a4e485e9c12df5bc38b61fb52ea09fdd6"><td class="memItemLeft">retained uint16_t&#160;</td><td class="memItemRight"><a class="el" href="#a4e485e9c12df5bc38b61fb52ea09fdd6">pmicAnomalyCount</a> = 0</td></tr>
+<tr class="memitem:a7da0d9879b783741a1e905c937cebeac" id="r_a7da0d9879b783741a1e905c937cebeac"><td class="memItemLeft">retained uint8_t&#160;</td><td class="memItemRight"><a class="el" href="#a7da0d9879b783741a1e905c937cebeac">staleSocConsecutiveCount</a> = 0</td></tr>
+<tr class="memitem:ae55a73786bacfc6a6997ae7cf99a3ead" id="r_ae55a73786bacfc6a6997ae7cf99a3ead"><td class="memItemLeft">retained uint16_t&#160;</td><td class="memItemRight"><a class="el" href="#ae55a73786bacfc6a6997ae7cf99a3ead">staleSocTotalCount</a> = 0</td></tr>
 </table>
+<a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
+<a id="a66e83d6a847a084efc915983eb0efa8f" name="a66e83d6a847a084efc915983eb0efa8f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a66e83d6a847a084efc915983eb0efa8f">&#9670;&#160;</a></span>pmicAnomalyAgeSec()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint32_t pmicAnomalyAgeSec </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00078">78</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">References <a class="el" href="_sensor_manager_8cpp_source.html#l00028">lastPmicAnomalyEpoch</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00027">lastPmicAnomalyUptimeMs</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00026">pmicAnomalyCount</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01738">publishStartupStatus()</a>, and <a class="el" href="_device_status_publisher_8cpp_source.html#l00023">Cloud::writeDeviceStatusToCloud()</a>.</p>
+
+</div>
+</div>
 <a name="doc-var-members" id="doc-var-members"></a><h2 id="header-doc-var-members" class="groupheader">Variable Documentation</h2>
 <a id="aef74f36dc982b031c818fa1eaed04c92" name="aef74f36dc982b031c818fa1eaed04c92"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aef74f36dc982b031c818fa1eaed04c92">&#9670;&#160;</a></span>batteryContext</h2>
@@ -146,7 +186,7 @@ Variables</h2></td></tr>
 </div><!-- fragment -->
 <p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00003">3</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">SensorManager::batteryState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01148">publishData()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>, and <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01570">publishData()</a>.</p>
 
 </div>
 </div>
@@ -162,9 +202,243 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00021">21</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00023">23</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00432">SensorManager::batteryState()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l01680">SensorManager::runPmicChargeCycleTest()</a>.</p>
+
+</div>
+</div>
+<a id="a9318e68eb5a14e9b684a39baa692b5bb" name="a9318e68eb5a14e9b684a39baa692b5bb"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9318e68eb5a14e9b684a39baa692b5bb">&#9670;&#160;</a></span>lastPmicAnomalyChargeStatus</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">retained uint8_t lastPmicAnomalyChargeStatus = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00030">30</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01738">publishStartupStatus()</a>, and <a class="el" href="_device_status_publisher_8cpp_source.html#l00023">Cloud::writeDeviceStatusToCloud()</a>.</p>
+
+</div>
+</div>
+<a id="a1873568fc46221829d91a9003a2a80c1" name="a1873568fc46221829d91a9003a2a80c1"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1873568fc46221829d91a9003a2a80c1">&#9670;&#160;</a></span>lastPmicAnomalyEpoch</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">retained time_t lastPmicAnomalyEpoch = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00028">28</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00078">pmicAnomalyAgeSec()</a>.</p>
+
+</div>
+</div>
+<a id="abe871556b6eed8f902c4d5dfcdeabdf5" name="abe871556b6eed8f902c4d5dfcdeabdf5"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#abe871556b6eed8f902c4d5dfcdeabdf5">&#9670;&#160;</a></span>lastPmicAnomalyPowerSource</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">retained uint8_t lastPmicAnomalyPowerSource = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00031">31</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01738">publishStartupStatus()</a>, and <a class="el" href="_device_status_publisher_8cpp_source.html#l00023">Cloud::writeDeviceStatusToCloud()</a>.</p>
+
+</div>
+</div>
+<a id="a288f19cbbf7c424482bd30d91c004095" name="a288f19cbbf7c424482bd30d91c004095"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a288f19cbbf7c424482bd30d91c004095">&#9670;&#160;</a></span>lastPmicAnomalySoc</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">retained float lastPmicAnomalySoc = 0.0f</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00029">29</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01738">publishStartupStatus()</a>, and <a class="el" href="_device_status_publisher_8cpp_source.html#l00023">Cloud::writeDeviceStatusToCloud()</a>.</p>
+
+</div>
+</div>
+<a id="a195bce92398e1f883e9b45e8fae03b99" name="a195bce92398e1f883e9b45e8fae03b99"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a195bce92398e1f883e9b45e8fae03b99">&#9670;&#160;</a></span>lastPmicAnomalyUptimeMs</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">retained uint32_t lastPmicAnomalyUptimeMs = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00027">27</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>, and <a class="el" href="_sensor_manager_8cpp_source.html#l00078">pmicAnomalyAgeSec()</a>.</p>
+
+</div>
+</div>
+<a id="aa293bed84da237c6e48d63b3a2c496ba" name="aa293bed84da237c6e48d63b3a2c496ba"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa293bed84da237c6e48d63b3a2c496ba">&#9670;&#160;</a></span>lastPmicAnomalyVbusStatus</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">retained uint8_t lastPmicAnomalyVbusStatus = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00032">32</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01738">publishStartupStatus()</a>, and <a class="el" href="_device_status_publisher_8cpp_source.html#l00023">Cloud::writeDeviceStatusToCloud()</a>.</p>
+
+</div>
+</div>
+<a id="afba24b9114ea2b1b23c79abf6ffab79e" name="afba24b9114ea2b1b23c79abf6ffab79e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#afba24b9114ea2b1b23c79abf6ffab79e">&#9670;&#160;</a></span>lastTrendEpoch</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">retained time_t lastTrendEpoch = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00042">42</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>.</p>
+
+</div>
+</div>
+<a id="aa3bcdefcdd5b5fcf622e667e5619ee8b" name="aa3bcdefcdd5b5fcf622e667e5619ee8b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa3bcdefcdd5b5fcf622e667e5619ee8b">&#9670;&#160;</a></span>lastTrendSoc</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">retained float lastTrendSoc = -999.0f</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00040">40</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>.</p>
+
+</div>
+</div>
+<a id="aa2981ffe6f840a5e9701eb7eb15a625d" name="aa2981ffe6f840a5e9701eb7eb15a625d"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa2981ffe6f840a5e9701eb7eb15a625d">&#9670;&#160;</a></span>lastTrendVcell</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">retained float lastTrendVcell = -999.0f</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00041">41</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>.</p>
+
+</div>
+</div>
+<a id="a98ab1817dfc8d4cd547b8797d5a4b48e" name="a98ab1817dfc8d4cd547b8797d5a4b48e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a98ab1817dfc8d4cd547b8797d5a4b48e">&#9670;&#160;</a></span>pmicAnomalyActive</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool pmicAnomalyActive = false</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00033">33</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>, and <a class="el" href="_device_status_publisher_8cpp_source.html#l00023">Cloud::writeDeviceStatusToCloud()</a>.</p>
+
+</div>
+</div>
+<a id="a4e485e9c12df5bc38b61fb52ea09fdd6" name="a4e485e9c12df5bc38b61fb52ea09fdd6"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4e485e9c12df5bc38b61fb52ea09fdd6">&#9670;&#160;</a></span>pmicAnomalyCount</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">retained uint16_t pmicAnomalyCount = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00026">26</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>, <a class="el" href="_sensor_manager_8cpp_source.html#l00078">pmicAnomalyAgeSec()</a>, <a class="el" href="_generalized-_core-_counter_8cpp_source.html#l01738">publishStartupStatus()</a>, and <a class="el" href="_device_status_publisher_8cpp_source.html#l00023">Cloud::writeDeviceStatusToCloud()</a>.</p>
+
+</div>
+</div>
+<a id="a7da0d9879b783741a1e905c937cebeac" name="a7da0d9879b783741a1e905c937cebeac"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a7da0d9879b783741a1e905c937cebeac">&#9670;&#160;</a></span>staleSocConsecutiveCount</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">retained uint8_t staleSocConsecutiveCount = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00036">36</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>.</p>
+
+</div>
+</div>
+<a id="ae55a73786bacfc6a6997ae7cf99a3ead" name="ae55a73786bacfc6a6997ae7cf99a3ead"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae55a73786bacfc6a6997ae7cf99a3ead">&#9670;&#160;</a></span>staleSocTotalCount</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">retained uint16_t staleSocTotalCount = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="_sensor_manager_8cpp_source.html#l00037">37</a> of file <a class="el" href="_sensor_manager_8cpp_source.html">SensorManager.cpp</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="_sensor_manager_8cpp_source.html#l00503">SensorManager::batteryState()</a>.</p>
 
 </div>
 </div>

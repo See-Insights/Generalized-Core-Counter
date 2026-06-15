@@ -1,5 +1,5 @@
 #include "state/State_Common.h"
-#include "Config.h"
+#include "../Config.h"
 #include "cloud/Cloud.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
@@ -29,6 +29,8 @@ void ensureSensorEnabled(const char* context) {
 
 // IDLE_STATE: Awake, monitoring sensor and deciding what to do next
 void handleIdleState() {
+  setLoopStage(LOOP_STAGE_IDLE_PROCESSING);
+
   if (state != oldState) {
     publishStateTransition();
   }
@@ -42,7 +44,7 @@ void handleIdleState() {
     if (current.get_occupied()) {
       uint32_t debounceMs = sensorConfig.get_sensorSetting1();
       if (debounceMs == 0) {
-        debounceMs = 60000; // default 60s
+        debounceMs = Config::occupancyDebounceMsForRuntime();
       }
 
       uint32_t lastEvent = current.get_lastOccupancyEvent();
@@ -54,14 +56,12 @@ void handleIdleState() {
 
       if (timeSinceLastEvent >= debounceMs) {
         // Debounce timeout expired - space is now unoccupied
-        uint32_t sessionDuration = Time.now() - current.get_occupancyStartTime();
-        uint32_t totalOccupied = current.get_totalOccupiedSeconds() + sessionDuration;
         const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
-        current.set_totalOccupiedSeconds(totalOccupied);
-        current.set_occupied(false);
-        current.set_occupancyStartTime(0);
+        const OccupancyCloseResult closeResult = closeOccupancySessionSafely("idle");
         signalLED(false);  // Turn off LED
-        logUnoccupiedEvent("debounce", sessionDuration, totalOccupied, reportNow);
+        if (closeResult.valid) {
+          logUnoccupiedEvent("debounce", closeResult.sessionSeconds, closeResult.totalSeconds, reportNow);
+        }
         
         // In INTERMITTENT_KEEP_ALIVE mode (connectionMode 3), report immediately
         // on occupancy transitions. In other modes, occupancy transitions are
@@ -103,7 +103,9 @@ void handleIdleState() {
   // When the park is closed, it should disconnect, power down the sensor, and
   // deep-sleep until the next opening time.
   if (Time.isValid() && sysStatus.get_connectionMode() == CONNECTED) {
-    if (!isWithinOpenHours()) {
+    const bool openNow = isWithinOpenHours();
+    logTimeDiag(openNow);
+    if (!openNow) {
       Log.info("CONNECTED mode: park CLOSED - transitioning to SLEEPING_STATE for overnight sleep");
       state = SLEEPING_STATE;
       return;
@@ -118,10 +120,7 @@ void handleIdleState() {
   if (sysStatus.get_sensorMode() == MEASUREMENT) {
     if (Time.isValid()) {
       static time_t lastScheduledSample = 0;
-      uint16_t intervalSec = sysStatus.get_reportingInterval();
-      if (intervalSec == 0) {
-        intervalSec = 3600; // Fallback to 1 hour
-      }
+      uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
 
       time_t now = Time.now();
       if (lastScheduledSample == 0 || (now - lastScheduledSample) >= intervalSec) {
@@ -167,10 +166,7 @@ void handleIdleState() {
         sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
       // Skip periodic reporting while occupied in this mode.
     } else {
-    uint16_t intervalSec = sysStatus.get_reportingInterval();
-    if (intervalSec == 0) {
-      intervalSec = 3600; // Fallback to 1 hour
-    }
+    uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
 
     time_t now = Time.now();
     time_t lastReport = sysStatus.get_lastReport();

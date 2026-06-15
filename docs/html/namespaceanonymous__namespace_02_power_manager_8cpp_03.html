@@ -26,7 +26,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;11.0.0</span>
+   <div id="projectname">Generalized-Core-Counter<span id="projectnumber">&#160;19</span>
    </div>
    <div id="projectbrief">Particle-based generalized core counter firmware</div>
   </td>
@@ -95,7 +95,6 @@ $(function(){initNavTree('namespaceanonymous__namespace_02_power_manager_8cpp_03
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:a4b41efac56e70a8707ad53c066ad8ea5" id="r_a4b41efac56e70a8707ad53c066ad8ea5"><td class="memItemLeft">const char *&#160;</td><td class="memItemRight"><a class="el" href="#a4b41efac56e70a8707ad53c066ad8ea5">compactProfileLabel</a> (<a class="el" href="_power_manager_8h.html#abc3d13c7b58b63381698ef85e244366f">PowerInputProfile</a> profile)</td></tr>
 <tr class="memitem:a9c7b27719e9a0067176aea9df8651605" id="r_a9c7b27719e9a0067176aea9df8651605"><td class="memItemLeft"><a class="el" href="_power_manager_8h.html#abc3d13c7b58b63381698ef85e244366f">PowerInputProfile</a>&#160;</td><td class="memItemRight"><a class="el" href="#a9c7b27719e9a0067176aea9df8651605">configuredFallbackProfile</a> ()</td></tr>
 <tr class="memitem:aca3326c72903ef9d6c1e4a9038cfba37" id="r_aca3326c72903ef9d6c1e4a9038cfba37"><td class="memItemLeft"><a class="el" href="_power_manager_8h.html#abc3d13c7b58b63381698ef85e244366f">PowerInputProfile</a>&#160;</td><td class="memItemRight"><a class="el" href="#aca3326c72903ef9d6c1e4a9038cfba37">selectInputProfile</a> (const <a class="el" href="struct_power_platform_1_1_power_source_snapshot.html">PowerPlatform::PowerSourceSnapshot</a> &amp;snapshot, <a class="el" href="_power_manager_8h.html#abc3d13c7b58b63381698ef85e244366f">PowerInputProfile</a> fallbackProfile, <a class="el" href="_power_manager_8h.html#abc3d13c7b58b63381698ef85e244366f">PowerInputProfile</a> lastAppliedProfile, <a class="el" href="_power_manager_8h.html#a7e2fca206adf1ac16ac2e0f95ea6791b">PowerProfileSelectionReason</a> &amp;reason)</td></tr>
 <tr class="memitem:ad8df3828526fad5c70b88814b780545b" id="r_ad8df3828526fad5c70b88814b780545b"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ad8df3828526fad5c70b88814b780545b">shouldLogProfileDecision</a> (const <a class="el" href="struct_power_report.html">PowerReport</a> &amp;previousReport, const <a class="el" href="struct_power_report.html">PowerReport</a> &amp;nextReport)</td></tr>
@@ -109,27 +108,6 @@ Variables</h2></td></tr>
 <tr class="memitem:aac2ac6a88a5a0f338c72161e86cc8755" id="r_aac2ac6a88a5a0f338c72161e86cc8755"><td class="memItemLeft">constexpr int&#160;</td><td class="memItemRight"><a class="el" href="#aac2ac6a88a5a0f338c72161e86cc8755">kPowerSourceVin</a> = 1</td></tr>
 </table>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
-<a id="a4b41efac56e70a8707ad53c066ad8ea5" name="a4b41efac56e70a8707ad53c066ad8ea5"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a4b41efac56e70a8707ad53c066ad8ea5">&#9670;&#160;</a></span>compactProfileLabel()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">const char * anonymous_namespace{PowerManager.cpp}::compactProfileLabel </td>
-          <td>(</td>
-          <td class="paramtype"><a class="el" href="_power_manager_8h.html#abc3d13c7b58b63381698ef85e244366f">PowerInputProfile</a></td>          <td class="paramname"><span class="paramname"><em>profile</em></span></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p class="definition">Definition at line <a class="el" href="_power_manager_8cpp_source.html#l00067">67</a> of file <a class="el" href="_power_manager_8cpp_source.html">PowerManager.cpp</a>.</p>
-
-<p class="reference">References <a class="el" href="_power_manager_8h_source.html#l00052">NotApplicable</a>, <a class="el" href="_power_manager_8h_source.html#l00050">Solar35W</a>, and <a class="el" href="_power_manager_8h_source.html#l00049">UsbBench</a>.</p>
-
-</div>
-</div>
 <a id="a9c7b27719e9a0067176aea9df8651605" name="a9c7b27719e9a0067176aea9df8651605"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a9c7b27719e9a0067176aea9df8651605">&#9670;&#160;</a></span>configuredFallbackProfile()</h2>
 
@@ -182,7 +160,7 @@ Variables</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_power_manager_8cpp_source.html#l00025">25</a> of file <a class="el" href="_power_manager_8cpp_source.html">PowerManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_power_manager_8h_source.html#l00063">BatteryFallback</a>, <a class="el" href="_power_manager_8h_source.html#l00062">BatteryKeepLast</a>, <a class="el" href="_power_manager_8cpp_source.html#l00014">kPowerSourceBattery</a>, <a class="el" href="_power_manager_8cpp_source.html#l00012">kPowerSourceUsbAdapter</a>, <a class="el" href="_power_manager_8cpp_source.html#l00011">kPowerSourceUsbHost</a>, <a class="el" href="_power_manager_8cpp_source.html#l00013">kPowerSourceUsbOtg</a>, <a class="el" href="_power_manager_8cpp_source.html#l00010">kPowerSourceVin</a>, <a class="el" href="_power_manager_8h_source.html#l00052">NotApplicable</a>, <a class="el" href="_power_manager_8h_source.html#l00050">Solar35W</a>, <a class="el" href="_power_platform_8h_source.html#l00011">PowerPlatform::PowerSourceSnapshot::source</a>, <a class="el" href="_power_manager_8h_source.html#l00064">UnknownSourceFallback</a>, <a class="el" href="_power_manager_8h_source.html#l00049">UsbBench</a>, <a class="el" href="_power_manager_8h_source.html#l00060">UsbPowerSource</a>, and <a class="el" href="_power_manager_8h_source.html#l00061">VinPowerSource</a>.</p>
+<p class="reference">References <a class="el" href="_power_manager_8h_source.html#l00063">BatteryFallback</a>, <a class="el" href="_power_manager_8h_source.html#l00062">BatteryKeepLast</a>, <a class="el" href="_power_manager_8cpp_source.html#l00014">kPowerSourceBattery</a>, <a class="el" href="_power_manager_8cpp_source.html#l00012">kPowerSourceUsbAdapter</a>, <a class="el" href="_power_manager_8cpp_source.html#l00011">kPowerSourceUsbHost</a>, <a class="el" href="_power_manager_8cpp_source.html#l00013">kPowerSourceUsbOtg</a>, <a class="el" href="_power_manager_8cpp_source.html#l00010">kPowerSourceVin</a>, <a class="el" href="_power_manager_8h_source.html#l00052">NotApplicable</a>, <a class="el" href="_power_manager_8h_source.html#l00050">Solar35W</a>, <a class="el" href="_power_platform_8h_source.html#l00011">PowerPlatform::PowerSourceSnapshot::source</a>, <a class="el" href="_power_manager_8h_source.html#l00065">UnknownSourceFallback</a>, <a class="el" href="_power_manager_8h_source.html#l00064">UnknownSourceKeepLast</a>, <a class="el" href="_power_manager_8h_source.html#l00049">UsbBench</a>, <a class="el" href="_power_manager_8h_source.html#l00060">UsbPowerSource</a>, and <a class="el" href="_power_manager_8h_source.html#l00061">VinPowerSource</a>.</p>
 
 </div>
 </div>
@@ -207,7 +185,7 @@ Variables</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="_power_manager_8cpp_source.html#l00056">56</a> of file <a class="el" href="_power_manager_8cpp_source.html">PowerManager.cpp</a>.</p>
 
-<p class="reference">References <a class="el" href="_power_manager_8h_source.html#l00134">PowerReport::activeInputProfile</a>, <a class="el" href="_power_manager_8h_source.html#l00135">PowerReport::inputProfileReason</a>, <a class="el" href="_power_manager_8h_source.html#l00137">PowerReport::inputProfileStatus</a>, <a class="el" href="_power_manager_8h_source.html#l00138">PowerReport::powerConfigurationResult</a>, <a class="el" href="_power_manager_8h_source.html#l00096">PowerReading::powerSource</a>, <a class="el" href="_power_manager_8h_source.html#l00131">PowerReport::reading</a>, and <a class="el" href="_power_manager_8h_source.html#l00129">PowerReport::valid</a>.</p>
+<p class="reference">References <a class="el" href="_power_manager_8h_source.html#l00135">PowerReport::activeInputProfile</a>, <a class="el" href="_power_manager_8h_source.html#l00136">PowerReport::inputProfileReason</a>, <a class="el" href="_power_manager_8h_source.html#l00138">PowerReport::inputProfileStatus</a>, <a class="el" href="_power_manager_8h_source.html#l00139">PowerReport::powerConfigurationResult</a>, <a class="el" href="_power_manager_8h_source.html#l00097">PowerReading::powerSource</a>, <a class="el" href="_power_manager_8h_source.html#l00132">PowerReport::reading</a>, and <a class="el" href="_power_manager_8h_source.html#l00130">PowerReport::valid</a>.</p>
 
 </div>
 </div>

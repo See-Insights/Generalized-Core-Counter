@@ -1,4 +1,28 @@
 var _cloud_8cpp =
 [
-    [ "FIRMWARE_VERSION", "_cloud_8cpp.html#acf025b054301360475a0ec4542f74ff3", null ]
+    [ "anonymous_namespace{Cloud.cpp}::LedgerRequestRecord", "structanonymous__namespace_02_cloud_8cpp_03_1_1_ledger_request_record.html", "structanonymous__namespace_02_cloud_8cpp_03_1_1_ledger_request_record" ],
+    [ "anonymous_namespace{Cloud.cpp}::currentLedgerOldestAgeMs", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#a9a01249811600768cae3ed11f6331a6e", null ],
+    [ "anonymous_namespace{Cloud.cpp}::currentLedgerPendingCount", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#a583f8f0ca3d8bcf8c839c8018f882994", null ],
+    [ "anonymous_namespace{Cloud.cpp}::finalizeLedgerAppliedConfig", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#a8131799e0f2e79b89585a0880e818264", null ],
+    [ "anonymous_namespace{Cloud.cpp}::findOldestRequestOfKind", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#a296a2a5863a3636dfb5f264f0e4a56b6", null ],
+    [ "anonymous_namespace{Cloud.cpp}::findRequestByPointer", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#a99abac0496d17656dd25a3a9e48874f0", null ],
+    [ "anonymous_namespace{Cloud.cpp}::findRequestBySeq", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#a803653d43347058704bbc24223cc8bdf", null ],
+    [ "anonymous_namespace{Cloud.cpp}::ledgerHasUnsyncedWriteForDiag", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#aeb5df6b937be5b77475de35b58491da1", null ],
+    [ "anonymous_namespace{Cloud.cpp}::ledgerRequestKindLabel", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#a2b76a9b60d69d9427a3003351658dd31", null ],
+    [ "anonymous_namespace{Cloud.cpp}::ledgerRequestSourceLabel", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#ad3a35b3ec63de6f581eb0a09de461501", null ],
+    [ "anonymous_namespace{Cloud.cpp}::logActiveLedgerRequests", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#a447942a151a1f7b342f615c8e95bd589", null ],
+    [ "anonymous_namespace{Cloud.cpp}::logConfigApplySnapshot", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#ad0e1dd25241800e858fa6da488613017", null ],
+    [ "anonymous_namespace{Cloud.cpp}::logConfigDiagFailure", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#ac82fb995a402f562b9da5ab21a419fb3", null ],
+    [ "anonymous_namespace{Cloud.cpp}::maybeLogLedgerDrainSummary", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#a59c72657d7531f9960b3f962e37ed250", null ],
+    [ "anonymous_namespace{Cloud.cpp}::removeLedgerRequest", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#a15396b6161f75e1f373486cf1437fa5d", null ],
+    [ "anonymous_namespace{Cloud.cpp}::updateCompletedAgeStats", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#aab2b80b19f9d473e205da24d77e3a9ce", null ],
+    [ "anonymous_namespace{Cloud.cpp}::LEDGER_REQUEST_TRACKER_MAX", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#acb581fafa68c2b21da62c253fdabb265", null ],
+    [ "anonymous_namespace{Cloud.cpp}::ledgerCompletedAgeMaxMs", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#ab9bdb4aae321e1d992d3c9cf458c42c2", null ],
+    [ "anonymous_namespace{Cloud.cpp}::ledgerCompletedAgeMinMs", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#a0ffe163208b049b57d65c2c006c0ff69", null ],
+    [ "anonymous_namespace{Cloud.cpp}::ledgerCompletedAgeValid", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#a8eb73589cc2e882e3409e9a69ca65b62", null ],
+    [ "anonymous_namespace{Cloud.cpp}::ledgerDrainActive", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#aa63d01029f878f2c64e9e75b9686a3df", null ],
+    [ "anonymous_namespace{Cloud.cpp}::ledgerDrainStartMs", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#a4ba5deb7059eff85287b4e4db670fcbb", null ],
+    [ "anonymous_namespace{Cloud.cpp}::ledgerRequestCount", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#a2942c57380a661fe0b4491755bf5d518", null ],
+    [ "anonymous_namespace{Cloud.cpp}::ledgerRequests", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#a15f49d90523b35bd5c00a2abf5fd67db", null ],
+    [ "anonymous_namespace{Cloud.cpp}::ledgerRequestSequence", "namespaceanonymous__namespace_02_cloud_8cpp_03.html#af2e830aeaad43513415a0255689b1e65", null ]
 ];

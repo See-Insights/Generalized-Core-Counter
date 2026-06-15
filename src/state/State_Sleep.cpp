@@ -1,10 +1,9 @@
 #include "BuildProfile.h"
 #include "state/State_Common.h"
-#include "Config.h"
+#include "../Config.h"
 #include "cloud/Cloud.h"
 #include "power/Connectivity.h"
 #include "power/ConnectivityPolicy.h"
-#include "time/LocalTimeCache.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
 #include "PublishQueuePosixRK.h"
@@ -81,6 +80,14 @@ void logTeardownContext(const char *prefix,
            current.get_occupied() ? 1 : 0);
 }
 
+// Drain USB CDC serial buffer before sleep to prevent split log lines (bench testing only)
+void drainSerialBeforeSleep() {
+  if (Serial.isConnected()) {
+    Serial.flush();
+    delay(75);
+  }
+}
+
 void markModemUnstable(ModemUnstableReason reason, unsigned long elapsedMs) {
   const bool reasonChanged = !session.modemUnstable ||
                              session.modemUnstableReason != (uint8_t)reason;
@@ -150,6 +157,150 @@ unsigned long computeCloudSyncTimeoutMs(uint16_t queueDepth) {
   return queueAwareTimeoutMs;
 }
 
+constexpr unsigned long kGateBlockLogThresholdMs = 10000UL;
+
+constexpr uint8_t kGateBlockerQueue = 0x01;
+constexpr uint8_t kGateBlockerLedger = 0x02;
+constexpr uint8_t kGateBlockerWebhook = 0x04;
+constexpr uint8_t kGateBlockerUpdate = 0x08;
+constexpr uint8_t kGateBlockerUninitialized = 0xFF;
+
+const char *gateBlockerReasonLabel(uint8_t blockerMask) {
+  switch (blockerMask) {
+  case 0x00:
+    return "none";
+  case kGateBlockerQueue:
+    return "queue";
+  case kGateBlockerLedger:
+    return "ledger";
+  case kGateBlockerQueue | kGateBlockerLedger:
+    return "queue+ledger";
+  case kGateBlockerWebhook:
+    return "webhook";
+  case kGateBlockerQueue | kGateBlockerWebhook:
+    return "queue+webhook";
+  case kGateBlockerLedger | kGateBlockerWebhook:
+    return "ledger+webhook";
+  case kGateBlockerQueue | kGateBlockerLedger | kGateBlockerWebhook:
+    return "queue+ledger+webhook";
+  case kGateBlockerUpdate:
+    return "update";
+  case kGateBlockerQueue | kGateBlockerUpdate:
+    return "queue+update";
+  case kGateBlockerLedger | kGateBlockerUpdate:
+    return "ledger+update";
+  case kGateBlockerQueue | kGateBlockerLedger | kGateBlockerUpdate:
+    return "queue+ledger+update";
+  case kGateBlockerWebhook | kGateBlockerUpdate:
+    return "webhook+update";
+  case kGateBlockerQueue | kGateBlockerWebhook | kGateBlockerUpdate:
+    return "queue+webhook+update";
+  case kGateBlockerLedger | kGateBlockerWebhook | kGateBlockerUpdate:
+    return "ledger+webhook+update";
+  case kGateBlockerQueue | kGateBlockerLedger | kGateBlockerWebhook |
+      kGateBlockerUpdate:
+    return "queue+ledger+webhook+update";
+  default:
+    return "unknown";
+  }
+}
+
+#if PLATFORM_ID == PLATFORM_BORON
+bool isDeviceOsAtLeast6400() {
+  int major = 0;
+  int minor = 0;
+  int patch = 0;
+  const String version = System.version();
+  if (sscanf(version.c_str(), "%d.%d.%d", &major, &minor, &patch) < 2) {
+    return false;
+  }
+
+  if (major > 6) {
+    return true;
+  }
+  if (major < 6) {
+    return false;
+  }
+  return minor >= 4;
+}
+
+bool isRtcTimeValidForHibernate(time_t rtcNow) {
+  static const time_t kRtcMin = 1704067200; // 2024-01-01 00:00:00 UTC
+  static const time_t kRtcMax = 2051222400; // 2035-01-01 00:00:00 UTC
+  return rtcNow >= kRtcMin && rtcNow < kRtcMax;
+}
+
+bool clearAb1805StaleAlarmInterrupts() {
+  static const uint8_t kRegStatus = 0x0f;
+  static const uint8_t kRegIntMask = 0x12;
+  static const uint8_t kMaskAieTie = 0x0c;
+
+  uint8_t intMask = 0;
+  if (!ab1805.readRegister(kRegIntMask, intMask)) {
+    return false;
+  }
+
+  // Clear stale interrupt flags before arming the next one-shot alarm.
+  if (!ab1805.writeRegister(kRegStatus, 0x00)) {
+    return false;
+  }
+
+  intMask = (uint8_t)(intMask & (uint8_t)~kMaskAieTie);
+  if (!ab1805.writeRegister(kRegIntMask, intMask)) {
+    return false;
+  }
+
+  if (!ab1805.maskRegister(
+        AB1805::REG_TIMER_CTRL,
+        (uint8_t)~AB1805::REG_TIMER_CTRL_RPT_MASK,
+        AB1805::REG_TIMER_CTRL_RPT_DIS)) {
+    return false;
+  }
+
+  return true;
+}
+
+bool shouldUseBoronRtcAlarmHibernate(uint32_t requestedSleepSec, time_t &rtcNow) {
+  Log.info("HibernateDiag: check enabled=%d requested=%lu",
+           sysStatus.get_enableHibernateSleep() ? 1 : 0,
+           (unsigned long)requestedSleepSec);
+  if (!sysStatus.get_enableHibernateSleep()) {
+    Log.info("HibernateDiag: fail=disabled");
+    return false;
+  }
+
+  if (!isDeviceOsAtLeast6400()) {
+    Log.info("HibernateDiag: fail=device_os");
+    return false;
+  }
+
+  static const uint32_t kMinHibernateSleepSec = 900;
+  static const uint32_t kMaxHibernateSleepSec = 36000;
+  if (requestedSleepSec < kMinHibernateSleepSec || requestedSleepSec > kMaxHibernateSleepSec) {
+    Log.info("HibernateDiag: fail=duration requested=%lu", (unsigned long)requestedSleepSec);
+    return false;
+  }
+
+  if (!ab1805.isRTCSet()) {
+    Log.info("HibernateDiag: fail=rtc_not_set");
+    return false;
+  }
+
+  if (!ab1805.getRtcAsTime(rtcNow)) {
+    Log.info("HibernateDiag: fail=rtc_read");
+    return false;
+  }
+
+  if (!isRtcTimeValidForHibernate(rtcNow)) {
+    Log.info("HibernateDiag: fail=rtc_invalid epoch=%ld", (long)rtcNow);
+    return false;
+  }
+
+  Log.info("HibernateDiag: pass epoch=%ld", (long)rtcNow);
+  return true;
+}
+#endif
+
 } // namespace
 
 // NOTE:
@@ -161,14 +312,16 @@ unsigned long computeCloudSyncTimeoutMs(uint16_t queueDepth) {
  * ...
  */
 void handleSleepingState() {
+  setLoopStage(LOOP_STAGE_SLEEP_PREP);
+
   bool enteredState = (state != oldState);
   static bool operationsCompleteLogged = false;  // Track if we've logged completion message
   static bool gateWasBlocking = false;
   static unsigned long lastGateStatusLogMs = 0;
+  static uint8_t lastGateBlockerMask = kGateBlockerUninitialized;
+  static uint8_t lastGateBlockerBeforeRelease = 0;
+  static bool gateReleaseReasonKnown = false;
   static bool cloudDisconnectCompleteLogged = false;
-#if CONNECTIVITY_FAILSAFE_TEST_MODE
-  bool hibernateFallbackThisPass = false;
-#endif
 #if HAL_PLATFORM_CELLULAR
   static bool preserveStandbyAfterNormalReturn = false;
   static bool forceModemOffAfterStandbyFailure = false;
@@ -184,6 +337,9 @@ void handleSleepingState() {
     operationsCompleteLogged = false;  // Reset flag on state entry
     gateWasBlocking = false;
     lastGateStatusLogMs = 0;
+    lastGateBlockerMask = kGateBlockerUninitialized;
+    lastGateBlockerBeforeRelease = 0;
+    gateReleaseReasonKnown = false;
     cloudDisconnectCompleteLogged = false;
   #if Wiring_Cellular
     radioOffCompleteLogged = false;
@@ -226,7 +382,7 @@ void handleSleepingState() {
   // mode so we stay awake/connected and resume counting.
   if (Time.isValid() && sysStatus.get_connectionMode() == CONNECTED && isWithinOpenHours()) {
     ensureSensorEnabled("SLEEP abort: CONNECTED+OPEN");
-    state = IDLE_STATE;
+    transitionTo(IDLE_STATE, "sleep-abort-open-hours");
     return;
   }
 
@@ -247,6 +403,7 @@ void handleSleepingState() {
   static unsigned long cloudSyncStartMs = 0;
   static unsigned long cloudSyncBudgetMs = 0;
   static uint16_t cloudSyncMaxQueueDepth = 0;
+  static uint16_t lastQueueDepth = 0xFFFF;
 
   // ********** Non-blocking disconnect + modem power-down **********
   // Device OS already manages the asynchronous cloud session teardown once
@@ -258,6 +415,8 @@ void handleSleepingState() {
   static unsigned long cloudDisconnectStartMs = 0;
   static unsigned long cloudDisconnectElapsedMs = 0;
   static unsigned long modemOffElapsedMs = 0;
+  static unsigned long lastDisconnectProgressMs = 0;
+  static unsigned long lastGateProgressMs = 0;
 #if Wiring_WiFi
   static bool wifiOffGuardActive = false;
   static unsigned long wifiOffGuardStartMs = 0;
@@ -273,6 +432,9 @@ void handleSleepingState() {
     modemOffElapsedMs = 0;
     cloudSyncBudgetMs = 0;
     cloudSyncMaxQueueDepth = 0;
+    lastQueueDepth = 0xFFFF;
+    lastDisconnectProgressMs = 0;
+    lastGateProgressMs = 0;
 #if Wiring_WiFi
     wifiOffGuardActive = false;
     wifiOffGuardStartMs = 0;
@@ -302,6 +464,10 @@ void handleSleepingState() {
     bool queueEmpty = PublishQueuePosix::instance().getCanSleep();
     bool configLedgersSynced = Cloud::instance().areLedgersSynced();
     bool outputLedgersSynced = !Cloud::instance().hasPendingOutputLedgerSync();
+    Cloud::LedgerSyncDiagnostics ledgerDiagnostics = Cloud::instance().ledgerSyncDiagnostics();
+  #if !ENABLE_GATE_TRACE
+    (void)ledgerDiagnostics;
+  #endif
     bool ledgersSynced = configLedgersSynced && outputLedgersSynced;
     bool updatesChecked = !System.updatesPending();
     bool webhookConfirmed = !session.awaitingWebhookResponse;
@@ -319,7 +485,6 @@ void handleSleepingState() {
     }
 
     {
-      static uint16_t lastQueueDepth = 0xFFFF;
       if (lastQueueDepth != 0xFFFF && queueDepth < lastQueueDepth) {
         thrashGuard.markProgress("QUEUE_DRAIN");
       }
@@ -334,10 +499,61 @@ void handleSleepingState() {
       const int ledgerPending = ledgersSynced ? 0 : 1;
       const int webhookPending = webhookConfirmed ? 0 : 1;
       const int updatePending = updatesChecked ? 0 : 1;
+      uint8_t blockerMask = 0;
+      if (queuePending) {
+        blockerMask |= kGateBlockerQueue;
+      }
+      if (ledgerPending) {
+        blockerMask |= kGateBlockerLedger;
+      }
+      if (webhookPending) {
+        blockerMask |= kGateBlockerWebhook;
+      }
+      if (updatePending) {
+        blockerMask |= kGateBlockerUpdate;
+      }
+      if (blockerMask != 0) {
+        lastGateBlockerBeforeRelease = blockerMask;
+        gateReleaseReasonKnown = true;
+      }
+
+      if (elapsedMs > kGateBlockLogThresholdMs &&
+          lastGateBlockerMask != blockerMask) {
+        if (ledgerPending) {
+#if ENABLE_GATE_TRACE
+          Log.info("GateDetail: wait=%lu ledger=%d pending=%u syncing=%d inflight=%d reason=%s",
+                   elapsedMs,
+                   ledgerPending,
+                   ledgerDiagnostics.pendingCount,
+                   ledgerDiagnostics.syncing ? 1 : 0,
+                   ledgerDiagnostics.inflight ? 1 : 0,
+                   gateBlockerReasonLabel(blockerMask));
+          Log.info("GateDetailState: config=%d output=%d queued=%d statusSync=%d dataSync=%d statusInflight=%d dataInflight=%d",
+                   configLedgersSynced ? 1 : 0,
+                   outputLedgersSynced ? 1 : 0,
+                   ledgerDiagnostics.pendingStatusPublish ? 1 : 0,
+                   ledgerDiagnostics.pendingDeviceStatusSync ? 1 : 0,
+                   ledgerDiagnostics.pendingDeviceDataSync ? 1 : 0,
+                   ledgerDiagnostics.statusInflight ? 1 : 0,
+                   ledgerDiagnostics.dataInflight ? 1 : 0);
+#endif
+        }
+#if ENABLE_GATE_TRACE
+        Log.info("GateBlock: wait=%lu reason=%s q=%d ledger=%d webhook=%d update=%d",
+                 elapsedMs,
+                 gateBlockerReasonLabel(blockerMask),
+                 queuePending,
+                 ledgerPending,
+                 webhookPending,
+                 updatePending);
+#endif
+        lastGateBlockerMask = blockerMask;
+      }
 
       if (elapsedMs < cloudSyncBudgetMs) {
         if (!gateWasBlocking ||
             (millis() - lastGateStatusLogMs) >= ConnectivityPolicy::CLOUD_OPS_STATUS_LOG_INTERVAL_MS) {
+#if ENABLE_GATE_TRACE
           Log.info("Gate: q=%d ledger=%d webhook=%d update=%d wait=%lu/%lu",
                    queuePending,
                    ledgerPending,
@@ -345,11 +561,13 @@ void handleSleepingState() {
                    updatePending,
                    elapsedMs,
                    cloudSyncBudgetMs);
+#endif
           gateWasBlocking = true;
           lastGateStatusLogMs = millis();
         }
         // Mark progress to prevent ThrashGuard timeout during legitimate cloud operations wait
         thrashGuard.markProgress("CLOUD_OPS_WAIT");
+        serviceAwakeWatchdog();
         Particle.process(); // Keep connection alive
         return; // Stay in SLEEPING_STATE until complete or timeout
       }
@@ -366,6 +584,9 @@ void handleSleepingState() {
           updatePending);
        gateWasBlocking = false;
        lastGateStatusLogMs = 0;
+       lastGateBlockerMask = kGateBlockerUninitialized;
+       lastGateBlockerBeforeRelease = 0;
+       gateReleaseReasonKnown = false;
 
       // Only raise one alert - check in priority order (queue > ledger > updates > webhook)
       if (!queueEmpty) {
@@ -389,11 +610,39 @@ void handleSleepingState() {
       cloudSyncBudgetMs = 0;
       cloudSyncMaxQueueDepth = 0;
     } else {
+      unsigned long gateWaitMs = millis() - cloudSyncStartMs;
+      if (gateWaitMs > kGateBlockLogThresholdMs && lastGateBlockerMask != 0) {
+#if ENABLE_GATE_TRACE
+        Log.info("GateBlock: wait=%lu reason=none q=0 ledger=0 webhook=0 update=0",
+                 gateWaitMs);
+#endif
+        lastGateBlockerMask = 0;
+      }
       if (gateWasBlocking) {
-        Log.info("Gate: ok wait=%lu", millis() - cloudSyncStartMs);
+        Cloud::LedgerSyncDiagnostics ledgerDiagnosticsRelease = Cloud::instance().ledgerSyncDiagnostics();
+#if ENABLE_GATE_TRACE
+        Log.info("GateReleaseDetail: wait=%lu pending=%u syncing=%d inflight=%d reason=%s",
+                 gateWaitMs,
+                 ledgerDiagnosticsRelease.pendingCount,
+                 ledgerDiagnosticsRelease.syncing ? 1 : 0,
+                 ledgerDiagnosticsRelease.inflight ? 1 : 0,
+                 gateReleaseReasonKnown
+                     ? gateBlockerReasonLabel(lastGateBlockerBeforeRelease)
+                     : "unknown");
+#endif
+        (void)ledgerDiagnosticsRelease;
+        Log.info("GateRelease: wait=%lu reason=%s",
+                 gateWaitMs,
+                 gateReleaseReasonKnown
+                     ? gateBlockerReasonLabel(lastGateBlockerBeforeRelease)
+                     : "unknown");
+        Log.info("Gate: ok wait=%lu", gateWaitMs);
       }
       gateWasBlocking = false;
       lastGateStatusLogMs = 0;
+      lastGateBlockerMask = kGateBlockerUninitialized;
+      lastGateBlockerBeforeRelease = 0;
+      gateReleaseReasonKnown = false;
       // All operations complete - reset timer and proceed
       cloudSyncStartMs = 0;
       cloudSyncBudgetMs = 0;
@@ -417,6 +666,9 @@ void handleSleepingState() {
     cloudSyncStartMs = 0;
     cloudSyncBudgetMs = 0;
     cloudSyncMaxQueueDepth = 0;
+    lastGateBlockerMask = kGateBlockerUninitialized;
+    lastGateBlockerBeforeRelease = 0;
+    gateReleaseReasonKnown = false;
   }
 
   // If we're going to sleep with cellular network standby, do NOT wait for radio-off.
@@ -540,7 +792,7 @@ void handleSleepingState() {
       markModemUnstable(MODEM_UNSTABLE_REASON_SLOW_TEARDOWN,
                         (unsigned long)(millis() - disconnectRequestStartMs));
       current.raiseAlert(15);
-      state = ERROR_STATE;
+      transitionTo(ERROR_STATE, "sleep-disconnect-timeout");
       disconnectRequested = false;
       disconnectRequestStartMs = 0;
       cloudDisconnectStartMs = 0;
@@ -555,12 +807,12 @@ void handleSleepingState() {
 
     // Help DeviceOS make progress on the disconnect.
     // Throttle progress markers to avoid noisy per-loop updates.
-    static unsigned long lastDisconnectProgressMs = 0;
     unsigned long nowMs = millis();
     if ((nowMs - lastDisconnectProgressMs) > 1000UL) {
       thrashGuard.markProgress("DISCONNECT_WAIT");
       lastDisconnectProgressMs = nowMs;
     }
+    serviceAwakeWatchdog();
     Particle.process();
     return;
   }
@@ -594,6 +846,8 @@ void handleSleepingState() {
     cloudDisconnectElapsedMs = 0;
     modemOffElapsedMs = 0;
   }
+
+  setAppBreadcrumb(18);
 
   // Enforce sleep preconditions before any final sleep call in this state.
   // Non-standby cellular sleep requires both cloud disconnect and radio/modem off.
@@ -658,7 +912,7 @@ void handleSleepingState() {
                useNetworkStandbyEffective ? 1 : 0);
       markModemUnstable(MODEM_UNSTABLE_REASON_SLOW_TEARDOWN, elapsedMs);
       current.raiseAlert(15);
-      state = ERROR_STATE;
+      transitionTo(ERROR_STATE, "sleep-precondition-timeout");
       disconnectRequested = false;
       disconnectRequestStartMs = 0;
       cloudDisconnectStartMs = 0;
@@ -671,18 +925,22 @@ void handleSleepingState() {
       return;
     }
 
-    static unsigned long lastGateProgressMs = 0;
     unsigned long nowMs = millis();
     if ((nowMs - lastGateProgressMs) > 1000UL) {
       thrashGuard.markProgress("DISCONNECT_WAIT");
       lastGateProgressMs = nowMs;
     }
+    serviceAwakeWatchdog();
     Particle.process();
     return;
   }
 
+  setAppBreadcrumb(19);
+
   int nightSleepSec = -1;
-  if (!isWithinOpenHours()) {
+  const bool openNow = isWithinOpenHours();
+  logTimeDiag(openNow);
+  if (!openNow) {
     // Notify sensor layer we are entering full night sleep so sensors and
     // indicator LEDs can be powered down. During daytime naps we keep
     // interrupt-driven sensors (like PIR) powered so they can wake the
@@ -692,7 +950,7 @@ void handleSleepingState() {
     // ********** Night sleep (outside opening hours) **********
     nightSleepSec = secondsUntilNextOpen();
     if (nightSleepSec <= 0) {
-      nightSleepSec = 3600; // Fallback
+      nightSleepSec = Config::DEFAULT_REPORT_INTERVAL_SEC;
     }
 
     // Device OS maximum sleep duration is 546 minutes (~9.1 hours).
@@ -719,67 +977,14 @@ void handleSleepingState() {
     }
 #endif
 
-    // First attempt a true HIBERNATE so platforms that support it
-    // still get a cold boot at next opening time.
-    if (!session.hibernateDisabledForSession) {
-      // Diagnostic logging to help debug alert 16 issues
-      const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
-      uint8_t currentHour = snapshot.localHour;
-      if (sysStatus.get_verboseMode()) {
-        Log.info("Sleep: HIB ctx valid=%d hr=%d open=%d close=%d",
-                 Time.isValid(), currentHour, sysStatus.get_openTime(), sysStatus.get_closeTime());
-      }
-    #if CONNECTIVITY_FAILSAFE_TEST_MODE
-      Log.info("Sleep: HIB dur=%ds open=0 test=1", nightSleepSec);
-    #else
-      Log.info("Sleep: HIB dur=%ds open=0", nightSleepSec);
-    #endif
-
-      ab1805.stopWDT();
-      // Reset sleep configuration so prior ULTRA_LOW_POWER GPIOs do not
-      // accidentally carry into HIBERNATE configuration.
-      config = SystemSleepConfiguration();
-      config.mode(SystemSleepMode::HIBERNATE)
-        .gpio(BUTTON_PIN, FALLING)
-        .duration((uint32_t)nightSleepSec * 1000UL);
-
-      // HIBERNATE should reset the device on wake, so execution should
-      // not resume here under normal conditions.
-      System.sleep(config);
-
-      // If we reach this point, HIBERNATE did not reset as expected on
-      // this hardware/OS combination. Log once, raise an alert, and
-      // permanently disable HIBERNATE for the remainder of this boot so
-      // we can fall back to ULTRA_LOW_POWER instead of thrashing.
-      ab1805.resumeWDT();
-    #if CONNECTIVITY_FAILSAFE_TEST_MODE
-      Log.warn("SleepWarn: HIB returned fallback=ULP test=1");
-    #endif
-      Log.error("HIBERNATE sleep returned unexpectedly (platform does not support or HIBERNATE woke early)");
-      Log.error("Park hours context: Time.isValid=%d localHour=%d openTime=%d closeTime=%d",
-                Time.isValid(), currentHour, sysStatus.get_openTime(), sysStatus.get_closeTime());
-      current.raiseAlert(16); // Alert: unexpected return from HIBERNATE
-      session.hibernateDisabledForSession = true;
-    #if CONNECTIVITY_FAILSAFE_TEST_MODE
-      hibernateFallbackThisPass = true;
-    #endif
-      // Clear alert immediately since we've handled the failure by disabling HIBERNATE
-      // Without a reset, the setup() alert clearing code won't run
-      current.set_alertCode(0);
-      current.set_lastAlertTime(0);
-      // Fall through to ULTRA_LOW_POWER fallback below.
-    }
   }
 
   // ********** ULTRA_LOW_POWER sleep (daytime or night fallback) **********
   // During opening hours we use the reportingIntervalSec as before.
-  // Outside opening hours, if HIBERNATE is disabled or unsupported,
+  // Outside opening hours,
   // fall back to ULTRA_LOW_POWER with a long sleep equal to the
   // time until next open to avoid rapid wake/sleep thrashing.
-  uint16_t intervalSec = sysStatus.get_reportingInterval();
-  if (intervalSec == 0) {
-    intervalSec = 1 * 3600; // Preserve 1 hour default if unset
-  }
+  uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
 
   const char *sleepReason = "scheduled";
   int wakeInSeconds;
@@ -812,7 +1017,7 @@ void handleSleepingState() {
     if (sensorDetect || ledRemaining > 0) {
       Log.info("COUNTING: Deferring sleep - sensor=%d LED remaining=%lu sec", 
                sensorDetect, ledRemaining);
-      state = IDLE_STATE;
+      transitionTo(IDLE_STATE, "sleep-counting-led-defer");
       return;
     }
     // Turn off LED before sleep (should already be off)
@@ -837,7 +1042,60 @@ void handleSleepingState() {
     }
   }
 
-  // If HIBERNATE is unavailable and we are about to take a long overnight
+#if PLATFORM_ID == PLATFORM_BORON
+  if (overnightFallbackSleep) {
+    time_t rtcNow = 0;
+    if (shouldUseBoronRtcAlarmHibernate((uint32_t)wakeInSeconds, rtcNow)) {
+      pinMode(WAKEUP_PIN, INPUT_PULLUP);
+      if (digitalRead(WAKEUP_PIN) == HIGH) {
+        if (clearAb1805StaleAlarmInterrupts()) {
+          const time_t wakeTime = rtcNow + (time_t)wakeInSeconds;
+          if (ab1805.interruptAtTime(wakeTime)) {
+            setAppBreadcrumb(20);
+            config = SystemSleepConfiguration();
+            config.mode(SystemSleepMode::HIBERNATE)
+              .gpio(WAKEUP_PIN, FALLING)
+              .gpio(BUTTON_PIN, FALLING);
+
+            const bool watchdogStopped = ab1805.stopWDT();
+            pauseAwakeWatchdogForSleep("hibernate");
+            if (!watchdogStopped) {
+              Log.warn("SleepCall: watchdog-stop failed mode=HIBERNATE dur=%ds", wakeInSeconds);
+            }
+
+            retainedHibernateRtcBefore = rtcNow;
+            retainedHibernateWakeTime = wakeTime;
+            retainedHibernateRequestedSleep = (uint32_t)wakeInSeconds;
+            retainedHibernateCount++;
+            retainedHibernatePending = true;
+
+            Log.info("Sleep: HIBERNATE reason=closed dur=%ds wakePin=%d", wakeInSeconds, (int)WAKEUP_PIN);
+            thrashGuard.markProgress("SLEEP_ATTEMPT");
+            Cloud::instance().logLedgerSleepState();
+            setAppBreadcrumb(21);
+            drainSerialBeforeSleep();
+            const SystemSleepResult hibernateResult = System.sleep(config);
+
+            // HIBERNATE should reset the MCU. If we return here, treat it as failed and fall back.
+            retainedHibernatePending = false;
+            ab1805.resumeWDT();
+            restoreAwakeWatchdogAfterWake("hibernate");
+            Log.warn("HIBERNATE sleep failed err=%d - falling back to ULTRA_LOW_POWER",
+                     (int)hibernateResult.error());
+          } else {
+            Log.warn("HIBERNATE bypass: failed to program AB1805 alarm - falling back to ULTRA_LOW_POWER");
+          }
+        } else {
+          Log.warn("HIBERNATE bypass: failed stale interrupt cleanup - falling back to ULTRA_LOW_POWER");
+        }
+      } else {
+        Log.warn("HIBERNATE bypass: wake pin held low before sleep - falling back to ULTRA_LOW_POWER");
+      }
+    }
+  }
+#endif
+
+  // Before a long overnight
   // ULTRA_LOW_POWER fallback sleep, optionally reset first when heap has
   // drifted low. This gives the next day a clean start without affecting
   // open-hours behavior.
@@ -861,6 +1119,7 @@ void handleSleepingState() {
 
   // Reset sleep configuration on each sleep so GPIO selections do not
   // accumulate across calls.
+  setAppBreadcrumb(20);
   config = SystemSleepConfiguration();
 
   // ********** WORKING SLEEP CONFIGURATION **********
@@ -1024,18 +1283,26 @@ void handleSleepingState() {
   // Stop watchdog immediately before sleep (after config is fully built)
   // to minimize time between I2C transaction and sleep entry
   const bool watchdogStopped = ab1805.stopWDT();
+  pauseAwakeWatchdogForSleep("ulp");
+#if ENABLE_SLEEP_TRACE
   Log.info("SleepCall: standby=%d dur=%d wdt=%s gate=ok",
            useNetworkStandby ? 1 : 0,
            wakeInSeconds,
            watchdogStopped ? "off" : "err");
+#else
+  if (!watchdogStopped) {
+    Log.warn("SleepCall: watchdog-stop failed standby=%d dur=%d",
+             useNetworkStandby ? 1 : 0,
+             wakeInSeconds);
+  }
+#endif
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
-  Log.info("Sleep: ULP standby=%d reason=%s dur=%ds occ=%d soc=%.1f hibFallback=%d test=1",
+  Log.info("Sleep: ULP standby=%d reason=%s dur=%ds occ=%d soc=%.1f test=1",
            useNetworkStandby ? 1 : 0,
            sleepReason,
            wakeInSeconds,
            current.get_occupied() ? 1 : 0,
-           (double)current.get_stateOfCharge(),
-           hibernateFallbackThisPass ? 1 : 0);
+           (double)current.get_stateOfCharge());
 #else
   Log.info("Sleep: ULP standby=%d reason=%s dur=%ds occ=%d soc=%.1f",
            useNetworkStandby ? 1 : 0,
@@ -1047,6 +1314,9 @@ void handleSleepingState() {
 
   thrashGuard.markProgress("SLEEP_ATTEMPT");
   const unsigned long sleepCallStartMs = millis();
+  Cloud::instance().logLedgerSleepState();
+  setAppBreadcrumb(21);
+  drainSerialBeforeSleep();
   SystemSleepResult result = System.sleep(config);
   const unsigned long sleepElapsedMs = millis() - sleepCallStartMs;
   pin_t wakePin = result.wakeupPin();
@@ -1086,18 +1356,26 @@ void handleSleepingState() {
     current.raiseAlert(16);
 
    // STOP generally supports a wider set of wake pins on some platforms.
+    setAppBreadcrumb(20);
     config = SystemSleepConfiguration();
     config.mode(SystemSleepMode::STOP)
       .gpio(BUTTON_PIN, FALLING)
       .gpio(intPin, RISING)
       .duration((uint32_t)wakeInSeconds * 1000UL);
+    Cloud::instance().logLedgerSleepState();
+    setAppBreadcrumb(21);
+    drainSerialBeforeSleep();
     result = System.sleep(config);
 
     if (result.error() != SYSTEM_ERROR_NONE) {
       Log.error("STOP sleep fallback failed err=%d (wakeIn=%d sec) - using timer-only STOP sleep", (int)result.error(), wakeInSeconds);
+      setAppBreadcrumb(20);
       config = SystemSleepConfiguration();
       config.mode(SystemSleepMode::STOP)
         .duration((uint32_t)wakeInSeconds * 1000UL);
+      Cloud::instance().logLedgerSleepState();
+      setAppBreadcrumb(21);
+      drainSerialBeforeSleep();
       result = System.sleep(config);
 
       if (result.error() != SYSTEM_ERROR_NONE) {
@@ -1114,7 +1392,7 @@ void handleSleepingState() {
         System.reset();
         
         // Should never reach here, but set ERROR_STATE as fallback
-        state = ERROR_STATE;
+        transitionTo(ERROR_STATE, "sleep-all-attempts-failed");
         return;
       }
     }
@@ -1127,6 +1405,7 @@ void handleSleepingState() {
   
   // Resume hardware watchdog immediately after wake
   ab1805.resumeWDT();
+  restoreAwakeWatchdogAfterWake("ulp");
 
   // Mark progress immediately after wake to reset ThrashGuard timer
   thrashGuard.markProgress("WAKE_FROM_SLEEP");
@@ -1141,6 +1420,7 @@ void handleSleepingState() {
     unsigned long serialWaitStart = millis();
     while (!Serial.isConnected() && (millis() - serialWaitStart) < ConnectivityPolicy::DEBUG_SERIAL_WAIT_TIMEOUT_MS) {
       thrashGuard.markProgress("SERIAL_WAIT");
+      serviceAwakeWatchdog();
       Particle.process();
       delay(ConnectivityPolicy::DEBUG_SERIAL_WAIT_POLL_DELAY_MS);
     }
@@ -1155,6 +1435,17 @@ void handleSleepingState() {
   Log.info("WakeReturn: elapsed=%lu reason=%s",
            sleepElapsedMs,
            wakeReturnReason);
+
+#if Wiring_Watchdog
+#if ENABLE_SLEEP_TRACE
+  Log.info("AppWDT: active ctx=ulp armed=%d",
+           Watchdog.started() ? 1 : 0);
+#else
+  if (!Watchdog.started()) {
+    Log.warn("AppWDT: active abnormal ctx=ulp armed=0");
+  }
+#endif
+#endif
 
   // Re-attach user button interrupt after sleep (sleep may have detached it)
   attachInterrupt(BUTTON_PIN, userSwitchISR, FALLING);
@@ -1183,7 +1474,7 @@ void handleSleepingState() {
     measure.batteryState(BatterySampleContext::PostWake);
     logWakeSummary(wakeReasonLabel);
     session.serviceRequestTriggered = true;
-    state = REPORTING_STATE;
+    transitionTo(REPORTING_STATE, "sleep-wake-button");
     return;
   } else {
     // In this state the device was awoken for hourly reporting or PIR
@@ -1212,7 +1503,7 @@ void handleSleepingState() {
       // start of open hours so it can resume normal connected behavior.
       if (sysStatus.get_connectionMode() == CONNECTED && !Particle.connected()) {
         logWakeSummary(wakeReasonLabel);
-        state = CONNECTING_STATE;
+        transitionTo(CONNECTING_STATE, "sleep-open-hours-reconnect");
         return;
       }
     }
@@ -1221,20 +1512,18 @@ void handleSleepingState() {
     // This ensures we don't immediately undo state changes from PIR processing
     if (sysStatus.get_sensorMode() == OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
       // LED timeout expired - debounce period elapsed without motion
-      uint32_t sessionDuration = Time.now() - current.get_occupancyStartTime();
-      uint32_t totalOccupied = current.get_totalOccupiedSeconds() + sessionDuration;
       const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
-      current.set_totalOccupiedSeconds(totalOccupied);
-      current.set_occupied(false);
-      current.set_occupancyStartTime(0);
+      const OccupancyCloseResult closeResult = closeOccupancySessionSafely("sleep");
       signalLED(false);  // Turn off LED
-      logUnoccupiedEvent("debounce", sessionDuration, totalOccupied, reportNow);
+      if (closeResult.valid) {
+        logUnoccupiedEvent("debounce", closeResult.sessionSeconds, closeResult.totalSeconds, reportNow);
+      }
       
       // Match the rest of the occupancy state machine: only KEEP_ALIVE mode
       // forces an immediate report/connect on occupancy transitions.
       if (reportNow) {
         session.occupancyChangeTriggered = true;
-        state = REPORTING_STATE;
+        transitionTo(REPORTING_STATE, "sleep-occupancy-debounce-report");
         return;
       }
     }
@@ -1277,7 +1566,7 @@ void handleSleepingState() {
           // Keep LED on for the debounce window (sensor.setting1 is milliseconds).
           uint32_t debounceMs = sensorConfig.get_sensorSetting1();
           if (debounceMs == 0) {
-            debounceMs = 60000; // default 60s
+            debounceMs = Config::occupancyDebounceMsForRuntime();
           }
           signalLED(true, debounceMs);
           const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
@@ -1288,14 +1577,14 @@ void handleSleepingState() {
           if (reportNow) {
             session.occupancyChangeTriggered = true;
             setAppBreadcrumb(5);
-            state = REPORTING_STATE;
+            transitionTo(REPORTING_STATE, "sleep-pir-occupancy-report");
             return;
           }
         } else {
           // Already occupied - motion detected during debounce, restart timer
           uint32_t debounceMs = sensorConfig.get_sensorSetting1();
           if (debounceMs == 0) {
-            debounceMs = 60000; // default 60s
+            debounceMs = Config::occupancyDebounceMsForRuntime();
           }
           signalLED(true, debounceMs);  // Restart LED timer
           logOccupiedEvent("pir-wake", debounceMs / 1000UL, false, true);
@@ -1318,11 +1607,11 @@ void handleSleepingState() {
       // while occupied so occupancy=1 is only reported on 0->1 transition.
       if (sysStatus.get_sensorMode() == OCCUPANCY && current.get_occupied() &&
           sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
-        state = SLEEPING_STATE;
+        transitionTo(SLEEPING_STATE, "sleep-timer-occupied-suppress-report");
         return;
       }
 
-      state = REPORTING_STATE;
+      transitionTo(REPORTING_STATE, "sleep-timer-report");
       return;
     }
 
@@ -1334,13 +1623,12 @@ void handleSleepingState() {
           sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
         // Skip overdue-report check while occupied.
       } else {
-      uint16_t intervalSec = sysStatus.get_reportingInterval();
-      if (intervalSec == 0) intervalSec = 3600;
+      uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
 
       time_t now = Time.now();
       time_t lastReport = sysStatus.get_lastReport();
       if (lastReport > 0 && (now - lastReport) >= intervalSec) {
-        state = REPORTING_STATE;
+        transitionTo(REPORTING_STATE, "sleep-pir-overdue-report");
         return;
       }
       }
@@ -1350,10 +1638,10 @@ void handleSleepingState() {
     // return immediately to sleep. This check comes AFTER opportunistic reporting
     // so overdue reports are not missed.
     if (pirWake && sysStatus.get_connectionMode() != CONNECTED) {
-      state = SLEEPING_STATE;
+      transitionTo(SLEEPING_STATE, "sleep-pir-return-to-sleep");
       return;
     }
 
-    state = IDLE_STATE;
+    transitionTo(IDLE_STATE, "sleep-wake-idle");
   }
 }

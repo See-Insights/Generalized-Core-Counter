@@ -1,5 +1,8 @@
 var annotated_dup =
 [
+    [ "anonymous_namespace{Cloud.cpp}", "namespaceanonymous__namespace_02_cloud_8cpp_03.html", [
+      [ "LedgerRequestRecord", "structanonymous__namespace_02_cloud_8cpp_03_1_1_ledger_request_record.html", "structanonymous__namespace_02_cloud_8cpp_03_1_1_ledger_request_record" ]
+    ] ],
     [ "anonymous_namespace{State_Connect.cpp}", "namespaceanonymous__namespace_02_state___connect_8cpp_03.html", [
       [ "ConnectBudgetContext", "structanonymous__namespace_02_state___connect_8cpp_03_1_1_connect_budget_context.html", "structanonymous__namespace_02_state___connect_8cpp_03_1_1_connect_budget_context" ]
     ] ],
@@ -16,6 +19,7 @@ var annotated_dup =
     [ "Cloud", "class_cloud.html", "class_cloud" ],
     [ "currentStatusData", "classcurrent_status_data.html", "classcurrent_status_data" ],
     [ "ISensor", "class_i_sensor.html", "class_i_sensor" ],
+    [ "OccupancyCloseResult", "struct_occupancy_close_result.html", "struct_occupancy_close_result" ],
     [ "Particle_Functions", "class_particle___functions.html", "class_particle___functions" ],
     [ "PIRSensor", "class_p_i_r_sensor.html", "class_p_i_r_sensor" ],
     [ "PowerAction", "struct_power_action.html", "struct_power_action" ],
@@ -25,6 +29,7 @@ var annotated_dup =
     [ "PowerPolicy", "struct_power_policy.html", "struct_power_policy" ],
     [ "PowerReading", "struct_power_reading.html", "struct_power_reading" ],
     [ "PowerReport", "struct_power_report.html", "struct_power_report" ],
+    [ "RetainedLoopForensics", "struct_retained_loop_forensics.html", "struct_retained_loop_forensics" ],
     [ "sensorConfigData", "classsensor_config_data.html", "classsensor_config_data" ],
     [ "SensorData", "struct_sensor_data.html", "struct_sensor_data" ],
     [ "SensorDefinition", "struct_sensor_definition.html", "struct_sensor_definition" ],

@@ -19,6 +19,16 @@
 extern char internalTempStr[16];
 extern char signalStr[64];
 
+// Retained PMIC contradiction forensics.
+extern retained uint16_t pmicAnomalyCount;
+extern retained uint32_t lastPmicAnomalyUptimeMs;
+extern retained float lastPmicAnomalySoc;
+extern retained uint8_t lastPmicAnomalyChargeStatus;
+extern retained uint8_t lastPmicAnomalyPowerSource;
+extern retained uint8_t lastPmicAnomalyVbusStatus;
+extern bool pmicAnomalyActive;
+uint32_t pmicAnomalyAgeSec();
+
 enum class BatterySampleContext : uint8_t {
     General = 0,
     Setup,
@@ -135,6 +145,18 @@ public:
      * @brief Update global signal strength strings for logging/telemetry.
      */
     void getSignalStrength();
+
+    /**
+     * @brief TEMPORARY DIAGNOSTIC: Test PMIC charge state machine behavior.
+     * 
+     * @details Controlled experiment to determine if PMIC is stuck in FAST_CHARGE
+     *          or will transition to DONE when charging is cycled. Only executes
+     *          once per boot with safety checks. Logs comprehensive PMIC state
+     *          before/during/after disabling and re-enabling charging.
+     * 
+     * @return 0 on success, negative error code on failure
+     */
+    int runPmicChargeCycleTest();
 
     ///@}
     

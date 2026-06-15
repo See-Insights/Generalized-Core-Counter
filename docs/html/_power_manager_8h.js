@@ -35,6 +35,7 @@ var _power_manager_8h =
       [ "VinPowerSource", "_power_manager_8h.html#a7e2fca206adf1ac16ac2e0f95ea6791baa978c4d63414168d74c9ef3f6cb1b370", null ],
       [ "BatteryKeepLast", "_power_manager_8h.html#a7e2fca206adf1ac16ac2e0f95ea6791ba91da0d261a6168d8e9ed2ebd01913f36", null ],
       [ "BatteryFallback", "_power_manager_8h.html#a7e2fca206adf1ac16ac2e0f95ea6791ba48180346d6e42613a62705fbe17525df", null ],
+      [ "UnknownSourceKeepLast", "_power_manager_8h.html#a7e2fca206adf1ac16ac2e0f95ea6791bad7e3d897ed8a13e3abadaa89eaddaf34", null ],
       [ "UnknownSourceFallback", "_power_manager_8h.html#a7e2fca206adf1ac16ac2e0f95ea6791ba130115bf4f344aaa0f51160e54719ff5", null ],
       [ "UnsupportedPlatform", "_power_manager_8h.html#a7e2fca206adf1ac16ac2e0f95ea6791ba32466f12a7ca314bff55d8bf6361f416", null ]
     ] ],

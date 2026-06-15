@@ -1,5 +1,7 @@
 var searchData=
 [
-  ['header_20pir_20sensor_20on_20carrier_0',['Carrier board header (PIR sensor on carrier)',['../device__pinout_8h.html#autotoc_md0',1,'']]],
-  ['highlights_1',['Highlights',['../md__r_e_l_e_a_s_e___n_o_t_e_s__v11.html#autotoc_md20',1,'']]]
+  ['7_0',['Days 4-7',['../md_docs_2v11-soak-plan.html#autotoc_md335',1,'']]],
+  ['7_2000_202026_2004_2021_1',['7.00 - 2026-04-21',['../md__c_h_a_n_g_e_l_o_g.html#autotoc_md70',1,'']]],
+  ['7_20connectivity_20architecture_2',['7. Connectivity Architecture',['../md_docs_2architecture-overview.html#autotoc_md143',1,'']]],
+  ['7_20pirsensor_20cpp_20medium_20priority_3',['7. PIRSensor.cpp (MEDIUM PRIORITY)',['../md_docs_2releases_2v3_823-implementation-status.html#autotoc_md302',1,'']]]
 ];

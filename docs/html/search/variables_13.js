@@ -16,5 +16,6 @@ var searchData=
   ['tmp36_5fsense_5fpin_13',['TMP36_SENSE_PIN',['../device__pinout_8cpp.html#abe0da77b4714252385701ee7c36ddfa5',1,'TMP36_SENSE_PIN:&#160;device_pinout.cpp'],['../device__pinout_8h.html#abe0da77b4714252385701ee7c36ddfa5',1,'TMP36_SENSE_PIN:&#160;device_pinout.cpp']]],
   ['total_5fawake_5fms_14',['total_awake_ms',['../struct_observability_1_1_wake_cycle_stats.html#a4eed46fd424bbf249324230bb7db9f6a',1,'Observability::WakeCycleStats']]],
   ['totaloccupiedseconds_15',['totalOccupiedSeconds',['../classcurrent_status_data_1_1_current_data.html#aa0e5a3b1fe72a2fcc64c4048fb83df3a',1,'currentStatusData::CurrentData']]],
-  ['type_16',['type',['../classsensor_config_data_1_1_sensor_data.html#a42f3f8e1b0f6e6c504c92d94405627c7',1,'sensorConfigData::SensorData::type'],['../struct_sensor_definition.html#aeeac185140f5cca31b010b3033eff544',1,'SensorDefinition::type']]]
+  ['totalseconds_16',['totalSeconds',['../struct_occupancy_close_result.html#a76f26b5ea097292c3e39a264af5d1a34',1,'OccupancyCloseResult']]],
+  ['type_17',['type',['../classsensor_config_data_1_1_sensor_data.html#a42f3f8e1b0f6e6c504c92d94405627c7',1,'sensorConfigData::SensorData::type'],['../struct_sensor_definition.html#aeeac185140f5cca31b010b3033eff544',1,'SensorDefinition::type']]]
 ];

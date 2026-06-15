@@ -72,21 +72,54 @@ bool getMergedStringValue(const Variant &defaultsSection,
     return true;
 }
 
+void normalizeTimezoneInPlace(char *timezone, size_t timezoneSize) {
+    if (!timezone || timezoneSize == 0) {
+        return;
+    }
+
+    const char *normalized = nullptr;
+    const char *reason = nullptr;
+
+    if (strcmp(timezone, "SGT8") == 0) {
+        normalized = "SGT-8";
+        reason = "posix-sign";
+    } else if (strcmp(timezone, "UTC+8") == 0 ||
+               strcmp(timezone, "GMT+8") == 0 ||
+               strcmp(timezone, "Singapore") == 0) {
+        normalized = "SGT-8";
+        reason = "alias";
+    }
+
+    if (!normalized) {
+        return;
+    }
+
+    Log.warn("TimezoneNormalize: from=%s to=%s reason=%s", timezone, normalized, reason);
+    snprintf(timezone, timezoneSize, "%s", normalized);
+}
+
 } // namespace
 
 bool Cloud::applyConfigurationFromLedger(const LedgerData &defaults, const LedgerData &device) {
     bool success = true;
+    bool sensorChanged = false;
+    bool timingChanged = false;
+    bool messagingChanged = false;
+    bool modesChanged = false;
+    bool reportingChanged = false;
     
     // Enhanced diagnostics for Alert 41 troubleshooting - track which section fails
-    bool sensorOk = applySensorConfig(defaults, device);
-    bool timingOk = applyTimingConfig(defaults, device);
-    bool messagingOk = applyMessagingConfig(defaults, device);
-    bool modesOk = applyModesConfig(defaults, device);
-    bool reportingOk = applyReportingConfig(defaults, device);
+    bool sensorOk = applySensorConfig(defaults, device, &sensorChanged);
+    bool timingOk = applyTimingConfig(defaults, device, &timingChanged);
+    bool messagingOk = applyMessagingConfig(defaults, device, &messagingChanged);
+    bool modesOk = applyModesConfig(defaults, device, &modesChanged);
+    bool reportingOk = applyReportingConfig(defaults, device, &reportingChanged);
     
     success = sensorOk && timingOk && messagingOk && modesOk && reportingOk;
     
     if (success) {
+        const bool anyChanged = sensorChanged || timingChanged || messagingChanged || modesChanged || reportingChanged;
+
         // Do not force synchronous storage flushes here; they can exceed the
         // 100 ms loop budget. Persistence is handled by sysStatus.loop() and
         // sensorConfig.loop() (called from the main loop).
@@ -95,7 +128,22 @@ bool Cloud::applyConfigurationFromLedger(const LedgerData &defaults, const Ledge
 
         // Defer device-status publishing to Cloud::loop() so it doesn't
         // execute inside CONNECTING_STATE or async callbacks.
-        pendingStatusPublish = true;
+        if (anyChanged) {
+            const bool wasPending = pendingStatusPublish;
+            pendingStatusPublish = true;
+            pendingStatusPublishSource = "ConfigApply";
+            if (!wasPending) {
+                const Cloud::LedgerSyncDiagnostics diagnostics = ledgerSyncDiagnostics();
+#if defined(ENABLE_LEDGER_TRACE) && ENABLE_LEDGER_TRACE
+                Log.info("LedgerQueue: kind=status pending=%u syncing=%d inflight=%d",
+                         diagnostics.pendingCount,
+                         diagnostics.syncing ? 1 : 0,
+                         diagnostics.inflight ? 1 : 0);
+#else
+                (void)diagnostics;
+#endif
+            }
+        }
     } else {
         Log.warn("Configuration apply failed: sensor=%s timing=%s messaging=%s modes=%s reporting=%s",
                  sensorOk ? "OK" : "FAIL",
@@ -108,7 +156,7 @@ bool Cloud::applyConfigurationFromLedger(const LedgerData &defaults, const Ledge
     return success;
 }
 
-bool Cloud::applyMessagingConfig(const LedgerData &defaults, const LedgerData &device) {
+bool Cloud::applyMessagingConfig(const LedgerData &defaults, const LedgerData &device, bool *changedOut) {
     Variant defaultMessaging;
     Variant deviceMessaging;
     bool hasDefault = getTopLevelMap(defaults, "messaging", defaultMessaging);
@@ -152,11 +200,14 @@ bool Cloud::applyMessagingConfig(const LedgerData &defaults, const LedgerData &d
         }
     }
 
+    if (changedOut) {
+        *changedOut = changed;
+    }
     if (changed) Log.info("Messaging config updated");
     return success;
 }
 
-bool Cloud::applyTimingConfig(const LedgerData &defaults, const LedgerData &device) {
+bool Cloud::applyTimingConfig(const LedgerData &defaults, const LedgerData &device, bool *changedOut) {
     Variant defaultTiming;
     Variant deviceTiming;
     bool hasDefault = getTopLevelMap(defaults, "timing", defaultTiming);
@@ -174,6 +225,7 @@ bool Cloud::applyTimingConfig(const LedgerData &defaults, const LedgerData &devi
     char timezone[sizeof(sysStatusData::SysData::timeZoneStr)] = {0};
 
     if (getMergedStringValue(defaultTiming, deviceTiming, "timezone", timezone, sizeof(timezone))) {
+        normalizeTimezoneInPlace(timezone, sizeof(timezone));
         size_t timezoneLen = strlen(timezone);
         if (timezoneLen > 0 && timezoneLen < sizeof(timezone)) {
             if (strcmp(sysStatus.get_timeZoneStrCStr(), timezone) != 0) {
@@ -239,6 +291,9 @@ bool Cloud::applyTimingConfig(const LedgerData &defaults, const LedgerData &devi
         }
     }
 
+    if (changedOut) {
+        *changedOut = changed;
+    }
     if (changed) Log.info("Timing config updated");
     return success;
 }
@@ -252,7 +307,7 @@ bool Cloud::validateRange(T value, T min, T max, const char* name) {
     return true;
 }
 
-bool Cloud::applySensorConfig(const LedgerData &defaults, const LedgerData &device) {
+bool Cloud::applySensorConfig(const LedgerData &defaults, const LedgerData &device, bool *changedOut) {
     Variant defaultSensor;
     Variant deviceSensor;
     bool hasDefault = getTopLevelMap(defaults, "sensor", defaultSensor);
@@ -323,11 +378,14 @@ bool Cloud::applySensorConfig(const LedgerData &defaults, const LedgerData &devi
         }
     }
     
+    if (changedOut) {
+        *changedOut = changed;
+    }
     if (changed) Log.info("Sensor config updated");
     return success;
 }
 
-bool Cloud::applyModesConfig(const LedgerData &defaults, const LedgerData &device) {
+bool Cloud::applyModesConfig(const LedgerData &defaults, const LedgerData &device, bool *changedOut) {
     Variant defaultModes;
     Variant deviceModes;
     bool hasDefault = getTopLevelMap(defaults, "modes", defaultModes);
@@ -344,6 +402,7 @@ bool Cloud::applyModesConfig(const LedgerData &defaults, const LedgerData &devic
     int samplingMode = 0;
     int cloudDisconnectBudgetSec = 0;
     int modemOffBudgetSec = 0;
+    bool enableHibernateSleep = false;
 
     // Sensor mode: 0=COUNTING, 1=OCCUPANCY, 2=MEASUREMENT
     if (getMergedIntValue(defaultModes, deviceModes, "sensorMode", sensorMode)) {
@@ -434,11 +493,22 @@ bool Cloud::applyModesConfig(const LedgerData &defaults, const LedgerData &devic
         }
     }
 
+    if (getMergedBoolValue(defaultModes, deviceModes, "enableHibernateSleep", enableHibernateSleep)) {
+        if (sysStatus.get_enableHibernateSleep() != enableHibernateSleep) {
+            sysStatus.set_enableHibernateSleep(enableHibernateSleep);
+            Log.info("Config: enable hibernate sleep -> %s", enableHibernateSleep ? "YES" : "NO");
+            changed = true;
+        }
+    }
+
+    if (changedOut) {
+        *changedOut = changed;
+    }
     if (changed) Log.info("Modes config updated");
     return success;
 }
 
-bool Cloud::applyReportingConfig(const LedgerData &defaults, const LedgerData &device) {
+bool Cloud::applyReportingConfig(const LedgerData &defaults, const LedgerData &device, bool *changedOut) {
     Variant defaultWebhook;
     Variant deviceWebhook;
     bool hasDefault = getNestedMap(defaults, "reporting", "webhook", defaultWebhook);
@@ -494,6 +564,9 @@ bool Cloud::applyReportingConfig(const LedgerData &defaults, const LedgerData &d
                  (int)webhookEnabled);
     }
 
+    if (changedOut) {
+        *changedOut = changed;
+    }
     if (changed) Log.info("Reporting config updated");
     return success;
 }

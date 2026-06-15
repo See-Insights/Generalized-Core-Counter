@@ -1,6 +1,6 @@
 #include "power/PowerManager.h"
 
-#include "Config.h"
+#include "../Config.h"
 #include "MyPersistentData.h"
 #include "power/PowerDiagnostics.h"
 #include "power/PowerPlatform.h"
@@ -29,11 +29,7 @@ PowerInputProfile selectInputProfile(
     PowerProfileSelectionReason &reason) {
   switch (snapshot.source) {
   case kPowerSourceUsbHost:
-    reason = PowerProfileSelectionReason::UsbPowerSource;
-    return PowerInputProfile::UsbBench;
   case kPowerSourceUsbAdapter:
-    reason = PowerProfileSelectionReason::UsbPowerSource;
-    return PowerInputProfile::UsbBench;
   case kPowerSourceUsbOtg:
     reason = PowerProfileSelectionReason::UsbPowerSource;
     return PowerInputProfile::UsbBench;
@@ -48,6 +44,10 @@ PowerInputProfile selectInputProfile(
     reason = PowerProfileSelectionReason::BatteryFallback;
     return fallbackProfile;
   default:
+    if (lastAppliedProfile != PowerInputProfile::NotApplicable) {
+      reason = PowerProfileSelectionReason::UnknownSourceKeepLast;
+      return lastAppliedProfile;
+    }
     reason = PowerProfileSelectionReason::UnknownSourceFallback;
     return fallbackProfile;
   }
@@ -64,7 +64,9 @@ bool shouldLogProfileDecision(const PowerReport &previousReport,
              nextReport.powerConfigurationResult;
 }
 
-const char *compactProfileLabel(PowerInputProfile profile) {
+} // namespace
+
+const char *PowerManager::compactProfileLabel(PowerInputProfile profile) {
   switch (profile) {
   case PowerInputProfile::UsbBench:
     return "USB";
@@ -76,8 +78,6 @@ const char *compactProfileLabel(PowerInputProfile profile) {
     return "?";
   }
 }
-
-} // namespace
 
 PowerManager &PowerManager::instance() {
   static PowerManager instance;
@@ -160,10 +160,10 @@ bool PowerManager::refreshInputProfile() {
   }
 
   if (shouldLogProfileDecision(report_, nextReport)) {
-    Log.info("Power: prof=%s src=%s cfg=%d",
+    Log.info("PowerApply: profile=%s source=%s reason=%s",
              compactProfileLabel(nextReport.activeInputProfile),
              powerSourceLabel(nextReport.reading.powerSource),
-             nextReport.powerConfigurationResult);
+             profileSelectionReasonLabel(nextReport.inputProfileReason));
   }
 
   report_ = nextReport;

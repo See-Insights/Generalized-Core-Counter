@@ -6,7 +6,6 @@ var struct_session_state =
     [ "failsafeDeferLogMask", "struct_session_state.html#af3394279a59294a89ada8607297649be", null ],
     [ "firstConnectionObserved", "struct_session_state.html#a0088f8de1f1a228221012131953327cc", null ],
     [ "firstConnectionQueueDrainedLogged", "struct_session_state.html#ab8e72d0a538b87295dfdf147c7a58e90", null ],
-    [ "hibernateDisabledForSession", "struct_session_state.html#ac03474741cb2abc800e6fcfedcba9939", null ],
     [ "lastCloudDisconnectElapsedMs", "struct_session_state.html#ae0bcfaae63262ccee6e4aec733e6f7e1", null ],
     [ "lastModemOffElapsedMs", "struct_session_state.html#a188ce8c87fd5d1552bf32dad760dd134", null ],
     [ "lastTeardownEndMs", "struct_session_state.html#a9d579456bf2f6d67475fdfcea16e30db", null ],

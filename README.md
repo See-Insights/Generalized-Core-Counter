@@ -1,15 +1,19 @@
+## Project Context
+
+This repository includes `PROJECT_STATUS.md`, which defines the project purpose, current priorities, architecture principles, constraints, and design rules for AI-assisted development. Contributors and AI coding assistants should consult it before proposing major changes.
+
 # Generalized-Core-Counter
 
-**Version:** 11.0.0 | **Latest:** Connectivity resiliency soak release
+**Version:** 19 | **Latest:** addressed power management issues particularly on USB power
 
-Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v11 release is the production soak candidate for the new connectivity recovery ladder and its supporting observability.
+Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v14 release packages cloud recovery tuning and release-safe logging cleanup without changing the existing production power, sleep, connectivity, watchdog, ledger, or PMIC behavior.
 
 ## Release Focus
 
-- Stable soak candidate for `1` Photon 2 in Singapore and `6` Borons in North Carolina.
-- Recovery-first connectivity behavior for marginal RF conditions.
-- Clear operator documentation for ledger-backed configuration, wake-cycle diagnostics, and release validation.
-- No new feature refactor in this release; focus is resiliency, maintainability, and deployment clarity.
+- Production-ready Raleigh Boron soak release built from the tested watchdog-forensics baseline.
+- Watchdog forensic visibility across resets via retained counters and startup telemetry.
+- Occupancy close validation and anomaly logging to block impossible unsigned-wrap totals.
+- PMIC contradiction forensic capture for low-SOC `Charged` or `Not Charging` events with no automatic remediation.
 
 ## Supported Platforms
 
@@ -41,6 +45,16 @@ The application is a small explicit state machine with focused handler modules:
 - `ERROR_STATE`
 
 `Generalized-Core-Counter.cpp` owns global lifecycle, retained breadcrumbs, startup telemetry, and top-level supervision. State-specific behavior lives under `src/state/`. Power and connectivity policies live under `src/power/`. Cloud configuration and ledger publishing live under `src/cloud/`.
+
+## Release Guardrails
+
+Release v14 focuses on production-safe cloud recovery tuning and logging cleanup:
+
+- No new runtime behavior changes.
+- No sleep-policy changes.
+- No watchdog-policy changes.
+- No ledger lifecycle changes.
+- No PMIC remediation-policy changes.
 
 ## Recovery Architecture
 
@@ -76,7 +90,9 @@ Connectivity and power policy are centralized in `ConnectivityPolicy.h`. The imp
 
 Battery-aware connection behavior can reduce connectivity aggressiveness as state of charge drops. Occupancy keep-alive is retained only when the platform and current battery tier can justify it.
 
-## `CONNECTIVITY_FAILSAFE_TEST_MODE`
+## Build Flags
+
+### `CONNECTIVITY_FAILSAFE_TEST_MODE`
 
 `CONNECTIVITY_FAILSAFE_TEST_MODE` exists only to validate the long-duration recovery ladder on the bench.
 
@@ -95,6 +111,15 @@ Production rules:
 - Production validation must confirm `FailsafeTest=0` in logs and production timing values in the failsafe boot line.
 
 See <a href="docs/bench-validation.md">docs/bench-validation.md</a> for the short-threshold validation workflow.
+
+### `ENABLE_PMIC_FORENSICS`
+
+`ENABLE_PMIC_FORENSICS` gates only the PMIC contradiction forensic path introduced for v13.
+
+- Default is `ON` in `BuildProfile.h` for release builds.
+- When enabled, the firmware records retained PMIC contradiction counters and includes PMIC forensic fields in startup and device-status telemetry.
+- When disabled, PMIC contradiction logging, counters, and PMIC-specific startup/device-status telemetry are compiled out.
+- It does not affect watchdog breadcrumbs, occupancy protection, charging policy, connectivity policy, sleep policy, or watchdog policy.
 
 ## Ledger Configuration Model
 
@@ -153,6 +178,9 @@ This split allows offline edits in Console without requiring the device to stay 
 
 Timezone values must be POSIX timezone strings, not IANA names.
 
+- Singapore / UTC+8: `SGT-8`
+- Do not use `SGT8` for Singapore; in POSIX notation that is interpreted as UTC-8.
+
 ## Build And Validation
 
 The repository is build-validated on Boron, Photon 2, and Argon using Device OS `6.4.1`.
@@ -189,19 +217,74 @@ Important signals:
 - failsafe boot and action lines
 - alert codes for bounded connect, ledger sync, and recovery conditions
 
-Startup status for v11 includes the connectivity recovery state needed for soak analysis:
+Startup status for v14 includes the connectivity recovery state plus the forensic fields needed for soak analysis:
 
 - `failsafeStage`
 - `failsafeCount`
 - `lastConnectionAgeSec`
 - `failsafeTest`
+- `watchdogResetCount`
+- `lastWatchdogBreadcrumb`
+- `lastWatchdogUptimeMs`
+- `pmicAnomalyCount`
+- `lastPmicAnomalySoc`
+- `lastPmicAnomalyChargeStatus`
+- `lastPmicAnomalyAgeSec`
+
+## Watchdog Forensics
+
+Watchdog reset investigations now use retained startup fields to preserve the prior boot's evidence even when serial logs are missing.
+
+- `watchdogResetCount`: retained count of watchdog-attributed resets seen by the application.
+- `lastWatchdogBreadcrumb`: last retained application breadcrumb written before the watchdog reset path completed or the device stopped making progress.
+- `lastWatchdogUptimeMs`: retained uptime snapshot from the watchdog forensic capture path.
+
+Interpretation:
+
+- Rising `watchdogResetCount` indicates repeat watchdog intervention.
+- `lastWatchdogBreadcrumb` identifies the last known application phase.
+- `lastWatchdogUptimeMs` helps distinguish immediate boot failures from long-uptime stalls.
+
+## Occupancy Protection
+
+Occupancy close handling now validates session durations before adding them to the retained daily total.
+
+- Close paths reject `occupancyStartTime` values that are zero, implausibly in the future, or would create impossible day totals.
+- This prevents unsigned-wrap corruption where `Time.now() - occupancyStartTime` could explode into a huge occupied duration.
+- When validation fails, the firmware emits `OccAnom` logs with the close path, timestamps, and prior total for field RCA.
+
+## PMIC Forensics
+
+PMIC contradiction forensics are intended for field investigations where charging behavior changes after a reset and serial logs may be unavailable.
+
+Permanent power-profile architecture notes live in
+[`docs/architecture/power-management.md`](docs/architecture/power-management.md).
+The June 2026 Boron USB/Solar charging root cause is documented in
+[`docs/postmortems/2026-06-pmic-charging-root-cause.md`](docs/postmortems/2026-06-pmic-charging-root-cause.md).
+
+Contradiction definition:
+
+- SOC below `20%`
+- Battery context is `Charged` or `Not Charging`
+- Temperature is within the normal charging range
+- The contradiction persists for the configured consecutive evaluations
+
+When `ENABLE_PMIC_FORENSICS=1`, the firmware retains:
+
+- `pmicAnomalyCount`
+- `lastPmicAnomalySoc`
+- `lastPmicAnomalyChargeStatus`
+- `lastPmicAnomalyAgeSec` in telemetry
+
+The detector records evidence only on the transition from inactive to active so one prolonged contradiction counts once. The feature is forensic-only in this release; it does not toggle charging, alter power policy, or introduce a new alert code.
 
 ## Documentation Index
 
-- <a href="RELEASE_NOTES_v11.md">RELEASE_NOTES_v11.md</a>
+- <a href="CHANGELOG.md">CHANGELOG.md</a>
 - <a href="docs/architecture-overview.md">docs/architecture-overview.md</a>
+- <a href="docs/architecture/power-management.md">docs/architecture/power-management.md</a>
+- <a href="docs/postmortems/2026-06-pmic-charging-root-cause.md">docs/postmortems/2026-06-pmic-charging-root-cause.md</a>
 - <a href="docs/recovery-architecture.md">docs/recovery-architecture.md</a>
-- <a href="docs/v11-soak-plan.md">docs/v11-soak-plan.md</a>
 - <a href="docs/bench-validation.md">docs/bench-validation.md</a>
 - Generated API reference: `docs/html/index.html`
 
@@ -217,13 +300,11 @@ Startup status for v11 includes the connectivity recovery state needed for soak 
 
 ## Deployment Workflow
 
-1. Build a production image with `CONNECTIVITY_FAILSAFE_TEST_MODE=0`.
+1. Build a production image with `CONNECTIVITY_FAILSAFE_TEST_MODE=0` and `ENABLE_PMIC_FORENSICS=1`.
 2. Flash or OTA deploy to the intended platform.
-3. Confirm startup status includes the expected version and recovery fields.
+3. Confirm startup status includes the expected version plus watchdog and PMIC forensic fields.
 4. Confirm ledger sync and publish behavior during the first connection window.
-5. Monitor wake-cycle summaries, connection age, and any recovery-stage transitions.
-
-For the v11 soak rollout, follow <a href="docs/v11-soak-plan.md">docs/v11-soak-plan.md</a>.
+5. Monitor wake-cycle summaries, connection age, watchdog counters, occupancy anomaly logs, and any PMIC contradiction evidence.
 
 ## Contributor Notes
 
@@ -234,4 +315,4 @@ For the v11 soak rollout, follow <a href="docs/v11-soak-plan.md">docs/v11-soak-p
 
 ## Current Release Status
 
-v11.0.0 is the connectivity resiliency soak release. It is intended to validate the new long-duration recovery ladder under real deployment conditions without widening scope into post-soak refactors.
+v14.0.0 is the cloud recovery tuning and logging cleanup release. It retains watchdog and PMIC forensic visibility while intentionally leaving charging, connectivity, sleep, and watchdog policies unchanged.

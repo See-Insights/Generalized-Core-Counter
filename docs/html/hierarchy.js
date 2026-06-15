@@ -6,7 +6,10 @@ var hierarchy =
     [ "ISensor", "class_i_sensor.html", [
       [ "PIRSensor", "class_p_i_r_sensor.html", null ]
     ] ],
+    [ "anonymous_namespace{Cloud.cpp}::LedgerRequestRecord", "structanonymous__namespace_02_cloud_8cpp_03_1_1_ledger_request_record.html", null ],
+    [ "Cloud::LedgerSyncDiagnostics", "struct_cloud_1_1_ledger_sync_diagnostics.html", null ],
     [ "LocalTimeCache::LocalTimeSnapshot", "struct_local_time_cache_1_1_local_time_snapshot.html", null ],
+    [ "OccupancyCloseResult", "struct_occupancy_close_result.html", null ],
     [ "Particle_Functions", "class_particle___functions.html", null ],
     [ "StorageHelperRK::PersistentDataFile", null, [
       [ "currentStatusData", "classcurrent_status_data.html", null ],
@@ -22,6 +25,7 @@ var hierarchy =
     [ "PowerReading", "struct_power_reading.html", null ],
     [ "PowerReport", "struct_power_report.html", null ],
     [ "PowerPlatform::PowerSourceSnapshot", "struct_power_platform_1_1_power_source_snapshot.html", null ],
+    [ "RetainedLoopForensics", "struct_retained_loop_forensics.html", null ],
     [ "sensorConfigData::SensorData", "classsensor_config_data_1_1_sensor_data.html", null ],
     [ "SensorData", "struct_sensor_data.html", null ],
     [ "SensorDefinition", "struct_sensor_definition.html", null ],

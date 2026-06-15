@@ -2,6 +2,7 @@ var classsys_status_data_1_1_sys_data =
 [
     [ "closeTime", "classsys_status_data_1_1_sys_data.html#a124d1947b9d0a93e46b95f4bfc98527a", null ],
     [ "cloudDisconnectBudgetSec", "classsys_status_data_1_1_sys_data.html#a312ad3e9e14030ddebc3d5251ffb4ddd", null ],
+    [ "configSource", "classsys_status_data_1_1_sys_data.html#a6a5845fcf3c08eec9ffb038f7a3a5a48", null ],
     [ "connectAttemptBudgetSec", "classsys_status_data_1_1_sys_data.html#ac148bf68d19405c01a9c1ee624208737", null ],
     [ "connectionAttemptCounter", "classsys_status_data_1_1_sys_data.html#ad032fbfceb6d43f08a899eaa57d1ac8c", null ],
     [ "connectionMode", "classsys_status_data_1_1_sys_data.html#a02d2a15146a6aa1fd512809eff624ca5", null ],
@@ -9,6 +10,7 @@ var classsys_status_data_1_1_sys_data =
     [ "connectivityRecoveryStage", "classsys_status_data_1_1_sys_data.html#aa47134421e25b74ecb87f2cf0312acee", null ],
     [ "currentBatteryTier", "classsys_status_data_1_1_sys_data.html#afc1ac9b1ee5ef09117fe63b04bb25c86", null ],
     [ "disconnectedMode", "classsys_status_data_1_1_sys_data.html#a1d988ae2845765cdaa981f5ea8655269", null ],
+    [ "hasValidLedgerConfig", "classsys_status_data_1_1_sys_data.html#a429ef8bc43bd6798b8c78b75b64d6c31", null ],
     [ "lastConnection", "classsys_status_data_1_1_sys_data.html#a88fef61bce4b028910de1441dc020c9c", null ],
     [ "lastConnectionDuration", "classsys_status_data_1_1_sys_data.html#a00dd45aa7796876b69f20b29ec4c54a6", null ],
     [ "lastConnectivityRecoveryAction", "classsys_status_data_1_1_sys_data.html#a495659bf0a0c4977701f03f73640bb57", null ],
@@ -16,6 +18,9 @@ var classsys_status_data_1_1_sys_data =
     [ "lastHookResponse", "classsys_status_data_1_1_sys_data.html#ad3f38ef14a6418b0dfaf9656e4e84152", null ],
     [ "lastReport", "classsys_status_data_1_1_sys_data.html#a553a7a26ab8760a9d912476e1dfd837f", null ],
     [ "lastTimeSync", "classsys_status_data_1_1_sys_data.html#afafd4b77d084a2e9f2e425bd7dc6868d", null ],
+    [ "lastWatchdogBreadcrumb", "classsys_status_data_1_1_sys_data.html#a04b5d219aefe37a36293022f47c8fbfe", null ],
+    [ "lastWatchdogResetReasonData", "classsys_status_data_1_1_sys_data.html#ad96c5093b8b2cb8feb2fa5822d0ad575", null ],
+    [ "lastWatchdogUptimeMs", "classsys_status_data_1_1_sys_data.html#a600c7e7a3064f0a7b3b3c0811a55094c", null ],
     [ "lowBatteryMode", "classsys_status_data_1_1_sys_data.html#a585c498d8e5c329844bee07dc696aa58", null ],
     [ "lowPowerMode", "classsys_status_data_1_1_sys_data.html#aebaa91e1d0c5b5a892a4d5d93e8914f3", null ],
     [ "modemOffBudgetSec", "classsys_status_data_1_1_sys_data.html#a0bbf6577468e7f05f9101582d2ac0c61", null ],
@@ -38,6 +43,7 @@ var classsys_status_data_1_1_sys_data =
     [ "verboseMode", "classsys_status_data_1_1_sys_data.html#a16316871cb17f0e9643e7a8a4efab0b0", null ],
     [ "verboseModeStartTime", "classsys_status_data_1_1_sys_data.html#ad8f3ac5f74d58b34d2d04159602d6781", null ],
     [ "verboseTimeoutMin", "classsys_status_data_1_1_sys_data.html#a7c89f1779ae342efe40303f3f1fe1062", null ],
+    [ "watchdogResetCount", "classsys_status_data_1_1_sys_data.html#a21608084208b8769dcf4c46c3c407dc9", null ],
     [ "webhookEnabled", "classsys_status_data_1_1_sys_data.html#a294ecc86e44f7cb180ea78debdf7914a", null ],
     [ "webhookName", "classsys_status_data_1_1_sys_data.html#a0e444ace1641199039b9dbdf2ea2ab19", null ],
     [ "webhookTimeoutMs", "classsys_status_data_1_1_sys_data.html#af41aac936e74cee70830a5e86c98d211", null ]

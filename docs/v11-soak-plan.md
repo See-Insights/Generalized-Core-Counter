@@ -2,7 +2,7 @@
 
 ## Scope
 
-This soak validates release `11.0.0` as the connectivity resiliency candidate.
+This soak validates release `11.0.1` as the connectivity resiliency candidate.
 
 Deployment plan:
 
@@ -13,8 +13,8 @@ The soak is intended to validate resiliency, observability, and operational clar
 
 ## Preconditions
 
-- Firmware version reports `11.0.0`.
-- `PRODUCT_VERSION(11)` is present in the firmware.
+- Firmware version reports `11.0.1`.
+- `PRODUCT_VERSION(12)` is present in the firmware.
 - Device OS target is `6.4.1`.
 - Production builds were compiled for Boron, Photon 2, and Argon.
 - `CONNECTIVITY_FAILSAFE_TEST_MODE` is disabled.

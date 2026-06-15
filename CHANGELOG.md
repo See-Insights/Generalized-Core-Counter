@@ -16,6 +16,94 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [16.0.0] - 2026-06-10
+
+### Fixed
+
+- **Watchdog forensic event suppression**: Removed conditional gating that prevented `publishWatchdogForensics()` from executing when the device was within open hours or sensor was ready. Watchdog forensic events are now queued unconditionally on every watchdog reset immediately after detection, ensuring forensic data (breadcrumb, loop stage, queue depth, state, connection age) is always captured and delivered for post-reset RCA.
+
+### Changed
+
+- **Release metadata updated for v16 patch**: Bumped firmware version to `16.0.0` and Particle product version to `PRODUCT_VERSION(16)`.
+
+## [15.0.0] - 2026-06-10
+
+### Added
+
+- **Watchdog forensic instrumentation**: Added loop-stage forensics snapshots and startup watchdog forensic publish payloads to improve post-reset RCA for breadcrumb/stage/queue/state/connection-age context.
+
+### Changed
+
+- **Hibernate validation objective**: Release objective includes validating Boron hibernate behavior with extended 36000-second sleep duration in limited deployment.
+- **Release metadata updated for v15 rollout**: Bumped firmware version to `15.0.0` and Particle product version to `PRODUCT_VERSION(15)`.
+
+### Fixed
+
+- **Breadcrumb collision risk in forensic ranges**: Reassigned breadcrumb IDs so `14-18` are uniquely reserved for `REPORT_LEDGER_DONE`, `CLOUD_LOOP_ENTER`, `CLOUD_LOOP_EXIT`, `PUBLISH_QUEUE_ENTER`, and `PUBLISH_QUEUE_EXIT`.
+
+### Validation
+
+- Revalidated Boron compile on Device OS `6.4.1` after v15 forensic instrumentation changes.
+- Confirmed watchdog forensic publish payload remains compact and well under Particle event-data limits.
+
+## [14.0.0] - 2026-06-06
+
+### Added
+
+- **Release trace controls**: Added compile-time trace controls for ledger, connect, connect-decision, sleep, performance, PMIC, and config logging so release builds can stay quiet without removing forensic and escalation visibility.
+
+### Changed
+
+- **Cloud recovery tuning**: Refined cloud recovery tuning and connect-decision observability while keeping the existing connection, recovery, and sleep behavior unchanged.
+- **Release logging cleanup**: Reduced release log noise by gating routine trace and narrative logs while retaining state transitions, report/connect summaries, gate release logs, sleep/time diagnostics, and all warning/error paths.
+- **Release metadata updated for v14 rollout**: Bumped the Particle product version, firmware version string, README version header, and Doxygen project number to `14.0.0` / `PRODUCT_VERSION(14)`.
+- **Timezone normalization retained**: Carried forward explicit normalization of known ambiguous Singapore aliases to POSIX-correct `SGT-8` in ledger config apply (`SGT8`, `UTC+8`, `GMT+8`, `Singapore` -> `SGT-8`).
+
+### Fixed
+
+- **Misleading warning-level performance logs**: Successful `ReportPerf` timing entries are no longer emitted as warnings in normal release builds; only failures or abnormal latency remain warning-level.
+- **Temporary diagnostic log noise**: Removed or trace-gated temporary timezone investigation logs (`TimeLedgerUpdate`, `TimeTZObject`, `TimeLedgerVerify`, `TimeBootVerify`) while keeping standard production diagnostics (`ConfigApply`, `ConfigValidate`, `ConfigDiag`, `TimeDiag`).
+
+### Validation
+
+- Revalidated production compiles for Boron and Photon 2 / P2 with Device OS `6.4.1` and release-safe trace defaults.
+
+## [13.0.0] - 2026-05-27
+
+### Added
+
+- **Watchdog forensic telemetry**: Added retained watchdog reset counters and startup telemetry fields including `watchdogResetCount`, `lastWatchdogBreadcrumb`, and `lastWatchdogUptimeMs` so post-reset analysis survives missing serial logs.
+- **PMIC anomaly telemetry**: Added retained PMIC contradiction counters, transition-only anomaly capture, startup/device-status telemetry, and `PMIC_ANOM` logging for low-SOC `Charged` or `Not Charging` contradictions.
+- **Occupancy anomaly logging**: Added `OccAnom` logging on invalid occupancy close paths so impossible durations and prior totals are preserved for RCA.
+
+### Changed
+
+- **Release metadata updated for v13 rollout**: Bumped the Particle product version, firmware version string, README version header, and Doxygen project number to `13.0.0` / `PRODUCT_VERSION(13)`.
+- **Occupancy close validation hardened**: Occupancy close handling now validates impossible session durations before updating daily totals.
+- **PMIC forensics build flag added**: Added `ENABLE_PMIC_FORENSICS` as the single compile-time deployment flag, enabled by default for release builds, to gate PMIC contradiction logging, counters, and telemetry.
+
+### Fixed
+
+- **Corrupted daily occupancy totals from invalid start times**: Protected against unsigned-wrap and otherwise invalid `occupancyStartTime` values from inflating `dailyoccupancy` with impossible occupied durations.
+
+### Validation
+
+- Revalidated production compiles for Boron, Photon 2, and Argon with `CONNECTIVITY_FAILSAFE_TEST_MODE=0` and `ENABLE_PMIC_FORENSICS=1`.
+
+## [11.0.1] - 2026-05-22
+
+### Added
+
+- **Release artifact documentation completeness**: Included the new architecture overview and the refreshed soak-plan references in the `11.0.1` release artifact so the published release matches the current `main` branch onboarding and soak guidance.
+
+### Changed
+
+- **Release metadata updated for the patch soak cut**: Bumped the Particle product version, firmware version string, README version header, Doxygen project number, and soak preconditions to `11.0.1` / `PRODUCT_VERSION(12)`.
+
+### Fixed
+
+- **Version traceability for Singapore soak deployment**: The firmware tip that includes the architecture overview documentation now reports a distinct patch-release identity instead of continuing to present itself as `11.0.0`.
+
 ## [11.0.0] - 2026-05-22
 
 ### Added
@@ -423,4 +511,10 @@ This release fundamentally restructures device configuration to use four indepen
 
 ## 5.00 – 2026-03-18
 - Hardware Soak Production Candidate
+
+## 18 – 2026-06-11
+- Watchdog forensics hard fault fix
+
+## 19 – 2026-06-15
+- addressed power management issues particularly on USB power
 
