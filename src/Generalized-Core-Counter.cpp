@@ -1706,14 +1706,18 @@ void publishData() {
     current.set_lastAlertTime(0);
   }
 
-  // Arm short-term webhook supervision.
+  // Arm short-term webhook supervision only if publish succeeded.
   // If we're already connected, start the 20s window immediately.
   // Otherwise start it when CONNECTING_STATE reports a successful cloud connect.
-  session.webhookExpectedOnConnect = true;
-  if (Particle.connected()) {
-    session.webhookExpectedOnConnect = false;
-    session.awaitingWebhookResponse = true;
-    session.webhookAwaitStartMs = millis();
+  if (queued) {
+    session.webhookExpectedOnConnect = true;
+    if (Particle.connected()) {
+      session.webhookExpectedOnConnect = false;
+      session.awaitingWebhookResponse = true;
+      session.webhookAwaitStartMs = millis();
+    }
+  } else {
+    Log.info("Webhook supervision not armed: publish queue rejected");
   }
 
   // Also update device-data ledger with structured JSON snapshot
