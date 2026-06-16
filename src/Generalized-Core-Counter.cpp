@@ -26,9 +26,11 @@
 #include "diagnostics/ConnectivityFailsafeTest.h"
 #include "ThrashGuard.h"
 
+// Firmware version metadata
+#include "FirmwareVersion.h"
+
 // Firmware version recognized by Particle Product firmware management
-// Bump this integer whenever you cut a new production release.
-PRODUCT_VERSION(19);
+PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 
 // Hardware abstraction and device-specific pinouts
 #include "device_pinout.h"           // Platform-specific pin definitions

@@ -41,7 +41,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
 VERSION_FILE="src/Version.cpp"
-MAIN_FILE="src/Generalized-Core-Counter.cpp"
+FIRMWARE_VERSION_FILE="src/FirmwareVersion.h"
 DOXYFILE="Doxyfile"
 CHANGELOG="CHANGELOG.md"
 README="README.md"
@@ -51,8 +51,8 @@ if [ ! -f "$VERSION_FILE" ]; then
   exit 1
 fi
 
-if [ ! -f "$MAIN_FILE" ]; then
-  echo "Error: $MAIN_FILE not found"
+if [ ! -f "$FIRMWARE_VERSION_FILE" ]; then
+  echo "Error: $FIRMWARE_VERSION_FILE not found"
   exit 1
 fi
 
@@ -72,8 +72,8 @@ sed -i '' "s/^const char\\* FIRMWARE_VERSION.*/const char* FIRMWARE_VERSION = \"
 # Update firmware release notes in Version.cpp
 sed -i '' "s/^const char\\* FIRMWARE_RELEASE_NOTES.*/const char* FIRMWARE_RELEASE_NOTES = \"${NOTES_ESCAPED}\";/" "$VERSION_FILE"
 
-# Update PRODUCT_VERSION in main file (Generalized-Core-Counter.cpp)
-sed -i '' "s/^PRODUCT_VERSION(.*);/PRODUCT_VERSION(${PRODUCT_VERSION_INT});/" "$MAIN_FILE"
+# Update FIRMWARE_PRODUCT_VERSION in FirmwareVersion.h
+sed -i '' "s/^#define FIRMWARE_PRODUCT_VERSION.*/#define FIRMWARE_PRODUCT_VERSION ${PRODUCT_VERSION_INT}/" "$FIRMWARE_VERSION_FILE"
 
 # Update Doxygen project number
 sed -i '' "s/^PROJECT_NUMBER.*/PROJECT_NUMBER         = \"${VERSION_ESCAPED}\"/" "$DOXYFILE"
