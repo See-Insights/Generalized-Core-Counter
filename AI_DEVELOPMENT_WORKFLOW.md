@@ -185,6 +185,8 @@ Current priorities:
 4. Observability
 5. Reduction of complexity
 
+Prefer concise Doxygen comments that explain intent and operational significance. Detailed design explanations belong in docs/architecture/*.md, not in source code.
+
 Not current priorities:
 
 * New sensors
