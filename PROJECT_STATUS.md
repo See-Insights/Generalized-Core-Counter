@@ -217,6 +217,59 @@ When proposing changes:
 
 ---
 
+# Firmware Versioning Strategy
+
+The firmware uses two distinct version identifiers:
+
+## Particle Product Version (Integer)
+
+- Defined in `src/FirmwareVersion.h` as `FIRMWARE_PRODUCT_VERSION`
+- Required by Particle's cloud firmware management system
+- Must be an integer (e.g., 19, 20, 21)
+- Should be incremented when starting a new firmware release line
+- Used by `PRODUCT_VERSION()` macro in the main firmware file
+
+## Human-Readable Version (String)
+
+- Defined in `src/Version.cpp` as `FIRMWARE_VERSION`
+- Human-readable string (e.g., "19", "19.1", "19.2", "20.0")
+- Used for logging, status reporting, cloud status, and user documentation
+- Point releases (e.g., 19.1, 19.2, 19.3) typically share the same PRODUCT_VERSION
+- Allows tracking bug fixes and minor updates within a release line
+
+## Version Update Process
+
+Use `bump_version.sh` to update version metadata:
+
+```bash
+./bump_version.sh 20 "New feature release"
+```
+
+This script automatically updates:
+- `FIRMWARE_VERSION` and `FIRMWARE_RELEASE_NOTES` in `src/Version.cpp`
+- `FIRMWARE_PRODUCT_VERSION` in `src/FirmwareVersion.h`
+- Doxygen `PROJECT_NUMBER` in `Doxyfile`
+- Version header in `README.md`
+- Changelog entry in `CHANGELOG.md`
+
+## When to Increment the Product Version
+
+Increment `FIRMWARE_PRODUCT_VERSION` (the Particle integer version) when:
+
+- Starting a new major release line
+- Making breaking changes to device behavior
+- Preparing for fleet-wide OTA deployments
+- Moving to a new Device OS version
+
+Keep `FIRMWARE_PRODUCT_VERSION` stable for point releases containing:
+
+- Bug fixes
+- Minor improvements
+- Non-breaking feature additions
+- Documentation updates
+
+---
+
 # Next Major Milestone
 
 Create a fully modular architecture separating:
