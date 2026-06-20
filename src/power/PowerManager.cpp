@@ -7,6 +7,7 @@
 
 namespace {
 
+constexpr int kPowerSourceUnknown = 0;
 constexpr int kPowerSourceVin = 1;
 constexpr int kPowerSourceUsbHost = 2;
 constexpr int kPowerSourceUsbAdapter = 3;
@@ -124,10 +125,37 @@ bool PowerManager::refreshInputProfile() {
     return true;
   }
 
-  const PowerPlatform::PowerSourceSnapshot sourceSnapshot =
+  PowerPlatform::PowerSourceSnapshot sourceSnapshot =
       PowerPlatform::readPowerSource();
   nextReport.reading.powerSource = sourceSnapshot.source;
   nextReport.reading.powerSourceStatus = sourceSnapshot.status;
+
+#if PLATFORM_ID == PLATFORM_BORON && ENABLE_BORON_USB_SOURCE_OVERRIDE
+  // Boron-specific USB source override: when Device OS reports VIN/UNKNOWN but
+  // Nordic USB hardware shows active enumeration + VBUS + regulator ready,
+  // override to USB_HOST to apply correct UsbBench charging profile.
+  const uint32_t usbAddr = NRF_USBD->USBADDR;
+  const uint32_t usbRegStatus = NRF_POWER->USBREGSTATUS;
+
+  const bool usbEnumerated = ((usbAddr & 0x7F) != 0);
+  const bool usbVbusPresent = (usbRegStatus & 0x01);
+  const bool usbRegReady = (usbRegStatus & 0x02);
+
+  if ((sourceSnapshot.source == kPowerSourceVin ||
+       sourceSnapshot.source == kPowerSourceUnknown) &&
+      usbEnumerated &&
+      usbVbusPresent &&
+      usbRegReady) {
+    Log.warn(
+        "PowerSourceOverride: source=%s usbAddr=0x%02lx usbReg=0x%02lx -> USB_HOST reason=usb_enumerated",
+        powerSourceLabel(sourceSnapshot.source),
+        (unsigned long)(usbAddr & 0x7FUL),
+        (unsigned long)(usbRegStatus & 0x03UL)
+    );
+
+    sourceSnapshot.source = kPowerSourceUsbHost;
+  }
+#endif
 
   const PowerInputProfile fallbackProfile = configuredFallbackProfile();
   PowerProfileSelectionReason selectionReason =
@@ -167,6 +195,7 @@ bool PowerManager::refreshInputProfile() {
   }
 
   report_ = nextReport;
+  PowerDiagnostics::logPowerState("post-refreshInputProfile");
   return report_.powerConfigurationResult == SYSTEM_ERROR_NONE;
 }
 
