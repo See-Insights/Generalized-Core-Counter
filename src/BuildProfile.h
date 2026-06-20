@@ -27,6 +27,7 @@
  * - Routine config trace logging: -DENABLE_CONFIG_TRACE=1
  * - PMIC charge cycle diagnostic test: -DENABLE_PMIC_CHARGE_CYCLE_TEST=1
  * - PMIC register dump diagnostic: -DENABLE_PMIC_REGISTER_DUMP=1
+ * - Boron USB power source override: -DENABLE_BORON_USB_SOURCE_OVERRIDE=0
  *
  * Trace flag notes:
  * - ENABLE_LEDGER_TRACE=1 enables detailed ledger request lifecycle logs.
@@ -182,6 +183,27 @@
 
 #if (ENABLE_PMIC_CHARGE_CYCLE_TEST != 0) && (ENABLE_PMIC_CHARGE_CYCLE_TEST != 1)
 #error "ENABLE_PMIC_CHARGE_CYCLE_TEST must be 0 or 1"
+#endif
+
+#ifndef ENABLE_BORON_USB_SOURCE_OVERRIDE
+/**
+ * @brief Boron-only USB power source override for drift mitigation.
+ *
+ * On Boron, Device OS occasionally reports powerSource() == VIN even when
+ * Nordic USB hardware shows active enumeration (USBADDR != 0, USBREGSTATUS == 0x03).
+ * This causes firmware to apply Solar35W profile instead of UsbBench during bench USB charging.
+ *
+ * When enabled, firmware overrides VIN/UNKNOWN source to USB_HOST when Nordic
+ * USB registers confirm enumeration + VBUS present + regulator ready.
+ *
+ * Boron-only guard. Enabled by default on investigation/boron-powerdiag branch.
+ * Set to 0 to disable override and restore baseline Device OS behavior.
+ */
+#define ENABLE_BORON_USB_SOURCE_OVERRIDE 1
+#endif
+
+#if (ENABLE_BORON_USB_SOURCE_OVERRIDE != 0) && (ENABLE_BORON_USB_SOURCE_OVERRIDE != 1)
+#error "ENABLE_BORON_USB_SOURCE_OVERRIDE must be 0 or 1"
 #endif
 
 // Optional convenience: enable DEBUG_SERIAL in DEV builds unless overridden.

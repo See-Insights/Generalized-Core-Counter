@@ -11,6 +11,7 @@ const char *batteryContext[7] = {"Unknown",    "Not Charging", "Charging",
 #include "power/Connectivity.h"
 #include "power/PowerManager.h"
 #include "power/PowerPlatform.h"
+#include "power/PowerDiagnostics.h"
 #include "power/ConnectivityPolicy.h"
 #include "state/StateMachine.h"
 #include "sensors/SensorFactory.h"
@@ -105,6 +106,21 @@ namespace {
 #if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
 constexpr uint8_t PMIC_ANOMALY_CONSECUTIVE_LIMIT = 3;
 #endif
+
+// BQ24195 PMIC REG09 fault register bit masks
+// REG09[5:4] = CHRG_FAULT (charge fault status)
+// REG09[3] = BAT_FAULT (battery fault status)
+constexpr uint8_t PMIC_CHRG_FAULT_MASK = 0x30;  // Bits 5:4
+constexpr uint8_t PMIC_BAT_FAULT_MASK = 0x08;   // Bit 3
+
+/**
+ * @brief Extract CHRG_FAULT field from BQ24195 REG09 fault register.
+ * @param faultReg Raw REG09 fault register value
+ * @return CHRG_FAULT bits (0-3): 0=Normal, 1=Input fault, 2=Thermal shutdown, 3=Safety timer expiration
+ */
+inline uint8_t pmicGetChargeFault(uint8_t faultReg) {
+  return (faultReg & PMIC_CHRG_FAULT_MASK) >> 4;
+}
 
 #if HAL_PLATFORM_CELLULAR || PLATFORM_ID == PLATFORM_ARGON
 void boundedBatterySettleDelay(unsigned long delayMs) {
@@ -209,7 +225,7 @@ unsigned long currentWakeAwakeMs() {
 }
 
 uint8_t batteryStateFromPmicStatus(uint8_t chargeStatus, byte faultReg) {
-  if (faultReg & 0x38) {
+  if (faultReg & (PMIC_CHRG_FAULT_MASK | PMIC_BAT_FAULT_MASK)) {
     return (uint8_t)PowerBatteryContext::Fault;
   }
 
@@ -239,7 +255,7 @@ const char *compactPmicVbusLabel(uint8_t vbusStatus) {
 }
 
 const char *compactPmicChargeLabel(uint8_t chargeStatus, byte faultReg) {
-  if (faultReg & 0x38) {
+  if (faultReg & (PMIC_CHRG_FAULT_MASK | PMIC_BAT_FAULT_MASK)) {
     return "FAULT";
   }
 
@@ -726,6 +742,36 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
 #if HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
   // Refresh power profile to handle runtime power source changes
   PowerManager::instance().refreshInputProfile();
+  PowerDiagnostics::logPowerState("battery-refresh");
+
+  // Temporary compact PMIC charge diagnostic for USB source override soak validation
+  {
+    PMIC pmic(true);
+    const byte faultReg = pmic.getFault();
+    const byte systemStatus = pmic.getSystemStatus();
+    const uint8_t chargeStatus = (systemStatus >> 4) & 0x03;
+    const bool chargeFault = (faultReg & 0x30) != 0;
+    const bool chargingActive = (chargeStatus == 1 || chargeStatus == 2); // PRE or FAST
+    
+    auto compactChargeLabel = [](uint8_t status, bool fault) -> const char* {
+      if (fault) return "FAULT";
+      const char* labels[] = {"OFF", "PRE", "FAST", "DONE"};
+      return labels[status & 0x03];
+    };
+    
+    const PowerReport &powerReport = PowerManager::instance().latestReport();
+    Log.info(
+        "ChargeDiag: chg=%s(%u) ichg=%d fault=0x%02x vcell=%.3f soc=%.1f src=%s prof=%s",
+        compactChargeLabel(chargeStatus, chargeFault),
+        chargeStatus,
+        chargingActive ? 1 : 0,
+        faultReg,
+        (double)vcell,
+        (double)loggedSoc,
+        PowerManager::powerSourceLabel(powerSource),
+        PowerManager::compactProfileLabel(powerReport.activeInputProfile)
+    );
+  }
 
   // =========================================================================
   // PMIC Health Monitoring & Smart Remediation (BQ24195 PMIC)
@@ -795,7 +841,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   };
 
   bool persistentAfterImmediateChargeFaultReset = false;
-  if (faultReg & 0x38) {
+  if (faultReg & PMIC_CHRG_FAULT_MASK) {
     const bool usbInputPresent = (vbusStatus == 1 || vbusStatus == 2 || vbusStatus == 3);
     const bool usbBackedFaultContext =
         powerReport.activeInputProfile == PowerInputProfile::UsbBench ||
@@ -803,7 +849,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
         isUsbBackedSource(powerSource) ||
         usbInputPresent;
     const bool severeBatteryState = (battState == 5 || battState == 6);
-    const uint8_t initialChargeFault = (faultReg >> 3) & 0x07;
+    const uint8_t initialChargeFault = pmicGetChargeFault(faultReg);
     const bool alreadyAttemptedForActiveFault =
         immediateChargeFaultResetConsumed &&
         immediateChargeFaultResetFaultReg == faultReg;
@@ -834,14 +880,14 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
       thermalRegulation = (systemStatus & 0x02) != 0;
       inVsysMin = (systemStatus & 0x01) != 0;
       immediateChargeFaultResetConsumed = true;
-      immediateChargeFaultResetFaultReg = (byte)(faultReg & 0x38 ? faultReg : initialChargeFault << 3);
+      immediateChargeFaultResetFaultReg = (byte)(faultReg & PMIC_CHRG_FAULT_MASK ? faultReg : initialChargeFault << 4);
       lastRemediationAttempt = millis();
 
       Log.info("PMIC: fault reset result faultReg=0x%02x charge=%s",
                faultReg,
                chargeStatusStr[chargeStatus]);
 
-      if (!(faultReg & 0x38)) {
+      if (!(faultReg & PMIC_CHRG_FAULT_MASK)) {
         Log.info("PMIC: charge fault cleared");
         consecutiveFaults = 0;
         remediationLevel = 0;
@@ -862,9 +908,9 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
     }
   }
   
-  // Check for charging faults (bits 3-5: CHRG_FAULT)
-  if (faultReg & 0x38) {
-    uint8_t chargeFault = (faultReg >> 3) & 0x07;
+  // Check for charging faults (bits 5:4: CHRG_FAULT)
+  if (faultReg & PMIC_CHRG_FAULT_MASK) {
+    uint8_t chargeFault = pmicGetChargeFault(faultReg);
     consecutiveFaults++;
     
     switch(chargeFault) {
@@ -901,6 +947,9 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
         }
         break;
     }
+    
+    // Charge-fault-specific remediation logic follows below.
+    // BAT_FAULT is handled separately and does NOT enter remediation.
     
     // Smart remediation with escalation and thrash prevention
     // CRITICAL SAFETY CHECK: Never attempt remediation if charging is disabled due to temperature
@@ -1027,6 +1076,16 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
     }
   }
 
+  // Check for battery fault (bit 3: BAT_FAULT - battery overvoltage protection)
+  // This is separate from CHRG_FAULT and does NOT enter charge-cycle remediation.
+  // BAT_FAULT indicates a battery hardware issue that cannot be resolved by toggling charging.
+  if (faultReg & PMIC_BAT_FAULT_MASK) {
+    Log.error("PMIC: Battery overvoltage protection active (BAT_FAULT)");
+    current.raiseAlert(23); // Alert code 23: PMIC Battery Fault
+    // Do NOT increment consecutiveFaults or enter remediation for BAT_FAULT
+    // This is a battery hardware condition, not a charging configuration issue
+  }
+
   static byte lastLoggedPmicSystemStatus = 0xFF;
   static byte lastLoggedPmicFaultReg = 0xFF;
   static int lastLoggedPmicPowerSource = -999;
@@ -1110,7 +1169,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
     const bool externalPowerPresent = (vbusStatus == 1 || vbusStatus == 2 || vbusStatus == 3);
     const bool pmicStateChargeDone = (chargeStatus == 3); // DONE
     const bool pmicStateNotChargingWithPower = (chargeStatus == 0 && powerGood);
-    const bool pmicNoFault = !(faultReg & 0x38);
+    const bool pmicNoFault = !(faultReg & (PMIC_CHRG_FAULT_MASK | PMIC_BAT_FAULT_MASK));
     const bool vcellHighConfidence = (vcell >= 4.10f);
     const bool vcellLowConfidence = (vcell >= 4.05f && vcell < 4.10f);
     
