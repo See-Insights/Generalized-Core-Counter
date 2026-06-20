@@ -4,6 +4,7 @@
 #include "cloud/Cloud.h"
 #include "power/Connectivity.h"
 #include "power/ConnectivityPolicy.h"
+#include "power/PowerDiagnostics.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
 #include "PublishQueuePosixRK.h"
@@ -1070,6 +1071,7 @@ void handleSleepingState() {
             retainedHibernatePending = true;
 
             Log.info("Sleep: HIBERNATE reason=closed dur=%ds wakePin=%d", wakeInSeconds, (int)WAKEUP_PIN);
+            PowerDiagnostics::logPowerState("pre-hibernate");
             thrashGuard.markProgress("SLEEP_ATTEMPT");
             Cloud::instance().logLedgerSleepState();
             setAppBreadcrumb(21);
@@ -1313,6 +1315,7 @@ void handleSleepingState() {
 #endif
 
   thrashGuard.markProgress("SLEEP_ATTEMPT");
+  PowerDiagnostics::logPowerState("pre-sleep-ulp");
   const unsigned long sleepCallStartMs = millis();
   Cloud::instance().logLedgerSleepState();
   setAppBreadcrumb(21);
@@ -1362,6 +1365,7 @@ void handleSleepingState() {
       .gpio(BUTTON_PIN, FALLING)
       .gpio(intPin, RISING)
       .duration((uint32_t)wakeInSeconds * 1000UL);
+    PowerDiagnostics::logPowerState("pre-sleep-stop-fallback");
     Cloud::instance().logLedgerSleepState();
     setAppBreadcrumb(21);
     drainSerialBeforeSleep();
@@ -1373,6 +1377,7 @@ void handleSleepingState() {
       config = SystemSleepConfiguration();
       config.mode(SystemSleepMode::STOP)
         .duration((uint32_t)wakeInSeconds * 1000UL);
+      PowerDiagnostics::logPowerState("pre-sleep-stop-timer-only");
       Cloud::instance().logLedgerSleepState();
       setAppBreadcrumb(21);
       drainSerialBeforeSleep();
@@ -1464,6 +1469,7 @@ void handleSleepingState() {
   // Battery must be sampled before any later report/connect logic turns on the
   // modem, so mark the first post-wake sample for fuel-gauge stabilization now.
   measure.noteWakeFromLowPowerSleep();
+  PowerDiagnostics::logPowerState("post-wake");
   
   // LED will be turned on with proper timeout by PIR wake processing below
   // Don't turn it on here without timeout as it causes false LED timeout detection

@@ -22,6 +22,7 @@
 #include "power/ConnectivityPolicy.h"
 #include "power/PowerManager.h"
 #include "power/PowerPlatform.h"
+#include "power/PowerDiagnostics.h"
 #include "observability/WakeCycleStats.h"
 #include "diagnostics/ConnectivityFailsafeTest.h"
 #include "ThrashGuard.h"
@@ -1114,9 +1115,11 @@ void setup() {
   // initialization have completed while the radio is still off.
   if (System.resetReason() == RESET_REASON_POWER_MANAGEMENT) {
     measure.noteWakeFromLowPowerSleep();
+    PowerDiagnostics::logPowerState("post-wake-setup");
   }
   measure.batteryState(BatterySampleContext::Setup);
   PowerManager::instance().refreshInputProfile();
+  PowerDiagnostics::logPowerState("setup", true);
   if (sysStatus.get_lowBatteryMode()) {
     applyBatteryAwareConnectionModePolicy(current.get_stateOfCharge());
   }
@@ -1126,7 +1129,7 @@ void setup() {
                   FALLING); // We may need to monitor the user switch to change
                             // behaviours / modes
 
-  if (state == INITIALIZATION_STATE)
+  if (state == INITIALIZATION_STATE)\
     transitionTo(IDLE_STATE, "setup complete"); // Default to IDLE; CONNECTING only when explicitly requested
 
   // setup reached stable completion; clear early-boot in-progress marker.

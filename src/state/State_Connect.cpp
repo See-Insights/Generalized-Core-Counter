@@ -9,6 +9,7 @@
 #include "sensors/SensorDefinitions.h"
 #include "power/ConnectivityPolicy.h"
 #include "power/Connectivity.h"
+#include "power/PowerDiagnostics.h"
 #include "observability/WakeCycleStats.h"
 #include "ThrashGuard.h"
 
@@ -558,6 +559,7 @@ void handleConnectingState() {
         current.set_alertCode(0);
       }
       measure.batteryState();
+      PowerDiagnostics::logPowerState("connect-success");
       
       if (sysStatus.get_verboseMode()) {
         char data[64];

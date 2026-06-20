@@ -196,6 +196,9 @@ PowerConfigurationApplyResult applyInputProfile(PowerInputProfile profile) {
                            USB_BENCH_CHARGE_CURRENT_MA,
                            USB_BENCH_CHARGE_VOLTAGE_MV,
                            result.systemResult);
+    if (result.applied) {
+      PowerDiagnostics::logPowerState("profile-change", true);
+    }
     return result;
 
   case PowerInputProfile::Solar35W:
@@ -207,6 +210,9 @@ PowerConfigurationApplyResult applyInputProfile(PowerInputProfile profile) {
                            SOLAR_CHARGE_CURRENT_MA,
                            SOLAR_CHARGE_VOLTAGE_MV,
                            result.systemResult);
+    if (result.applied) {
+      PowerDiagnostics::logPowerState("profile-change", true);
+    }
     return result;
 
   case PowerInputProfile::Auto:
