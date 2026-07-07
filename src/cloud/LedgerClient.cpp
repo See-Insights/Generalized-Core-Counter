@@ -37,6 +37,8 @@ void Cloud::setup() {
     deviceDataLedger = Particle.ledger("device-data");
     deviceDataLedger.onSync(onDeviceDataLedgerSync);
 
+    logLedgerStartupState();
+
 }
 
 // Static callbacks
@@ -65,19 +67,21 @@ void Cloud::onDeviceSettingsSync(Ledger ledger) {
 }
 
 void Cloud::onDeviceStatusLedgerSync(Ledger ledger) {
-    (void)ledger;
+    const unsigned long lastUpdated = (unsigned long)ledger.lastUpdated();
+    const unsigned long lastSynced = (unsigned long)ledger.lastSynced();
     const LedgerSyncDiagnostics before = Cloud::instance().ledgerSyncDiagnostics();
     Cloud::instance().pendingDeviceStatusSync = false;
     const LedgerSyncDiagnostics after = Cloud::instance().ledgerSyncDiagnostics();
-    Cloud::instance().noteLedgerSyncComplete(Cloud::LEDGER_REQUEST_KIND_STATUS, before, after);
+    Cloud::instance().noteLedgerSyncComplete(Cloud::LEDGER_REQUEST_KIND_STATUS, lastUpdated, lastSynced, before, after);
 }
 
 void Cloud::onDeviceDataLedgerSync(Ledger ledger) {
-    (void)ledger;
+    const unsigned long lastUpdated = (unsigned long)ledger.lastUpdated();
+    const unsigned long lastSynced = (unsigned long)ledger.lastSynced();
     const LedgerSyncDiagnostics before = Cloud::instance().ledgerSyncDiagnostics();
     Cloud::instance().pendingDeviceDataSync = false;
     const LedgerSyncDiagnostics after = Cloud::instance().ledgerSyncDiagnostics();
-    Cloud::instance().noteLedgerSyncComplete(Cloud::LEDGER_REQUEST_KIND_DATA, before, after);
+    Cloud::instance().noteLedgerSyncComplete(Cloud::LEDGER_REQUEST_KIND_DATA, lastUpdated, lastSynced, before, after);
 }
 
 bool Cloud::hasPendingOutputLedgerSync() const {

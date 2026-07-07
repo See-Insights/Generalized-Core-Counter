@@ -54,6 +54,17 @@ const char *ledgerRequestKindLabel(Cloud::LedgerRequestKind kind) {
     }
 }
 
+const char *ledgerRequestKindCompactLabel(Cloud::LedgerRequestKind kind) {
+    switch (kind) {
+    case Cloud::LEDGER_REQUEST_KIND_STATUS:
+        return "STATUS";
+    case Cloud::LEDGER_REQUEST_KIND_DATA:
+        return "DATA";
+    default:
+        return "UNKNOWN";
+    }
+}
+
 const char *ledgerRequestSourceLabel(const char *source) {
     return (source && source[0] != '\0') ? source : "Unknown";
 }
@@ -259,12 +270,28 @@ uint32_t Cloud::noteLedgerSyncRequest(LedgerRequestKind kind,
 
     if (existing && inflightForPointer) {
         const unsigned long ageMs = issueMs - existing->issueMs;
+        unsigned long lastUpdated = 0;
+        unsigned long lastSynced = 0;
+        if (ptr == &deviceStatusLedger) {
+            lastUpdated = (unsigned long)deviceStatusLedger.lastUpdated();
+            lastSynced = (unsigned long)deviceStatusLedger.lastSynced();
+        } else if (ptr == &deviceDataLedger) {
+            lastUpdated = (unsigned long)deviceDataLedger.lastUpdated();
+            lastSynced = (unsigned long)deviceDataLedger.lastSynced();
+        }
 #if ENABLE_LEDGER_TRACE
-        Log.warn("LedgerDuplicateIssue: source=%s ptr=%p existingSeq=%lu age=%lu",
-                 ledgerRequestSourceLabel(source),
-                 ptr,
+    Log.warn("LedgerDup: seq=%lu globalSeq=%lu kind=%s orig=%s new=%s age=%lu count=%u pendingData=%d pendingStatus=%d upd=%lu sync=%lu",
                  (unsigned long)existing->seq,
-                 ageMs);
+         (unsigned long)ledgerRequestSequence,
+                 ledgerRequestKindCompactLabel(existing->kind),
+                 ledgerRequestSourceLabel(existing->source),
+                 ledgerRequestSourceLabel(source),
+                 ageMs,
+                 (unsigned)currentLedgerPendingCount(),
+                 pendingDeviceDataSync ? 1 : 0,
+                 pendingDeviceStatusSync ? 1 : 0,
+                 lastUpdated,
+                 lastSynced);
         Log.info("LedgerIssueSkip: source=%s ptr=%p existingSeq=%lu age=%lu",
                  ledgerRequestSourceLabel(source),
                  ptr,
@@ -272,11 +299,18 @@ uint32_t Cloud::noteLedgerSyncRequest(LedgerRequestKind kind,
                  ageMs);
 #else
         if (ageMs > 30000UL) {
-            Log.warn("LedgerDuplicateStillInflight: source=%s ptr=%p existingSeq=%lu age=%lu",
-                     ledgerRequestSourceLabel(source),
-                     ptr,
+            Log.warn("LedgerDuplicateStillInflight: seq=%lu globalSeq=%lu kind=%s orig=%s new=%s age=%lu count=%u pendingData=%d pendingStatus=%d upd=%lu sync=%lu",
                      (unsigned long)existing->seq,
-                     ageMs);
+                     (unsigned long)ledgerRequestSequence,
+                     ledgerRequestKindCompactLabel(existing->kind),
+                     ledgerRequestSourceLabel(existing->source),
+                     ledgerRequestSourceLabel(source),
+                     ageMs,
+                     (unsigned)currentLedgerPendingCount(),
+                     pendingDeviceDataSync ? 1 : 0,
+                     pendingDeviceStatusSync ? 1 : 0,
+                     lastUpdated,
+                     lastSynced);
         }
 #endif
         return 0;
@@ -319,19 +353,24 @@ uint32_t Cloud::noteLedgerSyncRequest(LedgerRequestKind kind,
 }
 
 void Cloud::noteLedgerSyncComplete(LedgerRequestKind kind,
+                                   unsigned long lastUpdated,
+                                   unsigned long lastSynced,
                                    const LedgerSyncDiagnostics &before,
                                    const LedgerSyncDiagnostics &after) {
     const unsigned long nowMs = millis();
+    const uint16_t trackerCountBefore = currentLedgerPendingCount();
     LedgerRequestRecord *record = findOldestRequestOfKind(kind);
     if (!record) {
-        Log.warn("LedgerSyncCompleteMissing: seq=0 kind=%s age=0 pending_before=%u pending_after=%u syncing_before=%d syncing_after=%d inflight_before=%d inflight_after=%d",
-                 ledgerRequestKindLabel(kind),
-                 (unsigned)before.pendingCount,
-                 (unsigned)after.pendingCount,
-                 before.syncing ? 1 : 0,
-                 after.syncing ? 1 : 0,
-                 before.inflight ? 1 : 0,
-                 after.inflight ? 1 : 0);
+        Log.warn("LedgerCb: kind=%s seq=0 globalSeq=%lu found=0 age=0 ms=%lu upd=%lu sync=%lu countBefore=%u countAfter=%u pendingData=%d pendingStatus=%d",
+                 ledgerRequestKindCompactLabel(kind),
+                 (unsigned long)ledgerRequestSequence,
+                 nowMs,
+                 lastUpdated,
+                 lastSynced,
+                 (unsigned)trackerCountBefore,
+                 (unsigned)currentLedgerPendingCount(),
+                 after.pendingDeviceDataSync ? 1 : 0,
+                 after.pendingDeviceStatusSync ? 1 : 0);
         return;
     }
 
@@ -340,7 +379,21 @@ void Cloud::noteLedgerSyncComplete(LedgerRequestKind kind,
     const void *ptr = record->ptr;
     const unsigned long ageMs = nowMs - record->issueMs;
     removeLedgerRequest(record);
+    const uint16_t trackerCountAfter = currentLedgerPendingCount();
     updateCompletedAgeStats(ageMs);
+
+    Log.info("LedgerCb: kind=%s seq=%lu globalSeq=%lu found=1 age=%lu ms=%lu upd=%lu sync=%lu countBefore=%u countAfter=%u pendingData=%d pendingStatus=%d",
+             ledgerRequestKindCompactLabel(kind),
+             (unsigned long)seq,
+             (unsigned long)ledgerRequestSequence,
+             ageMs,
+             nowMs,
+             lastUpdated,
+             lastSynced,
+             (unsigned)trackerCountBefore,
+             (unsigned)trackerCountAfter,
+             after.pendingDeviceDataSync ? 1 : 0,
+             after.pendingDeviceStatusSync ? 1 : 0);
 
 #if ENABLE_LEDGER_TRACE
     Log.info("LedgerComplete: seq=%lu kind=%s source=%s ptr=%p age=%lu pending_before=%u pending_after=%u syncing_before=%d syncing_after=%d inflight_before=%d inflight_after=%d",
@@ -416,6 +469,18 @@ void Cloud::logLedgerConnectState() const {
 #endif
 }
 
+void Cloud::logLedgerStartupState() const {
+    Log.info("LedgerStartup: globalSeq=%lu count=%u pendingData=%d pendingStatus=%d dataUpd=%lu dataSync=%lu statusUpd=%lu statusSync=%lu",
+             (unsigned long)ledgerRequestSequence,
+             (unsigned)ledgerRequestCount,
+             pendingDeviceDataSync ? 1 : 0,
+             pendingDeviceStatusSync ? 1 : 0,
+             (unsigned long)deviceDataLedger.lastUpdated(),
+             (unsigned long)deviceDataLedger.lastSynced(),
+             (unsigned long)deviceStatusLedger.lastUpdated(),
+             (unsigned long)deviceStatusLedger.lastSynced());
+}
+
 void Cloud::logLedgerSleepState() const {
     const unsigned long nowMs = millis();
     const uint16_t pendingCount = (uint16_t)ledgerRequestCount;
@@ -441,6 +506,31 @@ void Cloud::logLedgerSleepState() const {
              1,
              oldestAgeMs);
 #endif
+}
+
+void Cloud::logLedgerSleepTimeoutState() const {
+    const unsigned long nowMs = millis();
+    const uint16_t pendingCount = (uint16_t)ledgerRequestCount;
+
+    Log.warn("LedgerSleepTimeout: globalSeq=%lu count=%u pendingData=%d pendingStatus=%d dataUpd=%lu dataSync=%lu statusUpd=%lu statusSync=%lu",
+             (unsigned long)ledgerRequestSequence,
+             (unsigned)pendingCount,
+             pendingDeviceDataSync ? 1 : 0,
+             pendingDeviceStatusSync ? 1 : 0,
+             (unsigned long)deviceDataLedger.lastUpdated(),
+             (unsigned long)deviceDataLedger.lastSynced(),
+             (unsigned long)deviceStatusLedger.lastUpdated(),
+             (unsigned long)deviceStatusLedger.lastSynced());
+
+    for (size_t index = 0; index < ledgerRequestCount; ++index) {
+        const unsigned long ageMs = nowMs - ledgerRequests[index].issueMs;
+        Log.warn("LedgerSleepTimeoutActive: seq=%lu globalSeq=%lu kind=%s source=%s age=%lu",
+                 (unsigned long)ledgerRequests[index].seq,
+                 (unsigned long)ledgerRequestSequence,
+                 ledgerRequestKindCompactLabel(ledgerRequests[index].kind),
+                 ledgerRequestSourceLabel(ledgerRequests[index].source),
+                 ageMs);
+    }
 }
 
 void Cloud::logLedgerFailure(int rc) const {

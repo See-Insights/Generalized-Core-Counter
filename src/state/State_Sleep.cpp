@@ -597,6 +597,7 @@ void handleSleepingState() {
         Log.warn("SLEEP: ledger sync incomplete after %lu ms (budget=%lu ms) - raising alert 44",
                  elapsedMs,
                  cloudSyncBudgetMs);
+        Cloud::instance().logLedgerSleepTimeoutState();
         current.raiseAlert(44); // Ledger sync timeout before sleep (minor - config already applied)
       } else if (!updatesChecked) {
         Log.warn("SLEEP: OTA updates pending - raising alert 42");

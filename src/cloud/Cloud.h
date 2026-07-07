@@ -147,6 +147,8 @@ public:
          * @brief Record completion of a ledger sync request.
          */
         void noteLedgerSyncComplete(LedgerRequestKind kind,
+                        unsigned long lastUpdated,
+                        unsigned long lastSynced,
                         const LedgerSyncDiagnostics &before,
                         const LedgerSyncDiagnostics &after);
 
@@ -161,9 +163,19 @@ public:
         void logLedgerConnectState() const;
 
         /**
+         * @brief Log output-ledger tracker state during cloud setup.
+         */
+        void logLedgerStartupState() const;
+
+        /**
          * @brief Log active ledger request state before entering sleep.
          */
         void logLedgerSleepState() const;
+
+        /**
+         * @brief Log active ledger request state when the sleep gate times out.
+         */
+        void logLedgerSleepTimeoutState() const;
 
         /**
          * @brief Log active ledger request state for a ledger failure return code.
