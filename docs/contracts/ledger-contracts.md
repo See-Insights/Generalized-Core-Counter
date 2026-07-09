@@ -1,54 +1,35 @@
 # Ledger Contracts
 
-**Version:** 1  
-**Status:** Active  
-**Applies To:** Generalized Core Counter Firmware
+## Overview
 
----
-
-# Purpose
+### Purpose
 
 This document defines the public contract between the firmware and cloud monitoring platform for the Particle Ledgers.
 
-The goal is to keep the contracts:
+The contracts are intended to remain:
 
 - stable
 - compact
 - operationally focused
 
-The ledger contracts intentionally expose only the information required for fleet operations.
+Ledgers describe current device state. They are not historical records, and they should not duplicate configuration or diagnostic detail that belongs in Product Default, Device Settings, serial logs, or telemetry storage.
 
-Detailed diagnostics belong in serial logs and telemetry rather than ledger payloads.
+### Versioning
 
----
+Every ledger contains a `schemaVersion` field.
 
-# General Principles
+Schema evolution follows these rules:
 
-## Compatibility
+- Schema evolution should be additive whenever practical.
+- Existing fields are not renamed or removed within a schema version.
+- Consumers must ignore unknown fields.
+- Breaking changes require a new schema version.
 
-The firmware and monitoring platform communicate through versioned ledger contracts.
+### Schema Evolution Rules
 
-Every ledger includes a `schemaVersion` field.
+The firmware is the authoritative publisher for operational ledger state.
 
-Future changes should be additive whenever practical.
-
----
-
-## Operational State
-
-Ledgers describe the current state of the device.
-
-They are **not** intended to be historical records.
-
-Historical analysis belongs in the telemetry platform.
-
----
-
-## Compact by Design
-
-Every published field should support an operational decision.
-
-If a field is only useful during firmware debugging, it belongs in diagnostic logs rather than a ledger.
+New fields should be added only when they support long-term operational decisions. Fields that are primarily useful for debugging should remain in logs or telemetry rather than becoming part of a ledger contract.
 
 ---
 
@@ -56,62 +37,59 @@ If a field is only useful during firmware debugging, it belongs in diagnostic lo
 
 ## Purpose
 
-Reports the current operational state of the device.
+Device Status reports the current operational state of the device.
 
-Updated after every successful cloud connection.
+It answers questions such as:
 
----
+- What firmware is running?
+- What effective configuration generation is active?
+- When did the device last report?
+- When is it expected to report next?
+- What are the current power, battery, and connection states?
 
-## Schema
+## Ownership
 
-```json
+Owner: Firmware.
+
+Device Status is published by firmware after runtime state has been finalized for a successful cloud connection.
+
+## Publishing Rules
+
+Device Status is updated after a successful cloud connection.
+
+Device Status describes runtime reality. It does not duplicate configuration from Product Default or Device Settings. The `config.generation` field identifies the effective merged configuration without copying configuration values into the status ledger.
+
+## JSON Example
+
 {
-  "schemaVersion": 1,
-
-  "firmware": {
-    "version": "25.01",
-    "resetCount": 412
-  },
-
-  "config": {
-    "generation": "4A31B62E"
-  },
-
-  "reporting": {
-    "lastReportEpoch": 1783508400,
-    "nextReportEpoch": 1783512000,
-    "windowOpen": true
-  },
-
-  "power": {
-    "source": "USB_HOST",
-    "profile": "UsbBench",
-    "overrideActive": false
-  },
-
-  "battery": {
-    "soc": 80.4,
-    "vcell": 4.02,
-    "chargeState": "DONE"
-  },
-
-  "connection": {
-    "lastResult": "ok",
-    "elapsedMs": 2010
-  },
-
-  "ledger": {
-    "pendingData": false,
-    "pendingStatus": false
-  },
-
-  "sleep": {
-    "mode": "hibernate"
-  }
+    "battery": {
+        "chargeState": "DONE",
+        "soc": 78.6,
+        "vcell": 4.03
+    },
+    "config": {
+        "generation": "BA69F072"
+    },
+    "connection": {
+        "elapsedMs": 10317,
+        "lastResult": "ok"
+    },
+    "firmware": {
+        "resetCount": 5,
+        "version": "20.0-dev"
+    },
+    "power": {
+        "overrideActive": false,
+        "profile": "UsbBench",
+        "source": "USB_HOST"
+    },
+    "reporting": {
+        "lastReportEpoch": 1783583647,
+        "nextReportEpoch": 1783587247,
+        "windowOpen": true
+    },
+    "schemaVersion": 1
 }
-```
-
----
 
 ## Field Definitions
 
@@ -119,22 +97,19 @@ Updated after every successful cloud connection.
 |--------|-------------|
 | schemaVersion | Ledger schema version. |
 | firmware.version | Running firmware version. |
-| firmware.bootCount | Number of firmware boots since deployment. |
-| config.generation | Deterministic identifier representing the merged Product Default + Device Settings configuration. |
-| reporting.lastReportEpoch | Time of the most recent report. |
-| reporting.nextReportEpoch | Next scheduled report time calculated by firmware. |
+| firmware.resetCount | Number of firmware resets recorded by the device. |
+| config.generation | Deterministic identifier representing the effective merged Product Default and Device Settings configuration. |
+| reporting.lastReportEpoch | Epoch timestamp of the most recent report. |
+| reporting.nextReportEpoch | Epoch timestamp of the next scheduled report calculated by firmware. |
 | reporting.windowOpen | Whether the reporting window is currently open. |
 | power.source | Current Particle power source classification. |
 | power.profile | Active firmware power profile. |
-| power.overrideActive | True if firmware overrode the reported power source. |
-| battery.soc | Battery state of charge. |
-| battery.vcell | Battery voltage. |
-| battery.chargeState | Current PMIC charging state. |
+| power.overrideActive | True when firmware is using an override or fallback power-source interpretation. |
+| battery.soc | Battery state of charge percentage. |
+| battery.vcell | Battery cell voltage. |
+| battery.chargeState | Current compact PMIC charge state. |
 | connection.lastResult | Result of the most recent connection attempt. |
-| connection.elapsedMs | Time required for the most recent successful connection. |
-| ledger.pendingData | Device Data ledger awaiting synchronization. |
-| ledger.pendingStatus | Device Status ledger awaiting synchronization. |
-| sleep.mode | Sleep mode entered after the last reporting cycle. |
+| connection.elapsedMs | Elapsed time for the most recent successful connection. |
 
 ---
 
@@ -142,40 +117,47 @@ Updated after every successful cloud connection.
 
 ## Purpose
 
-Publishes the most recent observation produced by the device.
+Device Data publishes the most recent observation produced by the device.
 
-Contents are sensor specific.
+It answers:
 
----
+> What is the latest observation?
 
-## Schema
+Device Data is not historical. Historical analysis belongs in the telemetry platform.
 
-```json
+## Ownership
+
+Owner: Sensor Runtime.
+
+Device Data is produced from the current sensor/runtime observation state.
+
+## Publishing Rules
+
+Device Data contains the latest observation only.
+
+The payload is sensor-focused and should remain compact. It should not accumulate prior observations or attempt to represent history.
+
+## JSON Example
+
 {
-  "schemaVersion": 1,
-
-  "timestamp": 1783508400,
-
-  "occupancy": {
-    "occupied": false,
-    "totalOccupiedSec": 0
-  },
-
-  "environment": {
-    "temperature": 30.3
-  },
-
-  "battery": {
-    "soc": 80.4
-  },
-
-  "system": {
-    "freeHeap": 78112
-  }
+    "battery": {
+        "soc": 78.6
+    },
+    "environment": {
+        "temperature": 27.9
+    },
+    "occupancy": {
+        "occupied": false,
+        "totalOccupiedSec": 4574
+    },
+    "schemaVersion": 1,
+    "system": {
+        "freeHeap": 77768,
+        "resetReason": 20,
+        "resetReasonData": 0
+    },
+    "timestamp": 1783584002
 }
-```
-
----
 
 ## Field Definitions
 
@@ -183,32 +165,22 @@ Contents are sensor specific.
 |--------|-------------|
 | schemaVersion | Ledger schema version. |
 | timestamp | Epoch timestamp for this observation. |
-| occupancy | Latest occupancy state and accumulated occupancy duration. |
-| environment | Latest environmental sensor observations. |
-| battery.soc | Current battery state of charge. |
-| system.freeHeap | Available heap at time of observation. |
+| occupancy.occupied | Whether the monitored space is currently occupied. |
+| occupancy.totalOccupiedSec | Accumulated occupied duration for the current reporting period, in seconds. |
+| environment.temperature | Latest internal or environmental temperature observation. |
+| battery.soc | Battery state of charge percentage at observation time. |
+| system.freeHeap | Available heap at observation time. |
+| system.resetReason | Device OS reset reason code. |
+| system.resetReasonData | Device OS reset reason data. |
 
 ---
 
-# Design Rules
+# Compatibility
 
-The following rules apply to all ledger contracts:
+## Schema Version History
 
-- Ledgers describe the current state only.
-- Firmware is the authoritative source of operational state.
-- Configuration is never duplicated into Device Status.
-- Scheduling decisions remain inside the firmware.
-- Monitoring platforms consume ledger information but do not recreate firmware decision logic.
-- Diagnostic information belongs in serial logs rather than ledger payloads unless it directly supports fleet operations.
+### Schema Version 1
 
----
-
-# Future Evolution
-
-New fields should be added only when they provide long-term operational value.
-
-Before adding a field, ask:
-
-> Would a fleet operator reasonably use this information to make an operational decision?
-
-If the answer is **no**, the information should normally remain in diagnostic logging rather than becoming part of the ledger contract.
+- Initial production contract.
+- Introduced Device Status V1.
+- Introduced Device Data V1.
