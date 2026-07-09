@@ -1,12 +1,18 @@
 #include "../Config.h"
 #include "cloud/Cloud.h"
 #include "observability/WakeCycleStats.h"
+#include "power/PowerManager.h"
 #include "sensors/SensorManager.h"
+#include "state/StateMachine.h"
 
 // External firmware version string (defined in Version.cpp)
 extern const char* FIRMWARE_VERSION;
 
 namespace {
+
+constexpr int kLedgerSchemaVersion = 1;
+constexpr size_t kDeviceStatusPayloadCapacity = 896;
+constexpr size_t kDeviceDataPayloadCapacity = 512;
 
 bool ledgerHasUnsyncedWriteForDiag(const Ledger &ledger) {
     const int64_t lastUpdatedMs = ledger.lastUpdated();
@@ -16,6 +22,75 @@ bool ledgerHasUnsyncedWriteForDiag(const Ledger &ledger) {
 
     const int64_t lastSyncedMs = ledger.lastSynced();
     return lastSyncedMs <= 0 || lastSyncedMs < lastUpdatedMs;
+}
+
+void updateFnv1a(uint32_t &hash, const char *text) {
+    if (!text) {
+        text = "";
+    }
+
+    while (*text) {
+        hash ^= (uint8_t)*text++;
+        hash *= 16777619UL;
+    }
+}
+
+void updateFnv1aField(uint32_t &hash, const char *name, const char *value) {
+    updateFnv1a(hash, name);
+    updateFnv1a(hash, "=");
+    updateFnv1a(hash, value);
+    updateFnv1a(hash, ";");
+}
+
+void updateFnv1aField(uint32_t &hash, const char *name, long value) {
+    char valueText[16];
+    snprintf(valueText, sizeof(valueText), "%ld", value);
+    updateFnv1aField(hash, name, valueText);
+}
+
+void updateFnv1aField(uint32_t &hash, const char *name, unsigned long value) {
+    char valueText[16];
+    snprintf(valueText, sizeof(valueText), "%lu", value);
+    updateFnv1aField(hash, name, valueText);
+}
+
+void formatConfigGeneration(char *buffer, size_t bufferSize) {
+    uint32_t hash = 2166136261UL;
+
+    updateFnv1aField(hash, "messaging.serial", sysStatus.get_serialConnected() ? 1L : 0L);
+    updateFnv1aField(hash, "messaging.verboseMode", sysStatus.get_verboseMode() ? 1L : 0L);
+    updateFnv1aField(hash, "messaging.verboseTimeoutMin", (unsigned long)sysStatus.get_verboseTimeoutMin());
+    updateFnv1aField(hash, "sensor.type", (unsigned long)sensorConfig.get_sensorType());
+    updateFnv1aField(hash, "sensor.setting1", (unsigned long)sensorConfig.get_sensorSetting1());
+    updateFnv1aField(hash, "sensor.setting2", (unsigned long)sensorConfig.get_sensorSetting2());
+    updateFnv1aField(hash, "sensor.setting3", (unsigned long)sensorConfig.get_sensorSetting3());
+    updateFnv1aField(hash, "sensor.setting4", (unsigned long)sensorConfig.get_sensorSetting4());
+    updateFnv1aField(hash, "timing.timezone", sysStatus.get_timeZoneStrCStr());
+    updateFnv1aField(hash, "timing.reportingIntervalSec", (unsigned long)sysStatus.get_reportingInterval());
+    updateFnv1aField(hash, "timing.openHour", (unsigned long)sysStatus.get_openTime());
+    updateFnv1aField(hash, "timing.closeHour", (unsigned long)sysStatus.get_closeTime());
+    updateFnv1aField(hash, "timing.connectAttemptBudgetSec", (unsigned long)sysStatus.get_connectAttemptBudgetSec());
+    updateFnv1aField(hash, "modes.sensorMode", (unsigned long)sysStatus.get_sensorMode());
+    updateFnv1aField(hash, "modes.connectionMode", (unsigned long)sysStatus.get_connectionMode());
+    updateFnv1aField(hash, "modes.reportingMode", (unsigned long)sysStatus.get_reportingMode());
+    updateFnv1aField(hash, "modes.samplingMode", (unsigned long)sysStatus.get_samplingMode());
+    updateFnv1aField(hash, "modes.cloudDisconnectBudgetSec", (unsigned long)sysStatus.get_cloudDisconnectBudgetSec());
+    updateFnv1aField(hash, "modes.modemOffBudgetSec", (unsigned long)sysStatus.get_modemOffBudgetSec());
+    updateFnv1aField(hash, "modes.enableHibernateSleep", sysStatus.get_enableHibernateSleep() ? 1L : 0L);
+    updateFnv1aField(hash, "webhook.name", sysStatus.get_webhookNameCStr());
+    updateFnv1aField(hash, "webhook.enabled", sysStatus.get_webhookEnabled() ? 1L : 0L);
+    updateFnv1aField(hash, "webhook.timeoutMs", (unsigned long)sysStatus.get_webhookTimeoutMs());
+
+    snprintf(buffer, bufferSize, "%08lX", (unsigned long)hash);
+}
+
+time_t nextReportEpoch() {
+    const time_t lastReport = sysStatus.get_lastReport();
+    const uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
+    if (lastReport <= 0 || intervalSec == 0) {
+        return 0;
+    }
+    return lastReport + intervalSec;
 }
 
 } // namespace
@@ -52,49 +127,43 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     (void)cellularReadyForDiag;
 #endif
 
-    // Build current configuration as JSON (base status).
-    // IMPORTANT: This base JSON is used for change detection so we do not
-    // increase cloud writes in the field.
-    char bufferBase[512];
+    // Build current status contract JSON for duplicate suppression.
+    char bufferBase[kDeviceStatusPayloadCapacity];
     JSONBufferWriter writerBase(bufferBase, sizeof(bufferBase));
+    char configGeneration[9];
+    formatConfigGeneration(configGeneration, sizeof(configGeneration));
+    const PowerReport &powerReport = PowerManager::instance().latestReport();
+    const auto &cycleStats = Observability::cycleStats();
+    float batteryVoltage = -1.0f;
+    SensorManager::instance().cachedBatteryVoltage(batteryVoltage);
 
     writerBase.beginObject();
-
-    // Firmware version
-    writerBase.name("firmwareVersion").value(FIRMWARE_VERSION);
-
-    // Messaging
-    writerBase.name("messaging").beginObject();
-    writerBase.name("serial").value(sysStatus.get_serialConnected());
-    writerBase.name("verboseMode").value(sysStatus.get_verboseMode());
-    writerBase.name("verboseTimeoutMin").value(sysStatus.get_verboseTimeoutMin());
+    writerBase.name("schemaVersion").value(kLedgerSchemaVersion);
+    writerBase.name("firmware").beginObject();
+    writerBase.name("version").value(FIRMWARE_VERSION);
+    writerBase.name("resetCount").value((int)sysStatus.get_resetCount());
     writerBase.endObject();
-
-    // Sensor
-    writerBase.name("sensor").beginObject();
-    writerBase.name("type").value(sensorConfig.get_sensorType());
-    writerBase.name("setting1").value((int)sensorConfig.get_sensorSetting1());
-    writerBase.name("setting2").value((int)sensorConfig.get_sensorSetting2());
-    writerBase.name("setting3").value((int)sensorConfig.get_sensorSetting3());
-    writerBase.name("setting4").value((int)sensorConfig.get_sensorSetting4());
+    writerBase.name("config").beginObject();
+    writerBase.name("generation").value(configGeneration);
     writerBase.endObject();
-
-    // Timing
-    writerBase.name("timing").beginObject();
-    writerBase.name("timezone").value(sysStatus.get_timeZoneStrCStr());
-    writerBase.name("reportingIntervalSec").value(sysStatus.get_reportingInterval());
-    writerBase.name("openHour").value(sysStatus.get_openTime());
-    writerBase.name("closeHour").value(sysStatus.get_closeTime());
-    writerBase.name("connectAttemptBudgetSec").value((int)sysStatus.get_connectAttemptBudgetSec());
+    writerBase.name("reporting").beginObject();
+    writerBase.name("lastReportEpoch").value((int)sysStatus.get_lastReport());
+    writerBase.name("nextReportEpoch").value((int)nextReportEpoch());
+    writerBase.name("windowOpen").value(isWithinOpenHours());
     writerBase.endObject();
-
-    // Modes
-    writerBase.name("modes").beginObject();
-    writerBase.name("sensorMode").value((int)sysStatus.get_sensorMode());
-    writerBase.name("connectionMode").value((int)sysStatus.get_connectionMode());
-    writerBase.name("reportingMode").value((int)sysStatus.get_reportingMode());
-    writerBase.name("samplingMode").value((int)sysStatus.get_samplingMode());
-    writerBase.name("enableHibernateSleep").value(sysStatus.get_enableHibernateSleep());
+    writerBase.name("power").beginObject();
+    writerBase.name("source").value(PowerManager::powerSourceLabel(powerReport.reading.powerSource));
+    writerBase.name("profile").value(PowerManager::inputProfileLabel(powerReport.activeInputProfile));
+    writerBase.name("overrideActive").value(powerReport.reading.fallbackUsed);
+    writerBase.endObject();
+    writerBase.name("battery").beginObject();
+    writerBase.name("soc").value(current.get_stateOfCharge(), 1);
+    writerBase.name("vcell").value(batteryVoltage, 2);
+    writerBase.name("chargeState").value(SensorManager::instance().cachedChargeStateLabel());
+    writerBase.endObject();
+    writerBase.name("connection").beginObject();
+    writerBase.name("lastResult").value(Observability::toString(cycleStats.connect_result));
+    writerBase.name("elapsedMs").value((int)cycleStats.connect_duration_ms);
     writerBase.endObject();
     writerBase.endObject();
 
@@ -105,87 +174,19 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
 
     bufferBase[writerBase.dataSize()] = '\0';
 
-    // Only publish if the configuration actually changed
+    // Only publish if the status payload actually changed.
     if (strcmp(lastPublishedStatus, bufferBase) == 0) {
         return true; // Not an error; nothing to do
     }
 
-    // Publish payload: base status + optional per-cycle diagnostics.
-    // This does NOT affect change detection, so it won't increase publish rate.
-    char bufferPublish[896];
-    JSONBufferWriter writer(bufferPublish, sizeof(bufferPublish));
-    writer.beginObject();
-
-    // Repeat base status fields.
-    writer.name("firmwareVersion").value(FIRMWARE_VERSION);
-
-    writer.name("messaging").beginObject();
-    writer.name("serial").value(sysStatus.get_serialConnected());
-    writer.name("verboseMode").value(sysStatus.get_verboseMode());
-    writer.name("verboseTimeoutMin").value(sysStatus.get_verboseTimeoutMin());
-    writer.endObject();
-
-    writer.name("sensor").beginObject();
-    writer.name("type").value(sensorConfig.get_sensorType());
-    writer.name("setting1").value((int)sensorConfig.get_sensorSetting1());
-    writer.name("setting2").value((int)sensorConfig.get_sensorSetting2());
-    writer.name("setting3").value((int)sensorConfig.get_sensorSetting3());
-    writer.name("setting4").value((int)sensorConfig.get_sensorSetting4());
-    writer.endObject();
-
-    writer.name("timing").beginObject();
-    writer.name("timezone").value(sysStatus.get_timeZoneStrCStr());
-    writer.name("reportingIntervalSec").value(sysStatus.get_reportingInterval());
-    writer.name("openHour").value(sysStatus.get_openTime());
-    writer.name("closeHour").value(sysStatus.get_closeTime());
-    writer.name("connectAttemptBudgetSec").value((int)sysStatus.get_connectAttemptBudgetSec());
-    writer.endObject();
-
-    writer.name("modes").beginObject();
-    writer.name("sensorMode").value((int)sysStatus.get_sensorMode());
-    writer.name("connectionMode").value((int)sysStatus.get_connectionMode());
-    writer.name("reportingMode").value((int)sysStatus.get_reportingMode());
-    writer.name("samplingMode").value((int)sysStatus.get_samplingMode());
-    writer.name("enableHibernateSleep").value(sysStatus.get_enableHibernateSleep());
-    writer.endObject();
-
-#if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
-    writer.name("pmicAnomalyCount").value((int)pmicAnomalyCount);
-    writer.name("lastPmicAnomalySoc").value((double)lastPmicAnomalySoc, 2);
-    writer.name("lastPmicAnomalyChargeStatus").value((int)lastPmicAnomalyChargeStatus);
-    writer.name("lastPmicAnomalyAgeSec").value((unsigned long)pmicAnomalyAgeSec());
-    writer.name("lastPmicAnomalyPowerSource").value((int)lastPmicAnomalyPowerSource);
-    writer.name("lastPmicAnomalyVbusStatus").value((int)lastPmicAnomalyVbusStatus);
-    writer.name("pmicAnomalyActive").value(pmicAnomalyActive ? 1 : 0);
-#endif
-
-    // Optional: piggyback last completed wake-cycle stats for field diagnostics.
-    // This is only included when we are already publishing device-status (config changed).
-    {
-        const auto &cs = Observability::cycleStats();
-        writer.name("cycle").beginObject();
-        writer.name("awakeMs").value((int)cs.total_awake_ms);
-        writer.name("connectType").value(Observability::toString(cs.connect_attempt_type));
-        writer.name("connectResult").value(Observability::toString(cs.connect_result));
-        writer.name("connectMs").value((int)cs.connect_duration_ms);
-        writer.name("serviceMs").value((int)cs.service_duration_ms);
-        writer.name("teardownMs").value((int)cs.teardown_duration_ms);
-        writer.name("qBefore").value(cs.publish_queue_depth_before_connect == 0xFFFF ? -1 : (int)cs.publish_queue_depth_before_connect);
-        writer.name("qAfter").value(cs.publish_queue_depth_after_connect == 0xFFFF ? -1 : (int)cs.publish_queue_depth_after_connect);
-        writer.name("qSleep").value(cs.publish_queue_depth_before_sleep == 0xFFFF ? -1 : (int)cs.publish_queue_depth_before_sleep);
-        writer.name("socTenths").value(cs.battery_soc_tenths == 0xFFFF ? -1 : (int)cs.battery_soc_tenths);
-        writer.name("charging").value(cs.is_charging == 0xFF ? -1 : (int)cs.is_charging);
-        writer.name("lastOk").value((int)cs.last_success_epoch);
-        writer.endObject();
-    }
-
-    writer.endObject();
-
-    if (!writer.buffer()) {
-        Log.warn("Failed to create status publish JSON");
-        return false;
-    }
-    bufferPublish[writer.dataSize()] = '\0';
+    char bufferPublish[kDeviceStatusPayloadCapacity];
+    strncpy(bufferPublish, bufferBase, sizeof(bufferPublish) - 1);
+    bufferPublish[sizeof(bufferPublish) - 1] = '\0';
+    const size_t statusPayloadSize = strlen(bufferPublish);
+    Log.info("LedgerPayloadStatus: bytes=%lu/%lu schema=%d",
+             (unsigned long)statusPayloadSize,
+             (unsigned long)kDeviceStatusPayloadCapacity,
+             kLedgerSchemaVersion);
 
     LedgerData data = LedgerData::fromJSON(bufferPublish);
 
@@ -263,8 +264,7 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
                  (unsigned)pendingLedgerOpsForDiag(),
                  (unsigned long)System.freeMemory());
 #endif
-        // Preserve base-status change detection so per-cycle fields don't
-        // force additional device-status publishes.
+        // Preserve status contract change detection.
         strncpy(lastPublishedStatus, bufferBase, sizeof(lastPublishedStatus) - 1);
         lastPublishedStatus[sizeof(lastPublishedStatus) - 1] = '\0';
         return true;
@@ -316,40 +316,28 @@ bool Cloud::publishDataToLedger(const char *source) {
     (void)cellularReadyForDiag;
 #endif
 
-    char buffer[512];
+    char buffer[kDeviceDataPayloadCapacity];
     JSONBufferWriter writer(buffer, sizeof(buffer));
     const unsigned long freeHeap = System.freeMemory();
     
     writer.beginObject();
+    writer.name("schemaVersion").value(kLedgerSchemaVersion);
     writer.name("timestamp").value((int)Time.now());
-
-    // Boot/wake diagnostics: included here so it is visible in Console even
-    // when early USB logs are missed after HIBERNATE/cold boot.
+    writer.name("occupancy").beginObject();
+    writer.name("occupied").value(current.get_occupied());
+    writer.name("totalOccupiedSec").value((unsigned long)current.get_totalOccupiedSeconds());
+    writer.endObject();
+    writer.name("environment").beginObject();
+    writer.name("temperature").value(current.get_internalTempC(), 1);
+    writer.endObject();
+    writer.name("battery").beginObject();
+    writer.name("soc").value(current.get_stateOfCharge(), 1);
+    writer.endObject();
+    writer.name("system").beginObject();
+    writer.name("freeHeap").value((int)freeHeap);
     writer.name("resetReason").value((int)System.resetReason());
     writer.name("resetReasonData").value((unsigned long)System.resetReasonData());
-
-    uint8_t sensorMode = sysStatus.get_sensorMode();
-
-    if (sensorMode == COUNTING) {
-        writer.name("mode").value("counting");
-        writer.name("hourlyCount").value(current.get_hourlyCount());
-        writer.name("dailyCount").value(current.get_dailyCount());
-    } else if (sensorMode == OCCUPANCY) {
-        writer.name("mode").value("occupancy");
-        writer.name("occupied").value(current.get_occupied());
-        // Report in whole minutes for external consumers (storage stays in seconds).
-        const unsigned long totalOccupiedMinutes = (unsigned long)(current.get_totalOccupiedSeconds() / 60UL);
-        writer.name("totalOccupiedSec").value(totalOccupiedMinutes);
-    } else { // MEASUREMENT or any future modes
-        writer.name("mode").value("measurement");
-        // In measurement mode we still track counts for compatibility
-        writer.name("hourlyCount").value(current.get_hourlyCount());
-        writer.name("dailyCount").value(current.get_dailyCount());
-    }
-    
-    writer.name("battery").value(current.get_stateOfCharge(), 1);
-    writer.name("temp").value(current.get_internalTempC(), 1);
-    writer.name("freeHeap").value((int)freeHeap);
+    writer.endObject();
     writer.endObject();
     
     if (!writer.buffer()) {
@@ -358,6 +346,11 @@ bool Cloud::publishDataToLedger(const char *source) {
     }
     
     buffer[writer.dataSize()] = '\0';
+    const size_t dataPayloadSize = strlen(buffer);
+    Log.info("LedgerPayloadData: bytes=%lu/%lu schema=%d",
+             (unsigned long)dataPayloadSize,
+             (unsigned long)kDeviceDataPayloadCapacity,
+             kLedgerSchemaVersion);
     
     LedgerData data = LedgerData::fromJSON(buffer);
 

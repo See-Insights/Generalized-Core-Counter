@@ -1723,7 +1723,7 @@ void publishData() {
     Log.info("Webhook supervision not armed: publish queue rejected");
   }
 
-  // Also update device-data ledger with structured JSON snapshot
+  // Also update device-data ledger with structured JSON snapshot.
   setAppBreadcrumb(BREADCRUMB_REPORT_LEDGER_START);
   const unsigned long ledgerStartMs = millis();
   const bool ledgerOk = Cloud::instance().publishDataToLedger("ReportState");

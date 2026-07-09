@@ -560,6 +560,10 @@ void handleConnectingState() {
       }
       measure.batteryState();
       PowerDiagnostics::logPowerState("connect-success");
+
+      if (!Cloud::instance().writeDeviceStatusToCloud("ConnectState")) {
+        Log.warn("Connect status ledger update skipped or failed");
+      }
       
       if (sysStatus.get_verboseMode()) {
         char data[64];

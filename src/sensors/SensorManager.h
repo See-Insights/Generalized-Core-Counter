@@ -136,6 +136,9 @@ public:
      */
     bool batteryState(BatterySampleContext sampleContext = BatterySampleContext::General);
 
+    bool cachedBatteryVoltage(float &vcell) const;
+    const char *cachedChargeStateLabel() const;
+
     /**
      * @brief Determine whether it is safe to charge the battery.
      */
@@ -192,6 +195,15 @@ protected:
 
     /** @brief Whether the trusted pre-radio sample used voltage fallback. */
     bool _authoritativeBatteryFallbackUsed;
+
+    /** @brief Cached battery voltage from the latest batteryState() sample. */
+    float _cachedBatteryVcell;
+
+    /** @brief Cached compact PMIC charge label from the latest batteryState() sample. */
+    const char *_cachedChargeStateLabel;
+
+    /** @brief Whether the cached battery voltage is valid. */
+    bool _cachedBatteryVcellValid;
 };
 
 #endif /* SENSORMANAGER_H */

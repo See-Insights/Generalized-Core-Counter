@@ -291,9 +291,25 @@ SensorManager::SensorManager()
   _authoritativeBatterySampleActive(false),
   _authoritativeBatterySoc(0.0f),
   _authoritativeBatteryState(0),
-  _authoritativeBatteryFallbackUsed(false) {}
+  _authoritativeBatteryFallbackUsed(false),
+  _cachedBatteryVcell(0.0f),
+  _cachedChargeStateLabel("UNKNOWN"),
+  _cachedBatteryVcellValid(false) {}
 
 SensorManager::~SensorManager() {}
+
+bool SensorManager::cachedBatteryVoltage(float &vcell) const {
+  if (!_cachedBatteryVcellValid) {
+    return false;
+  }
+
+  vcell = _cachedBatteryVcell;
+  return true;
+}
+
+const char *SensorManager::cachedChargeStateLabel() const {
+  return _cachedChargeStateLabel;
+}
 
 void SensorManager::setup() {
     if (!_sensor) {
@@ -1095,6 +1111,9 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
 #endif
   const uint8_t systemBattState = battState;
   const uint8_t pmicBattState = batteryStateFromPmicStatus(chargeStatus, faultReg);
+  _cachedBatteryVcell = vcell;
+  _cachedBatteryVcellValid = batteryVoltageLooksUsable(vcell);
+  _cachedChargeStateLabel = compactPmicChargeLabel(chargeStatus, faultReg);
   if (sampleCanBeAuthoritative) {
     _authoritativeBatteryState = pmicBattState;
   }
