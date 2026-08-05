@@ -249,3 +249,12 @@ Keeping these responsibilities separate:
 - simplifies cloud logic
 - allows firmware and monitoring capabilities to evolve independently
 - provides a stable contract between devices and the monitoring platform
+
+---
+
+ # Particle Ledger identifiers.
+ 
+ These names are part of the firmware/cloud contract and must remain synchronized with the Generalized Core Counter firmware. See ADR: Ledger Architecture.
+
+ ---
+ 

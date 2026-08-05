@@ -69,9 +69,18 @@ void publishData();
  * @brief Applies battery-aware policy overrides to the current connection mode.
  *
  * @param currentSoC Latest battery state of charge
- * @return Resulting battery tier used for the policy decision
+ * @param resolvedTier Tier already selected by the shared reporting resolver
  */
-BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC);
+void applyBatteryAwareConnectionModePolicy(float currentSoC, BatteryTier resolvedTier);
+void applyBatteryAwareConnectionModePolicy(float currentSoC);
+
+/**
+ * @brief Tests whether an epoch falls within configured local open hours.
+ *
+ * @param epoch UTC epoch to evaluate
+ * @return true when reporting is allowed at that local time
+ */
+bool isWithinOpenHoursAt(time_t epoch);
 
 /**
  * @brief Stores an application breadcrumb for the next boot.

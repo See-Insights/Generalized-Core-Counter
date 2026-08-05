@@ -53,6 +53,12 @@ For field builds, the configured fallback can use `solarPowerMode`; non-field bu
 4. `VIN` is the only Device OS source that selects `SOLAR`.
 5. Any future use of `SystemPowerFeature::USE_VIN_SETTINGS_WITH_USB_HOST` requires explicit architectural review.
 
+## Runtime Reporting Policy
+
+Battery policy can reduce the cloud/application reporting cadence when available energy declines. Firmware resolves configured timing, the active battery policy, and reporting-window state through one central runtime reporting policy, then publishes the resulting configured interval, effective interval, adjustment reason, and next intended reporting opportunity in Device Status.
+
+Firmware is authoritative for this decision. Fleet Operations consumes the published reporting policy and must not reconstruct cadence from battery state or assume that hardware wake timing is identical to cloud-report timing.
+
 ## Critical Warning
 
 Do not enable `SystemPowerFeature::USE_VIN_SETTINGS_WITH_USB_HOST` for mixed USB/Solar deployments.
