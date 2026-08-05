@@ -45,6 +45,18 @@ Source basis: `PROJECT_STATUS.md`, `README.md`, `docs/architecture-overview.md`,
 	- Apply/merge/validate responsibilities are distributed, increasing coupling.
 	- Retry/backoff behavior for sync failure paths appears limited compared to mission-critical connectivity requirements.
 
+Device Status also carries a compact, boot-scoped `startup` object captured after successful initialization. Fleet Operations treats this object as the authoritative initialization snapshot instead of depending on ephemeral serial logs:
+
+```text
+Reset
+    -> Initialization
+    -> startup object created
+    -> Device Status published
+    -> Fleet Operations
+```
+
+The object is not an event history: runtime values remain in their existing status sections, while historical reboot events belong in EventHistory.
+
 ## 3. Power, Connectivity Policy, and Platform Power Abstraction
 
 - Purpose: Implements battery-aware behavior, connect budgets, modem/power teardown timing, PMIC/fuel-gauge interpretation, and platform-specific power capabilities.
@@ -63,6 +75,8 @@ Source basis: `PROJECT_STATUS.md`, `README.md`, `docs/architecture-overview.md`,
 	- Platform guards and capability checks are spread across files.
 	- Policy coupling with occupancy/connectivity behavior can cause hidden regressions.
 	- PMIC forensic path increases observability but adds additional conditional complexity without remediation automation.
+
+Runtime reporting policy centrally converts configured cadence and current power context into the effective cloud-reporting schedule. Firmware publishes that decision in Device Status; Fleet Operations consumes the published policy instead of inferring cadence from battery state.
 
 ## 4. Sensor Abstraction and Sensor Runtime
 
@@ -136,6 +150,12 @@ Source basis: `PROJECT_STATUS.md`, `README.md`, `docs/architecture-overview.md`,
 - Technical debt:
 	- Diagnostics are intentionally compact, which can limit root-cause granularity in worst-case field failures.
 	- Timezone/signature invalidation correctness depends on edge-case handling around config updates and time validity.
+
+### Complementary Information Models
+
+- Runtime State: The current operational condition, published continuously through `device-status`.
+- Startup Snapshot: An immutable description of the current execution instance, published in `device-status.startup`.
+- Event History: A chronological history of significant events, maintained by Fleet Operations.
 
 ## Overall Architecture Readout
 

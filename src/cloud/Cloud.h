@@ -383,12 +383,14 @@ public:
     static void testBatteryBackoffLogic();
 
 private:
-	static constexpr size_t STATUS_CACHE_SIZE = 512;
+	// Match the device-status writer capacity so additive fields cannot make
+	// duplicate suppression compare a silently truncated prior payload.
+	static constexpr size_t DEVICE_STATUS_PAYLOAD_CAPACITY = 896;
     
     /**
      * @brief Store last published device status to detect changes
      */
-    char lastPublishedStatus[STATUS_CACHE_SIZE];
+    char lastPublishedStatus[DEVICE_STATUS_PAYLOAD_CAPACITY];
 
     /**
      * @brief Tracks success of last applyConfigurationFromLedger() call

@@ -57,7 +57,7 @@ Device Status is published by firmware after runtime state has been finalized fo
 
 Device Status is updated after a successful cloud connection.
 
-Device Status describes runtime reality. It does not duplicate configuration from Product Default or Device Settings. The `config.generation` field identifies the effective merged configuration without copying configuration values into the status ledger.
+Device Status describes runtime reality. It does not generally duplicate configuration from Product Default or Device Settings. The `config.generation` field identifies the effective merged configuration. `reporting.configuredIntervalSec` is a narrow operational exception: it exposes the baseline used by runtime reporting policy so consumers can interpret effective cadence without reconstructing firmware decisions.
 
 ## JSON Example
 
@@ -75,7 +75,7 @@ Device Status describes runtime reality. It does not duplicate configuration fro
         "lastResult": "ok"
     },
     "firmware": {
-        "resetCount": 5,
+        "resetCount": 22,
         "version": "20.0-dev"
     },
     "power": {
@@ -84,11 +84,21 @@ Device Status describes runtime reality. It does not duplicate configuration fro
         "source": "USB_HOST"
     },
     "reporting": {
+        "adjustmentReason": "none",
+        "configuredIntervalSec": 3600,
+        "effectiveIntervalSec": 3600,
         "lastReportEpoch": 1783583647,
         "nextReportEpoch": 1783587247,
         "windowOpen": true
     },
-    "schemaVersion": 1
+    "startup": {
+        "epoch": 1784550125,
+        "reason": "pin-reset",
+        "firmware": "20.0-dev",
+        "deviceOS": "6.4.1",
+        "resetCount": 22
+    },
+    "schemaVersion": 2
 }
 
 ## Field Definitions
@@ -99,9 +109,17 @@ Device Status describes runtime reality. It does not duplicate configuration fro
 | firmware.version | Running firmware version. |
 | firmware.resetCount | Number of firmware resets recorded by the device. |
 | config.generation | Deterministic identifier representing the effective merged Product Default and Device Settings configuration. |
-| reporting.lastReportEpoch | Epoch timestamp of the most recent report. |
-| reporting.nextReportEpoch | Epoch timestamp of the next scheduled report calculated by firmware. |
+| reporting.lastReportEpoch | Epoch timestamp when firmware most recently generated an application report and attempted its local queue and device-data ledger handoff. It does not indicate queue acceptance, ledger synchronization, webhook delivery, or another successful publication event. |
+| reporting.nextReportEpoch | The next cloud/application reporting opportunity the firmware currently intends to attempt after applying all active runtime reporting policies. This firmware-published value is authoritative for Fleet Operations. It is battery-adjusted, epoch-aligned, and constrained to configured open hours; zero means firmware cannot currently identify a valid future opportunity. |
+| reporting.configuredIntervalSec | Configured reporting interval before runtime policy adjustments. |
+| reporting.effectiveIntervalSec | Effective reporting cadence selected by firmware after runtime policy adjustments. |
+| reporting.adjustmentReason | Why the configured interval differs from the effective interval. Current values are `none` and `low-battery`; consumers must tolerate future additive values. |
 | reporting.windowOpen | Whether the reporting window is currently open. |
+| startup.epoch | Epoch when firmware initialization successfully completed. If valid time is unavailable during initialization, the timestamp is finalized once after time synchronization and then remains immutable for the lifetime of the execution. |
+| startup.reason | Reset reason for the current execution instance. |
+| startup.firmware | Firmware version running during this execution instance. |
+| startup.deviceOS | Particle Device OS version for this execution instance. |
+| startup.resetCount | Firmware-maintained reset counter captured at initialization. It is not a lifetime boot counter, does not increment on normal sleep/wake cycles, and reflects tracked firmware reset events only. |
 | power.source | Current Particle power source classification. |
 | power.profile | Active firmware power profile. |
 | power.overrideActive | True when firmware is using an override or fallback power-source interpretation. |
@@ -110,6 +128,34 @@ Device Status describes runtime reality. It does not duplicate configuration fro
 | battery.chargeState | Current compact PMIC charge state. |
 | connection.lastResult | Result of the most recent connection attempt. |
 | connection.elapsedMs | Elapsed time for the most recent successful connection. |
+
+## Reporting Cadence and Hardware Wake Cadence
+
+Cloud/application reporting cadence and hardware wake cadence are separate concepts. Firmware may wake more frequently to sense, count, maintain occupancy state, or re-evaluate policy while intentionally delaying cloud communication.
+
+Fleet Operations must interpret `reporting.nextReportEpoch` as the next cloud/application reporting opportunity firmware currently intends to attempt. It must not interpret that value as the next hardware wake, derive reporting cadence from battery state, or reconstruct firmware scheduling policy.
+
+The reporting contract follows this ownership flow:
+
+```text
+Configuration
+    -> Runtime reporting policy
+    -> Effective reporting schedule
+    -> Published Device Status
+    -> Fleet Operations
+```
+
+## Startup Snapshot
+
+The `startup` object describes the current execution instance of the firmware. It is immutable for the lifetime of that execution and is replaced only after the next successful initialization.
+
+It is not current runtime state, an event log, or reboot history.
+
+The device-status ledger persists the most recently published startup snapshot in the cloud. Firmware does not add another persistent store for this object; it retains the current execution's snapshot in RAM until publication.
+
+### Runtime vs Startup
+
+Current runtime values in `battery`, `reporting`, `power`, and `connection` continue changing as device conditions and policy decisions change. The `startup` object remains constant until the next reboot. This distinction is intentional.
 
 ---
 
@@ -150,7 +196,7 @@ The payload is sensor-focused and should remain compact. It should not accumulat
         "occupied": false,
         "totalOccupiedSec": 4574
     },
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "system": {
         "freeHeap": 77768,
         "resetReason": 20,
@@ -164,7 +210,7 @@ The payload is sensor-focused and should remain compact. It should not accumulat
 | Field | Description |
 |--------|-------------|
 | schemaVersion | Ledger schema version. |
-| timestamp | Epoch timestamp for this observation. |
+| timestamp | Epoch timestamp when firmware generated this latest structured observation. It is not a ledger-sync-success timestamp. |
 | occupancy.occupied | Whether the monitored space is currently occupied. |
 | occupancy.totalOccupiedSec | Accumulated occupied duration for the current reporting period, in seconds. |
 | environment.temperature | Latest internal or environmental temperature observation. |

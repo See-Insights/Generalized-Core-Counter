@@ -36,6 +36,7 @@
 #define __MYPERSISTENTDATA_H
 
 #include "Particle.h"
+#include "cloud/BatteryBackoffPolicy.h"
 #include "StorageHelperRK.h" 
 // This way you can do "data.setup()" instead of "MyPersistentData::instance().setup()" as an example
 #define current currentStatusData::instance()
@@ -99,23 +100,6 @@ enum SamplingMode {
 	INTERRUPT = 0,  // Hardware interrupt-driven
 	POLLING   = 1   // Periodic timer-based
 };
-
-/**
- * @brief Battery tier defines progressive power conservation levels
- * 
- * TIER_HEALTHY:    >70% SoC, normal operation (1x interval)
- * TIER_CONSERVING: 50-70% SoC, moderate reduction (2x interval)
- * TIER_CRITICAL:   30-50% SoC, aggressive reduction (4x interval)
- * TIER_SURVIVAL:   <30% SoC, minimal operation (12x interval)
- */
-enum BatteryTier {
-	TIER_HEALTHY    = 0,  // >70% - Normal operation
-	TIER_CONSERVING = 1,  // 50-70% - Moderate power saving
-	TIER_CRITICAL   = 2,  // 30-50% - Aggressive power saving
-	TIER_SURVIVAL   = 3   // <30% - Survival mode
-};
-
-
 
 /**
  * This class is a singleton; you do not create one as a global, on the stack, or with new.
@@ -197,7 +181,7 @@ public:
 		char timeZoneStr[39];							  // String for the timezone - https://developer.ibm.com/technologies/systems/articles/au-aix-posix/
 		uint8_t openTime;                                 // Hour the park opens (0-23)
 		uint8_t closeTime;                                // Hour the park closes (0-23)
-		time_t lastReport;								  // The last time we sent a webhook to the queue
+		time_t lastReport;								  // Last generated application report / local handoff attempt
 		time_t lastConnection;                     		  // Last time we successfully connected to Particle
 		time_t lastHookResponse;                   		  // Last time we got a valid Webhook response
 		uint16_t lastConnectionDuration;                  // How long - in seconds - did it take to last connect to the Particle cloud
