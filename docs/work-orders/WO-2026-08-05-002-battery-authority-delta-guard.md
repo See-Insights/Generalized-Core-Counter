@@ -374,9 +374,11 @@ Verified directly rather than inferred:
   was never the problem here, only the threshold number was, exactly as
   Codex's inference predicted.
 - **chg=DONE, ichg=0, and vcell essentially frozen (4.028V -> 4.026V) for
-  the entire 08:00-22:00 span** (14 hours, across the 09:00 sample, the
-  8-11 hour gap, and the 20:00/21:00/22:00 samples) — this is a battery at
-  rest, fully charge-terminated, not under any load or charge transient.
+  the entire 08:00-22:00 span** (14 hours, spanning an 11-hour low-power
+  gap between 09:00 and 20:00 with no battery reading logged — the 09:00
+  line is a `Sleep:`/`TimeDiag:` trace only, not a `ChargeDiag` sample —
+  and the 20:00/21:00/22:00 samples) — this is a battery at rest, fully
+  charge-terminated, not under any load or charge transient.
 - At 20:00:27, the "Battery sample" log line shows the raw fuel-gauge
   registers already reading `raw=78.63 norm=92.50` at the same instant
   `vcell=4.028` — i.e. by the time this sample was taken, the internal
@@ -522,10 +524,171 @@ above accepted as written. Authorized to proceed to Stage 6
 
 ## Status
 
-**Stage 5 complete — approved for implementation.** No code has been
-changed by Claude or Codex at any point in this investigation; both
-remained read-only throughout, per role restrictions. Handed off via
-GitHub issue (see repo) for Copilot to implement inside VS Code, scoped to
-the Permitted Files section above. Per the workflow, Copilot must leave
-the resulting diff uncommitted for Codex's Stage 7 verification and Chip's
-Stage 8 final gate — only Chip commits and pushes.
+**Stage 6 in progress.** No code has been changed by Claude or Codex at
+any point in this investigation; both remained read-only throughout, per
+role restrictions. Issue
+[#11](https://github.com/See-Insights/Generalized-Core-Counter/issues/11)
+assigned to GitHub Copilot cloud agent by Chip on 2026-08-05; the agent
+opened
+[PR #12](https://github.com/See-Insights/Generalized-Core-Counter/pull/12)
+(`copilot/wo-2026-08-05-002-battery-authority-check`, currently DRAFT)
+within a minute of assignment and is implementing against the scope above.
+
+**Next**: once the agent marks the PR ready for review, this still needs
+Codex's independent Stage 7 verification against this WO's acceptance
+criteria and required tests before Chip's Stage 8 final gate and merge —
+PR readiness is not the same as verified-and-approved.
+
+## Stage 6, revision 1 (Claude review, Chip confirmed, 2026-08-05)
+
+GitHub Copilot's cloud agent stalled twice with no code changes (see PR #12
+history); implementation was redone via Copilot in VS Code instead, on
+branch `investigation/battery-authority-delta-guard`, diff left
+uncommitted. Claude reviewed the diff before routing to Codex and found
+two deviations from the approved architecture, both confirmed by Chip:
+
+1. **Regression, not just a gap**: the post-connect comparison's new
+   direction-awareness (`batterySampleHasUnrealisticDelta` now
+   decrease-only) shipped *without* the required replacement quarantine
+   path for increases that aren't Vcell-corroborated. The approved
+   architecture required these to ship together specifically so removing
+   the old symmetric check wouldn't leave increases unguarded — confirmed
+   by the test suite itself, which asserts increases are *not* rejected
+   but has no case for an increase Vcell doesn't support. As implemented,
+   an uncorroborated jump (e.g. SOC jumps up while Vcell stays low) is
+   less protected than before this WO started.
+2. **Confirmed scope deviation**: the external-power/charging-context gate
+   was removed from *both* the new band and the pre-existing `>=4.10V/<30%`
+   tier. Decision 1 explicitly kept that existing tier gated to its
+   "current (charging/external-power) use"; decision 3's gate removal was
+   scoped only to the new band. The existing tier's gate needs to be
+   restored.
+
+Both sent back to Copilot (in VS Code) for a fix, before Stage 7 — per
+Chip: these are precisely diagnosed with clear fixes already, so bundling
+them into Codex's broader sweep would just add latency for no benefit.
+Codex's Stage 7 pass will run on the corrected diff instead. Chip also
+noted this WO (real battery-safety-relevant logic) warrants the Stage 7
+pass, unlike the earlier trivial-diff tooling WOs where it was skipped by
+mutual agreement.
+
+## Stage 7, pass 1 (Codex, 2026-08-05) — Verified with concerns
+
+Both revision-1 fixes independently confirmed correct: legacy tier's
+external-power gate genuinely restored (new band still ungated, as
+approved); sign convention on the signed delta functions walked through
+by hand, no inversion; debounce (`staleSocConsecutiveCount`) and cooldown
+(`staleSocWakeCyclesSinceResync`) confirmed as genuinely separate counters
+with correct semantics, traced to all real call sites of
+`noteWakeFromLowPowerSleep()`. The flat `vcell>=4.00V` post-connect
+increase-corroboration bar (not destination-SOC-aware) was independently
+flagged by Codex too, same conclusion as Claude: non-blocking, acceptable
+simplification for the documented incident, would need a real OCV curve
+(a non-goal) to do better.
+
+**New finding that changes the outcome**: the host test suite
+(`tests/SensorManagerBatteryAuthorityTests.cpp`) reimplements the
+production logic locally rather than linking against
+`SensorManager.cpp` — a hand-synced parallel copy, not a test of the real
+code. Every claim in this Stage 7 pass that relied on "the tests confirm
+X" (sign convention, debounce/cooldown separation) was actually verifying
+the copy, not production. Additional gaps: no boundary-case tests
+(3.999V/4.000V, 25.0%/25.1%), the incident fixture only replays the 08:00
+pair rather than the full sequence through to 78.6%, and Codex's own
+sandbox couldn't independently run the native tests or firmware build
+(read-only), so Copilot's self-reported "tests passed / compiled
+successfully" remains unverified by Codex, not confirmed.
+
+**Chip's ruling**: this is blocking, not a nitpick — sent back to Copilot
+before Stage 8, and this Stage 7 pass does not count as having verified
+the real implementation. Required: tests must actually exercise
+`SensorManager.cpp`, not a hand-maintained copy — either a real host-linked
+harness or an explicit, documented reason it's infeasible plus an
+alternative (build-time/integration check). Precedent found in this same
+repo: `src/reporting/ReportingPolicy.h/.cpp` has zero Particle Device OS
+dependency and is compiled directly by the host compiler alongside
+`tests/reporting_policy_test.cpp` (see `tests/README.md` on
+`fix/effective-reporting-policy`) — a real link-against-production pattern
+already proven to work here, strongly suggesting the same extraction is
+feasible for the battery-authority pure-logic functions. Also requested in
+the same round (non-blocking on their own): the boundary-case tests and
+the full incident-sequence fixture. A fresh Stage 7 pass is required once
+this comes back.
+
+## Stage 6, revision 2 (Copilot, 2026-08-05)
+
+The link-against-production harness was fully achievable — no fallback
+needed. All pure battery-authority decision logic (signed delta, sag
+detection, uncorroborated-increase detection, stale-SOC condition
+evaluation, quiet-state gate, debounce/cooldown resync decision, saturating
+wake-cycle counter, and the associated constants) extracted into a new
+dependency-free module, `src/sensors/BatteryAuthorityPolicy.h/.cpp` —
+zero Particle Device OS includes, following the exact pattern of
+`src/reporting/ReportingPolicy.h/.cpp`. `SensorManager.cpp` now calls into
+it directly; the old inline implementations and duplicate constants (moved
+out of `ConnectivityPolicy.h`, which is back to its pre-WO state) are gone.
+`tests/SensorManagerBatteryAuthorityTests.cpp` was rewritten to include
+only `BatteryAuthorityPolicy.h` and call the real functions — no local
+copies of thresholds or decision formulas remain. Added: 3.999V/4.000V and
+25.0%/25.1% boundary tests, and the full recovered incident sequence
+(08:00:19 through 22:00, including the 20:00:27 correction to 78.63%) as a
+fixture.
+
+Claude independently re-ran the linked host test
+(`clang++ -std=c++17 -Wall -Wextra -pedantic -Isrc
+tests/SensorManagerBatteryAuthorityTests.cpp
+src/sensors/BatteryAuthorityPolicy.cpp`) rather than trusting Copilot's
+report — clean compile, zero warnings, test binary passes, genuinely
+linked against production. Diff reviewed directly: extraction is a clean
+move (logic unchanged from the already-reviewed version), `SensorManager.cpp`
+wiring correct, `ConnectivityPolicy.h` correctly reverted to original
+(constants now live in the new module instead). Routed to Codex for the
+fresh Stage 7 pass Chip required, since the previous pass verified the
+wrong artifact.
+
+## Stage 7, pass 2 (Codex, 2026-08-05) — Not verified, then resolved
+
+Codex confirmed the extraction is complete and correct (every
+decision-relevant piece of logic genuinely lives in
+`BatteryAuthorityPolicy.cpp`, `SensorManager.cpp` merely calls it),
+confirmed the test file has zero local reimplementation, confirmed
+`ConnectivityPolicy.h` is byte-identical to its pre-WO blob, and confirmed
+the carried-over flat-`4.00V` corroboration concern is unchanged (still
+non-blocking). Final finding was **Not verified**, for three reasons —
+resolved as follows:
+
+1. Codex's own sandbox couldn't create compiler temp files even with
+   `--add-dir /tmp` (environment limitation) and so couldn't independently
+   run the linked host test itself. **Already closed**: Claude had already
+   independently run the exact same command moments earlier — clean
+   compile, zero warnings, test passes.
+2. Codex flagged the fixture as "omitting" a documented 09:00 battery
+   sample. **Not a real gap** — checked directly against the recovered raw
+   log: there is no `ChargeDiag` line at 09:00, only a `Sleep:`/`TimeDiag:`
+   trace. This was Codex misreading Claude's own imprecise WO phrasing
+   ("across the 09:00 sample..."), now corrected above.
+3. Genuine, minor finding: the fixture included an invented `"08:00:20"`
+   duplicate not present in the raw log, and used the precise `78.63%`
+   value (which only appears once, in the `raw=` field at 20:00:27) at
+   21:00/22:00, where the actual `ChargeDiag` lines show `78.6` (1
+   decimal). **Fixed by Claude directly** (Chip authorized this specific,
+   narrow fix without another Copilot/Codex round, given how well-diagnosed
+   it was): removed the invented duplicate, corrected 21:00/22:00 to the
+   literal logged `78.6f`, added a comment noting the fixture is a literal
+   transcription and the 09:00-20:00 gap is real (no sample exists there).
+   Re-verified by Claude: clean compile, zero warnings, test passes.
+
+All three items closed. No further Stage 7 pass requested — the fix was
+narrow enough, and independently re-verified, that Chip judged an
+additional full round unnecessary.
+
+## Status (final, pending Stage 8)
+
+Implementation complete: `src/sensors/BatteryAuthorityPolicy.h/.cpp` (new),
+`src/sensors/SensorManager.cpp` (modified), `src/power/ConnectivityPolicy.h`
+(back to pre-WO state), `tests/SensorManagerBatteryAuthorityTests.cpp`
+(new, linked against production). All Stage 6 revisions and both Stage 7
+passes documented above. Diff remains uncommitted on
+`investigation/battery-authority-delta-guard`. **Awaiting Chip's Stage 8
+final gate** — review of the complete diff, this record, and the decision
+to commit/push/merge. Only Chip commits.

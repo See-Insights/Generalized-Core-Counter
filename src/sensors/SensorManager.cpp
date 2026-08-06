@@ -14,6 +14,7 @@ const char *batteryContext[7] = {"Unknown",    "Not Charging", "Charging",
 #include "power/PowerDiagnostics.h"
 #include "power/ConnectivityPolicy.h"
 #include "state/StateMachine.h"
+#include "sensors/BatteryAuthorityPolicy.h"
 #include "sensors/SensorFactory.h"
 #include "device_pinout.h"     // TMP36_SENSE_PIN for enclosure temperature
 #include "PublishQueuePosixRK.h"
@@ -33,9 +34,11 @@ retained uint8_t lastPmicAnomalyPowerSource = 0;
 retained uint8_t lastPmicAnomalyVbusStatus = 0;
 bool pmicAnomalyActive = false;
 
-// Stale SOC detection (Phase 1: detection and instrumentation only)
+// Stale SOC detection and remediation
 retained uint8_t staleSocConsecutiveCount = 0;
 retained uint16_t staleSocTotalCount = 0;
+retained uint8_t staleSocWakeCyclesSinceResync =
+  BatteryAuthorityPolicy::STALE_SOC_RESYNC_COOLDOWN_WAKE_CYCLES;
 
 // Charging trend telemetry (diagnostic-only, no behavior changes)
 retained float lastTrendSoc = -999.0f;
@@ -425,6 +428,8 @@ void SensorManager::noteWakeFromLowPowerSleep() {
   _authoritativeBatterySoc = 0.0f;
   _authoritativeBatteryState = 0;
   _authoritativeBatteryFallbackUsed = false;
+  staleSocWakeCyclesSinceResync =
+      BatteryAuthorityPolicy::noteWakeCycle(staleSocWakeCyclesSinceResync);
 }
 
 float SensorManager::tmp36TemperatureC(int adcValue) {
@@ -505,30 +510,6 @@ bool probeTmp112Present(uint8_t addr) {
   Wire.unlock();
   return status == 0;
 }
-
-} // namespace
-
-namespace {
-
-#if HAL_PLATFORM_CELLULAR || PLATFORM_ID == PLATFORM_ARGON
-const float AUTHORITATIVE_POST_CONNECT_DELTA_THRESHOLD = 20.0f;
-
-bool batterySampleHasUnrealisticDelta(float authoritativeSoc, float soc) {
-  float delta = soc - authoritativeSoc;
-  if (delta < 0.0f) {
-    delta = -delta;
-  }
-  return delta >= AUTHORITATIVE_POST_CONNECT_DELTA_THRESHOLD;
-}
-
-float batterySampleDelta(float authoritativeSoc, float soc) {
-  float delta = soc - authoritativeSoc;
-  if (delta < 0.0f) {
-    delta = -delta;
-  }
-  return delta;
-}
-#endif
 
 } // namespace
 
@@ -694,16 +675,23 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
       _authoritativeBatterySampleActive &&
       Particle.connected()) {
     const bool suspiciousCandidate = batterySampleLooksSuspicious(battState, soc, vcell, ignoreUnknownBatteryState);
-    authoritativeDelta = batterySampleDelta(_authoritativeBatterySoc, soc);
-    const bool unrealisticDelta = batterySampleHasUnrealisticDelta(_authoritativeBatterySoc, soc);
+    authoritativeDelta = BatteryAuthorityPolicy::batterySampleDelta(_authoritativeBatterySoc, soc);
+    const bool unrealisticDelta =
+      BatteryAuthorityPolicy::batterySampleHasUnrealisticDelta(_authoritativeBatterySoc, soc);
+    const bool uncorroboratedIncrease =
+      BatteryAuthorityPolicy::batterySampleHasUncorroboratedIncrease(
+        _authoritativeBatterySoc, soc, vcell);
     const bool authoritativeFallbackLock = _authoritativeBatteryFallbackUsed;
-    if (authoritativeFallbackLock || suspiciousCandidate || unrealisticDelta) {
+    if (authoritativeFallbackLock || suspiciousCandidate || unrealisticDelta || uncorroboratedIncrease) {
       rejectAuthoritativeOverwrite = true;
+      const char *rejectionReason = authoritativeFallbackLock ? "fallback-lock" :
+          (suspiciousCandidate ? "suspicious" :
+           (unrealisticDelta ? "sag-decrease" : "increase-not-vcell-corroborated"));
       Log.warn("Battery post-connect sample ignored: preRadio=%.1f postConnect=%.1f delta=%.1f",
                (double)_authoritativeBatterySoc,
                (double)soc,
                (double)authoritativeDelta);
-      Log.warn("Battery authority: keeping pre-radio sample SoC=%.2f%% state=%s (%d)%s; rejecting later sample SoC=%.2f%% state=%s (%d) powerSource=%d suspicious=%s fallbackLock=%s delta=%.2f",
+      Log.warn("Battery authority: keeping pre-radio sample SoC=%.2f%% state=%s (%d)%s; rejecting later sample SoC=%.2f%% state=%s (%d) powerSource=%d suspicious=%s fallbackLock=%s delta=%.2f reason=%s",
                (double)_authoritativeBatterySoc,
                batteryContext[(_authoritativeBatteryState <= 6) ? _authoritativeBatteryState : 0],
                _authoritativeBatteryState,
@@ -714,7 +702,8 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
                powerSource,
                suspiciousCandidate ? "true" : "false",
                authoritativeFallbackLock ? "true" : "false",
-               (double)authoritativeDelta);
+               (double)authoritativeDelta,
+               rejectionReason);
     }
   }
 
@@ -1171,34 +1160,24 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
 #endif
 
   // ========================================================================
-  // Stale SOC Detection (Phase 1: detection and instrumentation only)
+  // Stale SOC Detection and Remediation
   // ========================================================================
-  // Detects fuel gauge SOC that appears stale (not updated after charge).
-  // Conservative detection criteria:
-  // - SOC < 30%
-  // - vCell >= 4.10V (preferred) or >= 4.05V (lower confidence)
-  // - External power present (VBUS active)
-  // - PMIC state: Charged/DONE or NotCharging with powerGood
-  // - No PMIC fault
-  // - Requires 2-3 consecutive samples before flagging
-  //
-  // Phase 1 scope: Detection and reporting only. No automatic remediation.
+  // Detects fuel gauge SOC that appears stale relative to usable cell voltage.
+  // Phase 2 keeps the existing debounce and forensics path, then quick-starts
+  // the fuel gauge only in a quiet state and only after a wake-cycle cooldown.
   {
     const float effectiveSoc = rejectAuthoritativeOverwrite ? _authoritativeBatterySoc : soc;
-    const bool externalPowerPresent = (vbusStatus == 1 || vbusStatus == 2 || vbusStatus == 3);
-    const bool pmicStateChargeDone = (chargeStatus == 3); // DONE
-    const bool pmicStateNotChargingWithPower = (chargeStatus == 0 && powerGood);
-    const bool pmicNoFault = !(faultReg & (PMIC_CHRG_FAULT_MASK | PMIC_BAT_FAULT_MASK));
     const bool vcellHighConfidence = (vcell >= 4.10f);
-    const bool vcellLowConfidence = (vcell >= 4.05f && vcell < 4.10f);
-    
+    const BatteryAuthorityPolicy::StaleSocSample staleSocSample = {
+      effectiveSoc,
+      vcell,
+      chargeStatus,
+      vbusStatus,
+      powerGood,
+      faultReg,
+    };
     const bool staleSocConditionsMet =
-        batterySocIsValid(effectiveSoc) &&
-        effectiveSoc < 30.0f &&
-        (vcellHighConfidence || vcellLowConfidence) &&
-        externalPowerPresent &&
-        (pmicStateChargeDone || pmicStateNotChargingWithPower) &&
-        pmicNoFault;
+      BatteryAuthorityPolicy::staleSocConditionsMet(staleSocSample);
     
     if (staleSocConditionsMet) {
       if (staleSocConsecutiveCount < 0xFF) {
@@ -1206,7 +1185,8 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
       }
       
       // Require 2 consecutive samples before flagging (conservative)
-      if (staleSocConsecutiveCount >= 2) {
+        if (staleSocConsecutiveCount >=
+          BatteryAuthorityPolicy::STALE_SOC_TRIGGER_CONSECUTIVE_COUNT) {
         if (staleSocTotalCount < 0xFFFF) {
           staleSocTotalCount++;
         }
@@ -1249,6 +1229,21 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
         stats.pmic_power_good = powerGood ? 1 : 0;
         stats.pmic_fault_reg = faultReg;
         stats.stale_soc_total_count = staleSocTotalCount;
+
+        if (BatteryAuthorityPolicy::shouldResyncFuelGauge(
+          staleSocConditionsMet,
+          staleSocConsecutiveCount,
+          staleSocWakeCyclesSinceResync,
+          Connectivity::isRadioPoweredOn(),
+          chargeStatus)) {
+          Log.warn("STALE_SOC: resyncing fuel gauge - soc=%.2f vcell=%.3fV wakeCooldown=%u",
+                   (double)effectiveSoc,
+                   (double)vcell,
+                   (unsigned)staleSocWakeCyclesSinceResync);
+          fuelGauge.quickStart();
+          staleSocWakeCyclesSinceResync = 0;
+          staleSocConsecutiveCount = 0;
+        }
       }
     } else {
       // Reset consecutive counter when conditions not met
