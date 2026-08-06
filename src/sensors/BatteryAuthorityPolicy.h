@@ -24,9 +24,31 @@ struct StaleSocSample {
   uint8_t faultReg;
 };
 
+class ResyncActions {
+public:
+  virtual ~ResyncActions() = default;
+  virtual void quickStart() = 0;
+  virtual void settle() = 0;
+  virtual void readSample(float &soc, float &vcell) = 0;
+  virtual void commitSoc(float soc) = 0;
+};
+
+struct SocCommitResolution {
+  bool shouldCommit;
+  bool initialSampleStale;
+  bool resyncAttempted;
+  bool settledSampleStale;
+  float soc;
+  float vcell;
+};
+
 float batterySampleDelta(float authoritativeSoc, float soc);
 bool batterySampleHasUnrealisticDelta(float authoritativeSoc, float soc);
 bool batterySampleHasUncorroboratedIncrease(float authoritativeSoc, float soc, float vcell);
+bool shouldEvaluatePostConnectDelta(bool shouldStabilize,
+                                    bool authoritativeSampleActive,
+                                    bool cloudConnected,
+                                    bool radioPoweredOn);
 bool staleSocConditionsMet(const StaleSocSample &sample);
 bool quietForFuelGaugeResync(bool radioPoweredOn, uint8_t chargeStatus);
 bool shouldResyncFuelGauge(bool staleSocConditionsMet,
@@ -34,6 +56,16 @@ bool shouldResyncFuelGauge(bool staleSocConditionsMet,
                            uint8_t wakeCyclesSinceResync,
                            bool radioPoweredOn,
                            uint8_t chargeStatus);
+SocCommitResolution resolveSocCommit(const StaleSocSample &sample,
+                                     bool rejectAuthoritativeOverwrite,
+                                     uint8_t consecutiveCount,
+                                     uint8_t wakeCyclesSinceResync,
+                                     bool radioPoweredOn,
+                                     ResyncActions &actions);
+bool stuckChargingHasMeaningfulProgress(float baselineSoc,
+                                        float acceptedSoc,
+                                        float baselineVcell,
+                                        float vcell);
 uint8_t noteWakeCycle(uint8_t wakeCyclesSinceResync);
 
 } // namespace BatteryAuthorityPolicy

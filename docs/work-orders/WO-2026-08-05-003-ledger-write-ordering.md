@@ -324,9 +324,86 @@ above), radio-gap extension approach, and stuck-charging detector fix all
 accepted as specified. Authorized to proceed to Stage 6 (implementation by
 Copilot).
 
+## Stage 6 (Copilot, 2026-08-06)
+
+Implemented via Copilot in VS Code on `fix/ledger-write-ordering`
+(branched from WO-002's completed work, since this WO builds directly on
+`BatteryAuthorityPolicy`). Introduced a clean testable seam:
+`BatteryAuthorityPolicy::resolveSocCommit()` takes a `ResyncActions`
+interface (`quickStart`/`settle`/`readSample`/`commitSoc`) so the full
+veto/debounce/resync/settle-and-revalidate orchestration is host-testable
+via a `FakeAuthorityActions` mock, without touching real hardware —
+extends WO-002's "link against production, no hand-copies" methodology to
+this more stateful logic.
+
+Claude reviewed the full diff directly (not just Copilot's self-report):
+traced `resolveSocCommit()` by hand against all four mechanism
+requirements (immediate veto never calls `quickStart()`; debounce/cooldown
+reused unchanged; settle-and-revalidate fires only on the actual
+debounce-confirmed resync cycle; no double `quickStart()` calls in one
+invocation); confirmed the Argon/M-SoM early-write branch was correctly
+left untouched (that platform never compiles the stale-SOC block at all,
+so the early write is its only valid commit point — not an oversight);
+confirmed downstream diagnostic log consumers (`PowerDiag`/`PowerTrend`
+mismatch logging) do their own independent fuel-gauge reads and are
+unaffected by the new shared-`soc`-variable reassignment; confirmed the
+radio-gap extension (`shouldEvaluatePostConnectDelta`) and stuck-charging
+fix (`stuckChargingHasMeaningfulProgress`, using `finalAcceptedSoc`) wire
+correctly; confirmed the lower-priority `runPmicChargeCycleTest()` fix was
+also completed (bonus). Independently re-compiled and ran the host test
+suite (clean, zero warnings) and the Boron Device OS 6.4.1 firmware build
+(clean) — not just trusted Copilot's self-report. Two cosmetic-only nits
+found (missing trailing newline in `BatteryAuthorityPolicy.h`,
+inconsistent indentation in two spots) — not blocking.
+
+Routed to Codex for independent Stage 7 verification.
+
+## Stage 7 (Codex, 2026-08-06) — Verified with concerns, no blocking findings
+
+Codex independently traced `resolveSocCommit()` across a 3-cycle scenario
+(isolated inconsistent sample → debounce-confirmed resync cycle →
+post-resync cycle) and confirmed `quickStart()` fires exactly once, at the
+right moment; confirmed `rejectAuthoritativeOverwrite` composition cannot
+revive a sample WO-002's mechanism already rejected; confirmed the
+Argon/M-SoM platform guard structure is correct; confirmed
+`FuelGaugeResyncActions.readSample()` genuinely reuses the existing
+`readBatterySample` lambda rather than a simplified reread; confirmed
+`finalAcceptedSoc` correctly reflects the committed value across all four
+cases (consistent commit, veto/hold, successful correction, failed
+revalidation).
+
+Non-blocking findings:
+- **Correction to Claude's own summary**: the charge-summary telemetry
+  block (a third downstream consumer beyond `PowerDiag`/`PowerTrend`) does
+  see the new authoritative/settled SOC in some paths — Claude's report to
+  Chip said those two were "unaffected" without calling this one out
+  separately. Diagnostic-only, directionally correct, but Claude's
+  communication was imprecise here, not just Copilot's implementation.
+- **Log-line internal-consistency nit — fixed by Claude directly**: the
+  "Battery sample:" detail log captured `loggedSoc`/raw/normalized before
+  the centralized commit block runs, but referenced the shared `vcell`
+  variable, which the block can reassign during settle-and-revalidate — so
+  on a resync cycle the log could show a pre-resync SOC alongside a
+  post-resync Vcell. Fixed by capturing `loggedVcell` alongside
+  `loggedSoc` at the same point, before any reassignment can occur.
+  Re-verified: host test (clean, zero warnings) and Boron Device OS 6.4.1
+  firmware build (clean), both independently re-run by Claude.
+- Radio-gap extension confirmed correctly wired, with an inherent residual
+  limitation already anticipated by the WO: on a recurrent standby wake
+  with no active authority baseline, the delta comparison still can't run
+  — the independent SOC-vs-Vcell veto remains the backstop there, as
+  designed.
+- Dormant `runPmicChargeCycleTest()` fix confirmed safe today; flagged a
+  forward-looking precondition for whoever eventually wires it up (must
+  run after a fresh sample, not a stale boot-time ledger value).
+- Test-fidelity note: the mock-based tests thoroughly exercise the policy
+  orchestration layer (linked against production, not copied) but don't
+  regression-test the full `SensorManager::batteryState()` integration
+  end-to-end — the same accepted testing boundary WO-002 already
+  established, not a new regression.
+
 ## Status
 
-**Stage 5 complete — approved for implementation.** No code has been
-changed by Claude or Codex at any point in this investigation. Dispatching
-to Copilot via VS Code (same path used for WO-002, after the GitHub
-cloud-agent stalled twice on that WO — skipping that detour here).
+**Stage 7 complete, no blocking findings. Ready for Chip's Stage 8 final
+gate.** Diff remains uncommitted on `fix/ledger-write-ordering`. Only Chip
+commits.

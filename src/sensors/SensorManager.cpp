@@ -671,9 +671,11 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
 
   bool rejectAuthoritativeOverwrite = false;
   float authoritativeDelta = 0.0f;
-  if (!shouldStabilize &&
-      _authoritativeBatterySampleActive &&
-      Particle.connected()) {
+    if (BatteryAuthorityPolicy::shouldEvaluatePostConnectDelta(
+      shouldStabilize,
+      _authoritativeBatterySampleActive,
+      Particle.connected(),
+      Connectivity::isRadioPoweredOn())) {
     const bool suspiciousCandidate = batterySampleLooksSuspicious(battState, soc, vcell, ignoreUnknownBatteryState);
     authoritativeDelta = BatteryAuthorityPolicy::batterySampleDelta(_authoritativeBatterySoc, soc);
     const bool unrealisticDelta =
@@ -715,6 +717,12 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   const bool logBatteryDetail = sysStatus.get_verboseMode() || shouldStabilize ||
       fallbackUsed || previousKnownGoodUsed || rejectAuthoritativeOverwrite;
   const float loggedSoc = rejectAuthoritativeOverwrite ? _authoritativeBatterySoc : soc;
+  // Captured alongside loggedSoc/rawFuelGaugeSoc/normalizedSoc, before the
+  // centralized SOC-commit block's settle-and-revalidate can reassign the
+  // shared `vcell` variable — keeps this cycle's detail log internally
+  // consistent (same sample) rather than mixing a pre-resync SOC with a
+  // post-resync Vcell.
+  const float loggedVcell = vcell;
 
 #if !(HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM))
   const uint8_t loggedBattState = rejectAuthoritativeOverwrite ? _authoritativeBatteryState : battState;
@@ -736,10 +744,6 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
 
   if (!rejectAuthoritativeOverwrite) {
     current.set_batteryState(battState);
-    current.set_stateOfCharge(soc);
-  }
-#else
-  if (!rejectAuthoritativeOverwrite) {
     current.set_stateOfCharge(soc);
   }
 #endif
@@ -1107,6 +1111,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
     _authoritativeBatteryState = pmicBattState;
   }
   current.set_batteryState(pmicBattState);
+  float finalAcceptedSoc = current.get_stateOfCharge();
 
 #if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
   // Instrument contradictory PMIC state without changing charging behavior.
@@ -1229,25 +1234,92 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
         stats.pmic_power_good = powerGood ? 1 : 0;
         stats.pmic_fault_reg = faultReg;
         stats.stale_soc_total_count = staleSocTotalCount;
-
-        if (BatteryAuthorityPolicy::shouldResyncFuelGauge(
-          staleSocConditionsMet,
-          staleSocConsecutiveCount,
-          staleSocWakeCyclesSinceResync,
-          Connectivity::isRadioPoweredOn(),
-          chargeStatus)) {
-          Log.warn("STALE_SOC: resyncing fuel gauge - soc=%.2f vcell=%.3fV wakeCooldown=%u",
-                   (double)effectiveSoc,
-                   (double)vcell,
-                   (unsigned)staleSocWakeCyclesSinceResync);
-          fuelGauge.quickStart();
-          staleSocWakeCyclesSinceResync = 0;
-          staleSocConsecutiveCount = 0;
-        }
       }
     } else {
       // Reset consecutive counter when conditions not met
       staleSocConsecutiveCount = 0;
+    }
+
+    using ReadBatterySample = decltype(readBatterySample);
+    class FuelGaugeResyncActions : public BatteryAuthorityPolicy::ResyncActions {
+    public:
+      FuelGaugeResyncActions(ReadBatterySample &reader,
+                             uint8_t &battState,
+                             float &rawFuelGaugeSoc,
+                             float &normalizedSoc,
+                             float &soc,
+                             float &vcell,
+                             int &powerSource,
+                             const char *&socAuthorityTag,
+                             bool &ignoreUnknownBatteryState)
+          : reader_(reader),
+            battState_(battState),
+            rawFuelGaugeSoc_(rawFuelGaugeSoc),
+            normalizedSoc_(normalizedSoc),
+            soc_(soc),
+            vcell_(vcell),
+            powerSource_(powerSource),
+            socAuthorityTag_(socAuthorityTag),
+            ignoreUnknownBatteryState_(ignoreUnknownBatteryState) {}
+
+      void quickStart() override {
+        fuelGauge.quickStart();
+      }
+
+      void settle() override {
+        boundedBatterySettleDelay(ConnectivityPolicy::BATTERY_WAKE_QUICKSTART_DELAY_MS);
+      }
+
+      void readSample(float &soc, float &vcell) override {
+        reader_(battState_, rawFuelGaugeSoc_, normalizedSoc_, soc_, vcell_, powerSource_,
+                socAuthorityTag_, ignoreUnknownBatteryState_);
+        soc = soc_;
+        vcell = vcell_;
+      }
+
+      void commitSoc(float soc) override {
+        current.set_stateOfCharge(soc);
+      }
+
+    private:
+      ReadBatterySample &reader_;
+      uint8_t &battState_;
+      float &rawFuelGaugeSoc_;
+      float &normalizedSoc_;
+      float &soc_;
+      float &vcell_;
+      int &powerSource_;
+      const char *&socAuthorityTag_;
+      bool &ignoreUnknownBatteryState_;
+    };
+
+    FuelGaugeResyncActions resyncActions(
+        readBatterySample, battState, rawFuelGaugeSoc, normalizedSoc, soc, vcell,
+        powerSource, socAuthorityTag, ignoreUnknownBatteryState);
+    const BatteryAuthorityPolicy::SocCommitResolution commitResolution =
+        BatteryAuthorityPolicy::resolveSocCommit(
+            staleSocSample,
+            rejectAuthoritativeOverwrite,
+            staleSocConsecutiveCount,
+            staleSocWakeCyclesSinceResync,
+            Connectivity::isRadioPoweredOn(),
+            resyncActions);
+
+    if (commitResolution.resyncAttempted) {
+      Log.warn("STALE_SOC: resyncing fuel gauge - soc=%.2f vcell=%.3fV wakeCooldown=%u",
+               (double)effectiveSoc,
+               (double)staleSocSample.vcell,
+               (unsigned)staleSocWakeCyclesSinceResync);
+      staleSocWakeCyclesSinceResync = 0;
+      staleSocConsecutiveCount = 0;
+    }
+
+    soc = commitResolution.soc;
+    vcell = commitResolution.vcell;
+    _cachedBatteryVcell = vcell;
+    _cachedBatteryVcellValid = batteryVoltageLooksUsable(vcell);
+    if (commitResolution.shouldCommit) {
+      finalAcceptedSoc = commitResolution.soc;
     }
   }
 
@@ -1352,7 +1424,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
              (double)loggedSoc,
              (double)rawFuelGaugeSoc,
              (double)normalizedSoc,
-             (double)vcell,
+             (double)loggedVcell,
              authorityTag,
              batteryContext[(finalLoggedBattState <= 6) ? finalLoggedBattState : 0],
              finalLoggedBattState,
@@ -1419,15 +1491,16 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   if (chargeStatus == 2) { // Fast Charging
     if (lastChargeStatus != 2) {
       chargeStateStartTime = millis(); // Just entered fast charging
-      fastChargeStartSoc = soc;
+      fastChargeStartSoc = finalAcceptedSoc;
       fastChargeStartVcell = vcell;
     } else if (chargeStateStartTime != 0) {
-      const float socGain = batterySocIsValid(fastChargeStartSoc) ? (soc - fastChargeStartSoc) : 0.0f;
+      const float socGain = batterySocIsValid(fastChargeStartSoc) ? (finalAcceptedSoc - fastChargeStartSoc) : 0.0f;
       const float vcellGain = batteryVoltageLooksUsable(fastChargeStartVcell) ? (vcell - fastChargeStartVcell) : 0.0f;
-      const bool meaningfulChargeProgress = (socGain >= 0.5f) || (vcellGain >= 0.015f);
+      const bool meaningfulChargeProgress = BatteryAuthorityPolicy::stuckChargingHasMeaningfulProgress(
+          fastChargeStartSoc, finalAcceptedSoc, fastChargeStartVcell, vcell);
       if (meaningfulChargeProgress) {
         chargeStateStartTime = millis();
-        fastChargeStartSoc = soc;
+        fastChargeStartSoc = finalAcceptedSoc;
         fastChargeStartVcell = vcell;
       } else if (millis() - chargeStateStartTime > 6UL * 3600000UL) { // 6 hours
         const unsigned long awakeMs = currentWakeAwakeMs();
@@ -1445,11 +1518,11 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
                    inVsysMin ? 1 : 0,
                    thermalRegulation ? 1 : 0);
           chargeStateStartTime = millis();
-          fastChargeStartSoc = soc;
+                  fastChargeStartSoc = finalAcceptedSoc;
           fastChargeStartVcell = vcell;
         } else {
           Log.error("PMIC: Stuck in Fast Charging for 6+ hours with no material gain soc=%.1f socGain=%.2f vcell=%.3f vcellGain=%.3f",
-                    (double)soc,
+                            (double)finalAcceptedSoc,
                     (double)socGain,
                     (double)vcell,
                     (double)vcellGain);
@@ -1762,7 +1835,7 @@ int SensorManager::runPmicChargeCycleTest() {
   Log.info("PMIC_TEST: ========== BEGIN CHARGE CYCLE DIAGNOSTIC ==========");
 
   // Safety checks before proceeding
-  const float currentSoc = fuelGauge.getSoC();
+  const float currentSoc = current.get_stateOfCharge();
   const float currentTemp = current.get_internalTempC();
   const int powerSource = System.powerSource();
   

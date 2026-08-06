@@ -20,6 +20,35 @@ StaleSocSample sample(float soc, float vcell, ChargeStatus charge,
   return {soc, vcell, chargeStatus(charge), vbusStatus, powerGood, faultReg};
 }
 
+struct FakeAuthorityActions : BatteryAuthorityPolicy::ResyncActions {
+    float settledSoc = 0.0f;
+    float settledVcell = 0.0f;
+    float committedSoc = -1.0f;
+    unsigned quickStartCalls = 0;
+    unsigned settleCalls = 0;
+    unsigned readCalls = 0;
+    unsigned commitCalls = 0;
+
+    void quickStart() override {
+        quickStartCalls++;
+    }
+
+    void settle() override {
+        settleCalls++;
+    }
+
+    void readSample(float &soc, float &vcell) override {
+        readCalls++;
+        soc = settledSoc;
+        vcell = settledVcell;
+    }
+
+    void commitSoc(float soc) override {
+        commitCalls++;
+        committedSoc = soc;
+    }
+};
+
 void testNewBandAcrossPmicStates() {
   assert(BatteryAuthorityPolicy::staleSocConditionsMet(
       sample(11.8f, 4.028f, ChargeStatus::Pre)));
@@ -117,6 +146,123 @@ void testCooldownRequiresThreeWakeCycles() {
   assert(BatteryAuthorityPolicy::noteWakeCycle(0xFF) == 0xFF);
 }
 
+void testSingleInconsistentSampleVetoesWithoutResync() {
+    FakeAuthorityActions actions;
+    const BatteryAuthorityPolicy::SocCommitResolution result =
+            BatteryAuthorityPolicy::resolveSocCommit(
+                    sample(11.8f, 4.028f, ChargeStatus::Done),
+                    false,
+                    1,
+                    BatteryAuthorityPolicy::STALE_SOC_RESYNC_COOLDOWN_WAKE_CYCLES,
+                    false,
+                    actions);
+
+    assert(result.initialSampleStale);
+    assert(!result.shouldCommit);
+    assert(!result.resyncAttempted);
+    assert(actions.commitCalls == 0);
+    assert(actions.quickStartCalls == 0);
+    assert(actions.settleCalls == 0);
+    assert(actions.readCalls == 0);
+}
+
+void testSecondInconsistentSampleResyncsAndCommitsCorrection() {
+    FakeAuthorityActions actions;
+    actions.settledSoc = 78.63f;
+    actions.settledVcell = 4.028f;
+    const StaleSocSample staleSample = sample(11.8f, 4.028f, ChargeStatus::Done);
+    const uint8_t cooldown = BatteryAuthorityPolicy::STALE_SOC_RESYNC_COOLDOWN_WAKE_CYCLES;
+
+    const BatteryAuthorityPolicy::SocCommitResolution first =
+            BatteryAuthorityPolicy::resolveSocCommit(
+                    staleSample, false, 1, cooldown, false, actions);
+    assert(!first.shouldCommit);
+    assert(actions.commitCalls == 0);
+    assert(actions.quickStartCalls == 0);
+
+    const BatteryAuthorityPolicy::SocCommitResolution second =
+            BatteryAuthorityPolicy::resolveSocCommit(
+                    staleSample, false, 2, cooldown, false, actions);
+    assert(second.resyncAttempted);
+    assert(!second.settledSampleStale);
+    assert(second.shouldCommit);
+    assert(actions.quickStartCalls == 1);
+    assert(actions.settleCalls == 1);
+    assert(actions.readCalls == 1);
+    assert(actions.commitCalls == 1);
+    assert(std::fabs(actions.committedSoc - 78.63f) < 0.001f);
+}
+
+void testResyncNeverRepeatsWithinInvocation() {
+    FakeAuthorityActions actions;
+    actions.settledSoc = 11.8f;
+    actions.settledVcell = 4.028f;
+    const BatteryAuthorityPolicy::SocCommitResolution result =
+            BatteryAuthorityPolicy::resolveSocCommit(
+                    sample(11.8f, 4.028f, ChargeStatus::Done),
+                    false,
+                    2,
+                    BatteryAuthorityPolicy::STALE_SOC_RESYNC_COOLDOWN_WAKE_CYCLES,
+                    false,
+                    actions);
+
+    assert(result.resyncAttempted);
+    assert(result.settledSampleStale);
+    assert(!result.shouldCommit);
+    assert(actions.quickStartCalls == 1);
+    assert(actions.settleCalls == 1);
+    assert(actions.readCalls == 1);
+    assert(actions.commitCalls == 0);
+}
+
+void testConsistentSampleCommitsWithoutExtraWork() {
+    FakeAuthorityActions actions;
+    const BatteryAuthorityPolicy::SocCommitResolution result =
+            BatteryAuthorityPolicy::resolveSocCommit(
+                    sample(78.63f, 4.028f, ChargeStatus::Done),
+                    false,
+                    0,
+                    0,
+                    true,
+                    actions);
+
+    assert(!result.initialSampleStale);
+    assert(result.shouldCommit);
+    assert(actions.commitCalls == 1);
+    assert(std::fabs(actions.committedSoc - 78.63f) < 0.001f);
+    assert(actions.quickStartCalls == 0);
+    assert(actions.settleCalls == 0);
+    assert(actions.readCalls == 0);
+}
+
+void testRadioOnCloudDisconnectedStillEvaluatesDelta() {
+    assert(BatteryAuthorityPolicy::shouldEvaluatePostConnectDelta(
+            false, true, false, true));
+    assert(!BatteryAuthorityPolicy::shouldEvaluatePostConnectDelta(
+            false, true, false, false));
+    assert(!BatteryAuthorityPolicy::shouldEvaluatePostConnectDelta(
+            true, true, false, true));
+}
+
+void testStuckChargingUsesAcceptedSocAndRawVcellProgress() {
+    FakeAuthorityActions actions;
+    const BatteryAuthorityPolicy::SocCommitResolution rejected =
+            BatteryAuthorityPolicy::resolveSocCommit(
+                    sample(80.0f, 3.800f, ChargeStatus::Fast),
+                    true,
+                    0,
+                    0,
+                    true,
+                    actions);
+
+    assert(!rejected.shouldCommit);
+    assert(actions.commitCalls == 0);
+    assert(!BatteryAuthorityPolicy::stuckChargingHasMeaningfulProgress(
+            50.0f, 50.0f, 3.800f, 3.800f));
+    assert(BatteryAuthorityPolicy::stuckChargingHasMeaningfulProgress(
+            50.0f, 50.0f, 3.800f, 3.816f));
+}
+
 void testRecoveredIncidentSequence() {
     struct IncidentPoint {
         const char *time;
@@ -158,6 +304,12 @@ int main() {
   testPostConnectIncreaseWithoutVcellCorroborationRejected();
   testDebounceRequiresTwoConsecutiveSamples();
   testCooldownRequiresThreeWakeCycles();
+    testSingleInconsistentSampleVetoesWithoutResync();
+    testSecondInconsistentSampleResyncsAndCommitsCorrection();
+    testResyncNeverRepeatsWithinInvocation();
+    testConsistentSampleCommitsWithoutExtraWork();
+    testRadioOnCloudDisconnectedStillEvaluatesDelta();
+    testStuckChargingUsesAcceptedSocAndRawVcellProgress();
   testRecoveredIncidentSequence();
   std::cout << "SensorManager battery authority tests passed\n";
   return 0;
