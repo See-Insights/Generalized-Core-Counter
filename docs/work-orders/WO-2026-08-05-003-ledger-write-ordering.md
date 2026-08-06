@@ -97,12 +97,25 @@ needed as part of this WO:**
   just the resync/cooldown decision logic — this is exactly the class of
   gap that slipped through WO-2026-08-05-002's test suite before its
   fidelity issue was caught).
+- A single (first) inconsistent sample vetoes the write but does NOT call
+  `quickStart()` — debounce protection must survive this change
+  unmodified.
+- Two consecutive inconsistent samples (existing debounce threshold): the
+  second one both vetoes its own write AND triggers `quickStart()` via the
+  existing mechanism, followed by settle-and-revalidate producing a
+  same-cycle corrected commit (or a held value if the re-read still fails).
+- Regression: `quickStart()` is never called more than once in the same
+  `batteryState()` invocation.
 - Stuck-fast-charging detector test: a rejected/implausible sample as
-  input does not reset its baseline or count as meaningful progress.
+  input does not reset its baseline or count as meaningful progress; a
+  rejected SOC sample with genuine Vcell rise (>=15mV) still legitimately
+  resets it (the OR-condition is intentional, not a bug).
 - Regression: consistent samples still write to the ledger without added
-  delay.
-- Whatever scenario the radio-on/cloud-not-connected gap turns out to be,
-  once specified.
+  delay, and without an extra fuel-gauge read.
+- Post-connect delta rejection applies during radio-on/cloud-disconnected
+  sampling (e.g. `PreSleep` context with an active wake-scoped authority
+  sample), if implemented — or explicitly absent with documented rationale
+  if not.
 
 ## Permitted Files
 
@@ -240,17 +253,80 @@ rejected SOC sample with genuine Vcell rise can still legitimately reset
 the window; a regression test needs to account for that OR clause rather
 than assert rejection never resets progress.
 
+## Decisions — CLOSED (Chip, 2026-08-06)
+
+**Mechanism: Option A**, confirmed cleanly, no hybrid. Option B's
+BQ24195 REG09-latching hazard is disqualifying on its own; Option A's open
+items were design-completeness questions, not correctness risks.
+
+**quickStart()-mid-cycle handling: sub-option 2 ("settle-and-revalidate"),
+refined to resolve a real conflict with WO-002's own debounce design**
+found while finalizing the spec (Claude, confirmed before dispatch):
+
+WO-002 deliberately gates `quickStart()` behind 2-consecutive-sample
+debounce specifically to avoid resyncing on a single noisy reading. But
+WO-003 requires the *write* to be vetoed on the first inconsistent sample,
+before debounce confirms anything — a naive "call `quickStart()` whenever
+the write is vetoed" would silently reintroduce single-sample-triggered
+resyncing through a side door, contradicting that decision. Resolution,
+splitting by which mechanism is actually firing:
+
+- The **immediate single-sample veto** (new, gates the write only): on
+  any cycle where `BatteryAuthorityPolicy::staleSocConditionsMet()` is
+  true for the current sample, regardless of debounce count, do not
+  commit the raw value to the ledger this cycle — hold the previous
+  accepted value. No `quickStart()` call from this path.
+- **Debounce, cooldown, and quiet-state** (existing, from WO-002):
+  completely unchanged. They continue to decide when a *real* resync
+  happens.
+- **Settle-and-revalidate applies only on the cycle where the existing
+  (debounce-protected) mechanism actually calls `quickStart()`**: since a
+  real resync legitimately fired there, immediately follow it with the
+  existing settle-delay pattern
+  (`ConnectivityPolicy::BATTERY_WAKE_QUICKSTART_DELAY_MS`, reusing the
+  same pattern the wake-time stabilization path already uses elsewhere in
+  this file), re-read via the same sample-acquisition path, and re-run the
+  immediate veto on the re-read. If it now passes, commit the corrected
+  value same-cycle. If it still fails, hold (same as any other veto
+  cycle).
+
+This delivers same-cycle correction exactly where debounce has already
+confirmed a real, persistent inconsistency — not on every isolated
+flagged sample — preserving WO-002's debounce protection while closing
+WO-003's same-cycle leak.
+
+**Radio-on/cloud-off gap**: extend the post-connect delta-rejection
+gating condition from `Particle.connected()` to `Particle.connected() ||
+Connectivity::isRadioPoweredOn()` — since `_authoritativeBatterySampleActive`
+can still be set from an earlier pre-radio sample this same wake, this
+lets the existing delta comparison apply during network-standby sleep's
+radio-on/cloud-off window too. If this turns out more complex than
+expected during implementation, document as an accepted limitation with
+reasoning instead — per the acceptance criteria below, one or the other,
+not silently left unaddressed.
+
+**Stuck-fast-charging detector**: use whatever single "final
+accepted/committed SOC" value the centralized commit point now produces
+(not a third repetition of the old `rejectAuthoritativeOverwrite` ternary,
+which wouldn't reflect the new immediate veto). Leave `vcell` as raw —
+confirmed not itself subject to authority arbitration.
+
+**Boron split-write structure**: only the SOC write moves to the
+centralized commit point. The separate, unconditional PMIC-derived
+`current.set_batteryState(pmicBattState)` write (~line 1109) is unrelated
+to this WO's concern (battery *state*, not SOC-vs-Vcell consistency) and
+should be left untouched.
+
+## Approval Record
+
+**Approved by Chip, 2026-08-06.** Option A, sub-option 2 (refined per
+above), radio-gap extension approach, and stuck-charging detector fix all
+accepted as specified. Authorized to proceed to Stage 6 (implementation by
+Copilot).
+
 ## Status
 
-Investigation complete (Stage 4). Both proposed mechanisms (reorder the
-write / preliminary veto) are now understood in enough depth to choose
-between responsibly — neither is as simple as originally framed, and
-Option B carries a real hardware-semantics risk (BQ24195 REG09 is
-latching) that wasn't part of the initial proposal. The radio-on/cloud-off
-gap is confirmed real but for a different, more consequential reason
-(network-standby sleep, not mid-attach) than originally hypothesized. The
-stuck-charging detector fix is confirmed simple, with one integration
-dependency on however the ordering fix defines "final accepted SOC."
-**Awaiting Chip's review and decision between Option A / Option B (or a
-hybrid) before this proceeds to Stage 5 approval.** No code has been
-changed.
+**Stage 5 complete — approved for implementation.** No code has been
+changed by Claude or Codex at any point in this investigation. Dispatching
+to Copilot via VS Code (same path used for WO-002, after the GitHub
+cloud-agent stalled twice on that WO — skipping that detour here).
