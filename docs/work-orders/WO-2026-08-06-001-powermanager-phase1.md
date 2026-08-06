@@ -317,16 +317,24 @@ pass.
 
 ## Approval Record
 
-*(pending — this section to be completed once Chip reviews the plan
-above)*
+**Approved by Chip, 2026-08-06.** Full Stage 5 approval: the live
+pass-through design (no caching) for functions 1/2, zero function-4
+surface in Phase 1, the incremental module-grouped migration plan, and
+all four behavior-preservation risk resolutions (§6) accepted as
+specified. Risk 3's expanded analysis singled out as the standout finding
+of this investigation — tracing past the initial (wrong) hypothesis to
+the real risk, and reframing it correctly as a trap for whoever
+implements this rather than a flaw in the plan itself. Explicit
+instruction: the non-goal forbidding `PowerReading::fallbackUsed`/
+`sampledPreRadio`/`quickStartUsed`/`stabilizationAttempts` population
+must be stated emphatically in the Copilot dispatch, not left as a
+footnote. Authorized to proceed to Stage 6.
 
 ## Status
 
-**Stage 4 investigation and migration plan complete, cross-verified by an
-independent Codex pass plus direct verification of the three most
-load-bearing claims (refresh-before-commit ordering, early-setup
-ordering, the `fallbackUsed`/`overrideActive` publish path). No code has
-been changed.** Awaiting Chip's review and Stage 5 approval before this
-proceeds to Copilot. Per the WO's own instruction, full Codex Stage 7
-verification applies once implementation happens, not the lighter
-tooling-diff pattern.
+**Stage 5 complete — approved for implementation.** No code has been
+changed by Claude or Codex at any point in this investigation. Dispatched
+to Copilot via VS Code (per WO-2026-08-05-002's established path). Per
+this WO's own instruction, full Codex Stage 7 verification applies once
+implementation lands — not the lighter tooling-diff pattern used
+elsewhere in this project.
