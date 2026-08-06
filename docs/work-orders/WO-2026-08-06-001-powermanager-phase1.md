@@ -244,30 +244,76 @@ timing/ordering unchanged, all target-platform compile branches
 (Boron/Argon/M-SoM/P2), and the full existing `BatteryAuthorityPolicy`
 suite passing unmodified.
 
-### 6. Behavior-preservation risks flagged for explicit decision (not silently resolved)
+### 6. Behavior-preservation risks — full detail (expanded per Chip's request, 2026-08-06)
 
-1. **Early-setup diagnostic ordering**: `PowerManager::setup()` runs ~300
-   lines before the first `Setup`-context battery sample. Diagnostics
-   logged in that window read the *persisted* (prior-session) SOC, not a
-   fresh one. Verified. A pass-through preserves this exactly; any design
-   involving a cached default would not. No production code was found
-   that calls a `PowerManager` accessor before `current.setup()` runs, so
-   this is a documented characteristic to preserve, not a currently-broken
-   ordering to fix.
-2. **`PowerDiagnostics.cpp` performs its own direct PMIC status read**,
-   independent of `SensorManager`'s main PMIC path. Function 2 "ownership"
-   isn't even fully consolidated in `SensorManager` today. Phase 1's
-   accessor makes `PowerManager` a query path for the ledger value, *not*
-   the sole owner of PMIC reads — fully consolidating PMIC access is a
-   separate, higher-risk migration, explicitly not part of this phase.
-3. **The `PowerReading::fallbackUsed` → `"overrideActive"` publish path**
-   (see §1) — must remain unpopulated/`false` through this migration
-   unless deliberately decided otherwise; not an incidental side effect to
-   introduce.
-4. **`PowerReport::valid` currently means "profile refresh has run,"
-   nothing about SOC/battery-context/policy/action validity** — worth
-   being precise about this in any doc-comment updates so a future reader
-   doesn't assume `valid` covers fields Phase 1 doesn't touch.
+Chip declined to rubber-stamp Stage 5 without the specifics of each risk.
+Full trace below; #3 corrects an initial wrong hypothesis from the first
+pass.
+
+1. **Early-setup diagnostic ordering.** `current.setup()` (line 822) →
+   `PowerManager::instance().setup()` (823) → first `Setup`-context
+   battery sample (1120). `PowerManager::setup()` internally calls
+   `refreshInputProfile()`, which ends by calling
+   `PowerDiagnostics::logPowerState()` — which reads
+   `current.get_stateOfCharge()` directly (`PowerDiagnostics.cpp:141`).
+   So at boot, before any fresh SOC sample this session, a diagnostic log
+   fires reading the *persisted* (prior-session) value. A pure
+   pass-through accessor preserves this exactly. **Concrete
+   implementation trap**: an accessor gated on `setupComplete_` would
+   break specifically here, because `logPowerState()` is called *from
+   inside* `PowerManager`'s own setup path — a self-referential ordering
+   bug, not a hypothetical one. This is why the accessor design explicitly
+   forbids gating on `setupComplete_`.
+
+2. **`PowerDiagnostics.cpp` has its own independent PMIC read.** Verified
+   by reading it directly: `logPowerState()` constructs its own `PMIC`
+   object and calls `getSystemStatus()` (REG08 — VBUS/power-good/charge-status/thermal),
+   independent of `SensorManager.cpp`'s main acquisition and its own
+   compact diagnostic — a third PMIC access point. Precision note: this
+   reads REG08, not REG09 (the fault register WO-2026-08-05-003 confirmed
+   is latching) — not independently confirmed to share that latching
+   behavior, so not asserted to be hazardous in the same specific way.
+   It is one more uncoordinated hardware access point in the pattern the
+   vision doc's motivation section calls out. Phase 1's SOC/battery-state
+   accessors don't touch this; consolidating PMIC reads themselves is a
+   separate, later migration.
+
+3. **`fallbackUsed` → `"overrideActive"` — corrected analysis.** Initial
+   hypothesis (grouped under `"power"` in the JSON payload next to
+   `"source"`/`"profile"`, so possibly related to the USB-source-override
+   mechanism) was wrong. Its actual struct neighbors in `PowerReading` are
+   `sampledPreRadio`, `quickStartUsed`, `stabilizationAttempts` — every
+   one of those names exactly matches real, already-computed local
+   variables inside `SensorManager::batteryState()`'s SOC-sampling logic
+   (`SensorManager.cpp:519,639,662,669,718` has its own `fallbackUsed`,
+   tracking whether that cycle's SOC came from the voltage-estimate
+   fallback). Not a coincidence — `PowerReading` was almost certainly
+   designed to eventually mirror exactly that SOC-acquisition telemetry.
+   **Under the Phase 1 design in this WO specifically: no path to
+   `true`** — the plan never touches `report_`, `refreshInputProfile()`,
+   or any `PowerReading`/`PowerPolicy`/`PowerAction` field; the two new
+   accessors read `current` directly, bypassing `report_` entirely. **But
+   the naming match is a standing invitation for a future
+   implementer — in this WO or later — to "helpfully" wire
+   `PowerReading::fallbackUsed = fallbackUsed` while touching SOC-related
+   code**, since the names line up so suggestively. If that happens,
+   `overrideActive` — already published in the device-status ledger today,
+   always `false` — would start reporting `true` on every voltage-estimate
+   fallback: a real, live change to existing production telemetry. **Explicit
+   non-goal for Phase 1 dispatch, not an assumed omission**: must not
+   populate `fallbackUsed`, `sampledPreRadio`, `quickStartUsed`, or
+   `stabilizationAttempts` under any circumstances in this phase, even
+   though matching values already exist in `SensorManager.cpp`.
+
+4. **`PowerReport::valid` — lower stakes than first implied.** Checked its
+   actual consumers: all three uses are internal to `PowerManager.cpp`
+   itself (`shouldLogProfileDecision`'s has-a-report-ever-run check, set
+   after building a report, and `shouldApplyProfile`'s first-time check).
+   **Nothing external reads `.valid` at all** — so unlike 1-3, there's no
+   actual behavior-change path here. It's a documentation-clarity risk
+   only: `valid` only ever meant "profile refresh has run once," not "the
+   whole report is trustworthy" — worth a doc-comment so a future reader
+   doesn't assume it covers fields Phase 1 doesn't touch.
 
 ## Approval Record
 
