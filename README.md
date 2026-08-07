@@ -8,7 +8,7 @@ This repository includes key documentation files that contributors and AI coding
 
 # Generalized-Core-Counter
 
-**Version:** 19 | **Latest:** addressed power management issues particularly on USB power
+**Version:** 20.1-PowerMgt | **Latest:** Testing Power Management
 
 Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v14 release packages cloud recovery tuning and release-safe logging cleanup without changing the existing production power, sleep, connectivity, watchdog, ledger, or PMIC behavior.
 

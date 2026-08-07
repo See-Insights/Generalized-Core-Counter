@@ -5,6 +5,7 @@
 #include "power/Connectivity.h"
 #include "power/ConnectivityPolicy.h"
 #include "power/PowerDiagnostics.h"
+#include "power/PowerManager.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
 #include "PublishQueuePosixRK.h"
@@ -1077,6 +1078,11 @@ void handleSleepingState() {
             Cloud::instance().logLedgerSleepState();
             setAppBreadcrumb(21);
             drainSerialBeforeSleep();
+            // HIBERNATE may reset the MCU without returning - flush the
+            // diagnostics batch now, since this is the only chance.
+#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
+            PowerDiagnostics::flushDiagBatch();
+#endif
             const SystemSleepResult hibernateResult = System.sleep(config);
 
             // HIBERNATE should reset the MCU. If we return here, treat it as failed and fall back.
@@ -1109,6 +1115,11 @@ void handleSleepingState() {
       Log.warn("Nightly heap guard: freeHeap=%lu <= %lu before overnight ULTRA_LOW_POWER fallback - resetting for clean next-day start",
                freeHeap,
                ConnectivityPolicy::NIGHTLY_HEAP_RESET_THRESHOLD_BYTES);
+      // Reset drops RAM - flush the diagnostics batch now, since this is
+      // the only chance for this cycle's accumulated entries.
+#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
+      PowerDiagnostics::flushDiagBatch();
+#endif
       System.reset();
       return;
     }
@@ -1141,9 +1152,9 @@ void handleSleepingState() {
   {
     measure.batteryState(BatterySampleContext::PreSleep);
     const uint16_t qDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
-    const float soc = current.get_stateOfCharge();
+    const float soc = PowerManager::instance().soc();
     const uint16_t socTenths = (soc >= 0.0f && soc <= 100.0f) ? (uint16_t)(soc * 10.0f + 0.5f) : 0xFFFF;
-    const uint8_t battState = (uint8_t)current.get_batteryState();
+    const uint8_t battState = PowerManager::instance().batteryState();
     const uint8_t isCharging = (battState == 0) ? 0xFF : ((battState == 2) ? 1 : 0); // 0=Unknown, 2=Charging
 
     Observability::cycleStats().finalizeBeforeSleep(
@@ -1305,14 +1316,14 @@ void handleSleepingState() {
            sleepReason,
            wakeInSeconds,
            current.get_occupied() ? 1 : 0,
-           (double)current.get_stateOfCharge());
+           (double)PowerManager::instance().soc());
 #else
   Log.info("Sleep: ULP standby=%d reason=%s dur=%ds occ=%d soc=%.1f",
            useNetworkStandby ? 1 : 0,
            sleepReason,
            wakeInSeconds,
            current.get_occupied() ? 1 : 0,
-           (double)current.get_stateOfCharge());
+           (double)PowerManager::instance().soc());
 #endif
 
   thrashGuard.markProgress("SLEEP_ATTEMPT");
@@ -1389,12 +1400,17 @@ void handleSleepingState() {
         // that requires immediate reset (alert 16 already raised on first failure).
         Log.error("All sleep attempts failed err=%d - immediate reset required", (int)result.error());
         ab1805.resumeWDT();
-        
+
         // Brief delay to allow log output to flush before reset
         delay(2000);
-        
+
         // Reset device to clear corrupted state
         Log.info("Resetting device to clear sleep failure state");
+        // Reset drops RAM - flush the diagnostics batch now, since this is
+        // the only chance for this cycle's cascade of sleep-attempt entries.
+#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
+        PowerDiagnostics::flushDiagBatch();
+#endif
         System.reset();
         
         // Should never reach here, but set ERROR_STATE as fallback
@@ -1416,6 +1432,15 @@ void handleSleepingState() {
   // Mark progress immediately after wake to reset ThrashGuard timer
   thrashGuard.markProgress("WAKE_FROM_SLEEP");
   setAppBreadcrumb(4);
+
+  // Single convergence point for the ULP/STOP-fallback/STOP-timer-only sleep
+  // cascade - whichever attempt actually succeeded lands here, so this flushes
+  // the whole cycle's diagnostics batch exactly once regardless of how many
+  // fallback attempts fired. (Hibernate and the total-sleep-failure reset are
+  // flushed separately at their own non-returning call sites, above.)
+#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
+  PowerDiagnostics::flushDiagBatch();
+#endif
 
   if (sysStatus.get_serialConnected() || (ALLOW_BLOCKING_SERIAL_WAITS != 0)) {
     // Re-initialize USB serial after wake and give the host a bounded chance
@@ -1503,7 +1528,7 @@ void handleSleepingState() {
       // battery policy immediately after the post-wake sample so this wake's
       // occupancy and sleep decisions do not use a stale downgraded mode.
       if (sysStatus.get_lowBatteryMode()) {
-        applyBatteryAwareConnectionModePolicy(current.get_stateOfCharge());
+        applyBatteryAwareConnectionModePolicy(PowerManager::instance().soc());
       }
 
       // In CONNECTED operating mode, the device should reconnect at the
@@ -1559,7 +1584,7 @@ void handleSleepingState() {
         // battery policy on wake so recovered power can restore the intended
         // occupancy behavior before we decide whether to report or sleep again.
         if (sysStatus.get_lowBatteryMode()) {
-          applyBatteryAwareConnectionModePolicy(current.get_stateOfCharge());
+          applyBatteryAwareConnectionModePolicy(PowerManager::instance().soc());
         }
         
         if (!current.get_occupied()) {

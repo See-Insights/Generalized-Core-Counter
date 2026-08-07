@@ -518,3 +518,6 @@ This release fundamentally restructures device configuration to use four indepen
 ## 19 – 2026-06-15
 - addressed power management issues particularly on USB power
 
+## 20.1-PowerMgt – 2026-08-07
+- Testing Power Management
+

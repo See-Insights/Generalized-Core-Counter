@@ -8,6 +8,7 @@
 #include "device_pinout.h"
 #include "sensors/SensorDefinitions.h"
 #include "power/Connectivity.h"
+#include "power/PowerManager.h"
 #include "ThrashGuard.h"
 
 // NOTE:
@@ -125,7 +126,7 @@ void handleIdleState() {
       time_t now = Time.now();
       if (lastScheduledSample == 0 || (now - lastScheduledSample) >= intervalSec) {
         measure.batteryState();
-        Log.info("Scheduled trigger sample - battery SoC: %4.2f%%", (double)current.get_stateOfCharge());
+        Log.info("Scheduled trigger sample - battery SoC: %4.2f%%", (double)PowerManager::instance().soc());
         lastScheduledSample = now;
       }
     }

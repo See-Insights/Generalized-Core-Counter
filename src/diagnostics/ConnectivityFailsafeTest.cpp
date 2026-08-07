@@ -4,6 +4,7 @@
 #include "MyPersistentData.h"
 #include "cloud/Cloud.h"
 #include "power/ConnectivityPolicy.h"
+#include "power/PowerManager.h"
 #include "power/PowerPlatform.h"
 #include "state/StateMachine.h"
 
@@ -58,7 +59,7 @@ BatteryTier currentBatteryTierForFailsafeLocal() {
   if (tierValue <= TIER_SURVIVAL) {
     return static_cast<BatteryTier>(tierValue);
   }
-  return Cloud::calculateBatteryTier(current.get_stateOfCharge());
+  return Cloud::calculateBatteryTier(PowerManager::instance().soc());
 }
 
 bool connectivityFailsafeHasExternalPowerLocal() {

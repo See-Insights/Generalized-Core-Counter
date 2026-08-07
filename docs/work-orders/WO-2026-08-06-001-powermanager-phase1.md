@@ -330,11 +330,127 @@ instruction: the non-goal forbidding `PowerReading::fallbackUsed`/
 must be stated emphatically in the Copilot dispatch, not left as a
 footnote. Authorized to proceed to Stage 6.
 
+## Stage 6 — Implementation (Copilot, 2026-08-06)
+
+Copilot implemented on `refactor/powermanager-phase1`: the two live
+pass-through accessors (`PowerManager::soc()`/`batteryState()`), all 17
+external call-site migrations across the eight consumer files, and a
+host-linked test (`tests/power_manager_accessors_test.cpp` +
+`tests/stubs/`) exercising the real `PowerManager.cpp` — not a
+hand-copied reimplementation. `SensorManager.cpp` and
+`BatteryAuthorityPolicy.{h,cpp}` were left untouched, as required.
+
+Claude's own review (independent of Copilot's report): traced every
+migrated site by hand, confirmed the non-goal was honored, confirmed
+`SensorManager.cpp` has zero diff, and independently recompiled/reran
+both host test suites plus a full Boron Device OS 6.4.1 firmware build —
+all passed clean. Flagged two out-of-scope-but-behavior-neutral touches
+for Codex to independently assess: `PowerManager.cpp`'s
+`#include "../Config.h"` changed to `#include "Config.h"`, and the Boron
+USB-override preprocessor guard gaining a `defined(...)` check.
+
+## Stage 7 — Verification (Codex, 2026-08-06)
+
+**Verdict: Verified with concerns.** Codex independently confirmed, via
+git object-hash comparison (not just `git diff`), that
+`SensorManager.cpp` and `BatteryAuthorityPolicy.{h,cpp}` are
+byte-for-byte identical to `HEAD`; confirmed all 17 call sites migrated
+correctly with no surrounding logic change; confirmed the non-goal fully
+honored (no writes to any of the four forbidden fields); confirmed
+accessor purity; and confirmed both flagged out-of-scope touches are
+behavior-neutral in real firmware builds (traced the same
+`BuildProfile.h` chain independently, plus proved the two `Config.h`
+include forms preprocess to an identical SHA-256).
+
+Codex additionally caught a third out-of-scope touch Claude had seen in
+the diff but not separately flagged to Chip: `[[maybe_unused]]` added to
+`kPowerSourceUnknown` in `PowerManager.cpp` — a compile-warning
+annotation with no runtime semantics, but an unreported item
+nonetheless.
+
+**The substantive finding**: the WO's Required Tests section calls for a
+regression test "for each migrated call site where practical." Only the
+two-accessor test was added — none of the 17 individual consumer sites
+(JSON payload serialization, the `>50%` connection-budget boundary, tier
+hysteresis, `publishData()`'s NaN/bounds guard) have an executable
+regression test. Behavior-preservation at those sites is confirmed only
+by static diff review (Claude's and Codex's, independently) plus the
+unmodified existing test suites continuing to pass — not by a test that
+would catch a future regression at any one of those sites specifically.
+
+Codex could not independently execute the host test suites or firmware
+build (sandbox blocked compiler temp-file creation, consistent with
+prior WOs) — Claude's own independently-run build/test pass already
+covers that gap.
+
+**Chip's decision, 2026-08-06**: hold the line, same standard as
+WO-2026-08-05-002's test-fidelity gap. Sent back to Copilot to add the
+missing per-call-site regression tests before this proceeds to Stage 8.
+
+## Stage 6/7, round 2 (2026-08-06)
+
+Copilot's fix: `tests/power_consumer_regression_test.sh`, a new harness
+using an `awk` brace-matcher (`extract_braced_block()`) to pull verbatim
+production source blocks out of the real files at test-run time —
+`ConnectBudgetContext`/`evaluateConnectBudget()` (`State_Connect.cpp`),
+`Cloud::calculateBatteryTier()` (`BatteryBackoff.cpp`), both
+failsafe-tier duplicates (`Generalized-Core-Counter.cpp`,
+`ConnectivityFailsafeTest.cpp`), and `publishData()`'s battery/SOC
+normalization (via a custom awk block that skips two verified-unrelated
+interposed declarations) — then compiles them against real
+`PowerManager.cpp`. This is not the "link the whole `.cpp`" pattern used
+by the first two test files, but a deliberate answer to the same
+no-hand-copied-logic requirement for files with disproportionate device
+dependencies. Claude reviewed the technique in depth, traced each
+extraction against the real source by hand, and flagged one residual
+issue: `tests/stubs/MyPersistentData.h` hand-typed its own duplicate
+`enum BatteryTier` rather than extracting it — exactly the category of
+risk this standard exists to catch, just far smaller in scope. Sent back
+once more; fixed by extracting the enum the same way as the function
+bodies. Second Codex Stage 7 pass: **Verified with concerns** — the enum
+fix was confirmed closed via SHA-256/`cmp` comparison, but coverage was
+found incomplete: only 7 of the 17 migrated call sites had an executable
+regression test, and the other 10 weren't explained.
+
+## Stage 6/7, round 3 (2026-08-06)
+
+Claude categorized the 10 uncovered sites by actual risk and got Chip's
+sign-off on a scoped resolution: 4 pure-logging sites
+(`PowerDiagnostics.cpp:141`, `State_Idle.cpp:129`,
+`State_Sleep.cpp:1309/1316`) need no test (no decision logic — the value
+only reaches a `Log.info()`/`Log.warn()` call); 4 sites
+(`State_Report.cpp:138`, `Generalized-Core-Counter.cpp:1124`,
+`State_Sleep.cpp:1507/1563`) need no new test because Claude verified via
+`git diff` that each is an exact one-line getter substitution into
+`applyBatteryAwareConnectionModePolicy()` with zero surrounding change;
+2 sites (`State_Sleep.cpp:1145/1147`, the pre-sleep SOC-tenths/isCharging
+encoding feeding `Observability::cycleStats().finalizeBeforeSleep()`)
+were judged genuinely undertested — same risk shape as the already-tested
+`publishData()` normalization — and sent back for a dedicated test.
+
+Copilot added `testPreSleepBatteryEncoding()`, extracting the four-line
+encoding block verbatim via a plain awk range extraction. Claude
+independently hand-derived every expected `socTenths`/`isCharging` value
+in Python from the real formula before accepting the test's own
+assertions, and independently reran all three host suites plus a full
+Boron firmware build.
+
+**Third Codex Stage 7 pass: Verified.** No remaining correctness or
+coverage gap. Confirmed: the new extraction is byte/hash-identical to
+production source; all seven new assertions independently recomputed and
+correct; the 4-site substitution audit re-verified independently (each
+confirmed an exact getter-only change); the 4 logging-only sites
+re-confirmed non-branching; full 17-site accounting closes exactly
+(9 directly tested + 4 substitution-audited + 4 logging-audited = 17,
+no site missing or duplicated); `SensorManager.cpp`/
+`BatteryAuthorityPolicy.{h,cpp}` confirmed still byte-for-byte unchanged
+from `HEAD`.
+
 ## Status
 
-**Stage 5 complete — approved for implementation.** No code has been
-changed by Claude or Codex at any point in this investigation. Dispatched
-to Copilot via VS Code (per WO-2026-08-05-002's established path). Per
-this WO's own instruction, full Codex Stage 7 verification applies once
-implementation lands — not the lighter tooling-diff pattern used
-elsewhere in this project.
+**Stage 7 complete and clean across three rounds.** Implementation
+verified behavior-preserving by Claude's independent review and three
+independent Codex passes, each targeting the gaps found by the previous
+round, plus Claude's independently-run host test suites and Boron
+Device OS 6.4.1 firmware build passing at every round. Ready for Chip's
+Stage 8 final gate.

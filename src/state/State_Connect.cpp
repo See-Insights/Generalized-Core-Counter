@@ -10,6 +10,7 @@
 #include "power/ConnectivityPolicy.h"
 #include "power/Connectivity.h"
 #include "power/PowerDiagnostics.h"
+#include "power/PowerManager.h"
 #include "observability/WakeCycleStats.h"
 #include "ThrashGuard.h"
 
@@ -113,7 +114,7 @@ ConnectBudgetContext evaluateConnectBudget() {
   }
 
   context.attemptCounter = sysStatus.get_connectionAttemptCounter();
-  context.currentSoC = current.get_stateOfCharge();
+  context.currentSoC = PowerManager::instance().soc();
   context.allowDeepAttempt =
       (context.attemptCounter >= ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD) ||
       (context.currentSoC > ConnectivityPolicy::DEEP_ATTEMPT_SOC_THRESHOLD);
