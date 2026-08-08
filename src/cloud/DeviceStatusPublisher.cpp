@@ -1,17 +1,18 @@
 #include "../Config.h"
 #include "cloud/Cloud.h"
 #include "observability/WakeCycleStats.h"
+#include "observability/StartupSnapshotRuntime.h"
 #include "power/PowerManager.h"
 #include "sensors/SensorManager.h"
 #include "state/StateMachine.h"
+#include "reporting/ReportingPolicy.h"
 
 // External firmware version string (defined in Version.cpp)
 extern const char* FIRMWARE_VERSION;
 
 namespace {
 
-constexpr int kLedgerSchemaVersion = 1;
-constexpr size_t kDeviceStatusPayloadCapacity = 896;
+constexpr int kLedgerSchemaVersion = 2;
 constexpr size_t kDeviceDataPayloadCapacity = 512;
 
 bool ledgerHasUnsyncedWriteForDiag(const Ledger &ledger) {
@@ -84,15 +85,6 @@ void formatConfigGeneration(char *buffer, size_t bufferSize) {
     snprintf(buffer, bufferSize, "%08lX", (unsigned long)hash);
 }
 
-time_t nextReportEpoch() {
-    const time_t lastReport = sysStatus.get_lastReport();
-    const uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
-    if (lastReport <= 0 || intervalSec == 0) {
-        return 0;
-    }
-    return lastReport + intervalSec;
-}
-
 } // namespace
 
 bool Cloud::writeDeviceStatusToCloud(const char *source) {
@@ -128,7 +120,7 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
 #endif
 
     // Build current status contract JSON for duplicate suppression.
-    char bufferBase[kDeviceStatusPayloadCapacity];
+    char bufferBase[DEVICE_STATUS_PAYLOAD_CAPACITY];
     JSONBufferWriter writerBase(bufferBase, sizeof(bufferBase));
     char configGeneration[9];
     formatConfigGeneration(configGeneration, sizeof(configGeneration));
@@ -136,6 +128,9 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     const auto &cycleStats = Observability::cycleStats();
     float batteryVoltage = -1.0f;
     SensorManager::instance().cachedBatteryVoltage(batteryVoltage);
+    const ReportingPolicy reportingPolicy = ReportingPolicyResolver::resolveRuntime(
+        current.get_stateOfCharge(), Time.now());
+    const Observability::StartupSnapshot &startup = Observability::currentStartupSnapshot();
 
     writerBase.beginObject();
     writerBase.name("schemaVersion").value(kLedgerSchemaVersion);
@@ -148,8 +143,19 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     writerBase.endObject();
     writerBase.name("reporting").beginObject();
     writerBase.name("lastReportEpoch").value((int)sysStatus.get_lastReport());
-    writerBase.name("nextReportEpoch").value((int)nextReportEpoch());
-    writerBase.name("windowOpen").value(isWithinOpenHours());
+    writerBase.name("nextReportEpoch").value((int)reportingPolicy.nextReportEpoch);
+    writerBase.name("configuredIntervalSec").value((unsigned long)reportingPolicy.configuredIntervalSec);
+    writerBase.name("effectiveIntervalSec").value((unsigned long)reportingPolicy.effectiveIntervalSec);
+    writerBase.name("adjustmentReason").value(
+        ReportingPolicyResolver::adjustmentReasonName(reportingPolicy.adjustmentReason));
+    writerBase.name("windowOpen").value(reportingPolicy.windowOpen);
+    writerBase.endObject();
+    writerBase.name("startup").beginObject();
+    writerBase.name("epoch").value((int)startup.epoch);
+    writerBase.name("reason").value(startup.reason);
+    writerBase.name("firmware").value(startup.firmware);
+    writerBase.name("deviceOS").value(startup.deviceOS);
+    writerBase.name("resetCount").value((unsigned long)startup.resetCount);
     writerBase.endObject();
     writerBase.name("power").beginObject();
     writerBase.name("source").value(PowerManager::powerSourceLabel(powerReport.reading.powerSource));
@@ -179,13 +185,13 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
         return true; // Not an error; nothing to do
     }
 
-    char bufferPublish[kDeviceStatusPayloadCapacity];
+    char bufferPublish[DEVICE_STATUS_PAYLOAD_CAPACITY];
     strncpy(bufferPublish, bufferBase, sizeof(bufferPublish) - 1);
     bufferPublish[sizeof(bufferPublish) - 1] = '\0';
     const size_t statusPayloadSize = strlen(bufferPublish);
     Log.info("LedgerPayloadStatus: bytes=%lu/%lu schema=%d",
              (unsigned long)statusPayloadSize,
-             (unsigned long)kDeviceStatusPayloadCapacity,
+             (unsigned long)DEVICE_STATUS_PAYLOAD_CAPACITY,
              kLedgerSchemaVersion);
 
     LedgerData data = LedgerData::fromJSON(bufferPublish);

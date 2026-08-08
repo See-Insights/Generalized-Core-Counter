@@ -6,8 +6,10 @@
  * Designed for remote deployment with robust error handling and cloud configuration.
  * 
  * Author: Charles McClelland
- * 
- * Date: 12/10/2025
+ *
+ * Date: 07/22/2026
+ * Version: 21.0_Test - Effective reporting policy contract, startup snapshot
+ *   observability, and battery backoff refactor. See CHANGELOG.md.
  * License: MIT
  * Repo: https://github.com/chipmc/Generalized-Core-Counter
  */
@@ -24,6 +26,7 @@
 #include "power/PowerPlatform.h"
 #include "power/PowerDiagnostics.h"
 #include "observability/WakeCycleStats.h"
+#include "observability/StartupSnapshotRuntime.h"
 #include "diagnostics/ConnectivityFailsafeTest.h"
 #include "ThrashGuard.h"
 
@@ -46,6 +49,7 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 #include "cloud/Cloud.h"                   // Particle Ledger integration (config + data)
 #include "PublishQueuePosixRK.h"     // File-backed persistent event queue
 #include "cloud/Particle_Functions.h"      // Particle.function() and Particle.variable() registration
+#include "reporting/ReportingPolicy.h"    // Shared cloud-report cadence policy
 
 // Sensor abstraction layer
 #include "sensors/SensorManager.h"           // Singleton managing active sensor instance
@@ -105,7 +109,8 @@ void UbidotsHandler(const char *event, const char *data); // Webhook response ha
 void publishStartupStatus();  // One-time status summary at boot
 void publishWatchdogForensics(); // One-time watchdog forensic snapshot at boot
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE); // Safe diagnostic publish with queue guard
-BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC);
+void applyBatteryAwareConnectionModePolicy(float currentSoC, BatteryTier resolvedTier);
+void applyBatteryAwareConnectionModePolicy(float currentSoC);
 void clearConnectivityFailsafeRecovery(const char *reason);
 void connectivityFailsafeSupervisor();
 
@@ -1135,6 +1140,7 @@ void setup() {
   // setup reached stable completion; clear early-boot in-progress marker.
   bootInProgress = false;
   setAppBreadcrumb(BREADCRUMB_SETUP_COMPLETE);
+  Observability::captureSuccessfulInitialization();
   signalLED(false);  // Turn off startup indicator
 }
 
@@ -1389,8 +1395,8 @@ static void appWatchdogHandler() {
  * @note Downgrades are sticky - device will not auto-upgrade even if SoC recovers.
  *       Critical for preventing premature battery death in remote solar deployments.
  */
-BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC) {
-  BatteryTier newTier = Cloud::calculateBatteryTier(currentSoC);
+void applyBatteryAwareConnectionModePolicy(float currentSoC, BatteryTier resolvedTier) {
+  BatteryTier newTier = resolvedTier;
   uint8_t prevTierValue = sysStatus.get_currentBatteryTier();
   const char* tierNames[] = {"HEALTHY", "CONSERVING", "CRITICAL", "SURVIVAL"};
 
@@ -1430,7 +1436,12 @@ BatteryTier applyBatteryAwareConnectionModePolicy(float currentSoC) {
     sysStatus.set_lowBatteryMode(false);
   }
 
-  return newTier;
+}
+
+void applyBatteryAwareConnectionModePolicy(float currentSoC) {
+  const ReportingPolicy policy = ReportingPolicyResolver::resolveRuntime(
+      currentSoC, Time.now());
+  applyBatteryAwareConnectionModePolicy(currentSoC, policy.batteryTier);
 }
 
 static bool isWithinOpenHoursForHour(uint8_t hour, uint8_t openHour, uint8_t closeHour) {
@@ -1504,6 +1515,18 @@ bool isWithinOpenHours() {
   const bool openNow = isWithinOpenHoursForHour(hour, openHour, closeHour);
 
   return openNow;
+}
+
+bool isWithinOpenHoursAt(time_t epoch) {
+  if (!Time.isValid() || !Config::isValid(false)) {
+    return true;
+  }
+
+  LocalTimeConvert converter;
+  converter.withConfig(LocalTime::instance().getConfig()).withTime(epoch).convert();
+  const uint8_t localHour = (uint8_t)(converter.getLocalTimeHMS().toSeconds() / 3600);
+  return isWithinOpenHoursForHour(
+      localHour, sysStatus.get_openTime(), sysStatus.get_closeTime());
 }
 
 void logTimeDiag(bool isOpen) {

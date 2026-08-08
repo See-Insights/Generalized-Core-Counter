@@ -10,6 +10,7 @@
 #include "sensors/SensorManager.h"
 #include "device_pinout.h"
 #include "sensors/SensorDefinitions.h"
+#include "reporting/ReportingPolicy.h"
 
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
@@ -52,8 +53,6 @@ void handleReportingState() {
     }
   }
 
-  sysStatus.set_lastReport(now);
-
   // Read battery state BEFORE connectivity decision so SoC-tiered
   // logic below uses fresh data, not stale values from a previous
   // cycle or from during an active radio session.
@@ -61,6 +60,10 @@ void handleReportingState() {
   measure.batteryState(); // Update battery SoC/state and enclosure temperature
 
   publishData(); // Queue hourly report; actual send depends on connectivity policy
+
+  // This timestamp is the authoritative application-report generation time.
+  // Transport acceptance and successful delivery have separate diagnostics.
+  sysStatus.set_lastReport(now);
 
   // After each hourly report, reset the hourly counter so
   // the next report contains only the counts for that hour.
@@ -134,26 +137,13 @@ void handleReportingState() {
   }
   
   if (!Particle.connected()) {
-    // Calculate current battery tier with hysteresis to prevent thrashing
     float currentSoC = PowerManager::instance().soc();
-    
-    BatteryTier newTier = applyBatteryAwareConnectionModePolicy(currentSoC);
-    
-    // Calculate effective interval based on tier multiplier only
-    // Connection timing is boundary-aligned, not elapsed-time based
-    uint16_t baseInterval = Config::reportingIntervalSecForRuntime();
-    uint16_t tierMultiplier = Cloud::getIntervalMultiplier(newTier);
-    uint32_t effectiveInterval = (uint32_t)baseInterval * tierMultiplier;
-    
-    // Check if current time is aligned to the effective interval boundary
-    // Allow 30 second tolerance for timer jitter and processing overhead
-    time_t offset = now % effectiveInterval;
-    bool isAligned = (offset <= ConnectivityPolicy::CONNECT_ALIGNMENT_TOLERANCE_SEC) ||
-             (offset >= effectiveInterval - ConnectivityPolicy::CONNECT_ALIGNMENT_TOLERANCE_SEC);
-    
-    const char* tierName = (newTier == TIER_HEALTHY ? "HEALTHY" : 
-                newTier == TIER_CONSERVING ? "CONSERVING" :
-                newTier == TIER_CRITICAL ? "CRITICAL" : "SURVIVAL");
+    const ReportingPolicy reportingPolicy =
+        ReportingPolicyResolver::resolveRuntime(currentSoC, now);
+    applyBatteryAwareConnectionModePolicy(currentSoC, reportingPolicy.batteryTier);
+
+    const char *tierName = ReportingPolicyResolver::batteryTierName(
+        reportingPolicy.batteryTier);
   #if !ENABLE_CONNECT_DECISION_TRACE
     (void)tierName;
   #endif
@@ -209,30 +199,31 @@ void handleReportingState() {
 #endif
         transitionTo(CONNECTING_STATE, "keep alive mode");
       }
-    } else if (isAligned) {
+    } else if (reportingPolicy.cadenceDue) {
       if (deferAutoConnectForUnstableModem) {
         Log.warn("MODEM_POLICY: reconnect deferred reason=unstable_modem remaining=%lu ms trigger=aligned",
                  reconnectDeferRemainingMs);
         transitionTo(IDLE_STATE, "modem unstable aligned");
       } else {
 #if ENABLE_CONNECT_DECISION_TRACE
-        Log.info("REPORTING: Connection due - boundary aligned tier=%s interval=%us (base=%u x %u) offset=%lus",
+        Log.info("REPORTING: Connection due - boundary aligned tier=%s interval=%lus (base=%lu x %u)",
                  tierName,
-                 (unsigned)effectiveInterval,
-                 (unsigned)baseInterval,
-                 (unsigned)tierMultiplier,
-                 (unsigned long)offset);
+                 (unsigned long)reportingPolicy.effectiveIntervalSec,
+                 (unsigned long)reportingPolicy.configuredIntervalSec,
+                 (unsigned)reportingPolicy.batteryMultiplier);
 #endif
         transitionTo(CONNECTING_STATE, "boundary aligned");
       }
     } else {
-      time_t nextBoundary = effectiveInterval - offset;
+      const time_t nextBoundary = reportingPolicy.nextReportEpoch > now
+          ? reportingPolicy.nextReportEpoch - now
+          : 0;
 #if ENABLE_CONNECT_DECISION_TRACE
-      Log.info("REPORTING: Connection deferred - not aligned tier=%s interval=%us offset=%lus next_in=%lus",
+      Log.info("REPORTING: Connection deferred - cadence closed tier=%s interval=%lus next_in=%lus window=%d",
                tierName,
-               (unsigned)effectiveInterval,
-               (unsigned long)offset,
-               (unsigned long)nextBoundary);
+               (unsigned long)reportingPolicy.effectiveIntervalSec,
+               (unsigned long)nextBoundary,
+               reportingPolicy.windowOpen ? 1 : 0);
     #else
       (void)nextBoundary;
 #endif

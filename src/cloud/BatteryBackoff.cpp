@@ -1,63 +1,21 @@
 #include "cloud/Cloud.h"
+#include "cloud/BatteryBackoffPolicy.h"
+#include "reporting/ReportingPolicy.h"
 
 // *************** Battery-Aware Connection Management ***************
 
 // [static]
 BatteryTier Cloud::calculateBatteryTier(float currentSoC) {
-    // Get previous tier for hysteresis logic
     uint8_t prevTierValue = sysStatus.get_currentBatteryTier();
-    BatteryTier prevTier = static_cast<BatteryTier>(prevTierValue);
-    
-    // Apply hysteresis: require 5% higher SoC to move to better tier
-    // This prevents rapid tier thrashing when battery is near threshold
-    
-    if (currentSoC >= 75.0f) {
-        // Strong signal to move to HEALTHY (or stay there)
-        return TIER_HEALTHY;
-    } else if (currentSoC >= 70.0f) {
-        // Boundary zone: stay in current tier unless coming from below
-        return (prevTier == TIER_HEALTHY) ? TIER_HEALTHY : TIER_CONSERVING;
-    } else if (currentSoC >= 55.0f) {
-        // Strong signal for CONSERVING or recovery from CRITICAL
-        return TIER_CONSERVING;
-    } else if (currentSoC >= 50.0f) {
-        // Boundary zone: stay in current tier unless coming from above
-        if (prevTier <= TIER_CONSERVING) {
-            return TIER_CONSERVING;
-        } else {
-            return TIER_CRITICAL;
-        }
-    } else if (currentSoC >= 35.0f) {
-        // Strong signal for CRITICAL or recovery from SURVIVAL
-        return TIER_CRITICAL;
-    } else if (currentSoC >= 30.0f) {
-        // Boundary zone: stay in current tier unless coming from above
-        if (prevTier <= TIER_CRITICAL) {
-            return TIER_CRITICAL;
-        } else {
-            return TIER_SURVIVAL;
-        }
-    } else {
-        // Below 30% - definite SURVIVAL mode
-        return TIER_SURVIVAL;
-    }
+    BatteryTier prevTier = prevTierValue <= TIER_SURVIVAL
+        ? static_cast<BatteryTier>(prevTierValue)
+        : TIER_HEALTHY;
+    return BatteryBackoff::calculateTier(currentSoC, prevTier);
 }
 
 // [static]
 uint16_t Cloud::getIntervalMultiplier(BatteryTier tier) {
-    switch (tier) {
-        case TIER_HEALTHY:
-            return 1;   // Normal interval
-        case TIER_CONSERVING:
-            return 2;   // Double interval (half connections per day)
-        case TIER_CRITICAL:
-            return 4;   // Quadruple interval (quarter connections per day)
-        case TIER_SURVIVAL:
-            return 12;  // 12x interval (e.g., hourly → every 12 hours)
-        default:
-            Log.warn("Unknown battery tier %d, defaulting to 1x multiplier", (int)tier);
-            return 1;
-    }
+    return BatteryBackoff::intervalMultiplier(tier);
 }
 
 // [static]
@@ -175,8 +133,8 @@ void Cloud::testBatteryBackoffLogic() {
     // Combined scenario tests
     Log.info(" ");
     Log.info("=== Combined Scenario Tests (Base Interval = 3600s / 1 hour) ===");
-    Log.info("Format: Battery | ConnTime | Tier Mult | History Mult | Effective Interval");
-    Log.info("----------------------------------------------------------------------");
+    Log.info("Format: Battery | ConnTime | Tier Mult | History Mult | Reporting Interval");
+    Log.info("------------------------------------------------------------------------");
     
     struct ScenarioTest {
         float soc;
@@ -207,16 +165,20 @@ void Cloud::testBatteryBackoffLogic() {
         BatteryTier tier = calculateBatteryTier(scenarios[i].soc);
         uint16_t tierMult = getIntervalMultiplier(tier);
         float historyMult = getConnectionBackoffMultiplier(scenarios[i].connDuration);
-        uint32_t effectiveInterval = (uint32_t)(baseInterval * tierMult * historyMult);
+        ReportingPolicyInputs inputs;
+        inputs.configuredIntervalSec = baseInterval;
+        inputs.batteryTier = tier;
+        inputs.batteryMultiplier = tierMult;
+        ReportingPolicy policy = ReportingPolicyResolver::resolve(inputs);
         
         Log.info("  %-18s | %-16s | %5ux | %12.1fx | %6lus (%luh %lum)",
                  scenarios[i].batteryDesc,
                  scenarios[i].locationDesc,
                  tierMult,
                  historyMult,
-                 (unsigned long)effectiveInterval,
-                 (unsigned long)(effectiveInterval / 3600),
-                 (unsigned long)((effectiveInterval % 3600) / 60));
+                 (unsigned long)policy.effectiveIntervalSec,
+                 (unsigned long)(policy.effectiveIntervalSec / 3600),
+                 (unsigned long)((policy.effectiveIntervalSec % 3600) / 60));
         
         // Restore original tier
         sysStatus.set_currentBatteryTier(originalTier);

@@ -16,6 +16,32 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [21.0_Test] - 2026-07-22
+
+### Added
+
+- **Shared reporting policy resolver**: Added `reporting/ReportingPolicy` as the single source of truth for effective report interval, next-report epoch, battery-tier multiplier, and open-hours gating, used by both the connection-mode policy and Device Status publishing.
+- **Startup snapshot observability**: Added `observability/StartupSnapshot` and `StartupSnapshotRuntime` to capture an immutable per-boot snapshot (epoch, reset reason, firmware, Device OS, reset count) once initialization completes successfully.
+- **Device Status `startup` object**: Device Status ledger now publishes a `startup` object describing the current execution instance, separate from continuously-changing runtime fields.
+- **Reporting cadence transparency fields**: Device Status `reporting` now includes `configuredIntervalSec`, `effectiveIntervalSec`, and `adjustmentReason` so Fleet Ops can see why the effective cadence differs from the configured baseline without reconstructing firmware policy.
+- **Unit test coverage**: Added `tests/` with a startup-snapshot unit test.
+
+### Changed
+
+- **Device Status schema bumped to v2**: `schemaVersion` for both Device Status and Device Data ledgers incremented to `2` to reflect the new `startup` object and reporting transparency fields.
+- **`BatteryBackoff.cpp` delegates to shared policy**: Battery tier calculation and interval multiplier logic moved to `cloud/BatteryBackoffPolicy.h`; `Cloud::calculateBatteryTier()` and `Cloud::getIntervalMultiplier()` are now thin wrappers.
+- **`lastReport` timestamp semantics documented and reordered**: `sysStatus.set_lastReport()` now runs immediately after `publishData()` and is documented as the application-report generation time, not a transport- or delivery-success timestamp.
+- **Ledger contract documentation**: `docs/contracts/ledger-contracts.md` clarifies the ownership flow from configuration through runtime policy to published Device Status, and documents `startup` snapshot semantics and reporting-vs-wake-cadence separation for Fleet Ops.
+- **Release metadata updated for v21 rollout**: Bumped firmware version to `21.0_Test` and Particle product version to `PRODUCT_VERSION(21)`.
+
+### Fixed
+
+- **Device Status `nextReportEpoch` drift from actual battery-adjusted cadence**: `writeDeviceStatusToCloud()` previously computed `nextReportEpoch` from a naive `lastReport + configuredInterval` calculation, independent of the battery-tier-adjusted interval actually used by `applyBatteryAwareConnectionModePolicy()`. Both now resolve through the same `ReportingPolicyResolver`, so published cadence matches actual firmware behavior.
+
+### Validation
+
+- Soak-tested on hardware for 48 hours prior to release; reporting cadence and Device Status fields behaved as designed.
+
 ## [16.0.0] - 2026-06-10
 
 ### Fixed

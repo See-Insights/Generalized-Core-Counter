@@ -25,6 +25,7 @@ extract_braced_block() {
   cat <<'CPP'
 #include "power/PowerManager.h"
 #include "MyPersistentData.h"
+#include "cloud/BatteryBackoffPolicy.h"
 
 #include <cassert>
 #include <cmath>
@@ -39,8 +40,6 @@ extract_braced_block() {
 TestCurrentStatus testCurrent;
 TestSystemStatus testSysStatus;
 CPP
-
-  extract_braced_block "$repo_root/src/MyPersistentData.h" "enum BatteryTier"
 
   cat <<'CPP'
 class Cloud {
