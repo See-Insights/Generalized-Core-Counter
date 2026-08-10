@@ -153,6 +153,7 @@ void sysStatusData::initialize() {
     sysStatus.set_lastWatchdogResetReasonData(0);
     sysStatus.set_hasValidLedgerConfig(false);
     sysStatus.set_configSource((uint8_t)Config::CONFIG_SOURCE_DEFAULT);
+    sysStatus.set_lastWatchdogSource((uint8_t)WATCHDOG_SOURCE_DEVICE_OS);
 }
 
 uint8_t sysStatusData::get_structuresVersion() const {
@@ -488,6 +489,13 @@ void sysStatusData::set_configSource(uint8_t value) {
     setValue<uint8_t>(offsetof(SysData,configSource), value);
 }
 
+uint8_t sysStatusData::get_lastWatchdogSource() const {
+    return getValue<uint8_t>(offsetof(SysData,lastWatchdogSource));
+}
+void sysStatusData::set_lastWatchdogSource(uint8_t value) {
+    setValue<uint8_t>(offsetof(SysData,lastWatchdogSource), value);
+}
+
 // End of sysStatusData class
 
 // *****************  Sensor Config Storage Object *******************
@@ -787,6 +795,16 @@ static int getAlertSeverity(int8_t code) {
         case 20: // PMIC thermal shutdown (critical battery/charging fault)
         case 21: // PMIC charge timeout / stuck charging
             return 3; // critical
+
+        // Watchdog/external reset represents actual lost execution - the
+        // device stopped responding entirely and had to be forcibly reset.
+        // That is a strictly more urgent, must-not-be-masked signal than any
+        // tier-3 condition above (e.g. thrash detection or a boot storm)
+        // that merely happened to already be active when the watchdog fired.
+        // It needs its own tier, strictly greater than 3, so raiseAlert(19)
+        // always supersedes whatever is currently active from that set.
+        case 19: // watchdog reset (Device-OS-detected or AB1805-confirmed PIN_RESET)
+            return 4; // watchdog / lost-execution - most urgent
 
         case 23: // PMIC battery fault (general)
         case 30: // connectivity timeout with radio up

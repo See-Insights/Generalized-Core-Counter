@@ -102,6 +102,20 @@ enum SamplingMode {
 };
 
 /**
+ * @brief Identifies which mechanism was responsible for the most recently
+ * recorded watchdog reset (persisted in SysData::lastWatchdogSource).
+ *
+ * DEVICE_OS:  Device OS itself reported RESET_REASON_WATCHDOG.
+ * AB1805_PIN: Device OS reported RESET_REASON_PIN_RESET, but the AB1805
+ *             RTC/watchdog chip's own wake-reason register confirmed it
+ *             fired the reset pin externally (WakeReason::WATCHDOG).
+ */
+enum WatchdogSource : uint8_t {
+	WATCHDOG_SOURCE_DEVICE_OS  = 0,
+	WATCHDOG_SOURCE_AB1805_PIN = 1
+};
+
+/**
  * This class is a singleton; you do not create one as a global, on the stack, or with new.
  * 
  * From global application setup you must call:
@@ -226,6 +240,8 @@ public:
 		uint32_t lastWatchdogResetReasonData;            // System.resetReasonData() from the last watchdog boot
 		bool hasValidLedgerConfig;                       // True once at least one complete, valid ledger configuration has been applied
 		uint8_t configSource;                            // Config::Source enum persisted for diagnostics
+		// ***** Appended per the persistent-layout append-only contract - do not reorder or insert above *****
+		uint8_t lastWatchdogSource;                       // WatchdogSource enum: which mechanism reported the last watchdog reset (DEVICE_OS vs AB1805_PIN)
 
 	};
 
@@ -416,6 +432,8 @@ public:
 	void set_hasValidLedgerConfig(bool value);
 	uint8_t get_configSource() const;
 	void set_configSource(uint8_t value);
+	uint8_t get_lastWatchdogSource() const;
+	void set_lastWatchdogSource(uint8_t value);
 
 	//Members here are internal only and therefore protected
 protected:
