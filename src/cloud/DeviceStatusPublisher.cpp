@@ -163,7 +163,7 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     writerBase.name("overrideActive").value(powerReport.reading.fallbackUsed);
     writerBase.endObject();
     writerBase.name("battery").beginObject();
-    writerBase.name("soc").value(current.get_stateOfCharge(), 1);
+    writerBase.name("soc").value(PowerManager::instance().soc(), 1);
     writerBase.name("vcell").value(batteryVoltage, 2);
     writerBase.name("chargeState").value(SensorManager::instance().cachedChargeStateLabel());
     writerBase.endObject();
@@ -337,7 +337,7 @@ bool Cloud::publishDataToLedger(const char *source) {
     writer.name("temperature").value(current.get_internalTempC(), 1);
     writer.endObject();
     writer.name("battery").beginObject();
-    writer.name("soc").value(current.get_stateOfCharge(), 1);
+    writer.name("soc").value(PowerManager::instance().soc(), 1);
     writer.endObject();
     writer.name("system").beginObject();
     writer.name("freeHeap").value((int)freeHeap);

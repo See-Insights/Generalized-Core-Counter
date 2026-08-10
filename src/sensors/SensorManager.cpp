@@ -749,9 +749,11 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
 #endif
 
 #if HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
-  // Refresh power profile to handle runtime power source changes
+  // Refresh power profile to handle runtime power source changes.
+  // refreshInputProfile() already logs its own PowerDiag[...]: post-refreshInputProfile
+  // line internally with this same source/profile/vbus/pg/soc snapshot, so no
+  // separate log call is needed here - it would be an exact duplicate.
   PowerManager::instance().refreshInputProfile();
-  PowerDiagnostics::logPowerState("battery-refresh");
 
   // Temporary compact PMIC charge diagnostic for USB source override soak validation
   {
@@ -780,6 +782,11 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
         PowerManager::powerSourceLabel(powerSource),
         PowerManager::compactProfileLabel(powerReport.activeInputProfile)
     );
+#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
+    PowerDiagnostics::recordChargeDiagEvent(chargeStatus, faultReg, chargingActive,
+                                             vcell, loggedSoc, powerSource,
+                                             powerReport.activeInputProfile);
+#endif
   }
 
   // =========================================================================
@@ -1310,6 +1317,9 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
                (double)effectiveSoc,
                (double)staleSocSample.vcell,
                (unsigned)staleSocWakeCyclesSinceResync);
+#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
+      PowerDiagnostics::recordResyncEvent(effectiveSoc, staleSocSample.vcell);
+#endif
       staleSocWakeCyclesSinceResync = 0;
       staleSocConsecutiveCount = 0;
     }

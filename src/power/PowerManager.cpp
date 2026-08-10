@@ -1,13 +1,13 @@
 #include "power/PowerManager.h"
 
-#include "../Config.h"
+#include "Config.h"
 #include "MyPersistentData.h"
 #include "power/PowerDiagnostics.h"
 #include "power/PowerPlatform.h"
 
 namespace {
 
-constexpr int kPowerSourceUnknown = 0;
+[[maybe_unused]] constexpr int kPowerSourceUnknown = 0;
 constexpr int kPowerSourceVin = 1;
 constexpr int kPowerSourceUsbHost = 2;
 constexpr int kPowerSourceUsbAdapter = 3;
@@ -130,7 +130,7 @@ bool PowerManager::refreshInputProfile() {
   nextReport.reading.powerSource = sourceSnapshot.source;
   nextReport.reading.powerSourceStatus = sourceSnapshot.status;
 
-#if PLATFORM_ID == PLATFORM_BORON && ENABLE_BORON_USB_SOURCE_OVERRIDE
+#if PLATFORM_ID == PLATFORM_BORON && defined(ENABLE_BORON_USB_SOURCE_OVERRIDE) && ENABLE_BORON_USB_SOURCE_OVERRIDE
   // Boron-specific USB source override: when Device OS reports VIN/UNKNOWN but
   // Nordic USB hardware shows active enumeration + VBUS + regulator ready,
   // override to USB_HOST to apply correct UsbBench charging profile.
@@ -213,6 +213,14 @@ bool PowerManager::hasPmic() const {
 
 bool PowerManager::hasFuelGauge() const {
   return report_.capabilities.hasFuelGauge;
+}
+
+float PowerManager::soc() const {
+  return current.get_stateOfCharge();
+}
+
+uint8_t PowerManager::batteryState() const {
+  return current.get_batteryState();
 }
 
 const char *PowerManager::availabilityLabel(PowerAvailability availability) {

@@ -28,6 +28,7 @@
  * - PMIC charge cycle diagnostic test: -DENABLE_PMIC_CHARGE_CYCLE_TEST=1
  * - PMIC register dump diagnostic: -DENABLE_PMIC_REGISTER_DUMP=1
  * - Boron USB power source override: -DENABLE_BORON_USB_SOURCE_OVERRIDE=0
+ * - Diagnostics publish mode: -DENABLE_DIAGNOSTICS_PUBLISH_MODE=1
  *
  * Trace flag notes:
  * - ENABLE_LEDGER_TRACE=1 enables detailed ledger request lifecycle logs.
@@ -204,6 +205,25 @@
 
 #if (ENABLE_BORON_USB_SOURCE_OVERRIDE != 0) && (ENABLE_BORON_USB_SOURCE_OVERRIDE != 1)
 #error "ENABLE_BORON_USB_SOURCE_OVERRIDE must be 0 or 1"
+#endif
+
+#ifndef ENABLE_DIAGNOSTICS_PUBLISH_MODE
+/**
+ * @brief Bench-only: batch PowerDiag/ChargeDiag lines and publish on next connect.
+ *
+ * When enabled, each PowerDiag/ChargeDiag/stale-SOC-resync diagnostic emission
+ * within a connect/sleep cycle is also captured into a small in-RAM batch. Once
+ * per cycle, at each true cycle-ending point, the batch is serialized to one
+ * compact "pdiag" JSON event and queued via PublishQueuePosix, which persists
+ * it to flash and drains it to Particle Cloud on the next connection - even
+ * across a fully-disconnected soak. Bench diagnostic replay only; not sourced
+ * from cloud/ledger config. Production builds must leave this at 0.
+ */
+#define ENABLE_DIAGNOSTICS_PUBLISH_MODE 0
+#endif
+
+#if (ENABLE_DIAGNOSTICS_PUBLISH_MODE != 0) && (ENABLE_DIAGNOSTICS_PUBLISH_MODE != 1)
+#error "ENABLE_DIAGNOSTICS_PUBLISH_MODE must be 0 or 1"
 #endif
 
 // Optional convenience: enable DEBUG_SERIAL in DEV builds unless overridden.

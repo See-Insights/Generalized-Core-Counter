@@ -2,6 +2,7 @@
 #include "../Config.h"
 #include "cloud/Cloud.h"
 #include "power/ConnectivityPolicy.h"
+#include "power/PowerManager.h"
 #include "time/LocalTimeCache.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
@@ -136,7 +137,7 @@ void handleReportingState() {
   }
   
   if (!Particle.connected()) {
-    float currentSoC = current.get_stateOfCharge();
+    float currentSoC = PowerManager::instance().soc();
     const ReportingPolicy reportingPolicy =
         ReportingPolicyResolver::resolveRuntime(currentSoC, now);
     applyBatteryAwareConnectionModePolicy(currentSoC, reportingPolicy.batteryTier);

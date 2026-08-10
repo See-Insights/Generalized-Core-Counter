@@ -318,7 +318,7 @@ BatteryTier currentBatteryTierForFailsafe() {
   if (tierValue <= TIER_SURVIVAL) {
     return static_cast<BatteryTier>(tierValue);
   }
-  return Cloud::calculateBatteryTier(current.get_stateOfCharge());
+  return Cloud::calculateBatteryTier(PowerManager::instance().soc());
 }
 
 bool connectivityFailsafeHasExternalPower() {
@@ -1126,7 +1126,7 @@ void setup() {
   PowerManager::instance().refreshInputProfile();
   PowerDiagnostics::logPowerState("setup", true);
   if (sysStatus.get_lowBatteryMode()) {
-    applyBatteryAwareConnectionModePolicy(current.get_stateOfCharge());
+    applyBatteryAwareConnectionModePolicy(PowerManager::instance().soc());
   }
   // ===================================
 
@@ -1645,7 +1645,7 @@ void publishData() {
   const unsigned long endOfPrevHourStampSec = nowStampSec - (Time.minute() * 60L + Time.second() + 1L);
 
   // Bounds check battery state index for safety
-  uint8_t battState = current.get_batteryState();
+  uint8_t battState = PowerManager::instance().batteryState();
   if (battState > 6) {
     battState = 0;
   }
@@ -1655,7 +1655,7 @@ void publishData() {
 
   // Ensure battery value is always a finite number for webhook ingestion.
   // Ubidots rejects NaN/Inf with a 400 response.
-  float stateOfCharge = current.get_stateOfCharge();
+  float stateOfCharge = PowerManager::instance().soc();
   if (!(stateOfCharge == stateOfCharge) || stateOfCharge < 0.0f || stateOfCharge > 100.0f) {
     stateOfCharge = 0.0f;
     battState = 0;

@@ -203,6 +203,23 @@ public:
   bool hasFuelGauge() const;
 
   /**
+   * @brief Returns the currently accepted battery state of charge.
+   *
+   * This is a live ledger pass-through. The cached PowerReport SOC and battery
+   * context remain unpopulated in Phase 1.
+   *
+   * @return Accepted state of charge percentage
+   */
+  float soc() const;
+
+  /**
+   * @brief Returns the currently accepted raw battery-state value.
+   *
+   * @return Raw battery-state value from the persistent status ledger
+   */
+  uint8_t batteryState() const;
+
+  /**
    * @brief Converts availability enum values to stable log labels.
    *
    * @param availability Availability enum to stringify
