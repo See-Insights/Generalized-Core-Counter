@@ -15,6 +15,7 @@
 #include "AB1805_RK.h"
 #include "observability/WakeCycleStats.h"
 #include "ThrashGuard.h"
+#include "state/SleepPrepSpanTiming.h"
 
 namespace {
 
@@ -315,6 +316,14 @@ bool shouldUseBoronRtcAlarmHibernate(uint32_t requestedSleepSec, time_t &rtcNow)
  */
 void handleSleepingState() {
   setLoopStage(LOOP_STAGE_SLEEP_PREP);
+
+  // Zero-gated (not enteredState-gated): two of this function's real exit
+  // paths transition SLEEPING_STATE -> SLEEPING_STATE
+  // (sleep-timer-occupied-suppress-report, sleep-pir-return-to-sleep) - a
+  // real cycle ends and a new one begins, but the FSM `state` value doesn't
+  // change, so an enteredState-gated reset would never fire for the new
+  // cycle. This mirrors the existing cloudSyncStartMs pattern below.
+  maybeStartSleepPrepSpan(retainedLoopForensics.sleepPrepSpanStartMillis, millis());
 
   bool enteredState = (state != oldState);
   static bool operationsCompleteLogged = false;  // Track if we've logged completion message

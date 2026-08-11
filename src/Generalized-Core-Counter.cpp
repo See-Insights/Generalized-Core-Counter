@@ -20,6 +20,7 @@
 // Global configuration (includes DEBUG_SERIAL define)
 #include "Config.h"
 #include "state/State_Common.h"
+#include "state/SleepPrepSpanTiming.h"
 #include "power/Connectivity.h"
 #include "power/ConnectivityPolicy.h"
 #include "power/PowerManager.h"
@@ -425,22 +426,19 @@ bool claimFailsafeDeferLog(FailsafeDeferReason reason) {
 // ===== Retained boot and breadcrumb state =====
 
 constexpr uint32_t kLoopForensicsMagic = 0x57444631UL;
-constexpr uint8_t kLoopForensicsVersion = 1;
+// Bumped 1 -> 2 for the addition of sleepPrepSpanStartMillis (see
+// WO-2026-08-11-001 Second Corrective Pass). This struct is `retained` RAM,
+// so a stale smaller layout from before this change must not be misread as
+// the new layout - the version check below forces a reinit on mismatch.
+constexpr uint8_t kLoopForensicsVersion = 2;
 constexpr unsigned long kLoopStageWarnThresholdMs = 2000UL;
 constexpr unsigned long kLoopStageErrorThresholdMs = 10000UL;
 constexpr unsigned long kLoopForensicsSnapshotIntervalMs = 1000UL;
 
-struct RetainedLoopForensics {
-  uint32_t magic;
-  uint8_t version;
-  uint8_t lastBreadcrumb;
-  uint8_t lastLoopStage;
-  uint8_t currentState;
-  uint16_t publishQueueDepth;
-  uint32_t stageStartMillis;
-  uint32_t lastLoopStageElapsed;
-  uint32_t millisSinceLastCloudConnect;
-};
+// RetainedLoopForensics is declared in state/State_Common.h so it (and
+// retainedLoopForensics below) can be shared with State_Sleep.cpp's
+// handleSleepingState() (span start) and this file's transitionTo() (span
+// close/log choke point - see WO-2026-08-11-001 Fourth Corrective Pass).
 
 // Boot-storm guard retained state protects against repeated resets that occur
 // before setup completes and therefore bypass ERROR_STATE protections.
@@ -574,6 +572,41 @@ void refreshRetainedLoopForensics(bool sampleQueueDepth = true, bool force = fal
   lastLoopForensicsSnapshotMs = nowMs;
 }
 
+// Shared five-field "LoopStage:" line, used both by noteLoopStageDuration()'s
+// WARN/ERROR threshold escalation and by transitionTo()'s once-per-real-span
+// SLEEP_PREP exit log (see WO-2026-08-11-001 Fourth Corrective Pass).
+// Keeping the format string in one place avoids the call sites drifting
+// apart.
+void logLoopStageLine(LogLevel level, LoopStage stage, unsigned long elapsedMs,
+                       uint16_t queueDepth, uint32_t millisSinceLastCloudConnect) {
+  switch (level) {
+  case LOG_LEVEL_ERROR:
+    Log.error("LoopStage: stage=%s elapsed=%lu state=%u q=%u connMs=%lu",
+              loopStageName(stage),
+              elapsedMs,
+              (unsigned)state,
+              (unsigned)queueDepth,
+              (unsigned long)millisSinceLastCloudConnect);
+    break;
+  case LOG_LEVEL_WARN:
+    Log.warn("LoopStage: stage=%s elapsed=%lu state=%u q=%u connMs=%lu",
+             loopStageName(stage),
+             elapsedMs,
+             (unsigned)state,
+             (unsigned)queueDepth,
+             (unsigned long)millisSinceLastCloudConnect);
+    break;
+  default:
+    Log.info("LoopStage: stage=%s elapsed=%lu state=%u q=%u connMs=%lu",
+              loopStageName(stage),
+              elapsedMs,
+              (unsigned)state,
+              (unsigned)queueDepth,
+              (unsigned long)millisSinceLastCloudConnect);
+    break;
+  }
+}
+
 void noteLoopStageDuration(bool sampleQueueDepth = true) {
   const unsigned long nowMs = millis();
   const unsigned long elapsedMs = (retainedLoopForensics.stageStartMillis != 0)
@@ -589,38 +622,27 @@ void noteLoopStageDuration(bool sampleQueueDepth = true) {
 
   refreshRetainedLoopForensics(sampleQueueDepth, false);
 
-  // LOOP_STAGE_SLEEP_PREP is excluded from WARN/ERROR threshold escalation:
-  // its elapsed time structurally spans pre-sleep gate-wait, the entire
-  // intentional (often multi-minute) blocking System.sleep() call, and the
-  // post-wake tail, so the thresholds designed for "stuck/blocked" stages
-  // do not apply here. Still log at INFO with the same fields so the raw
-  // data remains available; WakeReturn/GateRelease logging already cover
-  // the known gate-wait and sleep-duration components of this window (not
-  // every sub-phase, e.g. STOP-fallback retiming or the post-wake tail).
+  // LOOP_STAGE_SLEEP_PREP is excluded from WARN/ERROR threshold escalation
+  // here entirely (no branch for it at all): its elapsed time structurally
+  // spans pre-sleep gate-wait, the entire intentional (often multi-minute)
+  // blocking System.sleep() call, and the post-wake tail, so the thresholds
+  // designed for "stuck/blocked" stages do not apply. Its INFO-level logging
+  // is handled once per real span, on exit, by transitionTo()'s choke-point
+  // guard instead (see WO-2026-08-11-001 Fourth Corrective Pass) - this
+  // function is called on essentially every loop() iteration (including
+  // every re-entrant SLEEP_PREP polling pass), so logging it here (or in
+  // setLoopStage(), which is retagged by unrelated stage churn every
+  // iteration too, or in a State_Sleep.cpp-local wrapper, which real exits
+  // from outside handleSleepingState() can bypass) caused regressions on
+  // real hardware across this WO's earlier corrective passes.
   if (stage == LOOP_STAGE_SLEEP_PREP) {
-    Log.info("LoopStage: stage=%s elapsed=%lu state=%u q=%u connMs=%lu",
-              loopStageName(stage),
-              elapsedMs,
-              (unsigned)state,
-              (unsigned)queueDepth,
-              (unsigned long)millisSinceLastCloudConnect);
     return;
   }
 
   if (elapsedMs >= kLoopStageErrorThresholdMs) {
-    Log.error("LoopStage: stage=%s elapsed=%lu state=%u q=%u connMs=%lu",
-              loopStageName(stage),
-              elapsedMs,
-              (unsigned)state,
-              (unsigned)queueDepth,
-              (unsigned long)millisSinceLastCloudConnect);
+    logLoopStageLine(LOG_LEVEL_ERROR, stage, elapsedMs, queueDepth, millisSinceLastCloudConnect);
   } else if (elapsedMs >= kLoopStageWarnThresholdMs) {
-    Log.warn("LoopStage: stage=%s elapsed=%lu state=%u q=%u connMs=%lu",
-             loopStageName(stage),
-             elapsedMs,
-             (unsigned)state,
-             (unsigned)queueDepth,
-             (unsigned long)millisSinceLastCloudConnect);
+    logLoopStageLine(LOG_LEVEL_WARN, stage, elapsedMs, queueDepth, millisSinceLastCloudConnect);
   }
 }
 
@@ -680,6 +702,13 @@ void setup() {
   startupPreviousQueueDepth = previousQueueDepth;
   startupPreviousMillisSinceLastCloudConnect = previousMillisSinceLastCloudConnect;
   startupPreviousState = previousState;
+  // Unconditional, every boot (WO-2026-08-11-001 Third Corrective Pass): a
+  // SLEEP_PREP span cannot survive any real reset (HIBERNATE success,
+  // explicit System.reset(), or any other reset reason) - the call stack
+  // that would have closed it via closeSleepPrepSpan() is gone, so any
+  // retained nonzero value here is always stale and must be discarded
+  // before the next SLEEPING_STATE dwell.
+  resetSleepPrepSpanOnBoot(retainedLoopForensics.sleepPrepSpanStartMillis);
   setAppBreadcrumb(BREADCRUMB_SETUP_START);
   bootStormLastResetReason = (uint8_t)reason;
   bootStormLastResetReasonData = reasonData;
@@ -2069,6 +2098,22 @@ void publishStateTransition() {
 }
 
 void transitionTo(State newState, const char *reason) {
+  // Single universal choke point for every SLEEPING_STATE exit, from any
+  // call site in any file: state is written nowhere else. This closes any
+  // still-open SLEEP_PREP span exactly once per real dwell, regardless of
+  // whether the exit originates inside handleSleepingState() or from
+  // elsewhere (out-of-memory handling, user-switch handling, or
+  // connectivityFailsafeSupervisor()'s failsafe-stage-1 action) - see
+  // WO-2026-08-11-001 Fourth Corrective Pass.
+  if (state == SLEEPING_STATE && retainedLoopForensics.sleepPrepSpanStartMillis != 0) {
+    const unsigned long nowMs = millis();
+    const unsigned long elapsedMs =
+        closeSleepPrepSpan(retainedLoopForensics.sleepPrepSpanStartMillis, nowMs);
+    const uint16_t queueDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
+    const uint32_t millisSinceLastCloudConnect = (connectedStartMs != 0 && nowMs >= connectedStartMs)
+        ? (uint32_t)(nowMs - connectedStartMs) : 0UL;
+    logLoopStageLine(LOG_LEVEL_INFO, LOOP_STAGE_SLEEP_PREP, elapsedMs, queueDepth, millisSinceLastCloudConnect);
+  }
   Log.info("StateReq: %s->%s reason=%s",
            stateShortName(state),
            stateShortName(newState),
