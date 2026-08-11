@@ -613,6 +613,24 @@ void noteLoopStageDuration(bool sampleQueueDepth = true) {
 
   refreshRetainedLoopForensics(sampleQueueDepth, false);
 
+  // LOOP_STAGE_SLEEP_PREP is excluded from WARN/ERROR threshold escalation:
+  // its elapsed time structurally spans pre-sleep gate-wait, the entire
+  // intentional (often multi-minute) blocking System.sleep() call, and the
+  // post-wake tail, so the thresholds designed for "stuck/blocked" stages
+  // do not apply here. Still log at INFO with the same fields so the raw
+  // data remains available; WakeReturn/GateRelease logging already cover
+  // the known gate-wait and sleep-duration components of this window (not
+  // every sub-phase, e.g. STOP-fallback retiming or the post-wake tail).
+  if (stage == LOOP_STAGE_SLEEP_PREP) {
+    Log.info("LoopStage: stage=%s elapsed=%lu state=%u q=%u connMs=%lu",
+              loopStageName(stage),
+              elapsedMs,
+              (unsigned)state,
+              (unsigned)queueDepth,
+              (unsigned long)millisSinceLastCloudConnect);
+    return;
+  }
+
   if (elapsedMs >= kLoopStageErrorThresholdMs) {
     Log.error("LoopStage: stage=%s elapsed=%lu state=%u q=%u connMs=%lu",
               loopStageName(stage),

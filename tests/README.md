@@ -41,3 +41,17 @@ python3 tests/sleep_breadcrumb_sequence_test.py    # item 2: sleep-entry breadcr
 python3 tests/serial_settle_test.py                # item 4: always-on serial-settle placement/gating (traces real source)
 ```
 
+## WO-2026-08-11-001 (SLEEP_PREP threshold exclusion) host test
+
+`noteLoopStageDuration()` (`src/Generalized-Core-Counter.cpp`) pulls in heavy
+Particle/PublishQueuePosix dependencies and can't be compiled standalone on
+the host. This test parses the actual shipped source directly to confirm
+`LOOP_STAGE_SLEEP_PREP` is excluded from the
+`kLoopStageWarnThresholdMs`/`kLoopStageErrorThresholdMs`
+WARN/ERROR escalation while still logging at `INFO`, that the thresholds and
+other stages' escalation behavior are unchanged, and runs simulated scenarios
+matching the work order's required tests:
+
+```sh
+python3 tests/loop_stage_sleep_prep_exclusion_test.py
+```
