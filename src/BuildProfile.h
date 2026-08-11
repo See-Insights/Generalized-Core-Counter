@@ -63,7 +63,7 @@
 /**
  * @brief Allow explicit blocking waits for USB serial attachment.
  */
-#define ALLOW_BLOCKING_SERIAL_WAITS 0
+#define ALLOW_BLOCKING_SERIAL_WAITS 1
 #endif
 
 #ifndef CONNECTIVITY_FAILSAFE_TEST_MODE
@@ -219,7 +219,7 @@
  * across a fully-disconnected soak. Bench diagnostic replay only; not sourced
  * from cloud/ledger config. Production builds must leave this at 0.
  */
-#define ENABLE_DIAGNOSTICS_PUBLISH_MODE 0
+#define ENABLE_DIAGNOSTICS_PUBLISH_MODE 1
 #endif
 
 #if (ENABLE_DIAGNOSTICS_PUBLISH_MODE != 0) && (ENABLE_DIAGNOSTICS_PUBLISH_MODE != 1)
