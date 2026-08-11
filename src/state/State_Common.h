@@ -34,6 +34,49 @@ enum LoopStage : uint8_t {
 	LOOP_STAGE_CONNECTIVITY = 7,
 };
 
+/**
+ * @brief Retained (RAM-persisted across sleep/reset) loop-stage forensics.
+ *
+ * sleepPrepSpanStartMillis is a dedicated elapsed-time reference for the
+ * SLEEP_PREP exit-log design (see WO-2026-08-11-001 Fourth Corrective
+ * Pass). It is NOT the same as stageStartMillis - that field is
+ * contaminated by loop()'s per-iteration stage-tag churn. It is set exactly
+ * once per genuine SLEEPING_STATE dwell (zero-gated, in
+ * handleSleepingState()) and reset to 0 by transitionTo()'s choke-point
+ * guard (Generalized-Core-Counter.cpp) on genuine exit, from any call site
+ * in any file.
+ */
+struct RetainedLoopForensics {
+	uint32_t magic;
+	uint8_t version;
+	uint8_t lastBreadcrumb;
+	uint8_t lastLoopStage;
+	uint8_t currentState;
+	uint16_t publishQueueDepth;
+	uint32_t stageStartMillis;
+	uint32_t lastLoopStageElapsed;
+	uint32_t millisSinceLastCloudConnect;
+	uint32_t sleepPrepSpanStartMillis;
+};
+
+extern retained RetainedLoopForensics retainedLoopForensics;
+
+/**
+ * @brief Logs the shared five-field "LoopStage:" diagnostic line.
+ *
+ * Used both by noteLoopStageDuration()'s WARN/ERROR threshold escalation
+ * and by transitionTo()'s once-per-real-span SLEEP_PREP exit log (see
+ * WO-2026-08-11-001 Fourth Corrective Pass).
+ *
+ * @param level LOG_LEVEL_INFO/WARN/ERROR
+ * @param stage Loop stage the line describes
+ * @param elapsedMs Elapsed time for the stage/span
+ * @param queueDepth Publish queue depth at log time
+ * @param millisSinceLastCloudConnect Time since the last successful cloud connect
+ */
+void logLoopStageLine(LogLevel level, LoopStage stage, unsigned long elapsedMs,
+                       uint16_t queueDepth, uint32_t millisSinceLastCloudConnect);
+
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
 // No behavioral changes were made.
