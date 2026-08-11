@@ -270,7 +270,7 @@ void logPowerState(const char *reason, bool forceLog) {
   // Build compact log message with counter
   logCounter++;
   if (pmicAvailable && nordicUsbAvailable) {
-    Log.warn("PowerDiag[%lu]: %s source=%s profile=%s vbus=%u pg=%d soc=%.1f%% usbAddr=0x%lx usbReg=0x%lx",
+    Log.info("PowerDiag[%lu]: %s source=%s profile=%s vbus=%u pg=%d soc=%.1f%% usbAddr=0x%lx usbReg=0x%lx",
              (unsigned long)logCounter,
              reason,
              powerSourceLabel(powerSource),
@@ -281,7 +281,7 @@ void logPowerState(const char *reason, bool forceLog) {
              (unsigned long)usbAddr,
              (unsigned long)usbRegStatus);
   } else if (pmicAvailable) {
-    Log.warn("PowerDiag[%lu]: %s source=%s profile=%s vbus=%u pg=%d soc=%.1f%%",
+    Log.info("PowerDiag[%lu]: %s source=%s profile=%s vbus=%u pg=%d soc=%.1f%%",
              (unsigned long)logCounter,
              reason,
              powerSourceLabel(powerSource),
@@ -290,7 +290,7 @@ void logPowerState(const char *reason, bool forceLog) {
              powerGood ? 1 : 0,
              soc);
   } else if (nordicUsbAvailable) {
-    Log.warn("PowerDiag[%lu]: %s source=%s profile=%s soc=%.1f%% usbAddr=0x%lx usbReg=0x%lx",
+    Log.info("PowerDiag[%lu]: %s source=%s profile=%s soc=%.1f%% usbAddr=0x%lx usbReg=0x%lx",
              (unsigned long)logCounter,
              reason,
              powerSourceLabel(powerSource),
@@ -299,7 +299,7 @@ void logPowerState(const char *reason, bool forceLog) {
              (unsigned long)usbAddr,
              (unsigned long)usbRegStatus);
   } else {
-    Log.warn("PowerDiag[%lu]: %s source=%s profile=%s soc=%.1f%%",
+    Log.info("PowerDiag[%lu]: %s source=%s profile=%s soc=%.1f%%",
              (unsigned long)logCounter,
              reason,
              powerSourceLabel(powerSource),
