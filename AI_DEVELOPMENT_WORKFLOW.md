@@ -85,7 +85,7 @@
 
 **Initial model:** GPT-5.5, subject to evaluation against agentic coding alternatives.
 
-**Primary purpose:** Implement the approved Engineering Work Order inside VS Code.
+**Primary purpose:** Implement the approved Engineering Work Order via the local GitHub Copilot CLI (`gh copilot`), invoked headlessly against the local working tree. Not the GitHub issue-assignment cloud coding agent (loses visibility into local uncommitted work, adds an issue/PR round-trip) and not the VS Code-integrated chat experience (interactive, not scriptable).
 
 **Responsibilities:**
 

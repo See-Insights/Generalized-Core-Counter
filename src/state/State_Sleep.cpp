@@ -859,7 +859,7 @@ void handleSleepingState() {
     modemOffElapsedMs = 0;
   }
 
-  setAppBreadcrumb(18);
+  setAppBreadcrumb(22); // BREADCRUMB_SLEEP_GATE_START (was stale literal 18, colliding with BREADCRUMB_PUBLISH_QUEUE_EXIT)
 
   // Enforce sleep preconditions before any final sleep call in this state.
   // Non-standby cellular sleep requires both cloud disconnect and radio/modem off.
@@ -947,7 +947,7 @@ void handleSleepingState() {
     return;
   }
 
-  setAppBreadcrumb(19);
+  setAppBreadcrumb(23); // BREADCRUMB_SLEEP_GATE_DONE (was stale literal 19, colliding with BREADCRUMB_REPORT_POST_LEDGER)
 
   int nightSleepSec = -1;
   const bool openNow = isWithinOpenHours();
@@ -1063,7 +1063,7 @@ void handleSleepingState() {
         if (clearAb1805StaleAlarmInterrupts()) {
           const time_t wakeTime = rtcNow + (time_t)wakeInSeconds;
           if (ab1805.interruptAtTime(wakeTime)) {
-            setAppBreadcrumb(20);
+            setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START (was stale literal 20, colliding with BREADCRUMB_REPORT_EXIT)
             config = SystemSleepConfiguration();
             config.mode(SystemSleepMode::HIBERNATE)
               .gpio(WAKEUP_PIN, FALLING)
@@ -1085,13 +1085,16 @@ void handleSleepingState() {
             PowerDiagnostics::logPowerState("pre-hibernate");
             thrashGuard.markProgress("SLEEP_ATTEMPT");
             Cloud::instance().logLedgerSleepState();
-            setAppBreadcrumb(21);
+            setAppBreadcrumb(25); // BREADCRUMB_SLEEP_SYSTEM_CALL (was stale literal 21, colliding with BREADCRUMB_IDLE_ENTRY) - entering final pre-sleep sequence
             drainSerialBeforeSleep();
+            setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
             // HIBERNATE may reset the MCU without returning - flush the
             // diagnostics batch now, since this is the only chance.
 #if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
             PowerDiagnostics::flushDiagBatch();
+            setAppBreadcrumb(27); // BREADCRUMB_SLEEP_DIAG_FLUSH_DONE
 #endif
+            setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
             const SystemSleepResult hibernateResult = System.sleep(config);
 
             // HIBERNATE should reset the MCU. If we return here, treat it as failed and fall back.
@@ -1142,7 +1145,7 @@ void handleSleepingState() {
 
   // Reset sleep configuration on each sleep so GPIO selections do not
   // accumulate across calls.
-  setAppBreadcrumb(20);
+  setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START (was stale literal 20, colliding with BREADCRUMB_REPORT_EXIT)
   config = SystemSleepConfiguration();
 
   // ********** WORKING SLEEP CONFIGURATION **********
@@ -1339,8 +1342,10 @@ void handleSleepingState() {
   PowerDiagnostics::logPowerState("pre-sleep-ulp");
   const unsigned long sleepCallStartMs = millis();
   Cloud::instance().logLedgerSleepState();
-  setAppBreadcrumb(21);
+  setAppBreadcrumb(25); // BREADCRUMB_SLEEP_SYSTEM_CALL (was stale literal 21, colliding with BREADCRUMB_IDLE_ENTRY) - entering final pre-sleep sequence
   drainSerialBeforeSleep();
+  setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
+  setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
   SystemSleepResult result = System.sleep(config);
   const unsigned long sleepElapsedMs = millis() - sleepCallStartMs;
   pin_t wakePin = result.wakeupPin();
@@ -1380,7 +1385,7 @@ void handleSleepingState() {
     current.raiseAlert(16);
 
    // STOP generally supports a wider set of wake pins on some platforms.
-    setAppBreadcrumb(20);
+    setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START (was stale literal 20, colliding with BREADCRUMB_REPORT_EXIT)
     config = SystemSleepConfiguration();
     config.mode(SystemSleepMode::STOP)
       .gpio(BUTTON_PIN, FALLING)
@@ -1388,20 +1393,24 @@ void handleSleepingState() {
       .duration((uint32_t)wakeInSeconds * 1000UL);
     PowerDiagnostics::logPowerState("pre-sleep-stop-fallback");
     Cloud::instance().logLedgerSleepState();
-    setAppBreadcrumb(21);
+    setAppBreadcrumb(25); // BREADCRUMB_SLEEP_SYSTEM_CALL (was stale literal 21, colliding with BREADCRUMB_IDLE_ENTRY) - entering final pre-sleep sequence
     drainSerialBeforeSleep();
+    setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
+    setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
     result = System.sleep(config);
 
     if (result.error() != SYSTEM_ERROR_NONE) {
       Log.error("STOP sleep fallback failed err=%d (wakeIn=%d sec) - using timer-only STOP sleep", (int)result.error(), wakeInSeconds);
-      setAppBreadcrumb(20);
+      setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START
       config = SystemSleepConfiguration();
       config.mode(SystemSleepMode::STOP)
         .duration((uint32_t)wakeInSeconds * 1000UL);
       PowerDiagnostics::logPowerState("pre-sleep-stop-timer-only");
       Cloud::instance().logLedgerSleepState();
-      setAppBreadcrumb(21);
+      setAppBreadcrumb(25); // BREADCRUMB_SLEEP_SYSTEM_CALL - entering final pre-sleep sequence
       drainSerialBeforeSleep();
+      setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
+      setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
       result = System.sleep(config);
 
       if (result.error() != SYSTEM_ERROR_NONE) {
