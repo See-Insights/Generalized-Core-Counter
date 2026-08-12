@@ -62,8 +62,11 @@
 #ifndef ALLOW_BLOCKING_SERIAL_WAITS
 /**
  * @brief Allow explicit blocking waits for USB serial attachment.
+ *
+ * Disabled in v22-Diag-Soak: Pi forwarder now captures serial continuously,
+ * so the bench-only forced wait serves no purpose and wastes battery on reset.
  */
-#define ALLOW_BLOCKING_SERIAL_WAITS 1
+#define ALLOW_BLOCKING_SERIAL_WAITS 0
 #endif
 
 #ifndef CONNECTIVITY_FAILSAFE_TEST_MODE
@@ -209,15 +212,17 @@
 
 #ifndef ENABLE_DIAGNOSTICS_PUBLISH_MODE
 /**
- * @brief Bench-only: batch PowerDiag/ChargeDiag lines and publish on next connect.
+ * @brief Batch PowerDiag/ChargeDiag lines and publish on next connect.
  *
  * When enabled, each PowerDiag/ChargeDiag/stale-SOC-resync diagnostic emission
  * within a connect/sleep cycle is also captured into a small in-RAM batch. Once
  * per cycle, at each true cycle-ending point, the batch is serialized to one
  * compact "pdiag" JSON event and queued via PublishQueuePosix, which persists
  * it to flash and drains it to Particle Cloud on the next connection - even
- * across a fully-disconnected soak. Bench diagnostic replay only; not sourced
- * from cloud/ledger config. Production builds must leave this at 0.
+ * across a fully-disconnected soak. End-to-end verified in v22-Diag-Soak field
+ * soak, including nightly heap-guard flush and JSON truncation fixes, and
+ * survived real production failure (660s connect timeout). Promoted from
+ * bench-only to field soak in v22-Diag-Soak. Not sourced from cloud/ledger.
  */
 #define ENABLE_DIAGNOSTICS_PUBLISH_MODE 1
 #endif
