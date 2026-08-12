@@ -1081,6 +1081,7 @@ void handleSleepingState() {
             retainedHibernateCount++;
             retainedHibernatePending = true;
 
+            Log.info("ModemTeardown: radioOn=%d point=hibernate", (int)Connectivity::isRadioPoweredOn());
             Log.info("Sleep: HIBERNATE reason=closed dur=%ds wakePin=%d", wakeInSeconds, (int)WAKEUP_PIN);
             PowerDiagnostics::logPowerState("pre-hibernate");
             thrashGuard.markProgress("SLEEP_ATTEMPT");
@@ -1124,6 +1125,7 @@ void handleSleepingState() {
     const unsigned long freeHeap = (unsigned long)System.freeMemory();
 
     if (freeHeap <= ConnectivityPolicy::NIGHTLY_HEAP_RESET_THRESHOLD_BYTES) {
+      Log.info("ModemTeardown: radioOn=%d point=heap-guard-reset", (int)Connectivity::isRadioPoweredOn());
       Log.warn("Nightly heap guard: freeHeap=%lu <= %lu before overnight ULTRA_LOW_POWER fallback - resetting for clean next-day start",
                freeHeap,
                ConnectivityPolicy::NIGHTLY_HEAP_RESET_THRESHOLD_BYTES);
@@ -1416,6 +1418,7 @@ void handleSleepingState() {
       if (result.error() != SYSTEM_ERROR_NONE) {
         // All sleep modes failed - this indicates a device state corruption
         // that requires immediate reset (alert 16 already raised on first failure).
+        Log.info("ModemTeardown: radioOn=%d point=sleep-attempts-failed-reset", (int)Connectivity::isRadioPoweredOn());
         Log.error("All sleep attempts failed err=%d - immediate reset required", (int)result.error());
         ab1805.resumeWDT();
 
