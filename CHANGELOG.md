@@ -16,6 +16,21 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v22-Diag-Soak] - 2026-08-12
+
+### Added
+
+- **Diagnostics publish mode for field soak**: Promoted `ENABLE_DIAGNOSTICS_PUBLISH_MODE` from bench-only to field-soak builds. Feature batches PowerDiag/ChargeDiag diagnostic emissions into compact "pdiag" JSON events and queues them via PublishQueuePosix for delivery on next cloud connection, enabling diagnostics capture across fully-disconnected soaks. End-to-end verified this week, including nightly heap-guard flush and JSON truncation fixes. Survived real production failure (660s connect timeout) with correct queuing and draining behavior.
+
+### Changed
+
+- **Disable blocking serial waits on reset**: Set `ALLOW_BLOCKING_SERIAL_WAITS` to 0. The bench-only forced wait for serial monitor attachment no longer serves a purpose now that the Pi forwarder captures serial continuously, and wastes 20-30s of battery on every reset. The always-on "brief wait only if already connected" default is unaffected.
+- **Release metadata updated for v22-Diag-Soak staged rollout**: Bumped firmware version to `v22-Diag-Soak` and Particle product version to `PRODUCT_VERSION(22)` for targeted device-group OTA via Particle Fleet Manager.
+
+### Validation
+
+- Staged rollout via Particle Fleet Manager device selection (Boron-Dev-09 today, Boron-Dev-11/Dev-14 ~24h later, TRAIL02 Friday conditional, Photon2-Dev and Raleigh park devices deferred).
+
 ## [21.0_Test] - 2026-07-22
 
 ### Added

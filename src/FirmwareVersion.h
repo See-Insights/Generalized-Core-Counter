@@ -21,11 +21,11 @@
 
 /**
  * @brief Particle Product integer version (must be an integer).
- * 
+ *
  * This value is used with PRODUCT_VERSION() to identify the firmware
  * in Particle's cloud console and OTA update system.
  */
-#define FIRMWARE_PRODUCT_VERSION 21
+#define FIRMWARE_PRODUCT_VERSION 22
 
 /**
  * @brief Current firmware release string (e.g., "19", "19.1", "20.0").
