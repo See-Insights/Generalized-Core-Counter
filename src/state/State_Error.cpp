@@ -152,6 +152,7 @@ void handleErrorState() {
     // Soft reset after a short delay to allow any queued publishes to
     // flush.
     if (millis() - resetTimer > resetWait) {
+      Log.info("ModemTeardown: radioOn=%d point=error-state-soft-reset", (int)Connectivity::isRadioPoweredOn());
       Log.info("Executing soft reset from ERROR_STATE");
       System.reset();
     }

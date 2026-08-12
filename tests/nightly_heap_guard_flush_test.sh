@@ -54,6 +54,16 @@ namespace PowerDiagnostics {
 void flushDiagBatch() { callOrder.push_back("PowerDiagnostics::flushDiagBatch"); }
 } // namespace PowerDiagnostics
 
+// WO-2026-08-12-001 item 2 added a pure-read confirmation log call to
+// Connectivity::isRadioPoweredOn() inside this extracted block. Stub it the
+// same way flushDiagBatch() is stubbed above - a fixed value is fine here
+// since this test only cares about flush-before-reset ordering, not the
+// radio-state value itself (that is covered by
+// tests/modem_teardown_confirmation_logging_test.py).
+namespace Connectivity {
+bool isRadioPoweredOn() { return false; }
+} // namespace Connectivity
+
 CPP
 
     echo "void nightlyHeapGuardCheck(bool overnightFallbackSleep) {"
