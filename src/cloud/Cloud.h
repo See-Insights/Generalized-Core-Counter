@@ -62,21 +62,10 @@ public:
 
     /**
      * @brief Perform setup operations; call this from global application setup()
-     *
+     * 
      * You typically use Cloud::instance().setup();
      */
     void setup();
-
-    /**
-     * @brief Clear the ledger request tracker unconditionally
-     *
-     * Called on every boot to discard any in-flight state from prior sessions.
-     * Any request callback that would have cleared a tracker entry belongs to
-     * a session that no longer exists and will never fire; retained entries
-     * from an abrupt reset (watchdog) block new requests indefinitely.
-     * This pattern matches WO-2026-08-11-001's fix for sleepPrepSpanStartMillis.
-     */
-    void clearLedgerRequestTracker();
 
     /**
      * @brief Load and apply configuration from cloud ledgers

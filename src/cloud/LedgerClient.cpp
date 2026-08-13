@@ -24,11 +24,6 @@ bool ledgerHasUnsyncedWrite(const Ledger &ledger) {
 } // namespace
 
 void Cloud::setup() {
-    // Unconditional, every boot (WO-ledger-tracker-reset-clear): clear any
-    // orphaned ledger request tracker entries from prior sessions before
-    // proceeding with new ledger operations.
-    clearLedgerRequestTracker();
-
     // Create ledgers - default-settings will be Product scope via Console
     defaultSettingsLedger = Particle.ledger("default-settings");
     defaultSettingsLedger.onSync(onDefaultSettingsSync);
