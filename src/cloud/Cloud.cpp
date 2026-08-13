@@ -207,6 +207,24 @@ Cloud::Cloud() : ledgersSynced(false), lastApplySuccess(true) {
 Cloud::~Cloud() {
 }
 
+void Cloud::clearLedgerRequestTracker() {
+    // Unconditional, every boot: ledger request tracker entries from prior sessions
+    // are orphaned. Any callback that would resolve them (onDeviceStatusLedgerSync,
+    // onDeviceDataLedgerSync) belongs to a session that no longer exists and will
+    // never fire. Abrupt resets (watchdog) in particular can leave entries indefinitely
+    // stuck, blocking new requests for the same ledger (max 16 entries, so capacity
+    // exhaustion is possible under repeated watchdog events). Clear unconditionally
+    // on every boot, following the same pattern as WO-2026-08-11-001's fix for
+    // sleepPrepSpanStartMillis.
+    ledgerRequestCount = 0;
+    ledgerRequestSequence = 0;
+    ledgerDrainActive = false;
+    ledgerDrainStartMs = 0;
+    ledgerCompletedAgeMinMs = 0;
+    ledgerCompletedAgeMaxMs = 0;
+    ledgerCompletedAgeValid = false;
+}
+
 Cloud::LedgerSyncDiagnostics Cloud::ledgerSyncDiagnostics() const {
     const bool statusInflight = ledgerHasUnsyncedWriteForDiag(deviceStatusLedger);
     const bool dataInflight = ledgerHasUnsyncedWriteForDiag(deviceDataLedger);
