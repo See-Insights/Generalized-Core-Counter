@@ -113,6 +113,7 @@ bool PowerManager::refreshInputProfile() {
     nextReport.inputProfileStatus = PowerAvailability::NotAvailable;
     nextReport.reading.powerSource = -1;
     nextReport.reading.powerSourceStatus = PowerAvailability::NotAvailable;
+    nextReport.reading.overrideActive = false;
 
     if (shouldLogProfileDecision(report_, nextReport)) {
       Log.info("Power: prof=%s src=%s cfg=%d",
@@ -127,8 +128,8 @@ bool PowerManager::refreshInputProfile() {
 
   PowerPlatform::PowerSourceSnapshot sourceSnapshot =
       PowerPlatform::readPowerSource();
-  nextReport.reading.powerSource = sourceSnapshot.source;
   nextReport.reading.powerSourceStatus = sourceSnapshot.status;
+  nextReport.reading.overrideActive = false;
 
 #if PLATFORM_ID == PLATFORM_BORON && defined(ENABLE_BORON_USB_SOURCE_OVERRIDE) && ENABLE_BORON_USB_SOURCE_OVERRIDE
   // Boron-specific USB source override: when Device OS reports VIN/UNKNOWN but
@@ -154,8 +155,11 @@ bool PowerManager::refreshInputProfile() {
     );
 
     sourceSnapshot.source = kPowerSourceUsbHost;
+    nextReport.reading.overrideActive = true;
   }
 #endif
+
+  nextReport.reading.powerSource = sourceSnapshot.source;
 
   const PowerInputProfile fallbackProfile = configuredFallbackProfile();
   PowerProfileSelectionReason selectionReason =

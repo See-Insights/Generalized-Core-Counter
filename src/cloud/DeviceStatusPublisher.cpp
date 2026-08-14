@@ -160,7 +160,7 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     writerBase.name("power").beginObject();
     writerBase.name("source").value(PowerManager::powerSourceLabel(powerReport.reading.powerSource));
     writerBase.name("profile").value(PowerManager::inputProfileLabel(powerReport.activeInputProfile));
-    writerBase.name("overrideActive").value(powerReport.reading.fallbackUsed);
+    writerBase.name("overrideActive").value(powerReport.reading.overrideActive);
     writerBase.endObject();
     writerBase.name("battery").beginObject();
     writerBase.name("soc").value(PowerManager::instance().soc(), 1);
