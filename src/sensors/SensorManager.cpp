@@ -779,10 +779,23 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
         faultReg,
         (double)vcell,
         (double)loggedSoc,
+        // Deliberately the RAW, UNCORRECTED `powerSource` sample (from
+        // readBatterySample()'s System.powerSource()/PowerPlatform::readPowerSource()
+        // call above), NOT powerReport.reading.powerSource (which reflects the
+        // PowerSourceOverride-corrected value). This is not an oversight: this
+        // raw src= field is the exact ground-truth evidence that made the
+        // VIN/Solar power-source root-cause investigation possible, and it
+        // must stay independent of the override's correction so a future
+        // instance of this bug class remains diagnosable the same way.
         PowerManager::powerSourceLabel(powerSource),
         PowerManager::compactProfileLabel(powerReport.activeInputProfile)
     );
 #if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
+    // Same rationale as the src= field above: `powerSource` here is the RAW,
+    // uncorrected sample, deliberately kept independent of the
+    // PowerSourceOverride-corrected value so this ChargeDiag/reason-10 pdiag
+    // entry preserves the raw ground-truth evidence a future diagnostic
+    // investigation would need.
     PowerDiagnostics::recordChargeDiagEvent(chargeStatus, faultReg, chargingActive,
                                              vcell, loggedSoc, powerSource,
                                              powerReport.activeInputProfile);

@@ -101,6 +101,13 @@ struct PowerReading {
   bool quickStartUsed = false;
   bool fallbackUsed = false;
   uint8_t stabilizationAttempts = 0;
+
+  /**
+   * @brief True only on cycles where the Boron USB source override fired
+   * (i.e. actually corrected the raw power source this cycle). Distinct
+   * from fallbackUsed, which tracks unrelated fallback behavior.
+   */
+  bool overrideActive = false;
 };
 
 /**

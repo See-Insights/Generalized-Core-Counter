@@ -179,6 +179,39 @@ The `LoopStage: stage=SLEEP_PREP elapsed=Xms` measurement tracks time spent in s
 
 ---
 
+## Mixed Corrected/Raw Power Source Values Within a Single pdiag Batch
+
+**Observed pattern:** A single published `pdiag` batch can legitimately contain
+BOTH a corrected `source=` value (from `PowerDiag` entries and ordinary pdiag
+entries, sourced from `powerReport.reading.powerSource` after
+`PowerSourceOverride` has run) AND a raw, uncorrected `source=` value (from
+`ChargeDiag` entries and reason-10 pdiag entries, sourced directly from
+`System.powerSource()` / `PowerPlatform::readPowerSource()` before any
+override is applied). See `src/sensors/SensorManager.cpp` (ChargeDiag /
+reason-10 sampling sites) and `src/power/PowerManager.cpp`
+(`PowerSourceOverride` correction) for the two respective sampling points.
+
+**This is intentional, not an inconsistency to debug.** The two entry types
+serve different purposes:
+- `PowerDiag` / ordinary pdiag entries report the corrected, override-applied
+  source — the value actually used for profile selection and cloud telemetry.
+- `ChargeDiag` / reason-10 pdiag entries deliberately report the raw,
+  pre-override source — preserved as independent ground-truth evidence. This
+  raw value is what made the original VIN/Solar power-source root-cause
+  investigation possible, and removing it (by folding it into the corrected
+  value) would remove the diagnostic signal a future instance of this bug
+  class would need to be investigated the same way.
+
+**What to expect:** Within the same pdiag batch, it is normal and expected for
+a `ChargeDiag`/reason-10 entry's `src=` field to differ from a `PowerDiag`/
+ordinary entry's `source=` field in the same or an adjacent cycle (for
+example, during any window where the raw hardware-reported source and the
+override-corrected source temporarily diverge). Do not treat this divergence
+alone as a bug signal; confirm which entry type (corrected vs. raw) is being
+compared before concluding there is a genuine reporting defect.
+
+---
+
 ## References and Related Work Orders
 
 - **WO-2026-08-12-001:** Radio-off confirmation logging at HIBERNATE entry (depends on HIBERNATE actually occurring; validate via uptime reset)
