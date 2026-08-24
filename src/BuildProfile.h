@@ -27,8 +27,17 @@
  * - Routine config trace logging: -DENABLE_CONFIG_TRACE=1
  * - PMIC charge cycle diagnostic test: -DENABLE_PMIC_CHARGE_CYCLE_TEST=1
  * - PMIC register dump diagnostic: -DENABLE_PMIC_REGISTER_DUMP=1
- * - Boron USB power source override: -DENABLE_BORON_USB_SOURCE_OVERRIDE=0
  * - Diagnostics publish mode: -DENABLE_DIAGNOSTICS_PUBLISH_MODE=1
+ *
+ * WO-2026-08-24-001: the Boron USB power-source override in
+ * PowerManager::refreshInputProfile() previously had its own build flag
+ * (ENABLE_BORON_USB_SOURCE_OVERRIDE) which was found compiled OFF in a
+ * shipped product build despite the source default being 1 and the version
+ * string being identical to a build where it was ON -- an undetectable
+ * silent-drift failure mode. The flag has been removed; the override now
+ * compiles unconditionally on Boron (still gated only by the real
+ * PLATFORM_ID == PLATFORM_BORON platform check in PowerManager.cpp). Its own
+ * `usbEnumerated` predicate already self-limits cost on non-USB devices.
  *
  * Trace flag notes:
  * - ENABLE_LEDGER_TRACE=1 enables detailed ledger request lifecycle logs.
@@ -187,27 +196,6 @@
 
 #if (ENABLE_PMIC_CHARGE_CYCLE_TEST != 0) && (ENABLE_PMIC_CHARGE_CYCLE_TEST != 1)
 #error "ENABLE_PMIC_CHARGE_CYCLE_TEST must be 0 or 1"
-#endif
-
-#ifndef ENABLE_BORON_USB_SOURCE_OVERRIDE
-/**
- * @brief Boron-only USB power source override for drift mitigation.
- *
- * On Boron, Device OS occasionally reports powerSource() == VIN even when
- * Nordic USB hardware shows active enumeration (USBADDR != 0, USBREGSTATUS == 0x03).
- * This causes firmware to apply Solar35W profile instead of UsbBench during bench USB charging.
- *
- * When enabled, firmware overrides VIN/UNKNOWN source to USB_HOST when Nordic
- * USB registers confirm enumeration + VBUS present + regulator ready.
- *
- * Boron-only guard. Enabled by default on investigation/boron-powerdiag branch.
- * Set to 0 to disable override and restore baseline Device OS behavior.
- */
-#define ENABLE_BORON_USB_SOURCE_OVERRIDE 1
-#endif
-
-#if (ENABLE_BORON_USB_SOURCE_OVERRIDE != 0) && (ENABLE_BORON_USB_SOURCE_OVERRIDE != 1)
-#error "ENABLE_BORON_USB_SOURCE_OVERRIDE must be 0 or 1"
 #endif
 
 #ifndef ENABLE_DIAGNOSTICS_PUBLISH_MODE

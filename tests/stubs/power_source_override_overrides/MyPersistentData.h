@@ -63,6 +63,14 @@ struct TestSystemStatus {
   const char *webhookNameCStr = "test-webhook";
   bool webhookEnabled = false;
   uint32_t webhookTimeoutMs = 10000;
+  // WO-2026-08-24-001: including the real src/BuildProfile.h (via Config.h)
+  // now makes FIELD_BUILD defined for this host build, activating
+  // PowerManager.cpp's configuredFallbackProfile() FIELD_BUILD branch, which
+  // reads this getter. Defaults to false so configuredFallbackProfile()
+  // keeps returning UsbBench here, matching this harness's pre-existing
+  // behavior (previously the undefined-FIELD_BUILD `#else` branch, which
+  // always returned UsbBench unconditionally).
+  bool solarPowerMode = false;
 
   uint16_t get_connectAttemptBudgetSec() const { return connectAttemptBudgetSec; }
   uint8_t get_connectionAttemptCounter() const { return connectionAttemptCounter; }
@@ -86,6 +94,7 @@ struct TestSystemStatus {
   const char *get_webhookNameCStr() const { return webhookNameCStr; }
   bool get_webhookEnabled() const { return webhookEnabled; }
   uint32_t get_webhookTimeoutMs() const { return webhookTimeoutMs; }
+  bool get_solarPowerMode() const { return solarPowerMode; }
 };
 
 struct TestSensorConfig {

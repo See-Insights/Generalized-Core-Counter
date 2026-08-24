@@ -21,8 +21,9 @@ inline TestLog Log;
 
 // Host-side stand-ins for the Device OS platform identifiers so
 // PowerManager.cpp's `#if PLATFORM_ID == PLATFORM_BORON` guard can be forced
-// on for this test build (paired with -DENABLE_BORON_USB_SOURCE_OVERRIDE=1
-// in the driving shell script).
+// on for this test build. (WO-2026-08-24-001 removed
+// ENABLE_BORON_USB_SOURCE_OVERRIDE -- the override now compiles
+// unconditionally on Boron, gated only by this platform check.)
 #define PLATFORM_BORON 88
 #define PLATFORM_ID PLATFORM_BORON
 
@@ -70,6 +71,8 @@ struct JSONFieldObserver {
     char name[64];
     bool isBool = false;
     bool boolValue = false;
+    bool isInt = false;
+    int intValue = 0;
   };
   Field fields[kMaxFields];
   size_t count = 0;
@@ -82,10 +85,31 @@ struct JSONFieldObserver {
     ++count;
   }
 
+  // WO-2026-08-24-001: records int-valued fields (e.g. the "flags" build-flag
+  // witness in DeviceStatusPublisher.cpp's firmware object) the same way
+  // record(bool) already does for overrideActive.
+  void recordInt(const char *n, int value) {
+    if (count >= kMaxFields) return;
+    std::snprintf(fields[count].name, sizeof(fields[count].name), "%s", n ? n : "");
+    fields[count].isInt = true;
+    fields[count].intValue = value;
+    ++count;
+  }
+
   bool findBool(const char *n, bool *out) const {
     for (size_t i = 0; i < count; ++i) {
       if (fields[i].isBool && std::strcmp(fields[i].name, n) == 0) {
         *out = fields[i].boolValue;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool findInt(const char *n, int *out) const {
+    for (size_t i = 0; i < count; ++i) {
+      if (fields[i].isInt && std::strcmp(fields[i].name, n) == 0) {
+        *out = fields[i].intValue;
         return true;
       }
     }
@@ -119,7 +143,10 @@ class JSONBufferWriter {
     g_statusJsonObserver.record(lastName_.c_str(), v);
     return *this;
   }
-  JSONBufferWriter &value(int) { return *this; }
+  JSONBufferWriter &value(int v) {
+    g_statusJsonObserver.recordInt(lastName_.c_str(), v);
+    return *this;
+  }
   JSONBufferWriter &value(long) { return *this; }
   JSONBufferWriter &value(unsigned long) { return *this; }
   JSONBufferWriter &value(float, int) { return *this; }

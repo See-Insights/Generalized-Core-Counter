@@ -237,6 +237,52 @@ void testPublisherReportsOverrideInactiveWhenOverrideDoesNotFire() {
   assert(capturedOverrideActive == false);
 }
 
+// --- WO-2026-08-24-001: firmware-object "flags" build-flag witness --------
+//
+// DeviceStatusPublisher.cpp's firmware object now writes a "flags" bitmask
+// field derived directly from the same #if conditions BuildProfile.h uses to
+// gate each feature (see BuildProfile.h and the "compiledBuildFlags" block in
+// both Generalized-Core-Counter.cpp's Boot: line and here). This exercises
+// the REAL, unmodified DeviceStatusPublisher.cpp writer path (not a
+// source-level reimplementation) so a future rewiring of that field back to
+// something else -- or a bit layout that silently drifts from the Boot: line
+// -- would be caught here, the same way the overrideActive tests above catch
+// drift in that field.
+//
+// This test's expected value (0x6008 / 24584) is computed from
+// src/BuildProfile.h's actual DEFAULT flag values as of this WO, plus the
+// Addendum A 0x4000 bit:
+//   ENABLE_PMIC_FORENSICS=1        -> bit3  (0x0008)
+//   ENABLE_DIAGNOSTICS_PUBLISH_MODE=1 -> bit13 (0x2000)
+//   PLATFORM_ID == PLATFORM_BORON (forced by the test stub Particle.h, the
+//     same guard that gates PowerManager.cpp's USB source override) -> bit14
+//     (0x4000)
+//   all other witnessed flags default to 0.
+// tests/build_flags_witness_test.sh separately proves (by compiling the
+// REAL, extracted witness expression under a second, deliberately-flipped
+// build-flag configuration, and again under matching/non-matching
+// PLATFORM_ID/PLATFORM_BORON configurations) that this value actually
+// changes when the compiled flags change -- i.e. it isn't a
+// hardcoded/inert field.
+void testPublisherFirmwareObjectReportsCompiledBuildFlags() {
+  resetHarness();
+  g_statusJsonObserver.reset();
+  PowerPlatform::testPowerPlatformState.snapshot.source = kPowerSourceVin;
+  PowerPlatform::testPowerPlatformState.snapshot.status = PowerAvailability::Valid;
+  testNrfUsbdRegs.USBADDR = 0;
+  testNrfPowerRegs.USBREGSTATUS = 0;
+
+  const bool refreshed = PowerManager::instance().refreshInputProfile();
+  assert(refreshed);
+
+  Cloud::instance().writeDeviceStatusToCloud("mutation-test-build-flags-witness");
+
+  int capturedFlags = -1;
+  const bool found = g_statusJsonObserver.findInt("flags", &capturedFlags);
+  assert(found);
+  assert(capturedFlags == 0x6008);
+}
+
 } // namespace
 
 int main() {
@@ -246,6 +292,7 @@ int main() {
   testOverrideFiresFromUnknownSource();
   testPublisherReportsOverrideActiveWhenOverrideFires();
   testPublisherReportsOverrideInactiveWhenOverrideDoesNotFire();
+  testPublisherFirmwareObjectReportsCompiledBuildFlags();
   std::cout << "Power source override reporting/telemetry tests passed\n";
   return 0;
 }
