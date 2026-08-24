@@ -137,6 +137,40 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     writerBase.name("firmware").beginObject();
     writerBase.name("version").value(FIRMWARE_VERSION);
     writerBase.name("resetCount").value((int)sysStatus.get_resetCount());
+    // WO-2026-08-24-001: compact bitmask witness of the build flags that were
+    // ACTUALLY compiled in, derived from the same #if conditions that gate
+    // each feature (see src/BuildProfile.h) so it cannot silently drift from
+    // the shipped binary the way ENABLE_BORON_USB_SOURCE_OVERRIDE did. Bit
+    // layout mirrors the "flags=" witness on the Boot: serial line.
+    const uint16_t compiledBuildFlags =
+        (DEV_BUILD ? 0x0001 : 0) |
+        (ALLOW_BLOCKING_SERIAL_WAITS ? 0x0002 : 0) |
+        (CONNECTIVITY_FAILSAFE_TEST_MODE ? 0x0004 : 0) |
+        (ENABLE_PMIC_FORENSICS ? 0x0008 : 0) |
+        (ENABLE_LEDGER_TRACE ? 0x0010 : 0) |
+        (ENABLE_CONNECT_TRACE ? 0x0020 : 0) |
+        (ENABLE_CONNECT_DECISION_TRACE ? 0x0040 : 0) |
+        (ENABLE_PERF_TRACE ? 0x0080 : 0) |
+        (ENABLE_GATE_TRACE ? 0x0100 : 0) |
+        (ENABLE_SLEEP_TRACE ? 0x0200 : 0) |
+        (ENABLE_PMIC_TRACE ? 0x0400 : 0) |
+        (ENABLE_CONFIG_TRACE ? 0x0800 : 0) |
+        (ENABLE_PMIC_CHARGE_CYCLE_TEST ? 0x1000 : 0) |
+        (ENABLE_DIAGNOSTICS_PUBLISH_MODE ? 0x2000 : 0)
+        // Addendum A (WO-2026-08-24-001): bit 0x4000 mirrors the SAME #if guard
+        // that gates the USB source override in
+        // PowerManager::refreshInputProfile() (src/power/PowerManager.cpp), so
+        // this witness cannot drift from what actually gated the override in
+        // this incident. Bit set => override compiled in.
+        //
+        // A CLEAR bit is EXPECTED and CORRECT on non-Boron platforms (P2,
+        // Argon, MSOM) -- there is no USB source override on those platforms
+        // and none is compiled. It is a defect signal ONLY on a Boron build.
+#if defined(PLATFORM_ID) && defined(PLATFORM_BORON) && (PLATFORM_ID == PLATFORM_BORON)
+        | 0x4000
+#endif
+        ;
+    writerBase.name("flags").value((int)compiledBuildFlags);
     writerBase.endObject();
     writerBase.name("config").beginObject();
     writerBase.name("generation").value(configGeneration);

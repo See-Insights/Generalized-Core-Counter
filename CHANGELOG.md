@@ -16,6 +16,21 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v23-Diag-Soak] - 2026-08-24
+
+### Added
+
+- **Compiled build-flag witness (`flags=0x%04x` / ledger `flags`)**: `Boot:` serial line and the ledger `firmware` object now publish a compact bitmask derived directly from the same `#if` conditions that gate `DEV_BUILD`, `ALLOW_BLOCKING_SERIAL_WAITS`, `CONNECTIVITY_FAILSAFE_TEST_MODE`, `ENABLE_PMIC_FORENSICS`, the trace flags, `ENABLE_PMIC_CHARGE_CYCLE_TEST`, and `ENABLE_DIAGNOSTICS_PUBLISH_MODE`, so what was actually compiled into a running device is externally observable and cannot silently drift from what the version string implies. WO-2026-08-24-001.
+- **Addendum A — witness bit for the USB override's platform guard (bit `0x4000`)**: Added a bit to the same `compiledBuildFlags` witness (both the `Boot:` line and the ledger `firmware` object), derived from the exact same `#if defined(PLATFORM_ID) && defined(PLATFORM_BORON) && (PLATFORM_ID == PLATFORM_BORON)` guard that gates the USB source override in `PowerManager::refreshInputProfile()`. Set means the override is compiled into this binary; clear means it is not. **A clear bit is expected and correct on non-Boron platforms (P2, Argon, MSOM)** — those platforms never compile the override, so an absent bit there is not a defect. The bit is a defect signal only on a Boron build, where it closes the exact blind spot that let this incident's override compile out silently: a default Boron build now emits `0x6008` at both sites (was `0x2008`). WO-2026-08-24-001 Addendum A.
+
+### Changed
+
+- **Release metadata updated for v23-Diag-Soak**: Bumped the firmware version to `v23-Diag-Soak` and the Particle product version to `PRODUCT_VERSION(23)` for controlled OTA deployment.
+
+### Fixed
+
+- **Boron USB power-source override silently compiled out of a shipped build**: Removed `ENABLE_BORON_USB_SOURCE_OVERRIDE`; the `PowerManager::refreshInputProfile()` override now compiles unconditionally on Boron (still gated only by the real `PLATFORM_ID == PLATFORM_BORON` platform check). The flag defaulted to 1 in source but was found compiled OFF in a shipped product build (v22, `app_hash 64188ac3...`) with a version string identical to a build where it was ON, leaving a genuine VIN misread on a USB-powered device uncorrected and contributing to Boron-Dev-14's over-discharge. Measured cost of always compiling the override in: 48 bytes (145,806 B vs. 145,758 B for the prior default-flags-ON rebuild). WO-2026-08-24-001.
+
 ## [v22-Diag-Soak] - 2026-08-12
 
 ### Added
@@ -561,4 +576,3 @@ This release fundamentally restructures device configuration to use four indepen
 
 ## 20.1-PowerMgt – 2026-08-07
 - Testing Power Management
-

@@ -131,10 +131,17 @@ bool PowerManager::refreshInputProfile() {
   nextReport.reading.powerSourceStatus = sourceSnapshot.status;
   nextReport.reading.overrideActive = false;
 
-#if PLATFORM_ID == PLATFORM_BORON && defined(ENABLE_BORON_USB_SOURCE_OVERRIDE) && ENABLE_BORON_USB_SOURCE_OVERRIDE
+#if defined(PLATFORM_ID) && defined(PLATFORM_BORON) && (PLATFORM_ID == PLATFORM_BORON)
   // Boron-specific USB source override: when Device OS reports VIN/UNKNOWN but
   // Nordic USB hardware shows active enumeration + VBUS + regulator ready,
   // override to USB_HOST to apply correct UsbBench charging profile.
+  //
+  // WO-2026-08-24-001: compiled unconditionally on Boron (no longer gated by
+  // ENABLE_BORON_USB_SOURCE_OVERRIDE). That flag was found compiled OFF in a
+  // shipped build despite defaulting to 1, silently leaving a genuine VIN
+  // misread on a USB-powered device uncorrected. The `usbEnumerated` gate
+  // below already self-limits cost on solar/cellular-only devices: with
+  // nothing enumerated, USBADDR & 0x7F == 0 and the branch is never taken.
   const uint32_t usbAddr = NRF_USBD->USBADDR;
   const uint32_t usbRegStatus = NRF_POWER->USBREGSTATUS;
 

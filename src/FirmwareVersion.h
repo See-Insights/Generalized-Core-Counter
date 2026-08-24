@@ -25,7 +25,7 @@
  * This value is used with PRODUCT_VERSION() to identify the firmware
  * in Particle's cloud console and OTA update system.
  */
-#define FIRMWARE_PRODUCT_VERSION 22
+#define FIRMWARE_PRODUCT_VERSION 23
 
 /**
  * @brief Current firmware release string (e.g., "19", "19.1", "20.0").
