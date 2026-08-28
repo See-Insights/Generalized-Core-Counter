@@ -263,6 +263,14 @@ private:
     bool applyReportingConfig(const LedgerData &defaults, const LedgerData &device, bool *changedOut = nullptr);
 
     /**
+     * @brief Apply power configuration section (F2a thermal charge-inhibit
+     *        thresholds; WO-2026-08-25-001)
+     *
+     * @return true if successful
+     */
+    bool applyPowerConfig(const LedgerData &defaults, const LedgerData &device, bool *changedOut = nullptr);
+
+    /**
      * @brief Apply timing configuration section
      *
      * @return true if successful

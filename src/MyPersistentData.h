@@ -37,6 +37,7 @@
 
 #include "Particle.h"
 #include "cloud/BatteryBackoffPolicy.h"
+#include "power/ChargeInhibitPolicy.h"
 #include "StorageHelperRK.h" 
 // This way you can do "data.setup()" instead of "MyPersistentData::instance().setup()" as an example
 #define current currentStatusData::instance()
@@ -243,6 +244,21 @@ public:
 		// ***** Appended per the persistent-layout append-only contract - do not reorder or insert above *****
 		uint8_t lastWatchdogSource;                       // WatchdogSource enum: which mechanism reported the last watchdog reset (DEVICE_OS vs AB1805_PIN)
 
+		// ********** F2a Thermal Charge Inhibit Configuration (WO-2026-08-25-001) **********
+		// Per-device ledger-configurable overrides for ChargeInhibitPolicy::ThermalThresholds.
+		// initialize() does not run again for already-provisioned devices after these fields
+		// were appended, so StorageHelperRK::validate() zero-pads them for a migrated device
+		// instead. The get_ accessors resolve the raw stored set AS A WHOLE via
+		// ChargeInhibitPolicy::isValidThermalThresholds() (see
+		// sysStatusData::resolveThermalThresholds()) and fall back to the complete compiled
+		// default set (37/0/35/3) atomically when the stored set is invalid - a zero-padded
+		// {0,0,0,0} record fails this (armHighC > releaseHighC is false), while an individual
+		// field being 0.0f (armLowC's own default) inside an otherwise-valid set is honoured.
+		float thermalChargeArmHighC;                     // Arm (inhibit) at/above this temperature, C (default 37.0)
+		float thermalChargeArmLowC;                       // Arm (inhibit) at/below this temperature, C (default 0.0)
+		float thermalChargeReleaseHighC;                  // Release (resume) once at/below this temperature, C (default 35.0)
+		float thermalChargeReleaseLowC;                   // Release (resume) once at/above this temperature, C (default 3.0)
+
 	};
 
 	SysData sysData;
@@ -434,6 +450,34 @@ public:
 	void set_configSource(uint8_t value);
 	uint8_t get_lastWatchdogSource() const;
 	void set_lastWatchdogSource(uint8_t value);
+	float get_thermalChargeArmHighC() const;
+	void set_thermalChargeArmHighC(float value);
+	float get_thermalChargeArmLowC() const;
+	void set_thermalChargeArmLowC(float value);
+	float get_thermalChargeReleaseHighC() const;
+	void set_thermalChargeReleaseHighC(float value);
+	float get_thermalChargeReleaseLowC() const;
+	void set_thermalChargeReleaseLowC(float value);
+
+private:
+	/**
+	 * @brief Reads the raw stored/migrated F2a thermal thresholds and resolves
+	 * them to a safe set via ChargeInhibitPolicy::isValidThermalThresholds().
+	 *
+	 * @details A zero-padded/migrated record (see StorageHelperRK::validate()'s
+	 * zero-fill of appended fields) is invalid AS A SET even though 0.0f is
+	 * plausible for any single field on its own (armLowC's own compiled
+	 * default is 0.0f). Validating the whole set - and falling back to the
+	 * whole compiled default set atomically when it fails - avoids both the
+	 * unsafe {0,0,0,0} "always armed" state and the trap of rejecting a
+	 * legitimately-configured 0.0f field in isolation. All four get_ accessors
+	 * above resolve through this single function so they can never disagree
+	 * with each other about which set is in effect.
+	 *
+	 * @return The stored thresholds if valid as a set; otherwise the complete
+	 * compiled-in default set (37/0/35/3).
+	 */
+	ChargeInhibitPolicy::ThermalThresholds resolveThermalThresholds() const;
 
 	//Members here are internal only and therefore protected
 protected:

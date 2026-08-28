@@ -242,10 +242,6 @@ const char *PowerManager::batteryContextLabel(PowerBatteryContext context) {
   return PowerDiagnostics::batteryContextLabel(context);
 }
 
-const char *PowerManager::tierLabel(PowerTier tier) {
-  return PowerDiagnostics::tierLabel(tier);
-}
-
 const char *PowerManager::inputProfileLabel(PowerInputProfile profile) {
   return PowerDiagnostics::inputProfileLabel(profile);
 }

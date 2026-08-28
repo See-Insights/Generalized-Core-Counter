@@ -16,6 +16,24 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v24-Thermal-Inhibit] - 2026-08-28
+
+### Added
+
+- **Thermal charge-inhibit with hysteresis (F2a)**: New `ChargeInhibitPolicy` (pure, host-testable) plus `ChargeInhibit` mechanism. Arms charging inhibit at/above `armHighC` (37 C) or at/below `armLowC` (0 C); releases only once back inside the tighter `releaseHighC` (35 C) / `releaseLowC` (3 C) band, so the boundary cannot chatter. Replaces `SensorManager::isItSafeToCharge()`, whose hardcoded 0/45 C arm and 2/43 C release band was the LiPo spec limit rather than the field-proven arming values. Thresholds are ledger-configurable and per-device overridable; a candidate set is validated **as a whole** (`isValidThermalThresholds()`) and rejected wholesale rather than partially applied, and no ledger-supplied `armHighC` may exceed the cell's own 45 C charge maximum. WO-2026-08-25-001.
+- **Validity-gated thermal evaluation (Amendment B, Decision B2)**: `evaluateThermalWithValidity()` distinguishes a genuine this-boot temperature reading from a stale/persisted one. Without a fresh measurement the arm decision is suppressed outright, and an already-armed inhibit is held but flagged via `thermal_inhibit_held_without_fresh_temp` so it cannot persist unobserved. Closes the gap where an unmeasured-but-persisted-hot temperature could arm on every boot while a hibernate cycle reset the TMP36 sample counter before it could release.
+- **Boot-time inhibit resync**: `inhibited` is a non-retained static, but the DCT `DISABLE_CHARGING` bit it controls survives reset. The state is now read back from `System.getPowerConfiguration()` once per boot so a device that rebooted while hot recognizes it is already holding an armed inhibit instead of re-deciding from a false negative.
+- **`BatteryHealth`, `PmicFaultMonitor`, `PowerTier`, and `BatteryTierGuard`**: Battery SoC-trust classification, PMIC fault reaction (separate concern from the proactive thermal inhibit), and battery-tier resolution extracted into their own host-testable units.
+
+### Changed
+
+- **Release metadata updated for v24-Thermal-Inhibit**: Bumped the firmware version to `v24-Thermal-Inhibit` and the Particle product version to `PRODUCT_VERSION(24)` for controlled OTA deployment.
+- **`applyInputProfile()` preserves the DISABLE_CHARGING bit (Decision C5)**: Profile application now routes every config through `applyDisableChargingBit()` instead of replacing the DCT power configuration wholesale, so re-applying an input profile can no longer silently clear an active thermal inhibit.
+
+### Known issues
+
+- `tests/reporting_policy_adapter_test.sh` does not compile and is committed in a failing state. `src/reporting/RuntimeReportingPolicy.cpp` includes `"../MyPersistentData.h"` by relative path, which C++ resolves against the including file's own directory and therefore cannot be intercepted by the test's `-I` stub directory; the stub `MyPersistentData.h` in `tests/stubs/reporting_policy_adapter_overrides/` is consequently dead. Fixing it requires either a host stub for the Particle persistence layer or changing that include to a bare `#include "MyPersistentData.h"`. The other 14 host tests pass, including both thermal suites (`charge_inhibit_thermal_test.sh`, `thermal_threshold_migration_test.sh`).
+
 ## [v23-Diag-Soak] - 2026-08-24
 
 ### Added

@@ -32,17 +32,6 @@ enum class PowerBatteryContext : uint8_t {
 };
 
 /**
- * @brief Battery-health tier used to drive connection and sleep policy.
- */
-enum class PowerTier : uint8_t {
-  Healthy,
-  Conserving,
-  Critical,
-  Survival,
-  Unknown,
-};
-
-/**
  * @brief Input-power profile to apply for PMIC-aware platforms.
  */
 enum class PowerInputProfile : uint8_t {
@@ -111,17 +100,6 @@ struct PowerReading {
 };
 
 /**
- * @brief Policy outputs derived from the latest power reading.
- */
-struct PowerPolicy {
-  PowerTier tier = PowerTier::Unknown;
-  bool lowPowerSuggested = false;
-  bool reducedRetrySuggested = false;
-  bool extendedSleepSuggested = false;
-  bool recoveryPowerdownSuggested = false;
-};
-
-/**
  * @brief Charging-control action requested by the latest policy evaluation.
  */
 struct PowerAction {
@@ -137,7 +115,6 @@ struct PowerReport {
   bool valid = false;
   PowerCapabilities capabilities;
   PowerReading reading;
-  PowerPolicy policy;
   PowerAction action;
   PowerInputProfile activeInputProfile = PowerInputProfile::NotApplicable;
   PowerProfileSelectionReason inputProfileReason =
@@ -241,14 +218,6 @@ public:
    * @return Stable C string label
    */
   static const char *batteryContextLabel(PowerBatteryContext context);
-
-  /**
-   * @brief Converts power-tier enum values to stable log labels.
-   *
-   * @param tier Power tier enum to stringify
-   * @return Stable C string label
-   */
-  static const char *tierLabel(PowerTier tier);
 
   /**
    * @brief Converts input-profile enum values to stable log labels.

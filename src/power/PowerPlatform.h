@@ -64,4 +64,22 @@ PowerSourceSnapshot readPowerSource();
  */
 PowerConfigurationApplyResult applyInputProfile(PowerInputProfile profile);
 
+#if HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
+/**
+ * @brief Returns the base input-current/voltage SystemPowerConfiguration for
+ *        the given profile, with no charge-control feature flags set.
+ *
+ * Exposed so F2a (ChargeInhibit) can re-assert the DISABLE_CHARGING feature
+ * without silently reverting the active profile's input limits back to
+ * defaults - System.setPowerConfiguration() replaces the entire DCT config on
+ * every call, so anything writing that config must know the full intended
+ * state, not just the bit it cares about.
+ *
+ * @param profile Input profile currently active (per PowerManager::latestReport())
+ * @return Base configuration for that profile (Auto/NotApplicable return a
+ *         default-constructed configuration; callers should not apply it)
+ */
+SystemPowerConfiguration baseConfigurationForProfile(PowerInputProfile profile);
+#endif
+
 } // namespace PowerPlatform

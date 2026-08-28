@@ -13,6 +13,10 @@ const char *batteryContext[7] = {"Unknown",    "Not Charging", "Charging",
 #include "power/PowerPlatform.h"
 #include "power/PowerDiagnostics.h"
 #include "power/ConnectivityPolicy.h"
+#include "power/BatteryHealth.h"
+#include "power/ChargeInhibit.h"
+#include "power/ChargeInhibitPolicy.h"
+#include "power/PmicFaultMonitor.h"
 #include "state/StateMachine.h"
 #include "sensors/BatteryAuthorityPolicy.h"
 #include "sensors/SensorFactory.h"
@@ -33,51 +37,6 @@ retained uint8_t lastPmicAnomalyChargeStatus = 0;
 retained uint8_t lastPmicAnomalyPowerSource = 0;
 retained uint8_t lastPmicAnomalyVbusStatus = 0;
 bool pmicAnomalyActive = false;
-
-// Stale SOC detection and remediation
-retained uint8_t staleSocConsecutiveCount = 0;
-retained uint16_t staleSocTotalCount = 0;
-retained uint8_t staleSocWakeCyclesSinceResync =
-  BatteryAuthorityPolicy::STALE_SOC_RESYNC_COOLDOWN_WAKE_CYCLES;
-
-// Charging trend telemetry (diagnostic-only, no behavior changes)
-retained float lastTrendSoc = -999.0f;
-retained float lastTrendVcell = -999.0f;
-retained time_t lastTrendEpoch = 0;
-
-#if HAL_PLATFORM_FUELGAUGE_MAX17043
-/**
- * @brief Publish stale SOC forensics event.
- * 
- * @details Sends a compact "stale_soc" event with diagnostic snapshot.
- *          Called once when stale SOC is first detected in a session.
- *          Payload includes SOC, voltage, PMIC state, and environmental context.
- *          Only compiled for platforms with MAX17043 fuel gauge (Boron).
- */
-static void publishStaleSocForensics(float soc, float vcell, bool highConfidence,
-                                      uint8_t chargeStatus, uint8_t vbusStatus,
-                                      bool powerGood, uint8_t faultReg,
-                                      int powerSource, uint16_t totalCount,
-                                      float internalTempC) {
-  char payload[192];
-  
-  snprintf(payload,
-           sizeof(payload),
-           "{\"soc\":%.2f,\"vcell_mv\":%u,\"conf\":\"%s\",\"chg\":%u,\"vbus\":%u,\"pg\":%u,\"fault\":0x%02X,\"src\":%d,\"count\":%u,\"temp_c\":%.1f}",
-           (double)soc,
-           (unsigned)(vcell * 1000.0f),
-           highConfidence ? "HIGH" : "LOW",
-           (unsigned)chargeStatus,
-           (unsigned)vbusStatus,
-           powerGood ? 1u : 0u,
-           faultReg,
-           powerSource,
-           (unsigned)totalCount,
-           (double)internalTempC);
-  
-  PublishQueuePosix::instance().publish("stale_soc", payload, PRIVATE);
-}
-#endif // HAL_PLATFORM_FUELGAUGE_MAX17043
 
 uint32_t pmicAnomalyAgeSec() {
 #if !defined(ENABLE_PMIC_FORENSICS) || !ENABLE_PMIC_FORENSICS
@@ -116,30 +75,7 @@ constexpr uint8_t PMIC_ANOMALY_CONSECUTIVE_LIMIT = 3;
 constexpr uint8_t PMIC_CHRG_FAULT_MASK = 0x30;  // Bits 5:4
 constexpr uint8_t PMIC_BAT_FAULT_MASK = 0x08;   // Bit 3
 
-/**
- * @brief Extract CHRG_FAULT field from BQ24195 REG09 fault register.
- * @param faultReg Raw REG09 fault register value
- * @return CHRG_FAULT bits (0-3): 0=Normal, 1=Input fault, 2=Thermal shutdown, 3=Safety timer expiration
- */
-inline uint8_t pmicGetChargeFault(uint8_t faultReg) {
-  return (faultReg & PMIC_CHRG_FAULT_MASK) >> 4;
-}
-
 #if HAL_PLATFORM_CELLULAR || PLATFORM_ID == PLATFORM_ARGON
-void boundedBatterySettleDelay(unsigned long delayMs) {
-  const unsigned long startMs = millis();
-  while ((millis() - startMs) < delayMs) {
-    serviceAwakeWatchdog();
-    Particle.process();
-    const unsigned long elapsedMs = millis() - startMs;
-    const unsigned long remainingMs = (elapsedMs < delayMs) ? (delayMs - elapsedMs) : 0UL;
-    if (remainingMs == 0UL) {
-      break;
-    }
-    delay((remainingMs > 20UL) ? 20UL : remainingMs);
-  }
-}
-
 bool batterySocIsValid(float soc) {
   return (soc == soc) && soc >= 0.0f && soc <= 100.0f;
 }
@@ -213,20 +149,6 @@ bool shouldLogBatterySample(BatterySampleContext sampleContext) {
 }
 #endif
 #if HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
-constexpr unsigned long CHARGE_SUMMARY_INTERVAL_MS = 15UL * 60UL * 1000UL;
-
-unsigned long currentWakeAwakeMs() {
-  const Observability::WakeCycleStats &stats = Observability::cycleStats();
-  if (stats.total_awake_ms != 0) {
-    return stats.total_awake_ms;
-  }
-  if (stats.wake_start_ms != 0) {
-    const unsigned long nowMs = millis();
-    return (nowMs >= stats.wake_start_ms) ? (nowMs - stats.wake_start_ms) : 0UL;
-  }
-  return 0UL;
-}
-
 uint8_t batteryStateFromPmicStatus(uint8_t chargeStatus, byte faultReg) {
   if (faultReg & (PMIC_CHRG_FAULT_MASK | PMIC_BAT_FAULT_MASK)) {
     return (uint8_t)PowerBatteryContext::Fault;
@@ -241,19 +163,6 @@ uint8_t batteryStateFromPmicStatus(uint8_t chargeStatus, byte faultReg) {
   case 0: // Not charging
   default:
     return (uint8_t)PowerBatteryContext::NotCharging;
-  }
-}
-
-const char *compactPmicVbusLabel(uint8_t vbusStatus) {
-  switch (vbusStatus) {
-  case 1:
-    return "USB";
-  case 2:
-    return "ADAPT";
-  case 3:
-    return "OTG";
-  default:
-    return "NONE";
   }
 }
 
@@ -279,6 +188,38 @@ const char *compactPmicChargeLabel(uint8_t chargeStatus, byte faultReg) {
 
 } // namespace
 
+#if HAL_PLATFORM_CELLULAR || PLATFORM_ID == PLATFORM_ARGON
+// External linkage: also called from src/power/PmicFaultMonitor.cpp.
+void boundedBatterySettleDelay(unsigned long delayMs) {
+  const unsigned long startMs = millis();
+  while ((millis() - startMs) < delayMs) {
+    serviceAwakeWatchdog();
+    Particle.process();
+    const unsigned long elapsedMs = millis() - startMs;
+    const unsigned long remainingMs = (elapsedMs < delayMs) ? (delayMs - elapsedMs) : 0UL;
+    if (remainingMs == 0UL) {
+      break;
+    }
+    delay((remainingMs > 20UL) ? 20UL : remainingMs);
+  }
+}
+#endif
+
+#if HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
+// External linkage: also called from src/power/PmicFaultMonitor.cpp.
+unsigned long currentWakeAwakeMs() {
+  const Observability::WakeCycleStats &stats = Observability::cycleStats();
+  if (stats.total_awake_ms != 0) {
+    return stats.total_awake_ms;
+  }
+  if (stats.wake_start_ms != 0) {
+    const unsigned long nowMs = millis();
+    return (nowMs >= stats.wake_start_ms) ? (nowMs - stats.wake_start_ms) : 0UL;
+  }
+  return 0UL;
+}
+#endif
+
 // [static]
 SensorManager &SensorManager::instance() {
   if (!_instance) {
@@ -297,7 +238,8 @@ SensorManager::SensorManager()
   _authoritativeBatteryFallbackUsed(false),
   _cachedBatteryVcell(0.0f),
   _cachedChargeStateLabel("UNKNOWN"),
-  _cachedBatteryVcellValid(false) {}
+  _cachedBatteryVcellValid(false),
+  _cachedBatteryVcellSampled(false) {}
 
 SensorManager::~SensorManager() {}
 
@@ -310,8 +252,34 @@ bool SensorManager::cachedBatteryVoltage(float &vcell) const {
   return true;
 }
 
+SensorManager::VcellSampleState SensorManager::cachedBatteryVoltageState(float &vcell) const {
+  // WO-2026-08-25-001 Amendment C, Decision C2 (AC-C6): distinguishes
+  // "never sampled this boot" (Unavailable) from "sampled but implausible"
+  // (Invalid) - both previously collapsed into the same `false` returned by
+  // cachedBatteryVoltage(), which is why RuntimeReportingPolicy's guard
+  // could not treat them differently.
+  if (!_cachedBatteryVcellSampled) {
+    vcell = 0.0f;
+    return VcellSampleState::Unavailable;
+  }
+  if (!_cachedBatteryVcellValid) {
+    vcell = _cachedBatteryVcell;
+    return VcellSampleState::Invalid;
+  }
+  vcell = _cachedBatteryVcell;
+  return VcellSampleState::Known;
+}
+
 const char *SensorManager::cachedChargeStateLabel() const {
   return _cachedChargeStateLabel;
+}
+
+BatteryHealth::SocTrust SensorManager::cachedSocTrust() const {
+  return _cachedSocTrust;
+}
+
+bool SensorManager::chargeDisableConfigVerified() const {
+  return _chargeDisableConfigVerified;
 }
 
 void SensorManager::setup() {
@@ -428,8 +396,6 @@ void SensorManager::noteWakeFromLowPowerSleep() {
   _authoritativeBatterySoc = 0.0f;
   _authoritativeBatteryState = 0;
   _authoritativeBatteryFallbackUsed = false;
-  staleSocWakeCyclesSinceResync =
-      BatteryAuthorityPolicy::noteWakeCycle(staleSocWakeCyclesSinceResync);
 }
 
 float SensorManager::tmp36TemperatureC(int adcValue) {
@@ -717,11 +683,8 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   const bool logBatteryDetail = sysStatus.get_verboseMode() || shouldStabilize ||
       fallbackUsed || previousKnownGoodUsed || rejectAuthoritativeOverwrite;
   const float loggedSoc = rejectAuthoritativeOverwrite ? _authoritativeBatterySoc : soc;
-  // Captured alongside loggedSoc/rawFuelGaugeSoc/normalizedSoc, before the
-  // centralized SOC-commit block's settle-and-revalidate can reassign the
-  // shared `vcell` variable — keeps this cycle's detail log internally
-  // consistent (same sample) rather than mixing a pre-resync SOC with a
-  // post-resync Vcell.
+  // Captured now (before vcell can be reassigned later) so the detail log
+  // below reflects one consistent sample.
   const float loggedVcell = vcell;
 
 #if !(HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM))
@@ -749,376 +712,34 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
 #endif
 
 #if HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
-  // Refresh power profile to handle runtime power source changes.
-  // refreshInputProfile() already logs its own PowerDiag[...]: post-refreshInputProfile
-  // line internally with this same source/profile/vbus/pg/soc snapshot, so no
-  // separate log call is needed here - it would be an exact duplicate.
+  // refreshInputProfile() logs its own PowerDiag[...] line with this same
+  // snapshot, so no separate log call is needed here.
   PowerManager::instance().refreshInputProfile();
 
-  // Temporary compact PMIC charge diagnostic for USB source override soak validation
-  {
-    PMIC pmic(true);
-    const byte faultReg = pmic.getFault();
-    const byte systemStatus = pmic.getSystemStatus();
-    const uint8_t chargeStatus = (systemStatus >> 4) & 0x03;
-    const bool chargeFault = (faultReg & 0x30) != 0;
-    const bool chargingActive = (chargeStatus == 1 || chargeStatus == 2); // PRE or FAST
-    
-    auto compactChargeLabel = [](uint8_t status, bool fault) -> const char* {
-      if (fault) return "FAULT";
-      const char* labels[] = {"OFF", "PRE", "FAST", "DONE"};
-      return labels[status & 0x03];
-    };
-    
-    const PowerReport &powerReport = PowerManager::instance().latestReport();
-    Log.info(
-        "ChargeDiag: chg=%s(%u) ichg=%d fault=0x%02x vcell=%.3f soc=%.1f src=%s prof=%s",
-        compactChargeLabel(chargeStatus, chargeFault),
-        chargeStatus,
-        chargingActive ? 1 : 0,
-        faultReg,
-        (double)vcell,
-        (double)loggedSoc,
-        // Deliberately the RAW, UNCORRECTED `powerSource` sample (from
-        // readBatterySample()'s System.powerSource()/PowerPlatform::readPowerSource()
-        // call above), NOT powerReport.reading.powerSource (which reflects the
-        // PowerSourceOverride-corrected value). This is not an oversight: this
-        // raw src= field is the exact ground-truth evidence that made the
-        // VIN/Solar power-source root-cause investigation possible, and it
-        // must stay independent of the override's correction so a future
-        // instance of this bug class remains diagnosable the same way.
-        PowerManager::powerSourceLabel(powerSource),
-        PowerManager::compactProfileLabel(powerReport.activeInputProfile)
-    );
-#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
-    // Same rationale as the src= field above: `powerSource` here is the RAW,
-    // uncorrected sample, deliberately kept independent of the
-    // PowerSourceOverride-corrected value so this ChargeDiag/reason-10 pdiag
-    // entry preserves the raw ground-truth evidence a future diagnostic
-    // investigation would need.
-    PowerDiagnostics::recordChargeDiagEvent(chargeStatus, faultReg, chargingActive,
-                                             vcell, loggedSoc, powerSource,
-                                             powerReport.activeInputProfile);
-#endif
-  }
+  // WO-2026-08-25-001 Amendment C, Decision C1 (boot-ordering corollary):
+  // this MUST run after refreshInputProfile() (so ChargeInhibit::apply()
+  // sees this cycle's activeInputProfile) and BEFORE
+  // PmicFaultMonitor::pollAndRemediate() (so `safeToCharge` reflects a
+  // real measurement taken THIS call, not stale state left over from the
+  // previous call or an unmeasured, persisted value). This is the single
+  // production call site for this platform build - see
+  // measureTemperatureAndApplyChargeDecision()'s header comment.
+  bool safeToCharge = measureTemperatureAndApplyChargeDecision();
 
-  // =========================================================================
-  // PMIC Health Monitoring & Smart Remediation (BQ24195 PMIC)
-  // =========================================================================
-  // Supported platforms: Boron (Gen 3 cellular with BQ24195 PMIC)
-  // Excluded platforms: M-SoM/Muon (uses Particle Power Module with MAX17043, not BQ24195)
-  // 
-  // Detects charging faults (1Hz amber LED = fault register set) and attempts
-  // automatic recovery with escalating remediation levels to prevent thrashing.
-  //
-  // Alert Codes (auto-reported via webhook):
-  //   20 = PMIC Thermal Shutdown (critical - charging stopped due to temp)
-  //   21 = PMIC Charge Timeout (critical - safety timer expired, stuck charging)
-  //   23 = PMIC Battery Fault (major - general charging issue)
-  //
-  // Log-Only Diagnostics (NOT alerted - transient/normal conditions):
-  //   Input Fault: VBUS out of range (solar undervoltage common, backend detects sustained issues)
-  //
-  // Remediation Strategy:
-  //   Level 0: Monitor only (log diagnostics, raise alert)
-  //   Level 1: Soft reset (cycle charging off/on after 2+ consecutive faults)
-  //   Level 2: Power cycle with watchdog (after 3+ consecutive faults)
-  //   Cooldown: 1 hour minimum between remediation attempts
-  //   Auto-Clear: Resets all counters when charging returns to healthy state
-  //
-  // This prevents the common "loss of charge until power cycle" issue by
-  // detecting PMIC faults early and automatically attempting recovery before
-  // requiring manual intervention.
-  // =========================================================================
-  
-  // PMIC health monitoring (BQ24195 PMIC - Boron only)
-  // Tracks charging faults and attempts smart remediation with escalation
-  static unsigned long lastRemediationAttempt = 0;
-  static uint8_t remediationLevel = 0; // 0=none, 1=soft reset, 2=power cycle
-  static uint8_t consecutiveFaults = 0;
-  const unsigned long REMEDIATION_COOLDOWN = 3600000; // 1 hour between attempts
-
-  // Non-blocking remediation state machine (replaces delay-based sequencing)
-  // Keeps loop() responsive while still performing the same charge-cycle actions.
-  static bool remediationInProgress = false;
-  static uint8_t remediationActiveLevel = 0; // 0=none, 1=soft, 2=aggressive
-  static uint8_t remediationPhase = 0;       // 0=start, 1=wait
-  static unsigned long remediationPhaseStartMs = 0;
-  static bool immediateChargeFaultResetConsumed = false;
-  static byte immediateChargeFaultResetFaultReg = 0;
-  
-  // Check if charging is intentionally disabled due to temperature BEFORE attempting remediation
-  bool safeToCharge = isItSafeToCharge();
-  
+  // PMIC fault monitoring/remediation/telemetry (BQ24195, Boron only). See
+  // PmicFaultMonitor.h for the contract (fault detection, escalating
+  // remediation, alert codes 20/21/23, and the ChargeDiag forensic line).
   PMIC pmic(true); // true = lock I2C during operations
-  
-  // Read REG09 (Fault Register)
-  // NOTE: Use public API; PMIC::readRegister() is private in DeviceOS 6.3.4.
-  byte faultReg = pmic.getFault();
-  byte systemStatus = pmic.getSystemStatus();
-  uint8_t vbusStatus = (systemStatus >> 6) & 0x03;
-  uint8_t chargeStatus = (systemStatus >> 4) & 0x03;
-  bool powerGood = (systemStatus & 0x04) != 0;
-  bool thermalRegulation = (systemStatus & 0x02) != 0;
-  bool inVsysMin = (systemStatus & 0x01) != 0;
-
-  const char* chargeStatusStr[] = {"Off", "Pre", "Fast", "Done"};
+  PmicFaultMonitor::Registers pmicRegs =
+      PmicFaultMonitor::pollAndRemediate(pmic, safeToCharge, battState, powerSource,
+                                          chargeDisableConfigVerified());
+  byte faultReg = pmicRegs.faultReg;
+  uint8_t vbusStatus = pmicRegs.vbusStatus;
+  uint8_t chargeStatus = pmicRegs.chargeStatus;
+  bool powerGood = pmicRegs.powerGood;
   const PowerReport &powerReport = PowerManager::instance().latestReport();
+  PmicFaultMonitor::logChargeDiag(pmicRegs, vcell, loggedSoc, powerSource);
 
-  auto isUsbBackedSource = [](int source) {
-    return source == 2 || source == 3 || source == 4;
-  };
-
-  bool persistentAfterImmediateChargeFaultReset = false;
-  if (faultReg & PMIC_CHRG_FAULT_MASK) {
-    const bool usbInputPresent = (vbusStatus == 1 || vbusStatus == 2 || vbusStatus == 3);
-    const bool usbBackedFaultContext =
-        powerReport.activeInputProfile == PowerInputProfile::UsbBench ||
-        isUsbBackedSource(powerReport.reading.powerSource) ||
-        isUsbBackedSource(powerSource) ||
-        usbInputPresent;
-    const bool severeBatteryState = (battState == 5 || battState == 6);
-    const uint8_t initialChargeFault = pmicGetChargeFault(faultReg);
-    const bool alreadyAttemptedForActiveFault =
-        immediateChargeFaultResetConsumed &&
-        immediateChargeFaultResetFaultReg == faultReg;
-    const bool canAttemptImmediateChargeFaultReset =
-        !alreadyAttemptedForActiveFault &&
-        safeToCharge &&
-        powerGood &&
-        usbInputPresent &&
-        usbBackedFaultContext &&
-        !thermalRegulation &&
-        !severeBatteryState &&
-        initialChargeFault != 0x02;
-
-    if (canAttemptImmediateChargeFaultReset) {
-      Log.warn("PMIC: charge fault active; attempting charging reset");
-      pmic.disableCharging();
-      Log.warn("PMIC: charging disabled for fault reset");
-      boundedBatterySettleDelay(500UL);
-      pmic.enableCharging();
-      Log.warn("PMIC: charging re-enabled after fault reset");
-      boundedBatterySettleDelay(500UL);
-
-      faultReg = pmic.getFault();
-      systemStatus = pmic.getSystemStatus();
-      vbusStatus = (systemStatus >> 6) & 0x03;
-      chargeStatus = (systemStatus >> 4) & 0x03;
-      powerGood = (systemStatus & 0x04) != 0;
-      thermalRegulation = (systemStatus & 0x02) != 0;
-      inVsysMin = (systemStatus & 0x01) != 0;
-      immediateChargeFaultResetConsumed = true;
-      immediateChargeFaultResetFaultReg = (byte)(faultReg & PMIC_CHRG_FAULT_MASK ? faultReg : initialChargeFault << 4);
-      lastRemediationAttempt = millis();
-
-      Log.info("PMIC: fault reset result faultReg=0x%02x charge=%s",
-               faultReg,
-               chargeStatusStr[chargeStatus]);
-
-      if (!(faultReg & PMIC_CHRG_FAULT_MASK)) {
-        Log.info("PMIC: charge fault cleared");
-        consecutiveFaults = 0;
-        remediationLevel = 0;
-        remediationInProgress = false;
-        remediationActiveLevel = 0;
-        remediationPhase = 0;
-        immediateChargeFaultResetConsumed = false;
-        immediateChargeFaultResetFaultReg = 0;
-
-        int8_t currentAlert = current.get_alertCode();
-        if (currentAlert == 21 || currentAlert == 23) {
-          current.set_alertCode(0);
-          current.set_lastAlertTime(0);
-        }
-      } else {
-        persistentAfterImmediateChargeFaultReset = true;
-      }
-    }
-  }
-  
-  // Check for charging faults (bits 5:4: CHRG_FAULT)
-  if (faultReg & PMIC_CHRG_FAULT_MASK) {
-    uint8_t chargeFault = pmicGetChargeFault(faultReg);
-    consecutiveFaults++;
-    
-    switch(chargeFault) {
-      case 0x01: // Input fault (VBUS overvoltage or undervoltage)
-        // This triggers when VIN < powerSourceMinVoltage (5.08V) or > max
-        // Most common cause: obscured/faulty solar panel insufficient voltage
-        // LOG ONLY - transient voltage dips are normal (clouds, trees, dawn/dusk)
-        // Backend detects sustained panel failures via multi-day SoC decline
-        Log.info("PMIC: Input fault - VBUS out of range (likely solar variation)");
-        if (persistentAfterImmediateChargeFaultReset) {
-          Log.error("PMIC: charge fault persists after reset - alert 21");
-          current.raiseAlert(21);
-        }
-        break;
-      case 0x02: // Thermal shutdown
-        Log.error("PMIC: Thermal shutdown - charging stopped due to temperature");
-        current.raiseAlert(20); // Alert code 20: PMIC Thermal (critical)
-        break;
-      case 0x03: // Charge safety timer expired
-        if (persistentAfterImmediateChargeFaultReset) {
-          Log.error("PMIC: charge fault persists after reset - alert 21");
-        } else {
-          Log.error("PMIC: Charge safety timer expired - charging timeout (common stuck charging indicator)");
-        }
-        current.raiseAlert(21); // Alert code 21: PMIC Charge Timeout (critical)
-        break;
-      default:
-        if (persistentAfterImmediateChargeFaultReset) {
-          Log.error("PMIC: charge fault persists after reset - alert 21");
-          current.raiseAlert(21);
-        } else {
-          Log.warn("PMIC: Charge fault detected (code=0x%02x)", chargeFault);
-          current.raiseAlert(23); // Alert code 23: PMIC Battery Fault
-        }
-        break;
-    }
-    
-    // Charge-fault-specific remediation logic follows below.
-    // BAT_FAULT is handled separately and does NOT enter remediation.
-    
-    // Smart remediation with escalation and thrash prevention
-    // CRITICAL SAFETY CHECK: Never attempt remediation if charging is disabled due to temperature
-    if (!safeToCharge) {
-      Log.info("PMIC: Fault detected but charging disabled due to temperature (%.1fC) - skipping remediation", 
-               (double)current.get_internalTempC());
-      // Don't escalate fault counters when temperature is the issue
-      // Temperature will recover naturally without intervention
-        remediationInProgress = false;
-        remediationActiveLevel = 0;
-        remediationPhase = 0;
-    } else {
-      unsigned long now = millis();
-        // If we have an in-progress remediation, advance it without blocking.
-        if (remediationInProgress) {
-          switch (remediationActiveLevel) {
-            case 1: {
-              // Level 1: disableCharging -> wait 500ms -> enableCharging
-              if (remediationPhase == 0) {
-                pmic.disableCharging();
-                remediationPhaseStartMs = now;
-                remediationPhase = 1;
-              } else if (now - remediationPhaseStartMs >= 500UL) {
-                pmic.enableCharging();
-                Log.info("PMIC: Charging re-enabled after soft reset");
-                remediationInProgress = false;
-                remediationActiveLevel = 0;
-                remediationPhase = 0;
-                lastRemediationAttempt = now;
-              }
-              break;
-            }
-            case 2: {
-              // Level 2: disableCharging -> wait 1000ms -> set watchdog -> enableCharging
-              if (remediationPhase == 0) {
-                pmic.disableCharging();
-                remediationPhaseStartMs = now;
-                remediationPhase = 1;
-              } else if (now - remediationPhaseStartMs >= 1000UL) {
-                // Set watchdog to force reset if charging doesn't recover
-                pmic.setWatchdog(0b01); // 40 seconds
-                pmic.enableCharging();
-                Log.info("PMIC: Charging re-enabled with watchdog supervision");
-                remediationInProgress = false;
-                remediationActiveLevel = 0;
-                remediationPhase = 0;
-                remediationLevel = 0; // Reset level after power cycle attempt
-                lastRemediationAttempt = now;
-              }
-              break;
-            }
-            default:
-              remediationInProgress = false;
-              remediationActiveLevel = 0;
-              remediationPhase = 0;
-              break;
-          }
-        } else {
-          // Not in progress; decide whether to start a remediation attempt.
-          if (now - lastRemediationAttempt > REMEDIATION_COOLDOWN) {
-            // Escalate remediation level based on consecutive faults
-            if (consecutiveFaults >= 3 && remediationLevel < 2) {
-              remediationLevel = 2; // Escalate to power cycle reset
-            } else if (consecutiveFaults >= 2 && remediationLevel < 1) {
-              remediationLevel = 1; // Escalate to disable/enable charging
-            }
-
-            switch (remediationLevel) {
-              case 1:
-                Log.warn("PMIC: Attempting soft remediation - cycle charging (level 1)");
-                remediationInProgress = true;
-                remediationActiveLevel = 1;
-                remediationPhase = 0;
-                break;
-
-              case 2:
-                Log.error("PMIC: Attempting aggressive remediation - power cycle reset (level 2)");
-                remediationInProgress = true;
-                remediationActiveLevel = 2;
-                remediationPhase = 0;
-                break;
-
-              default:
-                Log.info("PMIC: Fault detected but remediation level 0 - monitoring only");
-                break;
-            }
-          } else {
-            unsigned long remainingCooldown = (REMEDIATION_COOLDOWN - (now - lastRemediationAttempt)) / 60000;
-            Log.info("PMIC: Fault detected but in cooldown period (%lu min remaining)", remainingCooldown);
-          }
-        }
-    }
-  } else {
-    // No faults detected - clear counters if charging is healthy
-    immediateChargeFaultResetConsumed = false;
-    immediateChargeFaultResetFaultReg = 0;
-    if (consecutiveFaults > 0) {
-      Log.info("PMIC: Charging healthy - clearing fault counters");
-      consecutiveFaults = 0;
-      remediationLevel = 0;
-
-        // Clear any pending remediation sequencing now that faults are gone.
-        remediationInProgress = false;
-        remediationActiveLevel = 0;
-        remediationPhase = 0;
-      
-      // Clear PMIC-related alerts if they were active
-      int8_t currentAlert = current.get_alertCode();
-      if (currentAlert >= 20 && currentAlert <= 23) {
-        Log.info("PMIC: Clearing battery/charging alert %d - charging resumed", currentAlert);
-        current.set_alertCode(0);
-        current.set_lastAlertTime(0);
-      }
-    }
-    
-    // Narrow recovery path for Alert 21 (charge timeout/stuck charging)
-    // Clear when PMIC fault cleared and not in stuck fast-charging state
-    int8_t currentAlert = current.get_alertCode();
-    if (currentAlert == 21 && chargeStatus != 2) {
-      // Alert 21 active, no PMIC fault, and not in fast charging - charge recovered
-      Log.info("PMIC: clearing alert 21 after charge recovery");
-      current.set_alertCode(0);
-      current.set_lastAlertTime(0);
-    }
-  }
-
-  // Check for battery fault (bit 3: BAT_FAULT - battery overvoltage protection)
-  // This is separate from CHRG_FAULT and does NOT enter charge-cycle remediation.
-  // BAT_FAULT indicates a battery hardware issue that cannot be resolved by toggling charging.
-  if (faultReg & PMIC_BAT_FAULT_MASK) {
-    Log.error("PMIC: Battery overvoltage protection active (BAT_FAULT)");
-    current.raiseAlert(23); // Alert code 23: PMIC Battery Fault
-    // Do NOT increment consecutiveFaults or enter remediation for BAT_FAULT
-    // This is a battery hardware condition, not a charging configuration issue
-  }
-
-  static byte lastLoggedPmicSystemStatus = 0xFF;
-  static byte lastLoggedPmicFaultReg = 0xFF;
-  static int lastLoggedPmicPowerSource = -999;
-  static PowerInputProfile lastLoggedPmicProfile = PowerInputProfile::NotApplicable;
 #if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
   static uint8_t consecutivePmicContradictions = 0;
 #endif
@@ -1126,11 +747,24 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   const uint8_t pmicBattState = batteryStateFromPmicStatus(chargeStatus, faultReg);
   _cachedBatteryVcell = vcell;
   _cachedBatteryVcellValid = batteryVoltageLooksUsable(vcell);
+  _cachedBatteryVcellSampled = true; // a real vcell sample was taken this call, valid or not
   _cachedChargeStateLabel = compactPmicChargeLabel(chargeStatus, faultReg);
   if (sampleCanBeAuthoritative) {
     _authoritativeBatteryState = pmicBattState;
   }
   current.set_batteryState(pmicBattState);
+  // Blocker 2 (WO-2026-08-25-001 round 3, AC-B4): the retired STALE_SOC
+  // resync machinery's ResyncActions::commitSoc() was the only path that
+  // committed an accepted Boron fuel-gauge sample to current.stateOfCharge.
+  // Retiring the resync/latch/retry machinery (WO line 620) must not also
+  // retire this ordinary commit - it is not stale-SOC correction, just the
+  // ordinary "accepted sample updates persisted SOC" behavior. Gated on the
+  // same authority fence as before (rejectAuthoritativeOverwrite): an
+  // accepted sample commits; a rejected post-connect candidate does not
+  // overwrite the pre-radio authoritative value.
+  if (!rejectAuthoritativeOverwrite) {
+    current.set_stateOfCharge(soc);
+  }
   float finalAcceptedSoc = current.get_stateOfCharge();
 
 #if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
@@ -1184,260 +818,43 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   }
 #endif
 
-  // ========================================================================
-  // Stale SOC Detection and Remediation
-  // ========================================================================
-  // Detects fuel gauge SOC that appears stale relative to usable cell voltage.
-  // Phase 2 keeps the existing debounce and forensics path, then quick-starts
-  // the fuel gauge only in a quiet state and only after a wake-cycle cooldown.
+  // F1 - BatteryHealth trust signal (WO-2026-08-25-001): replaces the
+  // retired STALE_SOC latch/resync machinery. Pure trust signal only - does
+  // not correct soc/vcell, latch, retry, or quickStart. See BatteryHealth.h.
   {
     const float effectiveSoc = rejectAuthoritativeOverwrite ? _authoritativeBatterySoc : soc;
-    const bool vcellHighConfidence = (vcell >= 4.10f);
-    const BatteryAuthorityPolicy::StaleSocSample staleSocSample = {
-      effectiveSoc,
-      vcell,
-      chargeStatus,
-      vbusStatus,
-      powerGood,
-      faultReg,
-    };
-    const bool staleSocConditionsMet =
-      BatteryAuthorityPolicy::staleSocConditionsMet(staleSocSample);
-    
-    if (staleSocConditionsMet) {
-      if (staleSocConsecutiveCount < 0xFF) {
-        staleSocConsecutiveCount++;
+    const bool chargingActive = (chargeStatus == 1 || chargeStatus == 2); // PRE or FAST
+    const bool radioActive = Connectivity::isRadioPoweredOn();
+    const BatteryHealth::Reading healthReading =
+        BatteryHealth::evaluate(effectiveSoc, vcell, chargingActive, radioActive);
+    // Cached for RuntimeReportingPolicy's trust-gated tier input (Amendment
+    // B, Decision B1 / AC-B2) via SensorManager::cachedSocTrust().
+    _cachedSocTrust = healthReading.trust;
+
+    if (healthReading.trust != BatteryHealth::SocTrust::Trusted) {
+      static BatteryHealth::SocTrust lastLoggedTrust = BatteryHealth::SocTrust::Trusted;
+      if (healthReading.trust != lastLoggedTrust) {
+        Log.warn("BatteryHealth: trust=%s soc=%.2f vcell=%.3fV restingEstimate=%.2f residual=%.2f",
+                 healthReading.trust == BatteryHealth::SocTrust::Suspect ? "Suspect" : "Untrusted",
+                 (double)healthReading.soc,
+                 (double)healthReading.vcell,
+                 (double)healthReading.restingSocEstimate,
+                 (double)healthReading.residual);
+        lastLoggedTrust = healthReading.trust;
       }
-      
-      // Require 2 consecutive samples before flagging (conservative)
-        if (staleSocConsecutiveCount >=
-          BatteryAuthorityPolicy::STALE_SOC_TRIGGER_CONSECUTIVE_COUNT) {
-        if (staleSocTotalCount < 0xFFFF) {
-          staleSocTotalCount++;
-        }
-        
-        // Log and publish once when first detected (not every sample)
-        static bool staleSocLoggedThisSession = false;
-        static bool staleSocPublishedThisSession = false;
-        if (!staleSocLoggedThisSession) {
-          const char *confidenceLabel = vcellHighConfidence ? "HIGH" : "LOW";
-          Log.warn("STALE_SOC: suspected stale fuel gauge reading - soc=%.2f vcell=%.3fV (conf=%s) vbus=%s chg=%s pg=%d fault=0x%02X src=%d consecutive=%u total=%u",
-                   (double)effectiveSoc,
-                   (double)vcell,
-                   confidenceLabel,
-                   compactPmicVbusLabel(vbusStatus),
-                   compactPmicChargeLabel(chargeStatus, faultReg),
-                   powerGood ? 1 : 0,
-                   faultReg,
-                   powerSource,
-                   (unsigned)staleSocConsecutiveCount,
-                   (unsigned)staleSocTotalCount);
-          staleSocLoggedThisSession = true;
-          
-          // Publish forensics event for remote visibility
-          if (!staleSocPublishedThisSession) {
-            publishStaleSocForensics(effectiveSoc, vcell, vcellHighConfidence,
-                                     chargeStatus, vbusStatus, powerGood, faultReg,
-                                     powerSource, staleSocTotalCount,
-                                     current.get_internalTempC());
-            staleSocPublishedThisSession = true;
-          }
-        }
-        
-        // Capture diagnostic snapshot in WakeCycleStats
-        Observability::WakeCycleStats &stats = Observability::cycleStats();
-        stats.stale_soc_suspected = true;
-        stats.battery_vcell_mv = (uint16_t)(vcell * 1000.0f);
-        stats.pmic_charge_status = chargeStatus;
-        stats.pmic_vbus_status = vbusStatus;
-        stats.pmic_power_source = (powerSource >= 0 && powerSource <= 0xFF) ? (uint8_t)powerSource : 0xFF;
-        stats.pmic_power_good = powerGood ? 1 : 0;
-        stats.pmic_fault_reg = faultReg;
-        stats.stale_soc_total_count = staleSocTotalCount;
-      }
-    } else {
-      // Reset consecutive counter when conditions not met
-      staleSocConsecutiveCount = 0;
     }
 
-    using ReadBatterySample = decltype(readBatterySample);
-    class FuelGaugeResyncActions : public BatteryAuthorityPolicy::ResyncActions {
-    public:
-      FuelGaugeResyncActions(ReadBatterySample &reader,
-                             uint8_t &battState,
-                             float &rawFuelGaugeSoc,
-                             float &normalizedSoc,
-                             float &soc,
-                             float &vcell,
-                             int &powerSource,
-                             const char *&socAuthorityTag,
-                             bool &ignoreUnknownBatteryState)
-          : reader_(reader),
-            battState_(battState),
-            rawFuelGaugeSoc_(rawFuelGaugeSoc),
-            normalizedSoc_(normalizedSoc),
-            soc_(soc),
-            vcell_(vcell),
-            powerSource_(powerSource),
-            socAuthorityTag_(socAuthorityTag),
-            ignoreUnknownBatteryState_(ignoreUnknownBatteryState) {}
-
-      void quickStart() override {
-        fuelGauge.quickStart();
-      }
-
-      void settle() override {
-        boundedBatterySettleDelay(ConnectivityPolicy::BATTERY_WAKE_QUICKSTART_DELAY_MS);
-      }
-
-      void readSample(float &soc, float &vcell) override {
-        reader_(battState_, rawFuelGaugeSoc_, normalizedSoc_, soc_, vcell_, powerSource_,
-                socAuthorityTag_, ignoreUnknownBatteryState_);
-        soc = soc_;
-        vcell = vcell_;
-      }
-
-      void commitSoc(float soc) override {
-        current.set_stateOfCharge(soc);
-      }
-
-    private:
-      ReadBatterySample &reader_;
-      uint8_t &battState_;
-      float &rawFuelGaugeSoc_;
-      float &normalizedSoc_;
-      float &soc_;
-      float &vcell_;
-      int &powerSource_;
-      const char *&socAuthorityTag_;
-      bool &ignoreUnknownBatteryState_;
-    };
-
-    FuelGaugeResyncActions resyncActions(
-        readBatterySample, battState, rawFuelGaugeSoc, normalizedSoc, soc, vcell,
-        powerSource, socAuthorityTag, ignoreUnknownBatteryState);
-    const BatteryAuthorityPolicy::SocCommitResolution commitResolution =
-        BatteryAuthorityPolicy::resolveSocCommit(
-            staleSocSample,
-            rejectAuthoritativeOverwrite,
-            staleSocConsecutiveCount,
-            staleSocWakeCyclesSinceResync,
-            Connectivity::isRadioPoweredOn(),
-            resyncActions);
-
-    if (commitResolution.resyncAttempted) {
-      Log.warn("STALE_SOC: resyncing fuel gauge - soc=%.2f vcell=%.3fV wakeCooldown=%u",
-               (double)effectiveSoc,
-               (double)staleSocSample.vcell,
-               (unsigned)staleSocWakeCyclesSinceResync);
-#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
-      PowerDiagnostics::recordResyncEvent(effectiveSoc, staleSocSample.vcell);
-#endif
-      staleSocWakeCyclesSinceResync = 0;
-      staleSocConsecutiveCount = 0;
-    }
-
-    soc = commitResolution.soc;
-    vcell = commitResolution.vcell;
-    _cachedBatteryVcell = vcell;
-    _cachedBatteryVcellValid = batteryVoltageLooksUsable(vcell);
-    if (commitResolution.shouldCommit) {
-      finalAcceptedSoc = commitResolution.soc;
-    }
+    Observability::WakeCycleStats &stats = Observability::cycleStats();
+    stats.stale_soc_suspected = (healthReading.trust != BatteryHealth::SocTrust::Trusted);
+    stats.battery_vcell_mv = (uint16_t)(vcell * 1000.0f);
+    stats.pmic_charge_status = chargeStatus;
+    stats.pmic_vbus_status = vbusStatus;
+    stats.pmic_power_source = (powerSource >= 0 && powerSource <= 0xFF) ? (uint8_t)powerSource : 0xFF;
+    stats.pmic_power_good = powerGood ? 1 : 0;
+    stats.pmic_fault_reg = faultReg;
   }
 
   const uint8_t finalLoggedBattState = pmicBattState;
-  const bool pmicStatusChanged =
-      systemStatus != lastLoggedPmicSystemStatus || faultReg != lastLoggedPmicFaultReg;
-  const bool pmicRouteChanged =
-      powerSource != lastLoggedPmicPowerSource ||
-      powerReport.activeInputProfile != lastLoggedPmicProfile;
-#if defined(ENABLE_PMIC_TRACE) && ENABLE_PMIC_TRACE
-  const bool pmicTraceEnabled = true;
-#else
-  const bool pmicTraceEnabled = false;
-#endif
-  const bool pmicFaultActive = (faultReg != 0);
-  if (pmicTraceEnabled || pmicFaultActive) {
-    Log.info("PMIC: vbus=%s chg=%s fault=%02x pg=%d th=%s vsys=%d prof=%s src=%s",
-             compactPmicVbusLabel(vbusStatus),
-             compactPmicChargeLabel(chargeStatus, faultReg),
-             faultReg,
-             powerGood ? 1 : 0,
-             thermalRegulation ? "REG" : "OK",
-             inVsysMin ? 1 : 0,
-             PowerManager::compactProfileLabel(powerReport.activeInputProfile),
-             PowerManager::powerSourceLabel(powerSource));
-    lastLoggedPmicSystemStatus = systemStatus;
-    lastLoggedPmicFaultReg = faultReg;
-    lastLoggedPmicPowerSource = powerSource;
-    lastLoggedPmicProfile = powerReport.activeInputProfile;
-  } else {
-    (void)pmicStatusChanged;
-    (void)pmicRouteChanged;
-  }
-  if (powerReport.activeInputProfile == PowerInputProfile::Solar35W && vbusStatus == 1) {
-    Log.warn("Power mismatch: prof=SOLAR vbus=USB");
-    const float currentSoc = fuelGauge.getSoC();
-    const float currentVcell = fuelGauge.getVCell();
-    Log.info("PowerDiag: soc=%.1f vcell=%.3f chg=%u vbus=%u pg=%u fault=0x%02X src=%d temp=%.1f",
-             (double)currentSoc,
-             (double)currentVcell,
-             (unsigned)chargeStatus,
-             (unsigned)vbusStatus,
-             powerGood ? 1u : 0u,
-             faultReg,
-             powerSource,
-             (double)current.get_internalTempC());
-    
-    // PMIC configuration diagnostic - show expected/configured charging parameters
-    const bool chargingEnabled = pmic.isChargingEnabled();
-    // Solar profile: 900mA input, 5080mV min, 900mA charge, 4208mV charge voltage
-    // USB profile: 900mA input, 3880mV min, 896mA charge, 4112mV charge voltage
-    const char* profLabel = (powerReport.activeInputProfile == PowerInputProfile::Solar35W) ? "SOLAR" : "USB";
-    const int expectedInputCurrentMa = 900;
-    const int expectedChargeCurrentMa = (powerReport.activeInputProfile == PowerInputProfile::Solar35W) ? 900 : 896;
-    const int expectedMinVoltageMv = (powerReport.activeInputProfile == PowerInputProfile::Solar35W) ? 5080 : 3880;
-    const int expectedChargeVoltageMv = (powerReport.activeInputProfile == PowerInputProfile::Solar35W) ? 4208 : 4112;
-    Log.info("PowerCfg: prof=%s iin=%umA ichg=%umA vmin=%umV vchg=%umV enabled=%d therm=%d vsysmin=%d",
-             profLabel,
-             (unsigned)expectedInputCurrentMa,
-             (unsigned)expectedChargeCurrentMa,
-             (unsigned)expectedMinVoltageMv,
-             (unsigned)expectedChargeVoltageMv,
-             chargingEnabled ? 1 : 0,
-             thermalRegulation ? 1 : 0,
-             inVsysMin ? 1 : 0);
-    
-    // Charging trend telemetry - track SOC/voltage changes over time
-    const bool trendBaselineValid = (lastTrendSoc > -500.0f && lastTrendVcell > 0.0f && lastTrendEpoch > 0);
-    if (trendBaselineValid && Time.isValid() && Time.now() > lastTrendEpoch) {
-      const float elapsedSec = (float)(Time.now() - lastTrendEpoch);
-      const float elapsedHours = elapsedSec / 3600.0f;
-      
-      if (elapsedHours >= 0.5f) {
-        const float deltaSoc = currentSoc - lastTrendSoc;
-        const float deltaVcell = currentVcell - lastTrendVcell;
-        Log.info("PowerTrend: soc=%.1f dsoc=%+.1f vcell=%.3f dv=%+.3f hrs=%.1f chg=%u",
-                 (double)currentSoc,
-                 (double)deltaSoc,
-                 (double)currentVcell,
-                 (double)deltaVcell,
-                 (double)elapsedHours,
-                 (unsigned)chargeStatus);
-        
-        // Update baseline for next trend measurement
-        lastTrendSoc = currentSoc;
-        lastTrendVcell = currentVcell;
-        lastTrendEpoch = Time.now();
-      }
-    } else if (Time.isValid()) {
-      // Initialize baseline on first valid sample
-      lastTrendSoc = currentSoc;
-      lastTrendVcell = currentVcell;
-      lastTrendEpoch = Time.now();
-    }
-  }
 
   const bool allowPreSleepBatteryLog =
       (sampleContext != BatterySampleContext::PreSleep) || (ENABLE_SLEEP_TRACE != 0);
@@ -1458,108 +875,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
              rejectAuthoritativeOverwrite ? " candidateRejected=true" : "");
   }
 
-  {
-    static bool chargeSummaryBaselineValid = false;
-    static unsigned long chargeSummaryBaselineMs = 0;
-    static float chargeSummaryBaselineSoc = 0.0f;
-    static float chargeSummaryBaselineVcell = 0.0f;
-    static int chargeSummaryBaselineSource = -1;
-    static PowerInputProfile chargeSummaryBaselineProfile = PowerInputProfile::NotApplicable;
-
-    const unsigned long nowMs = millis();
-    const bool sourceOrProfileChanged =
-        chargeSummaryBaselineValid &&
-        (chargeSummaryBaselineSource != powerSource ||
-         chargeSummaryBaselineProfile != powerReport.activeInputProfile);
-
-    if (!chargeSummaryBaselineValid || sourceOrProfileChanged) {
-      chargeSummaryBaselineValid = true;
-      chargeSummaryBaselineMs = nowMs;
-      chargeSummaryBaselineSoc = soc;
-      chargeSummaryBaselineVcell = vcell;
-      chargeSummaryBaselineSource = powerSource;
-      chargeSummaryBaselineProfile = powerReport.activeInputProfile;
-      if (sysStatus.get_verboseMode()) {
-        Log.info("Charge: base soc=%.2f v=%.3f",
-                 (double)soc,
-                 (double)vcell);
-      }
-    } else if ((nowMs - chargeSummaryBaselineMs) >= CHARGE_SUMMARY_INTERVAL_MS) {
-      const Observability::WakeCycleStats &stats = Observability::cycleStats();
-      Log.info("Charge: soc=%.1f d15=%+.2f v=%.3f dv=%+.3f chg=%s src=%s prof=%s a=%lus c=%lus t=%lus",
-               (double)soc,
-               (double)(soc - chargeSummaryBaselineSoc),
-               (double)vcell,
-               (double)(vcell - chargeSummaryBaselineVcell),
-               compactPmicChargeLabel(chargeStatus, faultReg),
-               PowerManager::powerSourceLabel(powerSource),
-               PowerManager::compactProfileLabel(powerReport.activeInputProfile),
-               (unsigned long)(currentWakeAwakeMs() / 1000UL),
-               (unsigned long)(stats.connect_duration_ms / 1000UL),
-               (unsigned long)(stats.teardown_duration_ms / 1000UL));
-      chargeSummaryBaselineMs = nowMs;
-      chargeSummaryBaselineSoc = soc;
-      chargeSummaryBaselineVcell = vcell;
-      chargeSummaryBaselineSource = powerSource;
-      chargeSummaryBaselineProfile = powerReport.activeInputProfile;
-    }
-  }
-
-  // Detect stuck charging state (charging for >6 hours at same SoC)
-  static uint8_t lastChargeStatus = 0xFF;
-  static unsigned long chargeStateStartTime = 0;
-  static float fastChargeStartSoc = -1.0f;
-  static float fastChargeStartVcell = -1.0f;
-
-  if (chargeStatus == 2) { // Fast Charging
-    if (lastChargeStatus != 2) {
-      chargeStateStartTime = millis(); // Just entered fast charging
-      fastChargeStartSoc = finalAcceptedSoc;
-      fastChargeStartVcell = vcell;
-    } else if (chargeStateStartTime != 0) {
-      const float socGain = batterySocIsValid(fastChargeStartSoc) ? (finalAcceptedSoc - fastChargeStartSoc) : 0.0f;
-      const float vcellGain = batteryVoltageLooksUsable(fastChargeStartVcell) ? (vcell - fastChargeStartVcell) : 0.0f;
-      const bool meaningfulChargeProgress = BatteryAuthorityPolicy::stuckChargingHasMeaningfulProgress(
-          fastChargeStartSoc, finalAcceptedSoc, fastChargeStartVcell, vcell);
-      if (meaningfulChargeProgress) {
-        chargeStateStartTime = millis();
-        fastChargeStartSoc = finalAcceptedSoc;
-        fastChargeStartVcell = vcell;
-      } else if (millis() - chargeStateStartTime > 6UL * 3600000UL) { // 6 hours
-        const unsigned long awakeMs = currentWakeAwakeMs();
-        const unsigned long connectMs = Observability::cycleStats().connect_duration_ms;
-        const unsigned long teardownMs = Observability::cycleStats().teardown_duration_ms;
-        const bool ambiguousHighLoad = inVsysMin || thermalRegulation || awakeMs > 300000UL ||
-                                       connectMs > 120000UL || teardownMs > 10000UL;
-        if (ambiguousHighLoad) {
-          Log.warn("PMIC: Fast Charging 6+ hours with limited gain under load socGain=%.2f vcellGain=%.3f awake=%lu conn=%lu td=%lu vsysMin=%d thermal=%d",
-                   (double)socGain,
-                   (double)vcellGain,
-                   awakeMs,
-                   connectMs,
-                   teardownMs,
-                   inVsysMin ? 1 : 0,
-                   thermalRegulation ? 1 : 0);
-          chargeStateStartTime = millis();
-                  fastChargeStartSoc = finalAcceptedSoc;
-          fastChargeStartVcell = vcell;
-        } else {
-          Log.error("PMIC: Stuck in Fast Charging for 6+ hours with no material gain soc=%.1f socGain=%.2f vcell=%.3f vcellGain=%.3f",
-                            (double)finalAcceptedSoc,
-                    (double)socGain,
-                    (double)vcell,
-                    (double)vcellGain);
-          current.raiseAlert(21); // Charge timeout alert
-        }
-      }
-    }
-  } else {
-    chargeStateStartTime = 0; // Not charging or charge done
-    fastChargeStartSoc = -1.0f;
-    fastChargeStartVcell = -1.0f;
-  }
-
-  lastChargeStatus = chargeStatus;
+  PmicFaultMonitor::trackAndReport(pmicRegs, powerSource, soc, vcell, finalAcceptedSoc);
 #endif // HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
 
 #elif PLATFORM_ID == 32 || PLATFORM_ID == 34
@@ -1603,8 +919,44 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   // Other Wi-Fi / SoM platforms: leave battery fields unchanged for now.
 #endif
 
+#if !(HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM))
+  // WO-2026-08-25-001 Amendment C, Decision C1: on this platform build,
+  // nothing else needs `safeToCharge` earlier in this function (there is no
+  // PmicFaultMonitor::pollAndRemediate() call to feed - see the other call
+  // site above, mutually exclusive with this one by platform), so the
+  // single coupled call happens here instead. Exactly one of the two call
+  // sites in this file compiles for any given platform.
+  measureTemperatureAndApplyChargeDecision();
+#endif
+
+  // Convenience: indicate whether battery is in a healthy range.
+  return current.get_stateOfCharge() > 20.0f;
+}
+
+bool SensorManager::measureTemperatureAndApplyChargeDecision() {
+  // =========================================================================
+  // WO-2026-08-25-001 Amendment C, Decision C1: structural coupling.
+  //
+  // This function is the ONLY place enclosure temperature is read, and the
+  // ONLY place the thermal charge-inhibit decision is evaluated/applied.
+  // Both halves live in this one function body with NO return statement
+  // between them (AC-C1, AC-C3): every path below - a genuine reading, a
+  // failed/invalid reading, a still-accumulating TMP36 partial sample, or
+  // the no-sensor platform stub - falls through unconditionally to the
+  // decision at the bottom. `tempC`/`measuredThisCall` are plain locals;
+  // the decision consumes THEM directly, never current.get_internalTempC()
+  // (that field is written below purely for telemetry, strictly AFTER the
+  // local values it is derived from are already fixed for this call).
+  //
+  // Because `measuredThisCall` is a fresh local every call rather than a
+  // sticky boot-scoped flag, a genuine reading followed by later sensor
+  // failures does not leave that earlier reading being treated as current
+  // (Blocker D / AC-C4): each call's validity is judged solely on whether
+  // THIS call produced a genuine reading.
+  // =========================================================================
+
   // -------------------------------------------------------------------------
-  // Temperature source selection
+  // Half 1: measurement.
   // -------------------------------------------------------------------------
   // Default behavior:
   //  - If a TMP112A is present on the I2C bus (Muon), prefer it.
@@ -1613,6 +965,9 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   // Compile-time controls:
   //  - Define MUON_HAS_TMP112 to force enable the TMP112A path.
   //  - Define DISABLE_TMP112_AUTODETECT to skip probing for TMP112A.
+
+  float tempC = current.get_internalTempC(); // seed; every branch below overwrites or falls back explicitly
+  bool measuredThisCall = false;             // set true ONLY by a genuine, in-range reading taken this call
 
 #if defined(MUON_TMP112_I2C_ADDR)
   const uint8_t tmp112Addr = (uint8_t)MUON_TMP112_I2C_ADDR;
@@ -1642,8 +997,11 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
 #endif
 
   if (tmp112Present) {
-    float tempC;
-    if (!readTmp112TemperatureC(tempC) || !(tempC > -50.0f && tempC < 120.0f)) {
+    float reading;
+    if (readTmp112TemperatureC(reading) && (reading > -50.0f && reading < 120.0f)) {
+      tempC = reading;
+      measuredThisCall = true;
+    } else {
       float prev = current.get_internalTempC();
       tempC = (prev > -50.0f && prev < 120.0f) ? prev : 25.0f;
       Log.warn("TMP112A read failed/invalid - falling back to %4.2f C", (double)tempC);
@@ -1656,148 +1014,223 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   // There is no TMP36 wired to an ADC-capable pin on the Photon 2 dev
   // carrier, so we cannot take a real analog temperature reading here.
   // Instead, use whatever value has been stored in internalTempC (for
-  // example, set manually for testing), falling back to 25C if unset.
+  // example, set manually for testing), falling back to 25C if unset. This
+  // is never a genuine measurement, so measuredThisCall is left false.
+  {
+    float stubTempC = current.get_internalTempC();
+    if (!(stubTempC > -50.0f && stubTempC < 120.0f)) {
+      stubTempC = 25.0f;
+    }
+    tempC = stubTempC;
 
-  float tempC = current.get_internalTempC();
-  if (!(tempC > -50.0f && tempC < 120.0f)) {
-    tempC = 25.0f;
-  }
-
-  if (sysStatus.get_verboseMode()) {
-    Log.info("P2/Photon2 stub: using internalTempC=%4.2f C (no TMP36 ADC)", (double)tempC);
-  }
-
-  current.set_internalTempC(tempC);
-
-#else
-  // Measure enclosure temperature using the TMP36 on the carrier board
-  // (connected to TMP36_SENSE_PIN, typically A4).
-  // Non-blocking sampling: spread 8 samples across multiple batteryState()
-  // calls to avoid blocking the main loop. Each call takes one sample (~5µs ADC
-  // read) until all samples are collected, then computes the average.
-  if (tmp112Present) {
-    // TMP112A already provided a temperature this cycle; skip TMP36 sampling.
-    // This avoids unnecessary ADC activity on boards where both might exist.
-    Log.info("DEBUG_tmp112: early return due to tmp112Present=true");
-    isItSafeToCharge();
-    return current.get_stateOfCharge() > 20.0f;
-  }
-  pinMode(TMP36_SENSE_PIN, INPUT);
-
-  const int TMP36_SAMPLES = 8;
-  static int sampleIndex = 0;     // Tracks how many samples taken this cycle
-  static int tmpRawSum = 0;       // Running sum of ADC readings
-
-  if (sampleIndex < TMP36_SAMPLES) {
-    // Take one ADC sample per call, accumulate into sum
-    int v = analogRead(TMP36_SENSE_PIN);
-    tmpRawSum += v;
-    sampleIndex++;
-    
-    // Not done yet; use previous temperature value and return early.
-    // Caller can call batteryState() again on next loop to continue sampling.
-    return current.get_stateOfCharge() > 20.0f;
-  }
-
-  // All samples collected; compute average and reset for next cycle
-  int tmpRaw = tmpRawSum / TMP36_SAMPLES;
-  sampleIndex = 0;
-  tmpRawSum = 0;
-
-  // Consider extremely low readings as "sensor not present". With a TMP36,
-  // even very cold temperatures should still be around 100mV (roughly 120
-  // ADC counts on a 3.3V/12-bit ADC), so an average below ~50 counts is
-  // effectively 0V at the pin.
-  bool sensorOk = (tmpRaw > 50 && tmpRaw < 4000);
-  float tempC = tmp36TemperatureC(tmpRaw);
-
-  // If the TMP36 reading is clearly out of a plausible enclosure range
-  // (for example, -50C from a raw 0 reading), or the sensor appears to be
-  // disconnected, fall back to a prior stored value or a conservative
-  // default so that charging guard rails and telemetry still operate with
-  // a realistic value.
-  if (!sensorOk || tempC < -20.0f || tempC > 80.0f) {
-    float prev = current.get_internalTempC();
-    float fallback = 25.0f; // conservative room-temperature default
-
-    if (prev > -20.0f && prev < 80.0f) {
-      fallback = prev;
+    if (sysStatus.get_verboseMode()) {
+      Log.info("P2/Photon2 stub: using internalTempC=%4.2f C (no TMP36 ADC)", (double)tempC);
     }
 
-    Log.warn("TMP36 reading invalid or out of range (tmp36=%4.2f C, raw=%d, sensorOk=%s) - falling back to %4.2f C",
-             (double)tempC, tmpRaw, sensorOk ? "true" : "false", (double)fallback);
-    tempC = fallback;
+    current.set_internalTempC(tempC);
   }
+#else
+  if (!tmp112Present) {
+    // Measure enclosure temperature using the TMP36 on the carrier board
+    // (connected to TMP36_SENSE_PIN, typically A4).
+    //
+    // WO-2026-08-25-001 Decision C4: all 8 samples are taken INLINE, in this
+    // one call - NOT spread across multiple batteryState()/coupled-call
+    // invocations. The TMP36 read has no I2C, initialization, or settling
+    // dependency, and each sample is a ~5us ADC read (measured), so all 8
+    // cost ~40us total - negligible against a loop() cadence, and Chip
+    // confirmed 2026-08-26 that cost is acceptable. Spreading sampling across
+    // calls made the accumulator itself a `static` that a hibernate-induced
+    // MCU reset would wipe mid-cycle, which was the root cause of both the
+    // original round-3 blocker (inhibit could never release) and its mirror,
+    // AC-C5 (a hot device could charge unboundedly after reboot while
+    // samples re-accumulated). Taking all samples inline means a genuine
+    // reading is available on THIS call, every call, with no accumulator
+    // state to lose across a reset - do not re-introduce cross-call
+    // accumulation to "optimize" this back to spread sampling (AC-C9).
+    pinMode(TMP36_SENSE_PIN, INPUT);
 
-  current.set_internalTempC(tempC);
+    const int TMP36_SAMPLES = 8;
+    int tmpRawSum = 0; // local to this call only - never static/retained
 
-  // Optional debug: log enclosure temperature when verbose logging is enabled
-  if (sysStatus.get_verboseMode()) {
-    Log.info("Enclosure temperature (effective): %4.2f C (raw=%d)", (double)tempC, tmpRaw);
+    for (int i = 0; i < TMP36_SAMPLES; i++) {
+      tmpRawSum += analogRead(TMP36_SENSE_PIN);
+    }
+
+    int tmpRaw = tmpRawSum / TMP36_SAMPLES;
+
+    // Consider extremely low readings as "sensor not present". With a
+    // TMP36, even very cold temperatures should still be around 100mV
+    // (roughly 120 ADC counts on a 3.3V/12-bit ADC), so an average below
+    // ~50 counts is effectively 0V at the pin.
+    bool sensorOk = (tmpRaw > 50 && tmpRaw < 4000);
+    float sampledTempC = tmp36TemperatureC(tmpRaw);
+
+    // If the TMP36 reading is clearly out of a plausible enclosure range
+    // (for example, -50C from a raw 0 reading), or the sensor appears to
+    // be disconnected, fall back to a prior stored value or a
+    // conservative default so that charging guard rails and telemetry
+    // still operate with a realistic value. This is the one remaining
+    // AC-C3 fall-through path for TMP36: a bad/disconnected sensor still
+    // leaves measuredThisCall=false and falls through to the decision below.
+    if (!sensorOk || sampledTempC < -20.0f || sampledTempC > 80.0f) {
+      float prev = current.get_internalTempC();
+      float fallback = 25.0f; // conservative room-temperature default
+
+      if (prev > -20.0f && prev < 80.0f) {
+        fallback = prev;
+      }
+
+      Log.warn("TMP36 reading invalid or out of range (tmp36=%4.2f C, raw=%d, sensorOk=%s) - falling back to %4.2f C",
+              (double)sampledTempC, tmpRaw, sensorOk ? "true" : "false", (double)fallback);
+      tempC = fallback;
+    } else {
+      tempC = sampledTempC;
+      measuredThisCall = true;
+    }
+
+    current.set_internalTempC(tempC);
+
+    // Optional debug: log enclosure temperature when verbose logging is enabled.
+    if (sysStatus.get_verboseMode()) {
+      Log.info("Enclosure temperature (effective): %4.2f C (raw=%d)", (double)tempC, tmpRaw);
+    }
   }
-
+  // else: TMP112A already provided tempC/measuredThisCall above; TMP36
+  // sampling is skipped entirely (previously an early return here - now it
+  // simply falls through to the decision below using the TMP112 result, per
+  // AC-C1/AC-C3).
 #endif // PLATFORM_ID == 32 || PLATFORM_ID == 34
 
-  // Apply temperature-based charging guard rails (see reference implementation).
-  // On cellular platforms this will enable/disable PMIC charging based on
-  // current.get_internalTempC(); on others it is a no-op.
-  isItSafeToCharge();
+  // -------------------------------------------------------------------------
+  // Half 2: evaluate and apply the thermal charge-inhibit decision.
+  //
+  // Consumes tempC / measuredThisCall LOCALS directly - never re-reads
+  // current.get_internalTempC() (AC-C1 point 2). Reached unconditionally
+  // from every measurement path above (AC-C1 point 3 / AC-C3).
+  // -------------------------------------------------------------------------
 
-  // Convenience: indicate whether battery is in a healthy range.
-  return current.get_stateOfCharge() > 20.0f;
-}
+  // F2a - thermal charge inhibit (WO-2026-08-25-001). Arm/release thresholds
+  // are ledger-configurable and per-device overridable (see
+  // MyPersistentData::get_thermalCharge*); compiled-in defaults are the
+  // field-proven 37C/0C arm, 35C/3C release values, not the 45C LiPo-spec
+  // value this function previously used.
+  static bool inhibited = false;
+  static bool inhibitedSyncedWithHardware = false;
 
-bool SensorManager::isItSafeToCharge() // Returns a true or false if the battery
-                                       // is in a safe charging range based on
-                                       // enclosure temperature
-{
-  float temp = current.get_internalTempC();
-  // Apply simple hysteresis around the recommended LiPo charge range
-  // to avoid rapid toggling near the temperature boundaries. When
-  // charging is currently allowed, we disable if temp < 0C or > 45C.
-  // When charging is currently disallowed, we only re-enable once
-  // temp has returned to a tighter 2C-43C window.
-  static bool lastSafe = true;
+  const ChargeInhibitPolicy::ThermalThresholds thresholds{
+      sysStatus.get_thermalChargeArmHighC(),
+      sysStatus.get_thermalChargeArmLowC(),
+      sysStatus.get_thermalChargeReleaseHighC(),
+      sysStatus.get_thermalChargeReleaseLowC(),
+  };
+
 #if HAL_PLATFORM_CELLULAR
-  const bool previousSafe = lastSafe;
+  if (!inhibitedSyncedWithHardware) {
+    // WO-2026-08-25-001 Amendment B, Decision B2: `inhibited` is a plain
+    // (non-retained) static, so it always starts false on a fresh boot -
+    // but the DCT-persisted DISABLE_CHARGING feature bit it controls
+    // survives that same reset. Without this sync, a device that rebooted
+    // with charging already disabled would look, to this function, exactly
+    // like a device that has never been inhibited, and the code below would
+    // go on to make an ARM/RELEASE decision as if starting clean instead of
+    // recognizing it is already holding an armed inhibit. Read the real
+    // hardware/DCT state once per boot instead of assuming "not inhibited".
+    //
+    // NOTE (Amendment C, AC-C5 bound - updated for Decision C5): PowerManager::
+    // setup() -> refreshInputProfile() runs before this coupled call ever
+    // executes (see Generalized-Core-Counter.cpp setup() ordering), but it
+    // only calls applyInputProfile() conditionally - when `!report_.valid`
+    // or the selected profile has changed (PowerManager.cpp) - not on every
+    // call. Since Decision C5, applyInputProfile() also no longer replaces
+    // the DCT power configuration wholesale: every profile config is passed
+    // through applyDisableChargingBit() (PowerPlatform.cpp), which preserves
+    // an existing DISABLE_CHARGING bit instead of clearing it. So on a
+    // device that rebooted while hot, `inhibited` syncs to TRUE here,
+    // matching the persisted DCT state, and charging stays disabled rather
+    // than re-arming from a false negative. Decision C4 (TMP36 sampling
+    // moved inline) remains relevant for the case where the bit was not
+    // set: it bounds this function's own re-arm decision to a single
+    // coupled call rather than leaving a gap across an unbounded number of
+    // them. See IMPLEMENTATION_REPORT_R4C.md for the measured figure.
+    const SystemPowerConfiguration currentConf = System.getPowerConfiguration();
+    inhibited = currentConf.isFeatureSet(SystemPowerFeature::DISABLE_CHARGING);
+    inhibitedSyncedWithHardware = true;
+  }
 #endif
 
-  bool safe;
-  if (lastSafe) {
-    safe = !(temp < 0.0f || temp > 45.0f);
-  } else {
-    safe = !(temp < 2.0f || temp > 43.0f);
-  }
-  lastSafe = safe;
+  const bool previouslyInhibited = inhibited;
 
-#if HAL_PLATFORM_CELLULAR
-  // On Boron (cellular Gen 3), a BQ24195 PMIC is available so we
-  // actually enable/disable charging based on the enclosure
-  // temperature.
-  const bool safeStateChanged = (safe != previousSafe);
-  PMIC pmic(true);
+  // Temperature-validity gate (Amendment B, Decision B2 / AC-B5; Amendment C
+  // AC-C4): delegated to the pure, host-tested
+  // ChargeInhibitPolicy::evaluateThermalWithValidity() so the arm/hold/release
+  // rules are exercised by the same function this production call site uses,
+  // not a hand-written mirror of it. See that function's header comment for
+  // the full rule set. `measuredThisCall` and `tempC` are this call's LOCALS
+  // from Half 1 above, not any persisted/boot-scoped state.
+  const ChargeInhibitPolicy::ThermalInhibitDecision decision =
+      ChargeInhibitPolicy::evaluateThermalWithValidity(
+          inhibited, measuredThisCall, tempC, thresholds);
+  inhibited = decision.inhibited;
+  const bool heldWithoutFreshTemp = decision.heldWithoutFreshTemp;
 
-  if (!safe) {
-    pmic.disableCharging();
-    current.set_batteryState(1); // Reflect that we are "Not Charging"
+  const bool safe = !inhibited;
 
-    Log.warn("Charging disabled due to enclosure temperature: %4.2f C", (double)temp);
-  } else {
-    pmic.enableCharging();
-
-    if (safeStateChanged || sysStatus.get_verboseMode()) {
-      Log.info("Charging enabled; enclosure temperature: %4.2f C", (double)temp);
+  Observability::WakeCycleStats &stats = Observability::cycleStats();
+  stats.thermal_inhibit_held_without_fresh_temp = heldWithoutFreshTemp;
+  if (heldWithoutFreshTemp) {
+    static bool loggedHeldThisBoot = false;
+    if (!loggedHeldThisBoot) {
+      Log.warn("ChargeInhibit: holding inhibit with no fresh temperature "
+               "measurement this call (lastLoggedInternalTempC=%.2f, "
+               "possibly stale/persisted) - will not release until a real "
+               "reading completes",
+               (double)tempC);
+      loggedHeldThisBoot = true;
     }
   }
+
+#if HAL_PLATFORM_CELLULAR
+  // Re-assert every call (not only on transitions): System.setPowerConfiguration()
+  // replaces the entire DCT power config, so the only way this inhibit is
+  // self-clearing without a latch is to rebuild and re-apply it every
+  // battery measurement.
+  const PowerReport &activeReport = PowerManager::instance().latestReport();
+  const ChargeInhibit::ApplyResult applyResult =
+      ChargeInhibit::apply(inhibited, activeReport.activeInputProfile);
+
+  if (inhibited) {
+    current.set_batteryState(1); // Reflect that we are "Not Charging"
+  }
+
+  if (inhibited && !previouslyInhibited) {
+    Log.warn("Charging inhibited due to enclosure temperature: %4.2f C (armHigh=%.1f armLow=%.1f)",
+             (double)tempC, (double)thresholds.armHighC, (double)thresholds.armLowC);
+  } else if (!inhibited && previouslyInhibited) {
+    Log.info("Charging inhibit cleared; enclosure temperature: %4.2f C", (double)tempC);
+  }
+
+  if (applyResult.supported && !applyResult.configReadbackVerified) {
+    Log.warn("ChargeInhibit: setPowerConfiguration verify-applied failed (result=%d, inhibited=%d)",
+             applyResult.systemResult, inhibited ? 1 : 0);
+  }
+
+  // DCT-config-readback-verified active disable = inhibited AND
+  // System.getPowerConfiguration() confirmed the DISABLE_CHARGING bit is
+  // set (not merely that some write happened to match some intent). This is
+  // NOT a hardware guarantee - see chargeDisableConfigVerified()'s doc
+  // comment.
+  _chargeDisableConfigVerified = inhibited && applyResult.configReadbackVerified;
 #else
   // On platforms without a PMIC API (such as Argon, Photon 2 / P2), we
   // do not control charging, but we still evaluate and log whether it
-  // would be considered safe based on the same temperature range.
-  if (!safe) {
-    Log.warn("Charging would be disabled due to enclosure temperature: %4.2f C (no PMIC on this platform)", (double)temp);
-  } else if (sysStatus.get_verboseMode()) {
-    Log.info("Charging would be enabled; enclosure temperature: %4.2f C (no PMIC on this platform)", (double)temp);
+  // would be considered safe based on the same temperature thresholds.
+  if (inhibited && !previouslyInhibited) {
+    Log.warn("Charging would be inhibited due to enclosure temperature: %4.2f C (no PMIC on this platform)", (double)tempC);
+  } else if (!inhibited && previouslyInhibited) {
+    Log.info("Charging inhibit would clear; enclosure temperature: %4.2f C (no PMIC on this platform)", (double)tempC);
   }
+  _chargeDisableConfigVerified = false; // No PMIC control on this platform.
 #endif
 
   return safe;

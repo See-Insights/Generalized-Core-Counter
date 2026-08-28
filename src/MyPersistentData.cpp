@@ -496,6 +496,53 @@ void sysStatusData::set_lastWatchdogSource(uint8_t value) {
     setValue<uint8_t>(offsetof(SysData,lastWatchdogSource), value);
 }
 
+// F2a thermal charge-inhibit thresholds (WO-2026-08-25-001). These fields were
+// appended after initial provisioning, so initialize() never runs for
+// already-provisioned devices - StorageHelperRK::validate() zero-pads the
+// structure extension instead. {0,0,0,0} is invalid AS A SET (armHighC(0) is
+// not > releaseHighC(0)) even though 0.0f is individually plausible for any
+// one field (armLowC's own compiled default IS 0.0f). Validate and resolve
+// the whole set via ChargeInhibitPolicy::isValidThermalThresholds() - the
+// same validator AC-B6 already applies to ledger candidates - so the stored/
+// migrated read path can never disagree with the ledger-candidate path, and
+// a caller never ends up mixing some stored fields with some defaults.
+ChargeInhibitPolicy::ThermalThresholds sysStatusData::resolveThermalThresholds() const {
+    ChargeInhibitPolicy::ThermalThresholds candidate;
+    candidate.armHighC = getValue<float>(offsetof(SysData,thermalChargeArmHighC));
+    candidate.armLowC = getValue<float>(offsetof(SysData,thermalChargeArmLowC));
+    candidate.releaseHighC = getValue<float>(offsetof(SysData,thermalChargeReleaseHighC));
+    candidate.releaseLowC = getValue<float>(offsetof(SysData,thermalChargeReleaseLowC));
+    return ChargeInhibitPolicy::resolveStoredThermalThresholds(candidate);
+}
+
+float sysStatusData::get_thermalChargeArmHighC() const {
+    return resolveThermalThresholds().armHighC;
+}
+void sysStatusData::set_thermalChargeArmHighC(float value) {
+    setValue<float>(offsetof(SysData,thermalChargeArmHighC), value);
+}
+
+float sysStatusData::get_thermalChargeArmLowC() const {
+    return resolveThermalThresholds().armLowC;
+}
+void sysStatusData::set_thermalChargeArmLowC(float value) {
+    setValue<float>(offsetof(SysData,thermalChargeArmLowC), value);
+}
+
+float sysStatusData::get_thermalChargeReleaseHighC() const {
+    return resolveThermalThresholds().releaseHighC;
+}
+void sysStatusData::set_thermalChargeReleaseHighC(float value) {
+    setValue<float>(offsetof(SysData,thermalChargeReleaseHighC), value);
+}
+
+float sysStatusData::get_thermalChargeReleaseLowC() const {
+    return resolveThermalThresholds().releaseLowC;
+}
+void sysStatusData::set_thermalChargeReleaseLowC(float value) {
+    setValue<float>(offsetof(SysData,thermalChargeReleaseLowC), value);
+}
+
 // End of sysStatusData class
 
 // *****************  Sensor Config Storage Object *******************
