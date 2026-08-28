@@ -11,7 +11,14 @@ c++ -std=c++11 -Wall -Wextra -Werror -Isrc \
 /tmp/reporting_policy_test
 ```
 
-The runtime adapter is validated by the normal Particle firmware compile.
+The runtime adapter itself (`ReportingPolicyResolver::resolveRuntime()` in
+`src/reporting/RuntimeReportingPolicy.cpp`) is compiled and exercised directly
+against a stub Particle/SensorManager surface - see
+`tests/reporting_policy_adapter_test.sh` (WO-2026-08-25-001 Amendment C,
+Decision C2 / AC-C6). This closes the gap where the guard's unit tests passed
+in isolation while the production adapter still let an Invalid or Unavailable
+vcell silently bypass the trust substitution and the 3.5V floor. The normal
+Particle firmware compile remains the final integration check.
 
 The boot-scoped startup snapshot has a separate host test:
 
@@ -220,3 +227,94 @@ description.
 ```sh
 python3 tests/loop_stage_sleep_prep_exclusion_test.py
 ```
+
+## WO-2026-08-25-001 (power management consolidation), Amendment B, Round 3 host tests
+
+Round 3 responded to a Codex Stage 7 "Not verified" verdict (four blockers)
+against the Amendment B architectural decisions (B1/B2/B3) and AC-B1..AC-B8.
+
+**Blocker 1 (F3/F4 architecture, Decision B1):** `BatteryBackoff` remains the
+sole tier/hysteresis/persistence authority. `PowerBehavior.{h,cpp}` (a
+duplicate of `BatteryBackoff::intervalMultiplier()` with zero production
+callers) was deleted, along with `tests/power_behavior_test.{cpp,sh}`. F1's
+trust signal and F3's vcell floor are applied only as a guard on the tier
+input and a floor on its output - `src/reporting/BatteryTierGuard.{h,cpp}` -
+wired into `RuntimeReportingPolicy::resolveRuntime()`. `PowerTier::evaluate()`
+is retained solely for this floor/guard role.
+
+```sh
+zsh tests/battery_tier_guard_test.sh   # AC-B2 (untrusted SoC doesn't drive cadence), AC-B3 (vcell floor)
+zsh tests/power_tier_test.sh           # AC-B1 (PowerTier's SoC breakpoints assert-equal BatteryBackoff's)
+```
+
+**Blocker 2 (Boron SoC commit regression, AC-B4):** retiring the STALE_SOC
+resync machinery's `commitSoc()` silently deleted the ordinary Boron
+`current.set_stateOfCharge()` commit alongside it. The plain commit (gated
+on the same `rejectAuthoritativeOverwrite` fence used elsewhere in
+`batteryState()`, not on any retired stale-SOC condition) was restored.
+`SensorManager.cpp` cannot be compiled standalone (heavy PMIC/System/Log
+dependencies, no full-file stub harness), so this is a source-tracing test
+in the same style as the WO-2026-08-11-001 tests above:
+
+```sh
+python3 tests/boron_soc_commit_test.py
+```
+
+**Blocker 3 (thermal inhibit arming from an unmeasured temperature, Decision
+B2, AC-B5/AC-B6):** `SensorManager::isItSafeToCharge()` now tracks whether a
+genuine (non-fallback) temperature reading has occurred this boot
+(`_temperatureMeasuredThisBoot`) and syncs its software `inhibited` state
+from the DCT-persisted hardware flag once per boot before making any
+decision. The arm/hold/release decision itself is delegated to a new pure,
+host-testable function,
+`ChargeInhibitPolicy::evaluateThermalWithValidity()`
+(`src/power/ChargeInhibitPolicy.h`): a stale/unmeasured temperature may not
+ARM the inhibit, and an already-armed inhibit is held-but-flagged
+(`WakeCycleStats::thermal_inhibit_held_without_fresh_temp`) rather than
+silently continued, while a fresh reading may always arm or release.
+`ChargeInhibitPolicy::isValidThermalThresholds()` (AC-B6) enforces
+`armHigh > releaseHigh`, `armLow < releaseLow`, and a hard `armHigh <= 45C`
+cell charge-maximum ceiling; `Cloud::applyPowerConfig()` validates the whole
+candidate threshold set before applying any field, rejecting the entire
+update rather than partially applying an invalid one.
+
+```sh
+zsh tests/charge_inhibit_thermal_test.sh
+```
+
+This covers the original hysteresis tests plus: `evaluateThermalWithValidity()`
+directly (unmeasured-cannot-arm, unmeasured-holds-but-flags, fresh-reading
+can-arm-and-can-release), a reproduction of the exact reset/hibernate field
+scenario Codex Stage 7 found reachable (a persisted-hot temperature across
+several simulated interrupted boots never arms, and correctly releases once
+a real reading lands), and `isValidThermalThresholds()` (defaults valid,
+inverted high/low hysteresis rejected, `armHigh` above/at the 45C ceiling).
+A fidelity check confirms `SensorManager.cpp`'s `isItSafeToCharge()` calls
+the real `evaluateThermalWithValidity()` under test, not a hand-written
+mirror of it.
+
+**Blocker 4 (PMIC remediation suppression, `PmicFaultMonitor.cpp`):**
+remediation suppression while `!safeToCharge` is now per fault class rather
+than blanket. It is defensible (and retained) only for a thermal shutdown
+fault (0x02) or a newly-classified NTC-status fault (REG09 bits 2:0,
+previously neither classified nor alerted); it no longer applies to an input
+fault (0x01) or safety-timer expiry (0x03), which have independent causes
+and would otherwise lose their only attempted recovery for an entire hot
+interval. A non-thermal fault additionally defers (rather than force-toggles)
+only when `ChargeInhibit`'s hardware disable is READ-BACK VERIFIED active
+this cycle (a new `chargeDisableVerified` parameter, threaded from
+`SensorManager::chargeDisableVerified()`), not merely the software
+`safeToCharge` intent. Suppression/deferral now FREEZES in-progress
+remediation state instead of zeroing it, so a level-1/2 sequence that already
+disabled charging in phase 0 is not abandoned mid-cycle with charging left
+disabled and no software owner to re-enable it. This module has heavy PMIC/
+Particle dependencies with no standalone host test; it is exercised via the
+full firmware compile and the linkage/nm evidence in the round's
+implementation report.
+
+**ALSO FIX:** `PowerDiagnostics::recordResyncEvent()` (zero production
+callers once its owning STALE_SOC machinery was retired) was removed, along
+with its now-unreachable serialization branch and reason code.
+`ChargeInhibit::apply()` now retries once on an immediate
+`System.setPowerConfiguration()` failure as well as a successful-write-wrong-
+readback (previously only the latter retried).

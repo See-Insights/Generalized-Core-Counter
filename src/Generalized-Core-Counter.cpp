@@ -907,7 +907,27 @@ void setup() {
   sysStatus.setup();    // Initialize persistent storage
   sensorConfig.setup(); // Initialize the sensor configuration
   current.setup();      // Initialize the current status data
-  PowerManager::instance().setup();
+
+  // WO-2026-08-25-001 Amendment C, Decision C1 boot-ordering corollary
+  // (AC-C5): PowerManager::instance().setup() is deliberately NOT called
+  // here anymore. It rebuilds the DCT power configuration via
+  // refreshInputProfile() WITHOUT any thermal charge-inhibit information
+  // (PowerPlatform.cpp:79-98 constructs it from input-profile detection
+  // alone) - calling it this early left a real, measured worst-case window
+  // of up to ~30.5 seconds (the configured USB serial wait,
+  // ConnectivityPolicy::DEBUG_SERIAL_WAIT_TIMEOUT_MS = 30000ms, plus
+  // DEBUG_SERIAL_POST_CONNECT_DELAY_MS = 500ms, both reachable in the field
+  // via the cloud/ledger-configurable `serialConnected` flag, not merely a
+  // dev-only build) during which a physically hot device could charge with
+  // no thermal inhibit yet applied. It is called instead immediately before
+  // the first coupled measureTemperatureAndApplyChargeDecision() call
+  // below, which re-establishes the DCT from a REAL measurement in the same
+  // synchronous span of code - see that call site for the rest of this
+  // rationale. Nothing between here and there reads
+  // PowerManager::instance()'s report/capabilities (verified: the
+  // constructor already populates report_.capabilities independently of
+  // setup(), and no other PowerManager::instance() call site exists in this
+  // range).
 
   if (sysStatus.get_hasValidLedgerConfig()) {
     Config::markStorageConfigurationLoaded();
@@ -1304,12 +1324,37 @@ void setup() {
   // Defer the first startup battery sample until setup tail so RTC/time,
   // cloud/ledger setup, timezone config, connection-mode logging, and sensor
   // initialization have completed while the radio is still off.
+  //
+  // WO-2026-08-25-001 Amendment C, Decision C1 boot-ordering corollary
+  // (AC-C5): PowerManager::instance().setup() (the DCT rebuild formerly done
+  // at the top of setup(), before the blocking USB serial wait) now runs
+  // HERE instead - immediately before the first coupled
+  // measureTemperatureAndApplyChargeDecision() call inside
+  // measure.batteryState() below, with no blocking call between the two.
+  // This closes AC-C5's measured worst-case window (was up to ~30.5 seconds
+  // when `serialConnected` is set via ledger config, dominated by
+  // ConnectivityPolicy::DEBUG_SERIAL_WAIT_TIMEOUT_MS +
+  // DEBUG_SERIAL_POST_CONNECT_DELAY_MS) down to the same single coupled
+  // call already relied on for every SUBSEQUENT reboot-free re-application -
+  // there is no longer a separate, earlier, thermally-uninformed DCT write
+  // for a hot device to exploit. Moving measure.batteryState() itself
+  // earlier (before RTC/ledger/timezone/sensor-init) was rejected: that is
+  // a deliberate, separately-justified ordering (see the comment above) with
+  // a broader blast radius across connection-mode logging and sensor
+  // bring-up that this dispatch did not re-derive; moving only the DCT
+  // rebuild achieves the same AC-C5 bound without touching it.
+  PowerManager::instance().setup();
   if (System.resetReason() == RESET_REASON_POWER_MANAGEMENT) {
     measure.noteWakeFromLowPowerSleep();
     PowerDiagnostics::logPowerState("post-wake-setup");
   }
+  // WO-2026-08-25-001 Decision C5 (AC-C11): the trailing refreshInputProfile()
+  // that used to run here immediately after the coupled decision above has
+  // been removed. It was redundant - SensorManager's internal refresh always
+  // runs before the coupled decision on Boron - and on a profile transition it
+  // could clear the thermal inhibit the coupled call just applied, with no
+  // bounded interval to the next thermal re-assertion.
   measure.batteryState(BatterySampleContext::Setup);
-  PowerManager::instance().refreshInputProfile();
   PowerDiagnostics::logPowerState("setup", true);
   if (sysStatus.get_lowBatteryMode()) {
     applyBatteryAwareConnectionModePolicy(PowerManager::instance().soc());

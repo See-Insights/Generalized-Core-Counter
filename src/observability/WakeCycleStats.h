@@ -77,6 +77,15 @@ struct WakeCycleStats {
   bool stale_soc_suspected = false;          // True if stale SOC detected this cycle
   uint16_t stale_soc_total_count = 0xFFFF;   // Cumulative stale SOC count (0xFFFF = not tracked)
 
+  /// WO-2026-08-25-001 Amendment B, Decision B2 (AC-B5): true when
+  /// isItSafeToCharge() is holding an already-armed thermal inhibit (DCT
+  /// DISABLE_CHARGING synced from a prior boot) without yet having a fresh
+  /// (this-boot) temperature measurement to justify either releasing it or
+  /// re-confirming it. Makes an otherwise-silent held inhibit visible in
+  /// telemetry rather than persisting unobserved (the failure mode Codex
+  /// Stage 7 found reachable via reset/hibernate).
+  bool thermal_inhibit_held_without_fresh_temp = false;
+
   /// Publish queue depth (events).
   uint16_t publish_queue_depth_before_connect = 0xFFFF;
   uint16_t publish_queue_depth_after_connect = 0xFFFF;

@@ -219,6 +219,77 @@ Codex reviews:
 
 Claude performs workflow completeness checks and compares the resulting behavior with the original incident evidence.
 
+#### Mandatory: linkage verification
+
+Every new module, function, or behavior introduced by a change must be proven
+**reachable in the shipped image**, not merely present in the source tree. For
+each one, both of the following are required before Stage 7 can pass:
+
+1. **A production call site.** A caller in `src/`, outside the module's own
+   files, its tests, and its comments. A module referenced only by its own unit
+   test is not integrated.
+2. **A symbol in the linked ELF.** Confirmed with `nm` on a symbolised build,
+   not `strings` on the `.bin` — `strings` cannot see C++ symbols in a stripped
+   artifact and will report nothing for a function that is present, which makes
+   its silence meaningless in both directions.
+
+Where a change is specified as a chain (for example, an evaluation feeding a
+tier feeding a behavior), each link must be demonstrated, not just the
+endpoints.
+
+The linker garbage-collects uncalled code. A module can therefore compile
+cleanly, pass a full unit-test suite, and contribute nothing whatsoever to
+device behavior. Passing tests are evidence that code is *correct*, never that
+it is *connected*.
+
+This check was added on 2026-08-25 after WO-2026-08-25-001 reached Stage 7 with
+two of its four functions absent from the artifact, having passed every other
+verification.
+
+#### Mandatory: local toolchain build
+
+Every change must be built with the **local Device OS toolchain**, not only the
+Particle cloud compiler. Both, before Stage 7 can pass.
+
+The two use different include-search orders. A source file can compile cleanly in
+the cloud and fail locally — or the reverse — so a cloud build passing is **not**
+evidence that the firmware builds. The most common form is a header name that
+collides with one Device OS ships (`Config.h` is the known case; Device OS has
+`services/inc/Config.h`). Within `src/`, subdirectory files include app headers
+by relative path (`"../Config.h"`) precisely to avoid this; a bare include is
+resolution-order dependent and may work only by accident.
+
+    export PATH=~/.particle/toolchains/buildtools/1.1.1/bin:~/.particle/toolchains/gcc-arm/10.2.1/bin:$PATH
+    cd ~/.particle/toolchains/deviceOS/6.4.1/main
+    make -s PLATFORM=boron APPDIR=<copy-of-tree> TARGET_DIR=<copy>/localbuild \
+         DEVICE_OS_PATH=~/.particle/toolchains/deviceOS/6.4.1 \
+         BUILD_PATH_BASE=<scratch>
+
+This is also the build that produces the symbolised ELF the linkage check above
+requires, so the two checks share the work.
+
+Added 2026-08-26 after WO-2026-08-25-001. An include rewritten from
+`"../Config.h"` to `"Config.h"` broke the local build and survived **seven
+implementation rounds and three independent Stage 7 reviews** — because every
+acceptance test, on every side, used the cloud compiler. Codex had flagged the
+same collision class in round 3 and it was recorded as an environment quirk
+rather than a defect class. It was found only when the engineer tried to flash a
+device.
+
+The general lesson, which is the same one behind the linkage check above:
+**verifying with an instrument that cannot see the failure is not verification.**
+
+#### Mandatory: retirement replacement check
+
+When a change retires an interface, verify that each **system requirement** the
+retired code satisfied is still met — separately from confirming the interface
+is gone. Deleting the tests alongside the API is correct and expected; it also
+removes the assertions that would have caught a dropped requirement, so the
+absence of a failing test after a retirement carries no information.
+
+Same WO, same date: retiring the stale-SOC machinery also removed the ordinary
+Boron `stateOfCharge` commit. Every test passed.
+
 ### Stage 8 — Final engineering gate
 
 Chip reviews:

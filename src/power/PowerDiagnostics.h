@@ -6,7 +6,6 @@ namespace PowerDiagnostics {
 
 const char *availabilityLabel(PowerAvailability availability);
 const char *batteryContextLabel(PowerBatteryContext context);
-const char *tierLabel(PowerTier tier);
 const char *inputProfileLabel(PowerInputProfile profile);
 const char *powerSourceLabel(int powerSource);
 const char *profileSelectionReasonLabel(PowerProfileSelectionReason reason);
@@ -31,14 +30,6 @@ void logPowerState(const char *reason, bool forceLog = false);
 void recordChargeDiagEvent(uint8_t chargeStatus, uint8_t faultReg, bool charging,
                             float vcell, float soc, int powerSource,
                             PowerInputProfile profile);
-
-/**
- * @brief Bench-only: capture a stale-SOC fuel-gauge resync into the diagnostics batch.
- *
- * No-op unless ENABLE_DIAGNOSTICS_PUBLISH_MODE=1. Call alongside (not instead
- * of) the existing STALE_SOC resync Log.warn emission.
- */
-void recordResyncEvent(float soc, float vcell);
 
 /**
  * @brief Bench-only: serialize and enqueue the accumulated diagnostics batch.

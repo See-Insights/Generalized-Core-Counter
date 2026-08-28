@@ -106,11 +106,25 @@ The USB CDC connection drops as part of sleep (HIBERNATE or other low-power mode
 
 ---
 
+### `ChargeDiag src=` Is Raw; `PowerDiag source=` Is Effective
+
+`ChargeDiag`'s `src=` field is the **raw, uncorrected** PMIC sample, deliberately
+kept independent of `PowerSourceOverride` so it survives as ground-truth
+evidence. `PowerDiag`'s `source=` is the **corrected, effective** value actually
+used for profile selection and cloud telemetry. The two diverging in adjacent
+log lines is expected, not a defect.
+
+Read `source=` for analysis. See the section "Mixed Corrected/Raw Power Source
+Values: `ChargeDiag src=` vs `PowerDiag source=`" below for the full
+explanation and a confirmed instance.
+
+---
+
 ### VIN/Solar Reading on a USB-Powered Device
 
 A USB-powered device can report `source=VIN profile=Solar`. **Two distinct behaviors share this symptom.** They are not the same thing and must not be read interchangeably: one is benign and self-correcting, the other is an unresolved defect with a measurable charge cost. Determine which case you are looking at before drawing any conclusion.
 
-What is shared is the surface reading: `source=VIN profile=Solar` on a device that is physically on USB. The underlying register state is **not** known to be identical between the two cases, and should not be assumed so — in Case 1 enumeration is still in progress, whereas Case 2 was observed with USB fully enumerated (`usbAddr=0x4`) and `vbus` still reading 0, which is the part that is unexplained.
+What is shared is the surface reading: `source=VIN profile=Solar` on a device that is physically on USB. The underlying register state is **not** known to be identical between the two cases, and should not be assumed so — in Case 1 enumeration is still in progress, whereas Case 2 was observed with USB fully enumerated (`usbAddr=0x4`) and the Nordic USB regulator ready (`usbReg=0x3`). The simultaneous `vbus=0` is a separate BQ24195 PMIC `VBUS_STAT` reading; it is not the override's VBUS predicate.
 
 **The distinguishing question:** does the reading correct itself on the next `PowerDiag`, or does it persist?
 
@@ -122,7 +136,7 @@ What is shared is the surface reading: `source=VIN profile=Solar` on a device th
 
 **Mechanism:** USB re-enumeration takes ~1-2 seconds after MCU reset. During that window `System.powerSource()` may return VIN (or UNKNOWN/unavailable) before USB VBUS presence is confirmed by Nordic hardware.
 
-**Mitigation:** `ENABLE_BORON_USB_SOURCE_OVERRIDE` (enabled by default, BuildProfile.h line 206) checks Nordic USB registers directly:
+**Mitigation:** Beginning with v23-Diag-Soak, the Boron USB source override is compiled unconditionally on Boron and checks Nordic USB registers directly:
 - Condition: `source==VIN/UNKNOWN && usbAddr!=0 && VBUS present && usbReg ready`
 - If met: override to USB_HOST, apply UsbBench profile
 - If not met: wait for next power reading
@@ -133,7 +147,7 @@ What is shared is the surface reading: `source=VIN profile=Solar` on a device th
 
 ---
 
-#### Case 2 — Persistent, multi-hour (confirmed defect, cause unknown)
+#### Case 2 — Persistent, multi-hour (confirmed defect, corrective failure explained)
 
 **Pattern:** The same `source=VIN profile=Solar` reading persists for hours and does **not** self-correct. Critically, it has been observed beginning *well after* a clean boot rather than immediately following one — the device first reads USB correctly, then degrades to VIN and stays there.
 
@@ -141,15 +155,15 @@ What is shared is the surface reading: `source=VIN profile=Solar` on a device th
 - Session booted 08:45:41 SGT; `ChargeDiag` at 08:52 correctly read `src=USB_HOST prof=USB vcell=4.157`.
 - By 09:52 it had reverted to `src=VIN prof=SOLAR` and remained there until 16:50 — approximately **7 hours** in a single session, with no self-correction.
 - Across the 24-hour window, 32 of 43 `ChargeDiag` readings reported `src=VIN prof=SOLAR`; ~10h50m total spanning two sessions.
-- The override did not engage. Its VBUS-present precondition was unsatisfied throughout: `PowerDiag[1271]: source=VIN profile=Solar vbus=0 pg=1 usbAddr=0x4 usbReg=0x3`.
+- The override did not engage: `PowerDiag[1271]: source=VIN profile=Solar vbus=0 pg=1 usbAddr=0x4 usbReg=0x3`. This was **not** an unsatisfied-precondition case. `vbus=0` is the BQ24195 PMIC's `VBUS_STAT` field and is not used by the override. The actual Nordic predicate was satisfied: `usbAddr & 0x7f != 0` and `usbReg & 0x03 == 0x03`. Disassembly of the exact deployed v22 artifact (`app_hash 64188ac3...`) confirmed that the override had been compiled out, so that binary never evaluated the satisfied predicate.
 
 **This is not benign — it has a measurable charge cost.** Observed on Dev-09: while on the Solar profile, the PMIC reported fast-charging but the battery net-discharged, producing 7 escalating `PMIC: Stuck in Fast Charging for 6+ hours with no material gain` errors (14:56–16:50 SGT) with `vcell` declining 3.961V → 3.885V. A watchdog reset at 16:56:43 cleared the condition; the device re-detected USB_HOST, `vcell` recovered to 4.101V and SOC rose 70.4% → 81.2%.
 
 The charge failure is *consistent with* the Solar profile's 5.08V minimum input exceeding what a USB supply provides (see the profile table above), but that link has not been independently confirmed on hardware and is stated here as a plausible reading of the numbers, not an established mechanism.
 
-**Root cause: not yet understood.** Specifically unresolved — why `vbus` reads 0 while USB is enumerated (`usbAddr` non-zero), and why the source degrades away from a *correct* USB_HOST reading mid-session instead of converging. No mechanism is asserted here; see the open investigation referenced below. Do not treat this case as explained, and do not apply Case 1's "not a defect" framing to it, until that investigation resolves.
+**Root cause of the failed correction: confirmed.** The deployed v22 binary did not contain the override because its build guard compiled it out. The v23-Diag-Soak fix removes that optional guard and compiles the override unconditionally on Boron, so this specific silent compile-out failure mode should not recur. The upstream reason Device OS changed its raw source from a correct USB_HOST reading to VIN remains unknown; that is separate from why the application failed to correct the reading.
 
-**Why this matters:** A Solar profile reading does not indicate actual solar operation when USB is connected. In Case 1 it reflects enumeration timing and is harmless. In Case 2 it reflects an unexplained fault that actively prevents charging — and on battery-backed field units, unlike a USB bench unit, there is no benign failure mode.
+**Why this matters:** A Solar profile reading does not indicate actual solar operation when USB is connected. In Case 1 it reflects enumeration timing and is harmless. In Case 2 the upstream source degradation remains unexplained, but the prolonged Solar-profile consequence is explained by the override being absent from that deployed binary. On battery-backed field units, unlike a USB bench unit, that consequence has no benign failure mode.
 
 ---
 
@@ -217,17 +231,36 @@ Whether that indicates the ranges are wrong, or that a long dwell is simply expe
 
 ---
 
-## Mixed Corrected/Raw Power Source Values Within a Single pdiag Batch
+## Mixed Corrected/Raw Power Source Values: `ChargeDiag src=` vs `PowerDiag source=`
 
-**Observed pattern:** A single published `pdiag` batch can legitimately contain
-BOTH a corrected `source=` value (from `PowerDiag` entries and ordinary pdiag
-entries, sourced from `powerReport.reading.powerSource` after
-`PowerSourceOverride` has run) AND a raw, uncorrected `source=` value (from
-`ChargeDiag` entries and reason-10 pdiag entries, sourced directly from
-`System.powerSource()` / `PowerPlatform::readPowerSource()` before any
-override is applied). See `src/sensors/SensorManager.cpp` (ChargeDiag /
-reason-10 sampling sites) and `src/power/PowerManager.cpp`
-(`PowerSourceOverride` correction) for the two respective sampling points.
+**Observed pattern:** Serial output and a single published `pdiag` batch can
+both legitimately contain BOTH a corrected `source=` value (from `PowerDiag`
+entries and ordinary pdiag entries, sourced from
+`powerReport.reading.powerSource` after `PowerSourceOverride` has run) AND a
+raw, uncorrected `source=` value (from `ChargeDiag` entries and reason-10 pdiag
+entries, sourced directly from `System.powerSource()` /
+`PowerPlatform::readPowerSource()` before any override is applied). See
+`src/power/PmicFaultMonitor.cpp` (`logChargeDiag()` — ChargeDiag / reason-10
+sampling site) and `src/power/PowerManager.cpp` (`PowerSourceOverride`
+correction) for the two respective sampling points.
+
+> **Note:** the ChargeDiag emission site moved from `src/sensors/SensorManager.cpp`
+> to `src/power/PmicFaultMonitor.cpp` in the v24 power-management consolidation
+> (commit `516332a`, WO-2026-08-25-001). Older work orders and investigations
+> citing the SensorManager path predate that move.
+
+**This applies to serial logs, not only pdiag batches.** The divergence is
+visible directly in a serial capture, where a `PowerSourceOverride` WARN line
+is normally the adjacent giveaway:
+
+```text
+21:09:36.250  WARN: PowerSourceOverride: source=VIN usbAddr=0x04 usbReg=0x03 -> USB_HOST reason=usb_enumerated
+21:09:37.199  INFO: PowerDiag[250]: post-refreshInputProfile source=USB_HOST ... vbus=0 pg=1
+21:09:38.425  INFO: ChargeDiag: chg=DONE(3) ... vbus=NONE pg=1 ... src=VIN prof=USB
+```
+
+Within one second, `PowerDiag` reports the corrected `USB_HOST` and `ChargeDiag`
+reports the raw `VIN`. Both are correct for what they represent.
 
 **This is intentional, not an inconsistency to debug.** The two entry types
 serve different purposes:
@@ -248,12 +281,29 @@ override-corrected source temporarily diverge). Do not treat this divergence
 alone as a bug signal; confirm which entry type (corrected vs. raw) is being
 compared before concluding there is a genuine reporting defect.
 
+**For soak and field analysis, read `PowerDiag source=`, not `ChargeDiag src=`.**
+Any dashboard, log review, or automated analysis that treats `ChargeDiag src=`
+as the effective power source will report phantom `VIN` / `UNKNOWN` sources on
+any device, indefinitely.
+
+**Confirmed instance (2026-08-28, Boron-Dev-09).** Two apparent "power
+disturbances" (13:09 UTC 08-27 and 00:08 UTC 08-28) were investigated and found
+to be no such thing. The first was nine transient post-connect PMIC
+misclassifications, each corrected by `PowerSourceOverride` within ~1 s of
+`ConnSummary: ok` (measured spread 0.90–1.39 s, 9 of 9). The second was not an
+event at all. Battery telemetry was byte-identical across every sample —
+`vcell=4.021`, `soc=78.8`, `pg=1`, `chg=DONE(3)` — which is not possible if USB
+power had actually been lost. The misreading came entirely from treating
+`ChargeDiag src=VIN` as the effective source. A separate signature,
+`vbus=USB` with `src=UNKNOWN`, was observed at 06:59:50 SGT 08-28 on the same
+post-connect path. Root cause of the underlying `VBUS_STAT` misread is not
+established and is deferred (would need `ENABLE_PMIC_REGISTER_DUMP`).
+
 ---
 
 ## References and Related Work Orders
 
 - **WO-2026-08-12-001:** Radio-off confirmation logging at HIBERNATE entry (depends on HIBERNATE actually occurring; validate via uptime reset)
 - **WO-2026-08-11-001:** SLEEP_PREP regression check — **status: UNRESOLVED.** A previous entry here recorded this as "confirmed holding clean; no flooding". That claim originated in the retracted 24-hour assessment and is not supported by telemetry. The redone assessment (Boron-Dev-09, 2026-08-13) found exactly **one** `SLEEP_PREP` line in 24 hours, which is too few samples to demonstrate either a regression or its absence. The device spent that window in `INTERMITTENT_KEEP_ALIVE` with multi-hour continuous sessions, so it was rarely exercising the sleep path at all. Re-run over a window containing real sleep cycles before recording any verdict.
-- **ENABLE_BORON_USB_SOURCE_OVERRIDE:** USB source misreporting workaround (enabled by default). Engages only when its VBUS-present precondition is satisfied. **It is not a guaranteed backstop** — on Boron-Dev-09 (2026-08-13) it did not engage for ~7 hours because `vbus` read 0 throughout despite USB being enumerated. See "VIN/Solar Reading on a USB-Powered Device", Case 2.
-- **OPEN — persistent VIN/Solar misdetection (unnumbered, root cause unknown):** Why `vbus` reads 0 with `usbAddr` non-zero, and why the reported source degrades from a correct USB_HOST reading mid-session. Evidence: Boron-Dev-09 24-hour soak assessment, 2026-08-13. No mechanism established; do not cite a cause for this until the investigation closes.
-
+- **Boron USB source override:** Beginning with v23-Diag-Soak, the workaround is compiled unconditionally on Boron. The Dev-09 2026-08-13 episode did not demonstrate a failed runtime predicate: `usbAddr=0x4` and `usbReg=0x3` satisfied it, but disassembly confirmed the override was absent from the deployed v22 binary. See "VIN/Solar Reading on a USB-Powered Device", Case 2.
+- **OPEN — upstream persistent VIN/Solar misdetection (unnumbered, root cause unknown):** Why Device OS changes the raw source from a correct USB_HOST reading to VIN mid-session remains unresolved. The concurrent PMIC `vbus=0` value is not the Nordic override predicate and must not be used to infer that the predicate failed. Evidence: Boron-Dev-09 24-hour soak assessment, 2026-08-13.

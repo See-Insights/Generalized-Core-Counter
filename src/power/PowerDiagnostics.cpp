@@ -25,9 +25,13 @@ constexpr int kPowerSourceBattery = 5;
 
 // Numeric reason codes for the batched "pdiag" payload - kept short to
 // leave byte headroom under PublishQueuePosixRK's ~622-byte event ceiling.
-// Codes 0-9 come from logPowerState()'s `reason` string; 10 and 11 are
-// synthetic codes for the ChargeDiag and stale-SOC-resync captures, which
-// aren't routed through logPowerState().
+// Codes 0-9 come from logPowerState()'s `reason` string; 10 is a synthetic
+// code for the ChargeDiag capture, which isn't routed through
+// logPowerState(). (Code 11 was the retired stale-SOC-resync capture -
+// recordResyncEvent() had zero production callers once the STALE_SOC resync
+// machinery it served was retired, so it and this code were removed rather
+// than kept as dead advisory telemetry - WO-2026-08-25-001 Amendment B ALSO
+// FIX.)
 constexpr uint8_t kReasonSetup = 0;
 constexpr uint8_t kReasonPostWakeSetup = 1;
 constexpr uint8_t kReasonPostRefreshInputProfile = 2;
@@ -39,7 +43,6 @@ constexpr uint8_t kReasonPreSleepStopFallback = 7;
 constexpr uint8_t kReasonPreSleepStopTimerOnly = 8;
 constexpr uint8_t kReasonPostWake = 9;
 constexpr uint8_t kReasonChargeDiag = 10;
-constexpr uint8_t kReasonResync = 11;
 constexpr uint8_t kReasonUnknown = 255;
 
 uint8_t reasonCodeFor(const char *reason) {
@@ -150,23 +153,6 @@ const char *batteryContextLabel(PowerBatteryContext context) {
     return "Disconnected";
   case PowerBatteryContext::NotApplicable:
     return "Not Applicable";
-  }
-
-  return "Unknown";
-}
-
-const char *tierLabel(PowerTier tier) {
-  switch (tier) {
-  case PowerTier::Healthy:
-    return "Healthy";
-  case PowerTier::Conserving:
-    return "Conserving";
-  case PowerTier::Critical:
-    return "Critical";
-  case PowerTier::Survival:
-    return "Survival";
-  case PowerTier::Unknown:
-    return "Unknown";
   }
 
   return "Unknown";
@@ -338,14 +324,6 @@ void recordChargeDiagEvent(uint8_t chargeStatus, uint8_t faultReg, bool charging
   appendDiagBatchEntry(entry);
 }
 
-void recordResyncEvent(float soc, float vcell) {
-  DiagBatchEntry entry{};
-  entry.reasonCode = kReasonResync;
-  entry.soc = soc;
-  entry.vcell = vcell;
-  appendDiagBatchEntry(entry);
-}
-
 void flushDiagBatch() {
   if (diagBatchCount == 0) {
     diagBatchDroppedCount = 0;
@@ -377,10 +355,6 @@ void flushDiagBatch() {
               sep, (unsigned)e.reasonCode, (unsigned)e.chargeStatus, (unsigned)e.charging,
               (unsigned)e.faultReg, (double)e.vcell, (double)e.soc,
               (int)e.powerSource, (unsigned)e.profile);
-    } else if (e.reasonCode == kReasonResync) {
-      wrote = appendFormatted(payload, entryBufSize, &offset,
-              "%s{\"r\":%u,\"soc\":%.1f,\"vc\":%.3f}",
-              sep, (unsigned)e.reasonCode, (double)e.soc, (double)e.vcell);
     } else {
       wrote = appendFormatted(payload, entryBufSize, &offset,
               "%s{\"r\":%u,\"s\":%d,\"p\":%u,\"vb\":%u,\"pg\":%u,\"soc\":%.1f}",

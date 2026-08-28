@@ -1,5 +1,7 @@
 #include "cloud/Cloud.h"
 
+#include "power/ChargeInhibitPolicy.h"
+
 namespace {
 
 bool getTopLevelMap(const LedgerData &ledger, const char *key, Variant &section) {
@@ -43,6 +45,20 @@ bool getMergedBoolValue(const Variant &defaultsSection, const Variant &deviceSec
 
     if (defaultsSection.isMap() && defaultsSection.has(key)) {
         value = defaultsSection.get(key).toBool();
+        return true;
+    }
+
+    return false;
+}
+
+bool getMergedFloatValue(const Variant &defaultsSection, const Variant &deviceSection, const char *key, float &value) {
+    if (deviceSection.isMap() && deviceSection.has(key)) {
+        value = static_cast<float>(deviceSection.get(key).toDouble());
+        return true;
+    }
+
+    if (defaultsSection.isMap() && defaultsSection.has(key)) {
+        value = static_cast<float>(defaultsSection.get(key).toDouble());
         return true;
     }
 
@@ -107,6 +123,7 @@ bool Cloud::applyConfigurationFromLedger(const LedgerData &defaults, const Ledge
     bool messagingChanged = false;
     bool modesChanged = false;
     bool reportingChanged = false;
+    bool powerChanged = false;
     
     // Enhanced diagnostics for Alert 41 troubleshooting - track which section fails
     bool sensorOk = applySensorConfig(defaults, device, &sensorChanged);
@@ -114,11 +131,12 @@ bool Cloud::applyConfigurationFromLedger(const LedgerData &defaults, const Ledge
     bool messagingOk = applyMessagingConfig(defaults, device, &messagingChanged);
     bool modesOk = applyModesConfig(defaults, device, &modesChanged);
     bool reportingOk = applyReportingConfig(defaults, device, &reportingChanged);
+    bool powerOk = applyPowerConfig(defaults, device, &powerChanged);
     
-    success = sensorOk && timingOk && messagingOk && modesOk && reportingOk;
+    success = sensorOk && timingOk && messagingOk && modesOk && reportingOk && powerOk;
     
     if (success) {
-        const bool anyChanged = sensorChanged || timingChanged || messagingChanged || modesChanged || reportingChanged;
+        const bool anyChanged = sensorChanged || timingChanged || messagingChanged || modesChanged || reportingChanged || powerChanged;
 
         // Do not force synchronous storage flushes here; they can exceed the
         // 100 ms loop budget. Persistence is handled by sysStatus.loop() and
@@ -145,12 +163,13 @@ bool Cloud::applyConfigurationFromLedger(const LedgerData &defaults, const Ledge
             }
         }
     } else {
-        Log.warn("Configuration apply failed: sensor=%s timing=%s messaging=%s modes=%s reporting=%s",
+        Log.warn("Configuration apply failed: sensor=%s timing=%s messaging=%s modes=%s reporting=%s power=%s",
                  sensorOk ? "OK" : "FAIL",
                  timingOk ? "OK" : "FAIL",
                  messagingOk ? "OK" : "FAIL",
                  modesOk ? "OK" : "FAIL",
-                 reportingOk ? "OK" : "FAIL");
+                 reportingOk ? "OK" : "FAIL",
+                 powerOk ? "OK" : "FAIL");
     }
     
     return success;
@@ -569,6 +588,85 @@ bool Cloud::applyReportingConfig(const LedgerData &defaults, const LedgerData &d
     }
     if (changed) Log.info("Reporting config updated");
     return success;
+}
+
+bool Cloud::applyPowerConfig(const LedgerData &defaults, const LedgerData &device, bool *changedOut) {
+    // F2a thermal charge-inhibit thresholds (WO-2026-08-25-001): ledger-configurable
+    // and per-device overridable, per the work order. Uses the merge convention
+    // shared by every other applyXConfig() in this file: device ledger wins,
+    // default ledger is the fallback, absence of either leaves the stored
+    // (or compiled-in default, via the get_ accessor fallback) value untouched.
+    Variant defaultThermal;
+    Variant deviceThermal;
+    bool hasDefault = getNestedMap(defaults, "power", "thermalChargeInhibit", defaultThermal);
+    bool hasDevice = getNestedMap(device, "power", "thermalChargeInhibit", deviceThermal);
+
+    if (!hasDefault && !hasDevice) return true;
+    if ((hasDefault && !defaultThermal.isMap()) || (hasDevice && !deviceThermal.isMap())) return true;
+
+    // AC-B6 (WO-2026-08-25-001 Amendment B): a malformed ledger must not be
+    // able to invert the hysteresis or configure an unsafe ceiling. Build the
+    // full candidate set (starting from the currently-stored values, so a
+    // ledger that only supplies a subset of the four fields is validated
+    // against the values it would actually run with) and validate it as a
+    // whole with ChargeInhibitPolicy::isValidThermalThresholds() BEFORE
+    // committing any individual field - a partially-applied invalid set
+    // would be just as unsafe as a fully-applied one.
+    ChargeInhibitPolicy::ThermalThresholds candidate{
+        sysStatus.get_thermalChargeArmHighC(),
+        sysStatus.get_thermalChargeArmLowC(),
+        sysStatus.get_thermalChargeReleaseHighC(),
+        sysStatus.get_thermalChargeReleaseLowC(),
+    };
+
+    bool anyFieldSupplied = false;
+    anyFieldSupplied |= getMergedFloatValue(defaultThermal, deviceThermal, "armHighC", candidate.armHighC);
+    anyFieldSupplied |= getMergedFloatValue(defaultThermal, deviceThermal, "armLowC", candidate.armLowC);
+    anyFieldSupplied |= getMergedFloatValue(defaultThermal, deviceThermal, "releaseHighC", candidate.releaseHighC);
+    anyFieldSupplied |= getMergedFloatValue(defaultThermal, deviceThermal, "releaseLowC", candidate.releaseLowC);
+
+    if (!anyFieldSupplied) return true;
+
+    if (!ChargeInhibitPolicy::isValidThermalThresholds(candidate)) {
+        Log.warn("Config: rejecting malformed thermal charge-inhibit thresholds "
+                 "(armHigh=%.1f armLow=%.1f releaseHigh=%.1f releaseLow=%.1f) - "
+                 "keeping existing values",
+                 (double)candidate.armHighC, (double)candidate.armLowC,
+                 (double)candidate.releaseHighC, (double)candidate.releaseLowC);
+        return false;
+    }
+
+    bool changed = false;
+
+    if (sysStatus.get_thermalChargeArmHighC() != candidate.armHighC) {
+        sysStatus.set_thermalChargeArmHighC(candidate.armHighC);
+        Log.info("Config: Thermal charge-inhibit armHighC -> %.1fC", (double)candidate.armHighC);
+        changed = true;
+    }
+
+    if (sysStatus.get_thermalChargeArmLowC() != candidate.armLowC) {
+        sysStatus.set_thermalChargeArmLowC(candidate.armLowC);
+        Log.info("Config: Thermal charge-inhibit armLowC -> %.1fC", (double)candidate.armLowC);
+        changed = true;
+    }
+
+    if (sysStatus.get_thermalChargeReleaseHighC() != candidate.releaseHighC) {
+        sysStatus.set_thermalChargeReleaseHighC(candidate.releaseHighC);
+        Log.info("Config: Thermal charge-inhibit releaseHighC -> %.1fC", (double)candidate.releaseHighC);
+        changed = true;
+    }
+
+    if (sysStatus.get_thermalChargeReleaseLowC() != candidate.releaseLowC) {
+        sysStatus.set_thermalChargeReleaseLowC(candidate.releaseLowC);
+        Log.info("Config: Thermal charge-inhibit releaseLowC -> %.1fC", (double)candidate.releaseLowC);
+        changed = true;
+    }
+
+    if (changedOut) {
+        *changedOut = changed;
+    }
+    if (changed) Log.info("Power config updated");
+    return true;
 }
 
 // Explicit template instantiations for validateRange

@@ -2,6 +2,7 @@
 
 #include "MyPersistentData.h"
 #include "power/PowerDiagnostics.h"
+#include "BuildProfile.h"
 
 namespace PowerPlatform {
 
@@ -101,6 +102,21 @@ SystemPowerConfiguration makeSolarConfiguration() {
 
 } // namespace
 
+#if HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
+SystemPowerConfiguration baseConfigurationForProfile(PowerInputProfile profile) {
+  switch (profile) {
+  case PowerInputProfile::UsbBench:
+    return makeUsbBenchConfiguration();
+  case PowerInputProfile::Solar35W:
+    return makeSolarConfiguration();
+  case PowerInputProfile::Auto:
+  case PowerInputProfile::NotApplicable:
+    return SystemPowerConfiguration();
+  }
+  return SystemPowerConfiguration();
+}
+#endif
+
 PowerCapabilities detectCapabilities() {
   PowerCapabilities capabilities;
 
@@ -180,6 +196,40 @@ PowerSourceSnapshot readPowerSource() {
   return snapshot;
 }
 
+#if HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
+// WO-2026-08-25-001 Decision C5 (AC-C12/AC-C13): applyInputProfile() must
+// COMPOSE onto the existing charge-inhibit state, not replace it.
+// System.setPowerConfiguration() replaces the ENTIRE DCT power configuration
+// on every call. The profile-specific configs built by
+// makeUsbBenchConfiguration()/makeSolarConfiguration() are freshly
+// default-constructed and never set DISABLE_CHARGING, so applying one during
+// a profile transition while charging is thermally inhibited would silently
+// re-authorize charging until the next coupled thermal measurement runs -
+// and on Device OS, a separate power-manager thread can act on that
+// re-authorized config before the next coupled call ever reaches
+// ChargeInhibit::apply(), so this cannot be fixed by reordering calls.
+//
+// The fix: read the CURRENT configuration and copy only the
+// DISABLE_CHARGING bit onto the freshly constructed profile configuration -
+// not the whole prior config, which would also carry forward unrelated or
+// obsolete flags. Note: System.getPowerConfiguration() (via the Wiring
+// wrapper) returns by value and discards its own read-status; Device OS
+// sanitizes a failed read to defaults. This preserves the bit when the read
+// succeeds and improves the concurrent-thread race case - it is NOT proof
+// the DCT read itself succeeded. Preserving a set bit can hold charging off
+// until the next coupled measurement; that is the safe direction, and the
+// thermal policy already clears it on a genuine cool reading.
+SystemPowerConfiguration applyDisableChargingBit(SystemPowerConfiguration conf) {
+  // NOTE: do not name this local `current` - MyPersistentData.h #defines
+  // `current` to `currentStatusData::instance()`, which this file includes.
+  const SystemPowerConfiguration existingConf = System.getPowerConfiguration();
+  if (existingConf.isFeatureSet(SystemPowerFeature::DISABLE_CHARGING)) {
+    conf.feature(SystemPowerFeature::DISABLE_CHARGING);
+  }
+  return conf;
+}
+#endif
+
 PowerConfigurationApplyResult applyInputProfile(PowerInputProfile profile) {
   PowerConfigurationApplyResult result;
 
@@ -188,7 +238,8 @@ PowerConfigurationApplyResult applyInputProfile(PowerInputProfile profile) {
 
   switch (profile) {
   case PowerInputProfile::UsbBench:
-    result.systemResult = System.setPowerConfiguration(makeUsbBenchConfiguration());
+    result.systemResult = System.setPowerConfiguration(
+        applyDisableChargingBit(makeUsbBenchConfiguration()));
     result.applied = (result.systemResult == SYSTEM_ERROR_NONE);
     logAppliedProfileConfig(profile,
                            USB_BENCH_MAX_CURRENT_MA,
@@ -202,7 +253,8 @@ PowerConfigurationApplyResult applyInputProfile(PowerInputProfile profile) {
     return result;
 
   case PowerInputProfile::Solar35W:
-    result.systemResult = System.setPowerConfiguration(makeSolarConfiguration());
+    result.systemResult = System.setPowerConfiguration(
+        applyDisableChargingBit(makeSolarConfiguration()));
     result.applied = (result.systemResult == SYSTEM_ERROR_NONE);
     logAppliedProfileConfig(profile,
                            SOLAR_MAX_CURRENT_MA,

@@ -337,6 +337,55 @@ Pass criteria:
 - Alerts visible in monitoring dashboard
 - Alert clears (returns to 0) when charging recovers
 
+## Test 7 — Thermal Charge-Inhibit (Boron Only)
+
+**Purpose:** Validate that charging is actually disabled above the enclosure-temperature arm threshold and re-enabled only on the tighter release band (WO-2026-08-25-001 F2a).
+
+**Platform:** Boron only. The `ChargeInhibit::apply()` path is inside `#if HAL_PLATFORM_CELLULAR`; on Photon2/P2/Argon the firmware logs `"Charging would be inhibited ..."` and takes no PMIC action. A P2 build also cannot pass this test at all — there is no TMP36 on an ADC pin, so the stub leaves `measuredThisCall = false` and the arm is suppressed on every call.
+
+Thresholds (`ChargeInhibitPolicy::ThermalThresholds`, compiled defaults):
+
+- `armHighC` `37.0` / `armLowC` `0.0` — start inhibiting outside this band
+- `releaseHighC` `35.0` / `releaseLowC` `3.0` — resume charging only back inside this band
+
+### Before You Start
+
+1. **Confirm the running build actually has the feature.** `firmware.version` is not reliable on bench units — they get flashed with working-tree builds without a version bump. Fingerprint the `ChargeDiag` format instead:
+   - `chg=..(N) ichg=D fault=..` → v22/v23/main. **No thermal inhibit.** Stop.
+   - `chg=..(N) fault=.. vbus=.. pg=D th=.. vsys=D` → v24 work present. Proceed.
+2. **Clear the device's fleet firmware target.** A device with `desired_firmware_version` set will be OTA-reverted to that version on its next cloud connect, silently discarding a local USB flash. Being marked `development: true` does **not** prevent this. Check with `particle product device list <productId> --json`.
+3. **Get the battery charging.** Draw it down beforehand so `chg=FAST(2)` rather than `DONE(3)` — an inhibit on a battery that is already full has nothing observable to interrupt. Note the UsbBench profile charges at 896 mA to a **4112 mV** target, so the constant-current window from a near-full pack is short.
+4. **Enable verbose mode** (`messaging.verboseMode: true`). Without it there is no running temperature readout anywhere in the serial output — `ChargeDiag`'s `th=` field is the PMIC's own thermal register, not the TMP36. You would be heating blind. There is no auto-expiry; turn it off afterwards.
+
+### Steps
+
+1. Capture serial to a file, not just the terminal:
+   `particle serial monitor --follow --timestamp --utc | tee -a ~/thermal.log`
+   The transition lines are one-shot and the USB CDC drops on every ULP standby, so anything landing in an unobserved wake cycle is gone from the terminal but still in the file.
+2. Heat the enclosure temperature sensor to **40–50 °C**. Do not exceed **80 °C** — see the trap below.
+3. Wave at the PIR to force a wake. Heat first, then wave: the awake window is 1–6 s and the 8-sample TMP36 read happens at the top of it.
+4. Confirm the arm, then stop heating and let it fall below 35 °C.
+5. To catch the release cleanly, stay out of the PIR's view while it cools — with no triggers the device sleeps and cannot evaluate, so the transition cannot burn in an unobserved cycle. Then wave once with the monitor attached.
+
+### Pass criteria
+
+- Arm line appears with the thresholds echoed:
+  `Charging inhibited due to enclosure temperature: 4X.XX C (armHigh=37.0 armLow=0.0)`
+- Next `ChargeDiag` shows `chg=` off `FAST(2)` — normally `OFF(0)` — with `state=Not Charging(1)`. **This is the load-bearing check.** A log line alone does not prove charging stopped.
+- `vcell` falls over the following seconds as the pack comes off charge.
+- `src=` stays `USB_HOST` throughout, confirming the change is the inhibit and not a power-source transition.
+- Charging stays off for readings **between 35 and 37 °C** — this is the hysteresis dead band and the clearest single observation available.
+- Release line appears at ≤ 35 °C:
+  `Charging inhibit cleared; enclosure temperature: 3X.XX C`
+- `chg=` returns to `FAST(2)`.
+
+### Traps
+
+- **Above 80 °C the test silently fails.** The TMP36 read is rejected as out of range (`sampledTempC > 80.0f`), `measuredThisCall` stays false, and `evaluateThermalWithValidity()` suppresses the arm decision outright. You get `TMP36 reading invalid or out of range ...` and no inhibit — which looks exactly like a broken feature. A heat gun on a bare sensor passes 80 °C in seconds.
+- **The arm/release lines are transition-only** (`inhibited && !previouslyInhibited`). They fire once. If you miss one, the state does not re-log.
+- **The DCT `DISABLE_CHARGING` bit is persisted and survives reset.** Do not leave a device parked hot with the inhibit armed — it stays inhibited across a reboot until a fresh reading releases it.
+- **Do not heat the battery**, only the sensor. Testing on an un-enclosed unit lets you do this; it validates the control path, not the thermal physics of a real hot enclosure.
+
 ## Quick Interpretation of Alerts
 
 ### Connectivity Alerts
