@@ -398,6 +398,12 @@ void logChargeDiag(const Registers &regs, float vcell, float soc, int powerSourc
   // src= is deliberately the RAW, uncorrected `powerSource` sample, not the
   // PowerSourceOverride-corrected value - kept independent so it remains the
   // ground-truth evidence for diagnosing this bug class in the field.
+  //
+  // Consumers must read PowerDiag's `source=` for the effective value; treating
+  // this raw src= as effective produces phantom VIN/UNKNOWN "power events" (a
+  // confirmed 2026-08-28 Dev-09 instance, where battery telemetry was unchanged
+  // throughout - see WO-2026-08-28-003). Documented for analysts in
+  // docs/FIELD_MEANINGS_REFERENCE.md, "Mixed Corrected/Raw Power Source Values".
   Log.info(
       "ChargeDiag: chg=%s(%u) fault=0x%02x vbus=%s pg=%d th=%s vsys=%d vcell=%.3f soc=%.1f src=%s prof=%s",
       chargeLabel(regs.chargeStatus, fault), regs.chargeStatus, regs.faultReg, vbusLabel(regs.vbusStatus),

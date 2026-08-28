@@ -106,6 +106,20 @@ The USB CDC connection drops as part of sleep (HIBERNATE or other low-power mode
 
 ---
 
+### `ChargeDiag src=` Is Raw; `PowerDiag source=` Is Effective
+
+`ChargeDiag`'s `src=` field is the **raw, uncorrected** PMIC sample, deliberately
+kept independent of `PowerSourceOverride` so it survives as ground-truth
+evidence. `PowerDiag`'s `source=` is the **corrected, effective** value actually
+used for profile selection and cloud telemetry. The two diverging in adjacent
+log lines is expected, not a defect.
+
+Read `source=` for analysis. See the section "Mixed Corrected/Raw Power Source
+Values: `ChargeDiag src=` vs `PowerDiag source=`" below for the full
+explanation and a confirmed instance.
+
+---
+
 ### VIN/Solar Reading on a USB-Powered Device
 
 A USB-powered device can report `source=VIN profile=Solar`. **Two distinct behaviors share this symptom.** They are not the same thing and must not be read interchangeably: one is benign and self-correcting, the other is an unresolved defect with a measurable charge cost. Determine which case you are looking at before drawing any conclusion.
@@ -217,17 +231,36 @@ Whether that indicates the ranges are wrong, or that a long dwell is simply expe
 
 ---
 
-## Mixed Corrected/Raw Power Source Values Within a Single pdiag Batch
+## Mixed Corrected/Raw Power Source Values: `ChargeDiag src=` vs `PowerDiag source=`
 
-**Observed pattern:** A single published `pdiag` batch can legitimately contain
-BOTH a corrected `source=` value (from `PowerDiag` entries and ordinary pdiag
-entries, sourced from `powerReport.reading.powerSource` after
-`PowerSourceOverride` has run) AND a raw, uncorrected `source=` value (from
-`ChargeDiag` entries and reason-10 pdiag entries, sourced directly from
-`System.powerSource()` / `PowerPlatform::readPowerSource()` before any
-override is applied). See `src/sensors/SensorManager.cpp` (ChargeDiag /
-reason-10 sampling sites) and `src/power/PowerManager.cpp`
-(`PowerSourceOverride` correction) for the two respective sampling points.
+**Observed pattern:** Serial output and a single published `pdiag` batch can
+both legitimately contain BOTH a corrected `source=` value (from `PowerDiag`
+entries and ordinary pdiag entries, sourced from
+`powerReport.reading.powerSource` after `PowerSourceOverride` has run) AND a
+raw, uncorrected `source=` value (from `ChargeDiag` entries and reason-10 pdiag
+entries, sourced directly from `System.powerSource()` /
+`PowerPlatform::readPowerSource()` before any override is applied). See
+`src/power/PmicFaultMonitor.cpp` (`logChargeDiag()` — ChargeDiag / reason-10
+sampling site) and `src/power/PowerManager.cpp` (`PowerSourceOverride`
+correction) for the two respective sampling points.
+
+> **Note:** the ChargeDiag emission site moved from `src/sensors/SensorManager.cpp`
+> to `src/power/PmicFaultMonitor.cpp` in the v24 power-management consolidation
+> (commit `516332a`, WO-2026-08-25-001). Older work orders and investigations
+> citing the SensorManager path predate that move.
+
+**This applies to serial logs, not only pdiag batches.** The divergence is
+visible directly in a serial capture, where a `PowerSourceOverride` WARN line
+is normally the adjacent giveaway:
+
+```text
+21:09:36.250  WARN: PowerSourceOverride: source=VIN usbAddr=0x04 usbReg=0x03 -> USB_HOST reason=usb_enumerated
+21:09:37.199  INFO: PowerDiag[250]: post-refreshInputProfile source=USB_HOST ... vbus=0 pg=1
+21:09:38.425  INFO: ChargeDiag: chg=DONE(3) ... vbus=NONE pg=1 ... src=VIN prof=USB
+```
+
+Within one second, `PowerDiag` reports the corrected `USB_HOST` and `ChargeDiag`
+reports the raw `VIN`. Both are correct for what they represent.
 
 **This is intentional, not an inconsistency to debug.** The two entry types
 serve different purposes:
@@ -247,6 +280,24 @@ example, during any window where the raw hardware-reported source and the
 override-corrected source temporarily diverge). Do not treat this divergence
 alone as a bug signal; confirm which entry type (corrected vs. raw) is being
 compared before concluding there is a genuine reporting defect.
+
+**For soak and field analysis, read `PowerDiag source=`, not `ChargeDiag src=`.**
+Any dashboard, log review, or automated analysis that treats `ChargeDiag src=`
+as the effective power source will report phantom `VIN` / `UNKNOWN` sources on
+any device, indefinitely.
+
+**Confirmed instance (2026-08-28, Boron-Dev-09).** Two apparent "power
+disturbances" (13:09 UTC 08-27 and 00:08 UTC 08-28) were investigated and found
+to be no such thing. The first was nine transient post-connect PMIC
+misclassifications, each corrected by `PowerSourceOverride` within ~1 s of
+`ConnSummary: ok` (measured spread 0.90–1.39 s, 9 of 9). The second was not an
+event at all. Battery telemetry was byte-identical across every sample —
+`vcell=4.021`, `soc=78.8`, `pg=1`, `chg=DONE(3)` — which is not possible if USB
+power had actually been lost. The misreading came entirely from treating
+`ChargeDiag src=VIN` as the effective source. A separate signature,
+`vbus=USB` with `src=UNKNOWN`, was observed at 06:59:50 SGT 08-28 on the same
+post-connect path. Root cause of the underlying `VBUS_STAT` misread is not
+established and is deferred (would need `ENABLE_PMIC_REGISTER_DUMP`).
 
 ---
 
