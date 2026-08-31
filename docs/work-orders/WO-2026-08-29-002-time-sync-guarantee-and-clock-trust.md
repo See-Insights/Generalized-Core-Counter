@@ -1,4 +1,13 @@
-# WO-2026-08-29-002: Guarantee time sync, make clock validity self-known, and stop a wrong RTC re-seeding itself
+# WO-2026-08-29-002: Clock-trust mechanism - RTC write-back, non-blocking sync observation, and a trustworthy clock signal
+
+> **Title corrected 2026-08-31.** This WO was originally titled
+> "Guarantee time sync, make clock validity self-known, and stop a wrong
+> RTC re-seeding itself". After the scope narrowing below, it makes no
+> wake-time *guarantee* - that moved to `WO-2026-08-31-002`. The H1 has
+> been corrected; the FILENAME is deliberately unchanged, because the
+> number and path are referenced from source comments, the sibling Work
+> Orders, and this project's Stage 7 records. Only the heading was
+> misleading, and only the heading needed to change.
 
 > **Numbering note.** Dispatched as `WO-2026-08-29-001`, but that number was
 > taken earlier the same day by
@@ -125,9 +134,22 @@ time never reaches the RTC, and the RTC is what seeds the next wake.
 
 6. **Periodic, monotonic-gated resync.** Elapsed-time gate <= 24h driven
    by `millis()`/uptime, not wall clock, so a wrong clock cannot postpone
-   its own repair. Fire around HIBERNATE wake specifically, and record
-   *completion* (`Particle.syncTimeDone()` / `timeSyncedLast()`), not the
-   request. Make `get_lastTimeSync()` actually read.
+   its own repair. ~~Fire around HIBERNATE wake specifically~~ - **struck
+   2026-08-31, see "## SCOPE NARROWED" below.** That was a wake-time
+   GUARANTEE and it is no longer this WO's to make: the gate becomes
+   *eligible* after a hibernate wake (`timeSyncedLast()` reads 0 on every
+   fresh boot) but a request is only issued when `Particle.connected()`,
+   so a device that wakes with a wrong clock and sleeps again before
+   connecting is never repaired here. Closing that loop requires waiting
+   on sync completion in the sleep gate and belongs to
+   `WO-2026-08-31-002`. What remains in scope here: record *completion*
+   (`timeSyncedLast()` advancing), not the request, and make
+   `get_lastTimeSync()` actually read.
+
+   Note also that `Particle.syncTimeDone()` appears above as a completion
+   signal. It is NOT one - it means "no longer pending" and goes true on
+   timeout and disconnect. It was the round-1 defect and is no longer
+   referenced anywhere in `src/`.
 
 7. **Push corrected time back into the RTC.** Call
    `ab1805.setRtcFromSystem()` after a *confirmed* sync, and on a
@@ -149,12 +171,161 @@ time never reaches the RTC, and the RTC is what seeds the next wake.
    Check the payload budget first - `LedgerPayloadStatus: bytes=612/896`
    observed on Dev-11.
 
+### Acceptance criteria amendment (Round 4 review, Codex Stage 7 Finding 5)
+
+Codex Stage 7 flagged that `isClockTrusted()` (item 8's trust signal)
+retains `Time.isValid()` as one of two ANDed terms, alongside sync recency.
+The Chief Engineer has reviewed this and accepts it AS-IS - this is not a
+defect to fix, so this amendment records the reasoning to avoid it being
+re-raised:
+
+`isClockTrusted()` is `Time.isValid() && (Particle.timeSyncedLast() is
+recent)`. **Sync recency is the decisive term** - it is what actually
+distinguishes "trusted" from "not" in every real scenario this Work Order
+investigates, including the incident that motivated it (`Time.isValid()`
+was `true` throughout; only sync recency correctly identified the clock as
+untrustworthy). `Time.isValid()` is retained as a defensive, necessary-but-
+not-sufficient co-requirement: it costs nothing in the failure mode this WO
+targets (it is always `true` in that scenario, so it never blocks the fix
+from working), and it correctly denies trust in the separate, degenerate
+case where system time is not set at all (`Time.isValid() == false`) even
+if a stale `timeSyncedLastMs` were somehow still nonzero from a prior boot
+(defensive; RAM state does not survive a reboot in practice, but the
+`isTrusted()` signature accepts these as independent parameters and should
+not assume that invariant silently holds). Removing the `Time.isValid()`
+term would not fix anything this Work Order is about and would remove a
+free, harmless safety net - so it stays.
+
+## SCOPE NARROWED 2026-08-31 (after two Stage 7 FAIL verdicts)
+
+Codex Stage 7 failed this change twice. Both times the *mechanism* was
+confirmed correct and every remaining HIGH finding sat in the **wake
+sequencing** wrapped around it - territory this WO's own constraints
+forbade touching ("do not restructure the state machine / sleep
+scheduling"). Round 5 obeyed that fence and produced a fix that both
+regressed existing behaviour (Stage 7 re-review finding 1: the forced-
+connect branch made the opening-hour alert-40 suppression at
+`Generalized-Core-Counter.cpp:1311` unreachable on every normal hibernate
+wake) and still did not deliver the stated guarantee (finding 2: the
+sleep gate waits on queues, ledgers, webhooks and updates - but not on a
+clock sync, so a session-resumed device can hibernate again before
+syncing).
+
+The fence was the binding problem, not a safeguard. This WO is therefore
+**narrowed to the clock-trust mechanism only**, and the wake-sequencing
+guarantee moves to `WO-2026-08-31-002`, which is explicitly permitted to
+touch the sleep gate and connection-mode policy.
+
+### Retained here (independently confirmed correct by BOTH Stage 7 passes)
+
+- The RTC write-back driven by observed change in
+  `Particle.timeSyncedLast()`, independent of `syncTimeDone()` and of any
+  request/pending bookkeeping.
+- `observedTimeSyncedLastMs()` - the connected-only cached accessor that
+  removes the blocking-API call from the main loop and from `setup()`.
+- Wrap-aware trust and resync gating.
+- Item 8 gating, including the three deliberate control-flow-sensitive
+  stops (`lastAlertTime`, `lastHookResponse`, `occupancyStartTime`) and
+  all `lastCountTime` sites.
+- The accepted `Time.isValid() && recentSync` trust rationale (Stage 7
+  judged the rationale sound; recency is the decisive term).
+
+### Removed from this WO
+
+- **Round 5's `setup()` forced-connect gate** (the
+  `hibernateWakeWithoutConfirmedSyncThisBoot` OR term). REVERT it. It
+  belongs to `WO-2026-08-31-002`. Reverting it also removes the alert-40
+  regression, so this WO should clear Stage 7 on its own.
+- The item 6 claim that resync "fires around HIBERNATE wake". This WO no
+  longer claims a wake-time guarantee; it provides a correct mechanism
+  that a connected device uses. The guarantee is `-002`'s job.
+
+### Remaining work before sign-off (cleanup, not design)
+
+1. **Pace the RTC-write retry (Stage 7 finding 5).** The consumed-write
+   defect is fixed, but a permanent AB1805/Wire fault now retries
+   `setRtcFromSystem()` on every main-loop pass - potentially hundreds of
+   locked I2C transactions per second on a bus shared with PMIC work,
+   plus matching log volume. Add a monotonic retry floor. The existing
+   test asserts 200 attempts in 200 checks and therefore *codifies* the
+   hot loop; it must be changed to assert the pacing.
+
+2. **Republish status on confirmed sync (Stage 7 finding 3).** Assessed
+   2026-08-31 as severable from the sleep gate and kept here. The status
+   payload is published on connect, before the corrective sync, so it
+   correctly reads `trusted=false` - and nothing republishes it when the
+   sync later succeeds, so the ledger may never show `trusted=true`. The
+   deferred-republish machinery already exists: `Cloud::loop()` at
+   `Cloud.cpp:684` republishes when `pendingStatusPublish` is set, and
+   retries on failure (`DeviceStatusPublisher.cpp:310`).
+   `ConfigApply.cpp:150-152` is the precedent for setting it externally.
+   `pendingStatusPublish` is private (`Cloud.h:412`), so this needs a
+   small public entry point on `Cloud`. No sleep-gate, state-machine or
+   connection-mode change is involved.
+
+3. **Tests must assert behaviour, not code shape (Stage 7 finding 7).**
+   `clock_resync_wiring_test.py` checks substrings, statement order and
+   named calls - it would still pass if `requestClockResync()` stopped
+   calling `Particle.syncTime()` altogether.
+   `clock_rtc_writeback_test.cpp` exercises a hand-written simulator
+   rather than the production function. Every changed test must be
+   mutation-tested: break the behaviour, show the test fails.
+
 ## Out of scope
 
 - **The 12-hour local-time-conversion issue.** Per dispatch item 8. It is
   a separate defect with a separate signature (wrong sleep *entry*,
   correct 8h duration) and is not addressed here.
 - **Modifying `lib/AB1805_RK`.** Vendored; fix app-side.
+
+## Verification
+
+### Mandatory: Codex Stage 7 on the complete diff
+
+Full Stage 7, same tier as the AB1805/watchdog and thermal-inhibit work -
+not the lighter standard. Plus the existing host tests and a clean local
+build.
+
+### Primary functional test: a deliberately skewed RTC on a bench device
+
+The failure path must be reproduced deliberately rather than waited for:
+
+1. Set the AB1805 to a known-wrong time (a few hours off is enough; the
+   observed natural case is -5h09m).
+2. Boot. Confirm `ab1805.setup()` seeds system time from the wrong RTC and
+   that `Time.isValid()` reports true - this is the precondition that makes
+   the bug invisible today, and the test should assert it explicitly.
+3. Confirm the new periodic write-back corrects the RTC after a confirmed
+   sync, and that it does so on a recurring basis rather than being spent
+   once per boot.
+4. Force a hibernate wake and confirm the corrected time survives it. This
+   is the step that actually distinguishes a fix from a cosmetic one: the
+   pre-existing defect is that a correction to system time never reaches
+   the RTC, and the RTC is what seeds the next wake.
+5. Confirm the item-9 telemetry fields report the clock as untrusted during
+   the skewed window and trusted after correction.
+
+### Do NOT verify against Dev-11
+
+Dev-11 is the live device that surfaced this and is still running ~5h09m
+behind (confirmed 2026-08-29 across 15 reports spanning 03:09Z-14:15Z, and
+again indirectly on 2026-08-30 when it entered hibernate at 19:10:00Z real
+time, which is 22:01 SGT by its own displaced clock - exactly its
+`closeHour=22`).
+
+It is nonetheless the wrong verification vehicle, for a methodological
+reason. Deploying this fix to Dev-11 requires an OTA, which produces
+`RESET_REASON_UPDATE` and a full handshake. A full handshake performs an
+automatic cloud time sync, so on that boot `Time.now()` is already correct
+when the pre-existing `AB1805::loop()` one-shot fires - and the **old**
+code writes the correct time to the RTC. Dev-11's clock would come back
+right whether or not this change works. The act of deploying destroys the
+condition under test, and the resulting pass would be unattributable.
+
+Dev-11's value is as a preserved natural specimen, not a test target. Its
+wrong RTC is perishable: any future boot that happens to include a full
+handshake will silently correct it under the old code. Treat it as
+read-only evidence until the bench test above has passed.
 
 ## Relationship to WO-2026-08-29-001
 

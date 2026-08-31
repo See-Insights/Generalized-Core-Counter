@@ -6,6 +6,22 @@
 #include "sensors/SensorManager.h"
 #include "state/StateMachine.h"
 #include "reporting/ReportingPolicy.h"
+#include "time/ClockTrust.h"
+
+// WO-2026-08-29-002 item 8: forward-declared rather than pulled in via
+// state/State_Common.h - that header transitively drags in retained-memory
+// declarations and other app-wide state that some host test harnesses (see
+// tests/power_source_override_test.sh) intentionally don't stub out for
+// this translation unit.
+bool isClockTrusted();
+// Round 6 (Stage 7 finding 1): wrap-aware, sentinel-bearing sync age for
+// telemetry - see Generalized-Core-Counter.cpp's reportedSyncAgeMs() doc
+// comment for the full design (reuses the same wrap-generation tracking
+// isClockTrusted() already uses; no parallel mechanism). This supersedes
+// this file's former direct use of observedTimeSyncedLastMs() (Finding 2,
+// Round 4 review) - reportedSyncAgeMs() calls it internally, so this file
+// no longer needs its own forward declaration for it.
+uint32_t reportedSyncAgeMs();
 
 // External firmware version string (defined in Version.cpp)
 extern const char* FIRMWARE_VERSION;
@@ -205,6 +221,37 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     writerBase.name("lastResult").value(Observability::toString(cycleStats.connect_result));
     writerBase.name("elapsedMs").value((int)cycleStats.connect_duration_ms);
     writerBase.endObject();
+    // Item 9 (WO-2026-08-29-002): clock trust verdict and sync recency, so
+    // "was this cycle's timestamp trustworthy" is readable from telemetry
+    // instead of reconstructed. trusted uses the same monotonic
+    // Particle.timeSyncedLast() signal as the resync gate and trust check
+    // in Generalized-Core-Counter.cpp (isClockTrusted()) - not
+    // Time.isValid() alone (Finding 3). lastSyncEpoch is the persisted
+    // completion stamp (sysStatus.get_lastTimeSync()), which previously had
+    // zero callers.
+    //
+    // Round 6 (Stage 7 finding 1): syncAgeSec is derived from
+    // reportedSyncAgeMs(), the wrap-aware, sentinel-bearing telemetry
+    // value - not raw elapsedMs(). Raw elapsedMs() would wrap back around
+    // to a small, deceptively fresh-looking value after a full millis()
+    // rollover with no further confirmed sync, even though `trusted` has
+    // correctly already gone false - contradicting telemetry consumers'
+    // reading of the ledger. -1 (already the established "never synced"
+    // sentinel for this signed-seconds field) is reused for BOTH "never
+    // synced this boot" and "sync is stale beyond one full wrap" - both are
+    // "no reliable age to report", and `trusted` is independently false in
+    // both cases for any consumer that needs to tell them apart further.
+    {
+        const uint32_t reportedAgeMs = reportedSyncAgeMs();
+        const long syncAgeSec = (reportedAgeMs == ClockTrust::kReportedSyncAgeUnavailableMs)
+            ? -1L
+            : (long)(reportedAgeMs / 1000UL);
+        writerBase.name("clock").beginObject();
+        writerBase.name("trusted").value(isClockTrusted());
+        writerBase.name("syncAgeSec").value((int)syncAgeSec);
+        writerBase.name("lastSyncEpoch").value((int)sysStatus.get_lastTimeSync());
+        writerBase.endObject();
+    }
     writerBase.endObject();
 
     if (!writerBase.buffer()) {

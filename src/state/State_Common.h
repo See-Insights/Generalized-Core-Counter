@@ -161,6 +161,39 @@ void clearConnectivityFailsafeRecovery(const char *reason);
 void logTimeDiag(bool isOpen);
 
 /**
+ * @brief WO-2026-08-29-002 item 8: is Time.now() currently trustworthy?
+ *
+ * @details Requires BOTH Time.isValid() and a confirmed cloud time sync
+ *          within ClockTrust::kMaxSyncAgeMs (Particle.timeSyncedLast()
+ *          recency) - Time.isValid() alone is not sufficient (Finding 3: it
+ *          is true even when system time was seeded from a wrong RTC and
+ *          never corrected).
+ *
+ * @return true when Time.now() should be treated as trustworthy.
+ */
+bool isClockTrusted();
+
+/**
+ * @brief Non-blocking substitute for Particle.timeSyncedLast() (WO-2026-08-
+ *        29-002 Finding 2, Round 4 review).
+ *
+ * @details Particle.timeSyncedLast() can block the calling thread until an
+ *          in-progress cloud connection completes (SYSTEM_THREAD_CONTEXT_
+ *          SYNC's future->get()) - the same hazard the vendored AB1805_RK
+ *          guards against by calling it only when Particle.connected(). This
+ *          caches the real value while connected and returns that cached
+ *          snapshot while disconnected, so callers (isClockTrusted(),
+ *          checkClockResync(), logTimeDiag(), the status-payload publisher)
+ *          never risk blocking past a watchdog boundary during a slow
+ *          cellular connect. See Generalized-Core-Counter.cpp for the full
+ *          behavioral-consequence writeup.
+ *
+ * @return The last real Particle.timeSyncedLast() value observed while
+ *         connected, or 0 if this boot has never yet been connected.
+ */
+uint32_t observedTimeSyncedLastMs();
+
+/**
  * @brief Returns true when CONNECTING_STATE still owns an in-budget connect attempt.
  *
  * @return true when long-duration failsafe actions should defer to CONNECTING_STATE

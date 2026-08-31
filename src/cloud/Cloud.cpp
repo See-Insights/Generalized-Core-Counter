@@ -207,6 +207,14 @@ Cloud::Cloud() : ledgersSynced(false), lastApplySuccess(true) {
 Cloud::~Cloud() {
 }
 
+void Cloud::requestStatusPublish(const char *source) {
+    // See the doc comment in Cloud.h - this only flags the existing
+    // deferred-republish mechanism that Cloud::loop() already drains; it
+    // never publishes synchronously.
+    pendingStatusPublish = true;
+    pendingStatusPublishSource = source ? source : "Unknown";
+}
+
 Cloud::LedgerSyncDiagnostics Cloud::ledgerSyncDiagnostics() const {
     const bool statusInflight = ledgerHasUnsyncedWriteForDiag(deviceStatusLedger);
     const bool dataInflight = ledgerHasUnsyncedWriteForDiag(deviceDataLedger);
