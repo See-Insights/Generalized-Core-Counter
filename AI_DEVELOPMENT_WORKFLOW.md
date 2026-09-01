@@ -42,6 +42,52 @@
 - Must not operate, configure, restart, or update Fleet devices.
 - Fleet Ops access must be read-only.
 - May write planning artifacts or draft GitHub issues only where specifically authorized.
+- Must not write hidden or cryptically named temporary artifacts. See
+  "Temporary build and test artifacts" below.
+
+### Temporary build and test artifacts — all agents
+
+Applies to Copilot, Codex, and Claude Code equally.
+
+Temporary files created during implementation or verification — compiled
+host-test binaries, mutation-testing backups, build logs, scratch
+directories — **must be visibly and descriptively named**, and must be
+removed when the work completes.
+
+**Required:**
+
+- Visible names. No leading `.` on files or directories.
+- Descriptive names that identify the tool and purpose, e.g.
+  `tests/rtc_skew_test_bin`, not `tests/.t`.
+- Placement under a path already covered by `.gitignore`, or added to it.
+- Cleanup on completion, including on failure paths.
+
+**Prohibited:**
+
+- Dot-prefixed temporary files or directories anywhere in the working
+  tree (`tests/.t`, `./.ctt`, `tests/.final_check`, `.hosttest_tmp`).
+- Single-letter or otherwise unidentifiable names.
+- Leaving artifacts behind after a dispatch completes.
+
+**Why this is a rule and not a preference.** On 2026-09-01, CrowdStrike
+raised a genuine security alert on this host. A Copilot dispatch round had
+run:
+
+```
+clang++ -std=c++17 -Wall -Wextra -pedantic -Isrc \
+  tests/rtc_skew_test.cpp -o tests/.t 2>&1 && ./tests/.t; rm -f tests/.t
+```
+
+That writes a freshly compiled, never-before-seen executable to a hidden
+path and immediately executes it — which is precisely the signature an EDR
+product should flag, and it did. The activity was benign and was
+attributed to a specific dispatch round from the session log, but only
+after an investigation that would have been unnecessary had the file been
+called `tests/rtc_skew_test_bin`.
+
+The hidden name bought nothing. It cost an incident-response cycle, and it
+made the artifact invisible to a routine `ls` and easy to miss in
+`git status`. Reviewers cannot audit what they cannot see.
 
 ### Codex — Independent Investigator and Verifier
 
