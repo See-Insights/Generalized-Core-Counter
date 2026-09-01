@@ -43,6 +43,8 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 #include "LocalTimeRK.h"             // Timezone conversion (UTC to local)
 #include "time/LocalTimeCache.h"          // Cached LocalTimeRK conversions
 #include "time/ClockTrust.h"         // Sync-recency resync gate and trust signal (WO-2026-08-29-002)
+#include "time/HibernateWakeDiagnostics.h" // Hibernate-wake gate classification/payload (WO-2026-08-29-001)
+
 
 // Persistent data and configuration
 #include "MyPersistentData.h"        // FRAM-backed sysStatus, current, sensorConfig
@@ -110,6 +112,7 @@ void dailyCleanup();          // Reset daily counters and housekeeping
 void UbidotsHandler(const char *event, const char *data); // Webhook response handler
 void publishStartupStatus();  // One-time status summary at boot
 void publishWatchdogForensics(bool ab1805Confirmed = false); // One-time watchdog forensic snapshot at boot
+void publishHibernateWakeForensics(const HibernateWakeDiagnostics::EventFields &fields); // WO-2026-08-29-001
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE); // Safe diagnostic publish with queue guard
 void applyBatteryAwareConnectionModePolicy(float currentSoC, BatteryTier resolvedTier);
 void applyBatteryAwareConnectionModePolicy(float currentSoC);
@@ -1067,6 +1070,7 @@ void setup() {
   const bool timeValidBeforeRtc = Time.isValid();
   ab1805.withFOUT(WKP).setup();                // Initialize AB1805 RTC - WKP is D10 on Photon2
 
+
   // ===== AB1805 WATCHDOG WAKE-REASON CLASSIFICATION =====
   // Gated on RESET_REASON_PIN_RESET. Device OS reports an external MCU reset
   // (e.g. the carrier board's AB1805 watchdog firing via the reset pin) as
@@ -1200,6 +1204,28 @@ void setup() {
                rtcReadOk ? 1 : 0);
     }
 
+    // WO-2026-08-29-001: queue a forensic event capturing the gate outcome
+    // BEFORE retainedHibernatePending is cleared below, so the failure case
+    // (previously invisible - see the Work Order) reaches the cloud too.
+    // buildEventFields() classifies via classifyGateArm(), which mirrors the
+    // exact same conditions/order as the `if` above; none of this alters
+    // startupHibernateStatusReady or any gate decision, it only identifies
+    // which arm failed (or kNone on success) for reporting.
+    {
+      HibernateWakeDiagnostics::GateInputs gateInputs{};
+      gateInputs.resetReasonIsPowerManagement = (reason == RESET_REASON_POWER_MANAGEMENT);
+      gateInputs.wakeReasonIsAlarm = (wakeReason == AB1805::WakeReason::ALARM);
+      gateInputs.rtcReadOk = rtcReadOk;
+      gateInputs.rtcBefore = (int64_t)retainedHibernateRtcBefore;
+      gateInputs.requestedSleepSec = retainedHibernateRequestedSleep;
+      gateInputs.rtcAtWake = (int64_t)rtcTime;
+
+      const HibernateWakeDiagnostics::EventFields eventFields = HibernateWakeDiagnostics::buildEventFields(
+          gateInputs, reason, startupHibernateWakeReason, retainedHibernateCount,
+          startupHibernateActualSleepSec, startupHibernateSleepErrorSec);
+
+      publishHibernateWakeForensics(eventFields);
+    }
   }
 #endif
   retainedHibernatePending = false;
@@ -2689,6 +2715,40 @@ void publishWatchdogForensics(bool ab1805Confirmed) {
   PublishQueuePosix::instance().publish("watchdog", payload, PRIVATE);
 }
 
+/**
+ * @brief Publishes a forensic snapshot of the hibernate-wake gate outcome
+ *        (WO-2026-08-29-001), mirroring publishWatchdogForensics() above.
+ *
+ * @details The gate at setup()'s `if (retainedHibernatePending)` block only
+ * ever made its SUCCESS outcome cloud-visible (via the status payload's
+ * hibernate fields). Its FAILURE outcome - the interesting case for
+ * diagnosing an oversleep/undersleep or a wake that never qualified -
+ * previously reached only a `Log.info()` line emitted before USB CDC
+ * re-enumerates, which the Pi serial forwarder structurally cannot capture
+ * (see the Work Order). This is a SEPARATE queued event from the status
+ * payload deliberately, so it does not compete with WO-2026-08-29-002's
+ * status payload byte budget and reaches every fleet device (not just the
+ * bench units with a serial forwarder attached), the same way the
+ * publish-queue-backed "watchdog" event above does. Called only when
+ * `retainedHibernatePending` was true this boot, before it is cleared.
+ *
+ * @param fields Gate-outcome fields already classified and assembled by
+ *        HibernateWakeDiagnostics::buildEventFields() at the call site
+ *        (which itself calls classifyGateArm()); this function only
+ *        formats and publishes them, it does not evaluate the gate itself.
+ */
+void publishHibernateWakeForensics(const HibernateWakeDiagnostics::EventFields &fields) {
+  char payload[256];
+  const int written = HibernateWakeDiagnostics::buildEventPayload(payload, sizeof(payload), fields);
+  if (written < 0 || (size_t)written >= sizeof(payload)) {
+    Log.warn("HibernateWake forensic payload truncated or failed (written=%d)", written);
+    return;
+  }
+
+  if (!PublishQueuePosix::instance().publish("hibernate_wake", payload, PRIVATE)) {
+    Log.warn("HibernateWake forensic event publish() returned false (queue full or not ready)");
+  }
+}
 
 /**
  * @brief Handle response from Ubidots webhook.
