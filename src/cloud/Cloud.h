@@ -89,6 +89,32 @@ public:
     bool writeDeviceStatusToCloud(const char *source = "Unknown");
 
     /**
+     * @brief Flags a deferred, best-effort device-status republish for
+     *        `loop()` to pick up on a later pass.
+     *
+     * WO-2026-08-29-002, SCOPE NARROWED 2026-08-31 cleanup task 3 (Stage 7
+     * finding 3): the status payload is published on connect, BEFORE the
+     * clock's corrective sync completes (see State_Connect.cpp), so it
+     * correctly reads `trusted=false` at that point - but nothing
+     * previously republished it once the sync later succeeded, so the
+     * ledger could go a whole session without ever showing `trusted=true`.
+     *
+     * This does not publish synchronously - it only sets the existing
+     * deferred-republish flag that `Cloud::loop()` already drains (and
+     * retries on failure, since `writeDeviceStatusToCloud()` deliberately
+     * leaves the flag set on failure - see `loop()` below), the same
+     * mechanism `ConfigApply.cpp`'s `applyConfigurationFromLedger()` uses
+     * to request a republish from outside the publish path itself. Calling
+     * this can never block or reorder anything in the caller - it is a
+     * cheap flag set, not a network call.
+     *
+     * @param source A short label describing why the republish was
+     *        requested (for logging - see `writeDeviceStatusToCloud()`'s
+     *        `source` parameter), e.g. "ClockResync".
+     */
+    void requestStatusPublish(const char *source);
+
+    /**
      * @brief Publish latest sensor data to device-data ledger
      * 
      * Updates the Device→Cloud ledger with current sensor readings,

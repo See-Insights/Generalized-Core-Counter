@@ -60,3 +60,27 @@ uint32_t Cloud::noteLedgerSyncRequest(LedgerRequestKind /*kind*/,
 // call this) -- provided only to satisfy the linker, since
 // DeviceStatusPublisher.cpp references the symbol unconditionally.
 void Cloud::noteLedgerSyncFail(uint32_t /*seq*/, int /*error*/) {}
+
+// WO-2026-08-29-002 item 8: DeviceStatusPublisher.cpp calls the real
+// isClockTrusted() defined in Generalized-Core-Counter.cpp, which this
+// power-source-focused harness does not compile/link. Provided only to
+// satisfy the linker; always reports "trusted" so this harness's existing
+// assertions about the rest of the status payload are unaffected.
+bool isClockTrusted() { return true; }
+
+// Finding 2 (Round 4 review): DeviceStatusPublisher.cpp now also calls the
+// real observedTimeSyncedLastMs() defined in Generalized-Core-Counter.cpp,
+// which this harness does not compile/link either. Provided only to
+// satisfy the linker; a fixed nonzero value keeps this harness's existing
+// syncAgeSec/clock-payload assertions stable.
+uint32_t observedTimeSyncedLastMs() { return 1000; }
+
+// Round 6 (Stage 7 finding 1): DeviceStatusPublisher.cpp now derives
+// syncAgeSec from reportedSyncAgeMs() (the wrap-aware, sentinel-bearing
+// telemetry value) rather than calling observedTimeSyncedLastMs() itself.
+// The real reportedSyncAgeMs() is defined in Generalized-Core-Counter.cpp,
+// which this harness does not compile/link. Provided only to satisfy the
+// linker; a fixed, non-sentinel value keeps this harness's status-payload
+// assertions unaffected (this harness does not itself assert on
+// syncAgeSec's numeric value - see power_source_override_test.cpp).
+uint32_t reportedSyncAgeMs() { return 1000; }

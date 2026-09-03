@@ -42,6 +42,14 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 #include "AB1805_RK.h"               // RTC and hardware watchdog
 #include "LocalTimeRK.h"             // Timezone conversion (UTC to local)
 #include "time/LocalTimeCache.h"          // Cached LocalTimeRK conversions
+#include "time/ClockTrust.h"         // Sync-recency resync gate and trust signal (WO-2026-08-29-002)
+#include "time/HibernateWakeDiagnostics.h" // Hibernate-wake gate classification/payload (WO-2026-08-29-001)
+#include "time/RtcSkewTest.h"         // Bench-only RTC skew hook arithmetic/guard (WO-2026-08-31-003)
+
+#if ENABLE_RTC_SKEW_TEST
+#warning "ENABLE_RTC_SKEW_TEST=1 (bench-only RTC skew hook enabled - must not ship)"
+#endif
+
 
 // Persistent data and configuration
 #include "MyPersistentData.h"        // FRAM-backed sysStatus, current, sensorConfig
@@ -109,11 +117,17 @@ void dailyCleanup();          // Reset daily counters and housekeeping
 void UbidotsHandler(const char *event, const char *data); // Webhook response handler
 void publishStartupStatus();  // One-time status summary at boot
 void publishWatchdogForensics(bool ab1805Confirmed = false); // One-time watchdog forensic snapshot at boot
+void publishHibernateWakeForensics(const HibernateWakeDiagnostics::EventFields &fields); // WO-2026-08-29-001
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE); // Safe diagnostic publish with queue guard
 void applyBatteryAwareConnectionModePolicy(float currentSoC, BatteryTier resolvedTier);
 void applyBatteryAwareConnectionModePolicy(float currentSoC);
 void clearConnectivityFailsafeRecovery(const char *reason);
 void connectivityFailsafeSupervisor();
+void requestClockResync(const char *reason); // WO-2026-08-29-002 item 6: monotonic-gated resync request
+void checkClockResync();                     // WO-2026-08-29-002 items 6/7: per-loop resync gate + RTC write-back
+bool isClockTrusted();                       // WO-2026-08-29-002 item 8: sync-recency trust signal
+uint32_t observedTimeSyncedLastMs();         // WO-2026-08-29-002 Finding 2: non-blocking Particle.timeSyncedLast() substitute
+uint32_t reportedSyncAgeMs();                // WO-2026-08-29-002 Round 6 (Stage 7 finding 1): wrap-aware, sentinel-bearing sync age for telemetry only
 
 // ===== Global runtime objects =====
 
@@ -473,6 +487,26 @@ retained time_t retainedHibernateWakeTime = 0;
 retained uint32_t retainedHibernateRequestedSleep = 0;
 retained uint32_t retainedHibernateCount = 0;
 retained bool retainedHibernatePending = false;
+#if PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST
+// WO-2026-08-31-003 Amendment A.2 / round 3 HIGH fix: persists whether the
+// bench-only RTC skew hook (below, in setup()) has already fired.
+// `retained` RAM survives an MCU reset (soft reset, AB1805 watchdog reset,
+// HIBERNATE wake) as long as system power is maintained - see
+// src/time/RtcSkewTest.h's file-level doc comment for the full "what this
+// does and does not survive" reasoning. Guarded the same as the hook
+// itself so it compiles out of a default (ENABLE_RTC_SKEW_TEST=0) build
+// entirely.
+//
+// retainedRtcSkewTestArmToken pairs with the fired-flag below: a fresh
+// flash's build token will not match whatever token is already persisted
+// (a different build's token, or unconstrained bytes left by firmware
+// that never wrote this field) - see RtcSkewTest::rearmIfBuildTokenChanged()
+// and the header's "Round 3 HIGH" doc section for why the fired-flag's
+// OWN `= false` initializer is not sufficient to guarantee re-arming on a
+// fresh flash.
+retained uint64_t retainedRtcSkewTestArmToken = 0;
+retained bool retainedRtcSkewTestFired = false;
+#endif
 uint8_t startupPreviousBreadcrumb = BREADCRUMB_NONE;
 uint32_t startupPreviousBreadcrumbMs = 0;
 uint8_t startupPreviousLoopStage = LOOP_STAGE_NONE;
@@ -945,6 +979,11 @@ void setup() {
   if (bootStormAlertPending) {
     // Force explicit boot-storm alert visibility in startup/report payloads.
     current.set_alertCode(17);
+    // WO-2026-08-29-002 item 8: deliberately NOT gated on isClockTrusted().
+    // Same shared lastAlertTime field/consumer as currentStatusData::
+    // raiseAlert() (MyPersistentData.cpp) - see that function's comment for
+    // why writing a 0 sentinel here would incorrectly bypass State_Report.cpp's
+    // alert-40 escalation cooldown.
     current.set_lastAlertTime(Time.now());
     bootStormAlertPending = false;
     Log.warn("Boot storm holdoff detected - raising alert 17");
@@ -1055,6 +1094,84 @@ void setup() {
   // Initialize AB1805 RTC and hardware watchdog, then restore system time if needed
   const bool timeValidBeforeRtc = Time.isValid();
   ab1805.withFOUT(WKP).setup();                // Initialize AB1805 RTC - WKP is D10 on Photon2
+
+#if PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST
+  // ===== BENCH-ONLY: DELIBERATE RTC SKEW (WO-2026-08-31-003, Amendment A) =====
+  // Compiled in ONLY when ENABLE_RTC_SKEW_TEST=1 (see BuildProfile.h) on
+  // Boron. Fires ONCE - not once per boot, but once ever, across resets,
+  // until a fresh flash or an explicit reset of retainedRtcSkewTestFired
+  // (Amendment A.2) - right after ab1805.setup() and before the
+  // hibernate-wake classification block below, so the rest of setup() sees
+  // exactly the state the field defect produces: a "set" RTC holding a
+  // plausible-but-wrong value.
+  //
+  // A.3: RTC write only - ab1805.setRtcFromTime() - nothing else. In
+  // particular, no Time.setTime(): ab1805.setup() (above) already seeded
+  // system time from whatever the RTC held BEFORE this hook runs, so this
+  // boot's own Time stays whatever it already was. The skewed value only
+  // becomes the system's believed time on a LATER boot, when that boot's
+  // own ab1805.setup() reads the now-skewed RTC - matching the bench
+  // procedure's amended step 3 (verify Time.isValid()/wrong-time belief
+  // after the post-flash power-cycle, not on the flashing boot itself).
+  //
+  // A.4: the write's return value is checked before treating it as done -
+  // a failed write is logged distinctly and does NOT log a fabricated
+  // "after" time as if it had taken effect.
+  //
+  // Round 3 HIGH fix: before trusting retainedRtcSkewTestFired at all,
+  // compare the persisted arm-token against a token computed for THIS
+  // build (__DATE__/__TIME__/__FILE__, evaluated at compile time of this
+  // translation unit). A mismatch - a fresh flash of newly compiled
+  // firmware, or a persisted slot left unconstrained by firmware that
+  // never wrote it - forces retainedRtcSkewTestFired back to false
+  // unconditionally, so arming does not depend on that flag's own
+  // `retained` initializer having run (see RtcSkewTest.h's "Round 3 HIGH"
+  // doc section for the full root-cause analysis and what this does and
+  // does not guarantee).
+  //
+  // Round 4 HIGH fix: the token is now a 64-bit FNV-1a hash
+  // (fnv1aHash64(), retainedRtcSkewTestArmToken widened to uint64_t), not
+  // 32-bit - Stage 7 demonstrated two distinct real build-identity strings
+  // colliding at 32 bits, which silently left the fired-flag set across a
+  // genuine recompile. See RtcSkewTest.h's "Round 4 HIGH" doc section for
+  // what the 64-bit widening does and does not guarantee (in particular:
+  // it does not and cannot distinguish two builds completed within the
+  // same wall-clock second, since __TIME__ itself is then byte-identical
+  // - accepted as a residual limitation, not a defect, because a full
+  // Boron build takes minutes).
+  {
+    const uint64_t rtcSkewTestBuildToken = RtcSkewTest::fnv1aHash64(__DATE__ " " __TIME__ " " __FILE__);
+    RtcSkewTest::rearmIfBuildTokenChanged(retainedRtcSkewTestArmToken, retainedRtcSkewTestFired,
+                                           rtcSkewTestBuildToken);
+    RtcSkewTest::OneShotGuard rtcSkewTestGuard(retainedRtcSkewTestFired);
+    if (rtcSkewTestGuard.shouldRun()) {
+      time_t rtcSkewRawBefore = 0;
+      const bool rtcSkewReadBeforeOk = ab1805.getRtcAsTime(rtcSkewRawBefore);
+      const time_t rtcSkewAnchor = (time_t)RtcSkewTest::chooseAnchor(rtcSkewRawBefore, rtcSkewReadBeforeOk);
+      const time_t rtcSkewAfter = (time_t)RtcSkewTest::applySkew(rtcSkewAnchor);
+      const bool rtcSkewWriteOk = ab1805.setRtcFromTime(rtcSkewAfter);
+      if (rtcSkewWriteOk) {
+        time_t rtcSkewVerify = 0;
+        const bool rtcSkewVerifyReadOk = ab1805.getRtcAsTime(rtcSkewVerify);
+        Log.warn("RtcSkewTest: ONE-SHOT bench hook fired - before(raw=%ld readOk=%d) anchor=%s "
+                 "skew=%ldsec after=%s verify=%s verifyReadOk=%d",
+                 (long)rtcSkewRawBefore, rtcSkewReadBeforeOk ? 1 : 0,
+                 Time.format(rtcSkewAnchor, TIME_FORMAT_DEFAULT).c_str(),
+                 (long)RtcSkewTest::kSkewSeconds,
+                 Time.format(rtcSkewAfter, TIME_FORMAT_DEFAULT).c_str(),
+                 Time.format(rtcSkewVerify, TIME_FORMAT_DEFAULT).c_str(),
+                 rtcSkewVerifyReadOk ? 1 : 0);
+      } else {
+        // Write failed - the RTC still holds whatever it held before this
+        // hook ran. Do not claim the skew took effect (A.4).
+        Log.error("RtcSkewTest: ONE-SHOT bench hook FAILED - setRtcFromTime() write did not "
+                  "succeed; RTC left unchanged (before(raw=%ld readOk=%d) attemptedAfter=%s)",
+                  (long)rtcSkewRawBefore, rtcSkewReadBeforeOk ? 1 : 0,
+                  Time.format(rtcSkewAfter, TIME_FORMAT_DEFAULT).c_str());
+      }
+    }
+  }
+#endif
 
   // ===== AB1805 WATCHDOG WAKE-REASON CLASSIFICATION =====
   // Gated on RESET_REASON_PIN_RESET. Device OS reports an external MCU reset
@@ -1188,6 +1305,29 @@ void setup() {
                startupHibernateWakeReason,
                rtcReadOk ? 1 : 0);
     }
+
+    // WO-2026-08-29-001: queue a forensic event capturing the gate outcome
+    // BEFORE retainedHibernatePending is cleared below, so the failure case
+    // (previously invisible - see the Work Order) reaches the cloud too.
+    // buildEventFields() classifies via classifyGateArm(), which mirrors the
+    // exact same conditions/order as the `if` above; none of this alters
+    // startupHibernateStatusReady or any gate decision, it only identifies
+    // which arm failed (or kNone on success) for reporting.
+    {
+      HibernateWakeDiagnostics::GateInputs gateInputs{};
+      gateInputs.resetReasonIsPowerManagement = (reason == RESET_REASON_POWER_MANAGEMENT);
+      gateInputs.wakeReasonIsAlarm = (wakeReason == AB1805::WakeReason::ALARM);
+      gateInputs.rtcReadOk = rtcReadOk;
+      gateInputs.rtcBefore = (int64_t)retainedHibernateRtcBefore;
+      gateInputs.requestedSleepSec = retainedHibernateRequestedSleep;
+      gateInputs.rtcAtWake = (int64_t)rtcTime;
+
+      const HibernateWakeDiagnostics::EventFields eventFields = HibernateWakeDiagnostics::buildEventFields(
+          gateInputs, reason, startupHibernateWakeReason, retainedHibernateCount,
+          startupHibernateActualSleepSec, startupHibernateSleepErrorSec);
+
+      publishHibernateWakeForensics(eventFields);
+    }
   }
 #endif
   retainedHibernatePending = false;
@@ -1226,8 +1366,40 @@ void setup() {
   }
 
   // Validate time and configure local time converter
-  if (!Time.isValid()) {
-    transitionTo(CONNECTING_STATE, "time invalid");
+  //
+  // Finding 3 (WO-2026-08-29-002, Round 4 review): Time.isValid() alone can
+  // be true here with zero confirmed cloud syncs ever - ab1805.setup() seeds
+  // system time from the RTC every boot, whether or not the RTC is correct.
+  //
+  // sysStatus.get_lastTimeSync() (persisted across reboots, stamped only by
+  // checkClockResync() at confirmed-sync time - see below) is the correct
+  // signal to use here, NOT Particle.timeSyncedLast() (which always reads 0
+  // immediately after every boot/HIBERNATE wake and would force this branch
+  // on every single wake, defeating the low-power connection scheduling
+  // that INTERMITTENT/DISCONNECTED modes rely on). get_lastTimeSync()==0
+  // means "this device has never, across its whole persisted history,
+  // completed a confirmed sync" - true on a genuinely fresh install/reset.
+  //
+  // SCOPE NARROWED 2026-08-31: Round 5 added a second OR term
+  // (`hibernateWakeWithoutConfirmedSyncThisBoot`, gated on
+  // `System.resetReason() == RESET_REASON_POWER_MANAGEMENT`) intended to
+  // guarantee a resync opportunity around every HIBERNATE wake. That term
+  // is REVERTED here per the Work Order's "SCOPE NARROWED 2026-08-31"
+  // section: because isClockTrusted() is unconditionally false at this
+  // point in setup() (no connection has been attempted yet this boot), the
+  // term reduced to just `resetReason == RESET_REASON_POWER_MANAGEMENT`,
+  // which fired on EVERY hibernate wake - not just the skewed-RTC case -
+  // making the mutually-exclusive opening-hour alert-40 suppression in the
+  // `else` branch below unreachable on every normal overnight hibernate
+  // wake. That was an unauthorised regression to existing behaviour
+  // (Stage 7 re-review finding 1). The wake-time guarantee this term was
+  // trying to provide has moved to WO-2026-08-31-002, which is explicitly
+  // permitted to touch the sleep gate and connection-mode policy that a
+  // correct fix actually requires; this WO no longer claims a wake-time
+  // guarantee and reverts to the plain Round-4 condition below.
+  const bool neverConfirmedSyncEver = (sysStatus.get_lastTimeSync() == 0);
+  if (!Time.isValid() || neverConfirmedSyncEver) {
+    transitionTo(CONNECTING_STATE, !Time.isValid() ? "time invalid" : "no confirmed time sync ever (Finding 3)");
   } else {
     // Now that time is valid, configure local time converter for timezone-aware operations
     conv.withCurrentTime().convert();
@@ -1424,6 +1596,7 @@ void loop() {
   thrashGuard.loop(state, millis());
 
   ab1805.loop(); // Keeps the RTC synchronized with the device clock
+  checkClockResync(); // WO-2026-08-29-002: recurring app-side RTC write-back, not gated by ab1805.loop()'s per-boot latch
 
   // Housekeeping for each transit of the main loop
   current.loop();
@@ -1780,7 +1953,28 @@ void logTimeDiag(bool isOpen) {
   const uint8_t localMinute = (uint8_t)((localSecondsOfDay / 60UL) % 60UL);
   const uint8_t localSecond = (uint8_t)(localSecondsOfDay % 60UL);
 
-  Log.info("TimeDiag: tz=%s valid=%d epoch=%lu utc=%04d-%02d-%02d %02d:%02d:%02d local=%04d-%02d-%02d %02d:%02d:%02d open=%d close=%d isOpen=%d",
+  // Item 9 (WO-2026-08-29-002): sync recency and the trust verdict, using
+  // the same monotonic Particle.timeSyncedLast() signal as the resync gate
+  // and trust check above - not Time.isValid() alone (Finding 3).
+  // lastTimeSyncEpoch is the persisted, wall-clock completion stamp from
+  // checkClockResync() (item 6's fix to sysStatus.get_lastTimeSync(), which
+  // previously had zero callers).
+  //
+  // Round 6 (Stage 7 finding 1): syncAgeMs is now reportedSyncAgeMs(), the
+  // wrap-aware, sentinel-bearing telemetry value - not raw elapsedMs().
+  // Raw elapsedMs() would (a) misreport uptime as sync age before any sync
+  // has completed this boot (ambiguous with "synced 0 ms ago"), and (b)
+  // wrap back around to a small, deceptively fresh-looking value after a
+  // full millis() rollover with no further confirmed sync, even though
+  // `trusted` has correctly already gone false - telemetry would then
+  // contradict the trust verdict. reportedSyncAgeMs() reports
+  // ClockTrust::kReportedSyncAgeUnavailableMs (UINT32_MAX) for both cases
+  // instead - a value no genuine sync age can ever reach, so a log reader
+  // cannot mistake it for a real duration.
+  const bool clockTrusted = isClockTrusted();
+  const time_t lastTimeSyncEpoch = sysStatus.get_lastTimeSync();
+
+  Log.info("TimeDiag: tz=%s valid=%d epoch=%lu utc=%04d-%02d-%02d %02d:%02d:%02d local=%04d-%02d-%02d %02d:%02d:%02d open=%d close=%d isOpen=%d trusted=%d syncAgeMs=%lu lastSyncEpoch=%ld",
            tz,
            timeValid ? 1 : 0,
            (unsigned long)epoch,
@@ -1798,7 +1992,432 @@ void logTimeDiag(bool isOpen) {
            localSecond,
            (int)sysStatus.get_openTime(),
            (int)sysStatus.get_closeTime(),
-           isOpen ? 1 : 0);
+           isOpen ? 1 : 0,
+           clockTrusted ? 1 : 0,
+           (unsigned long)reportedSyncAgeMs(),
+           (long)lastTimeSyncEpoch);
+}
+
+// ===== WO-2026-08-29-002: monotonic-gated resync, RTC write-back, and =====
+// ===== sync-recency trust signal                                     =====
+//
+// Root cause recap (see the Work Order's Investigation Findings 3 and 5):
+// `Time.isValid()` is true as soon as `ab1805.setup()` seeds system time
+// from the RTC, whether or not the RTC itself is correct. The only path
+// that ever wrote the RTC in this build, `AB1805::loop()`, is latched by a
+// per-boot `timeSet` member: it can fire once, as a no-op, before any real
+// correction ever lands in system time, after which it silently blocks
+// every later correction for that boot. `AB1805::setRtcFromSystem()`
+// (`lib/AB1805_RK`, not modified here - vendored) exists for exactly this
+// purpose but had zero callers.
+//
+// Design (2nd review fix): the RTC write-back is now a pure function of
+// OBSERVED `Particle.timeSyncedLast()` state, never of request/pending
+// bookkeeping. The system thread runs in this project (default since
+// Device OS 6.2.0, confirmed against system/src/system_mode.cpp and the
+// SYSTEM_THREAD() macro's own compiler warning), so a sync request and its
+// completion are asynchronous and can race arbitrarily against loop()'s
+// checks - including completing before the very next loop() iteration.
+// Tying the RTC write to a `clockResyncPending`/`syncTimeDone()` branch (the
+// 1st review fix's design) meant a fast completion could be observed via
+// `syncTimeDone()==true` before `Particle.timeSyncedLast()` had actually
+// advanced, get misclassified as "did not complete", and permanently lose
+// its only path to `ab1805.setRtcFromSystem()` for that sync - silently
+// reintroducing the exact bug this Work Order exists to fix, while logs
+// looked healthy. The fix: track the `timeSyncedLast()` value the RTC was
+// last written for (`lastRtcWriteSyncedLastMs`); on every
+// `checkClockResync()` call, if `timeSyncedLast()` is nonzero and differs
+// from that tracked value, a sync has genuinely advanced - write the RTC,
+// stamp `lastTimeSync`, and update the tracked value - regardless of
+// whether *this app* requested it. This also means a Device-OS-initiated
+// sync at cloud handshake (which this app never explicitly requested) now
+// correctly drives an RTC write too, closing a gap the request-tracking
+// design ignored entirely.
+//
+// `clockResyncPending` is dropped entirely for this reason: once the RTC
+// write-back no longer depends on knowing whether a specific request
+// completed, the only remaining job for pending-state bookkeeping was
+// pacing repeat requests - and `ClockTrust::canRetryResyncNow()` already
+// does that directly from `clockResyncLastAttemptMs`, with no window where
+// a stuck/racy "pending" flag could block a later request that should have
+// been allowed to fire.
+namespace {
+uint32_t lastRtcWriteSyncedLastMs = 0; // Finding 1: only updated after a CONFIRMED successful RTC write
+// Round 6 (second follow-up): split from a single "last attempt of any
+// kind" timestamp into a FAILURE-only pair, so the retry floor
+// (canRetryRtcWriteNow()) can never withhold a distinct new sync value
+// that arrives shortly after a SUCCESSFUL write - only a repeat attempt of
+// the exact value that already failed is paced. See
+// ClockTrust::shouldAttemptRtcWriteNow()'s doc comment for the full
+// rationale.
+uint32_t lastRtcWriteFailedAttemptMs = 0; // millis() at the last FAILED write attempt, or 0 if none yet
+uint32_t lastRtcWriteFailedSyncMs = 0; // the sync value lastRtcWriteFailedAttemptMs was recorded for
+uint32_t clockResyncLastAttemptMs = 0;
+
+// Finding 2 (Round 4 review): non-blocking cache for Particle.timeSyncedLast().
+// See observedTimeSyncedLastMs() below for the full design writeup.
+uint32_t cachedTimeSyncedLastMs = 0;
+
+// Finding 4 (Round 4 review): millis() full-wrap tracking. lastLoopMs/
+// millisWrapTrackerInitialized let tickMillisWrapTracker() detect a wrap
+// (nowMs < the previous sample) by comparing consecutive samples;
+// millisWrapGeneration counts how many wraps have been observed so far this
+// boot. syncCaptureWrapGeneration/lastSeenSyncRawMs record the generation
+// and raw value in effect the last time Particle.timeSyncedLast() (via
+// observedTimeSyncedLastMs()) was observed to change, so a later comparison
+// can tell whether a full wrap has occurred since that specific sync was
+// captured - see ClockTrust::shouldResyncWrapAware()/isTrustedWrapAware().
+uint32_t millisWrapGeneration = 0;
+uint32_t lastLoopMs = 0;
+bool millisWrapTrackerInitialized = false;
+uint32_t syncCaptureWrapGeneration = 0;
+uint32_t lastSeenSyncRawMs = 0;
+} // namespace
+
+/**
+ * @brief Non-blocking substitute for Particle.timeSyncedLast() (Finding 2,
+ *        Round 4 review).
+ *
+ * @details Particle.timeSyncedLast() backs onto spark_sync_time_last(),
+ *          which is wrapped in SYSTEM_THREAD_CONTEXT_SYNC - when called from
+ *          the application thread (as here; the system thread IS started in
+ *          this project, confirmed against system/src/system_mode.cpp and
+ *          the SYSTEM_THREAD() macro's own compiler warning), that macro
+ *          blocks the CALLING thread on future->get() until the system
+ *          thread actually processes the call - which, while a cloud
+ *          connection is being established, can take as long as the
+ *          connection itself does. The vendored, unmodified
+ *          lib/AB1805_RK/src/AB1805_RK.cpp:51-53 documents this exact hazard
+ *          in a comment and guards its own call to this same API behind
+ *          Particle.connected(). Before this fix, checkClockResync() called
+ *          Particle.timeSyncedLast() unconditionally every loop() - ahead of
+ *          serviceAwakeWatchdog() - and isClockTrusted() reached it from
+ *          publishStartupStatus() during setup(); a slow cellular connect
+ *          could delay the watchdog refresh past the 60s app / 124s AB1805
+ *          watchdog budget, risking a watchdog-reset/boot-storm.
+ *
+ *          DESIGN TENSION (must be stated explicitly, not papered over): the
+ *          obvious guard - only call the real API when Particle.connected()
+ *          - changes what callers see while disconnected. Chosen resolution:
+ *          cache the real value while connected; return the cached snapshot
+ *          while disconnected, instead of a synthesized "unknown"/0 value.
+ *
+ *          BEHAVIORAL CONSEQUENCE: while disconnected, isClockTrusted()/
+ *          checkClockResync()/logTimeDiag()/the status payload see a frozen
+ *          snapshot of the last-known sync timestamp rather than a live
+ *          read. This is always an accurate reflection of "has a sync
+ *          completed, and when" for two reasons: (a) a sync cannot complete
+ *          while disconnected anyway, so there is nothing newer to miss, and
+ *          (b) trust still correctly DEGRADES the longer the device stays
+ *          disconnected, because elapsedMs()/ClockTrust::isTrustedWrapAware()
+ *          compute
+ *          age from millis() (which keeps advancing) against this fixed
+ *          cached timestamp - the clock does not get stuck falsely
+ *          "trusted" while offline. A device that has never connected this
+ *          boot has cachedTimeSyncedLastMs == 0 (its initial value), which
+ *          reads identically to what the real API would report in that case
+ *          (Particle.connected() would be false and the real API would
+ *          never even be called, but the semantic answer - "no confirmed
+ *          sync this boot" - is the same).
+ */
+uint32_t observedTimeSyncedLastMs() {
+  if (Particle.connected()) {
+    cachedTimeSyncedLastMs = Particle.timeSyncedLast();
+  }
+  return cachedTimeSyncedLastMs;
+}
+
+/**
+ * @brief Finding 4 (Round 4 review): call once per loop() with the current
+ *        millis() to detect a full 32-bit rollover (~49.7 days).
+ *
+ * @details A wrap is detected purely by comparing consecutive samples
+ *          (nowMs < the previous sample) - this only requires being called
+ *          more often than once per wrap period, which loop() trivially
+ *          satisfies. Deliberately NOT reset on HIBERNATE wake by anything
+ *          here: it doesn't need to be - millisWrapGeneration/lastLoopMs are
+ *          plain RAM globals, so a HIBERNATE wake (a fresh boot) already
+ *          resets them to 0 along with everything else in this translation
+ *          unit's static storage.
+ */
+void tickMillisWrapTracker(uint32_t nowMs) {
+  if (millisWrapTrackerInitialized && nowMs < lastLoopMs) {
+    ++millisWrapGeneration;
+  }
+  lastLoopMs = nowMs;
+  millisWrapTrackerInitialized = true;
+}
+
+/**
+ * @brief Requests a Device OS time sync, paced by the retry floor.
+ *
+ * @details Fire-and-forget: `Particle.syncTime()` queues the request on the
+ *          system thread. Completion is NOT tracked here - see
+ *          `checkClockResync()`'s observed-state write-back below, which
+ *          fires independently of who asked for the sync (this function,
+ *          `dailyCleanup()`, or Device OS's own cloud-handshake sync that
+ *          this app never explicitly requests).
+ */
+void requestClockResync(const char *reason) {
+  if (!Particle.connected()) {
+    return;
+  }
+  clockResyncLastAttemptMs = millis();
+  Log.info("ClockResync: requesting sync (%s)", reason ? reason : "unspecified");
+  Particle.syncTime();
+}
+
+/**
+ * @brief Per-loop monotonic-gated resync request and recurring, observed-
+ *        state-driven RTC write-back.
+ *
+ * @details Item 6 (request side): the elapsed-time gate
+ *          (`ClockTrust::shouldResyncWrapAware()`) is driven by
+ *          `millis()`/`Particle.timeSyncedLast()` - both monotonic - never
+ *          by wall clock, so a wrong wall clock cannot postpone its own
+ *          repair. `Particle.timeSyncedLast()` resets to 0 on every fresh
+ *          boot, including every HIBERNATE wake, so the gate is eligible on
+ *          the first check after such a wake with no hibernate-specific
+ *          detection needed; within a boot that stays up without
+ *          hibernating, it recurs every <=24h. Eligible is not the same as
+ *          guaranteed: a request is only issued when `Particle.connected()`,
+ *          so a device that wakes with a wrong clock and sleeps again before
+ *          connecting is never repaired here. Closing that loop requires
+ *          waiting on sync COMPLETION in the sleep gate and is
+ *          WO-2026-08-31-002's scope, not this one's. Repeat requests are
+ *          paced by `ClockTrust::canRetryResyncNow()`
+ *          (`kMinResyncRetryIntervalMs`).
+ *
+ *          Item 7 (write-back side, 2nd review fix): fires whenever
+ *          `Particle.timeSyncedLast()` is nonzero and has advanced past the
+ *          value the RTC was last written for - a pure function of observed
+ *          sync state, decoupled from request/pending bookkeeping (see the
+ *          design note above). This is safe to stamp `lastTimeSync` at this
+ *          point, because `timeSyncedLast()` having just advanced means the
+ *          clock is trusted by definition (matches
+ *          `ClockTrust::isTrustedWrapAware()`).
+ *          Fires on a recurring basis every time the sync advances, not
+ *          gated by `AB1805::loop()`'s per-boot `timeSet` latch, and picks
+ *          up syncs regardless of whether this app, `dailyCleanup()`, or
+ *          Device OS's own cloud-handshake time sync caused them.
+ *
+ *          Finding 1 fix: `lastTimeSync` is stamped with `Time.now()` here,
+ *          at observed-sync-advance time, not at the moment any request was
+ *          issued (the request-time stamp used the very clock under
+ *          suspicion).
+ *
+ *          Finding 1 fix, Round 4: `lastRtcWriteSyncedLastMs` is now updated
+ *          ONLY after `ab1805.setRtcFromSystem()` returns true. Previously it
+ *          was updated unconditionally before the call, so a failed I2C
+ *          write was permanently treated as done - the sync was never
+ *          retried, and because the cloud sync itself had succeeded, the
+ *          *request*-side gate (`shouldResync()`) also saw a recent sync and
+ *          would not ask again for up to 24h, while a HIBERNATE could
+ *          re-seed system time from the still-wrong RTC much sooner. Now, on
+ *          a failed write, the tracked value is left unchanged, so the very
+ *          next `checkClockResync()` call (still observing the same
+ *          unwritten `lastSyncMs`) retries the write - recurring, not a
+ *          one-shot.
+ *
+ *          Round 5 cleanup (Stage 7 finding 5): the recurring retry above
+ *          is now paced by `ClockTrust::canRetryRtcWriteNow()`
+ *          (`kMinRtcWriteRetryIntervalMs`), a monotonic millis()-based
+ *          floor separate from the request-side retry floor. Without this,
+ *          a PERMANENT AB1805/Wire fault would retry `setRtcFromSystem()`
+ *          (a locked I2C transaction) on every single main-loop pass -
+ *          potentially hundreds of times per second on a bus shared with
+ *          PMIC/battery work, with matching log volume and watchdog
+ *          pressure. This only paces the FAILED-write path: a confirmed
+ *          successful write advances `lastRtcWriteSyncedLastMs`, which
+ *          already blocks any further attempt for that sync value via the
+ *          gate condition itself, so the success path's cadence is
+ *          unaffected.
+ *
+ *          Round 6 (second follow-up) fix: the Round 5 implementation
+ *          above keyed the floor to `lastRtcWriteAttemptMs`, a timestamp
+ *          recorded before EVERY attempt including successes - so a
+ *          DISTINCT new sync value arriving within `kMinRtcWriteRetryIntervalMs`
+ *          of a successful write was wrongly withheld from the RTC too,
+ *          which made the two paragraphs above false in that case. Fixed
+ *          by splitting the tracked state into `lastRtcWriteFailedAttemptMs`/
+ *          `lastRtcWriteFailedSyncMs`, captured ONLY in the `else` (failed)
+ *          branch below, so `ClockTrust::shouldAttemptRtcWriteNow()` applies
+ *          the floor only when retrying the exact value that already
+ *          failed - never to a value that has not yet been attempted.
+ *
+ *          Finding 2 fix, Round 4: uses `observedTimeSyncedLastMs()`, not
+ *          `Particle.timeSyncedLast()` directly, so this can never block
+ *          past a watchdog boundary during a slow cellular connect.
+ *
+ *          Finding 4 fix, Round 4: the request- and write-back-side gates
+ *          use `ClockTrust::shouldResyncWrapAware()`/wrap-generation
+ *          tracking rather than the plain millis()-diff gate, so an ancient
+ *          sync can't be misread as fresh after a full millis() rollover
+ *          (~49.7 days) with no intervening confirmed sync.
+ *
+ *          Finding 8 (Round 4 review, accepted/documented, not "fixed"):
+ *          the vendored `AB1805::loop()` (lib/AB1805_RK, untouched) has its
+ *          own one-shot RTC write, gated on
+ *          `!timeSet && Time.isValid() && Particle.connected() &&
+ *          Particle.timeSyncedLast() != 0` - the SAME condition ("a sync has
+ *          completed") this function's write-back reacts to, and
+ *          `ab1805.loop()` runs immediately before `checkClockResync()` in
+ *          `loop()`. So the FIRST time a sync completes each boot, BOTH
+ *          fire, writing the same correct value to the RTC twice. This is a
+ *          harmless, idempotent duplicate write (same value, immediate
+ *          succession), not a correctness bug - it costs one extra I2C
+ *          transaction once per boot. There is no accessor into the
+ *          vendored `timeSet` latch to suppress it without modifying
+ *          `lib/AB1805_RK`, which is out of scope. "Exactly once" elsewhere
+ *          in this codebase (tests, comments) refers to THIS function's own
+ *          idempotency across repeated calls with an unchanged
+ *          `timeSyncedLast()` value, not to the total count of physical RTC
+ *          writes across both this function and the vendored one-shot.
+ */
+void checkClockResync() {
+  const uint32_t nowMs = millis();
+  tickMillisWrapTracker(nowMs);
+  const uint32_t lastSyncMs = observedTimeSyncedLastMs();
+
+  // Track the wrap generation in effect the moment this sync value was
+  // first observed, so the wrap-aware gates below can tell whether a full
+  // millis() rollover has happened since (Finding 4).
+  if (lastSyncMs != lastSeenSyncRawMs) {
+    lastSeenSyncRawMs = lastSyncMs;
+    syncCaptureWrapGeneration = millisWrapGeneration;
+  }
+
+  // --- Write-back side: pure function of observed timeSyncedLast() state. ---
+  // Round 5 cleanup task 2 (Stage 7 finding 5), corrected Round 6 (second
+  // follow-up): a FAILED write is paced by ClockTrust::canRetryRtcWriteNow()
+  // so a permanent AB1805/Wire fault cannot retry ab1805.setRtcFromSystem()
+  // (a locked I2C transaction) on every single main-loop pass. This does
+  // NOT affect a distinct new sync value: lastRtcWriteFailedAttemptMs/
+  // lastRtcWriteFailedSyncMs are recorded ONLY in the `else` (failed)
+  // branch below, never on a success and never before the attempt, so
+  // ClockTrust::shouldAttemptRtcWriteNow() only applies the floor when
+  // lastSyncMs is the SAME value that most recently failed - a fresh sync
+  // value is admitted immediately regardless of how recently any write was
+  // last attempted.
+  //
+  // Round 5 cleanup task 4 (Stage 7 finding 7): the gate condition itself
+  // is now ClockTrust::shouldAttemptRtcWriteNow() - a pure function shared
+  // with the host tests - rather than being re-derived inline, so a host
+  // test can exercise the real decision logic instead of a hand-written
+  // mirror that could silently drift from it.
+  if (ClockTrust::shouldAttemptRtcWriteNow(lastSyncMs, lastRtcWriteSyncedLastMs,
+                                            nowMs, lastRtcWriteFailedAttemptMs,
+                                            lastRtcWriteFailedSyncMs)) {
+    const bool rtcUpdated = ab1805.setRtcFromSystem();
+    Log.info("ClockResync: sync advanced, rtcUpdated=%d epoch=%ld",
+             rtcUpdated ? 1 : 0, (long)Time.now());
+    if (rtcUpdated) {
+      // Finding 1: only mark this sync value as "written" once the RTC
+      // write is confirmed successful, and only then stamp lastTimeSync.
+      lastRtcWriteSyncedLastMs = lastSyncMs;
+      sysStatus.set_lastTimeSync(Time.now());
+
+      // Round 5 cleanup task 3 (Stage 7 finding 3): the status payload is
+      // published on connect, BEFORE this corrective sync completes (see
+      // State_Connect.cpp), so it correctly read trusted=false at that
+      // point. Nothing previously republished it once the sync succeeded,
+      // so the ledger could go a whole session without ever showing
+      // trusted=true. Flag the EXISTING deferred-republish mechanism
+      // (Cloud::loop() already drains pendingStatusPublish, retrying on
+      // failure) rather than publishing synchronously here - this cannot
+      // block or reorder anything checkClockResync() does.
+      Cloud::instance().requestStatusPublish("ClockResync");
+    } else {
+      // Round 6 (second follow-up): record the failure-only timestamp/value
+      // pair that paces JUST this value's retries - never touched on a
+      // success, so a later distinct sync is never delayed by it.
+      lastRtcWriteFailedAttemptMs = nowMs;
+      lastRtcWriteFailedSyncMs = lastSyncMs;
+      Log.warn("ClockResync: setRtcFromSystem failed (Time.isValid=%d) - will retry after retry floor",
+               Time.isValid() ? 1 : 0);
+    }
+  }
+
+  // --- Request side: ask for a resync when the monotonic gate is open, ---
+  // --- paced by the retry floor.                                       ---
+  if (Particle.connected() &&
+      ClockTrust::shouldResyncWrapAware(nowMs, lastSyncMs, millisWrapGeneration, syncCaptureWrapGeneration) &&
+      ClockTrust::canRetryResyncNow(nowMs, clockResyncLastAttemptMs)) {
+    requestClockResync(lastSyncMs == 0 ? "no confirmed sync yet this boot" : "24h elapsed since last confirmed sync");
+  }
+}
+
+/**
+ * @brief Item 8: is `Time.now()` currently trustworthy enough to persist or
+ *        report?
+ *
+ * @details Per Finding 3, `Time.isValid()` alone is NOT sufficient - it was
+ *          true throughout the incident this Work Order investigates. This
+ *          additionally requires a confirmed cloud time sync within the
+ *          last `ClockTrust::kMaxSyncAgeMs`, using the same monotonic,
+ *          non-blocking, wrap-aware signal as the resync gate above
+ *          (`observedTimeSyncedLastMs()` / `syncCaptureWrapGeneration`).
+ *
+ *          Acceptance criteria note (Finding 5, accepted as-is - see the
+ *          Work Order): this deliberately requires BOTH `Time.isValid()`
+ *          AND sync recency. `Time.isValid()` is necessary but not
+ *          sufficient on its own (that is the whole point of Finding 3);
+ *          sync recency is the decisive term that actually distinguishes
+ *          "trusted" from "not" in every real scenario this Work Order
+ *          investigates - a device with `Time.isValid()==false` is
+ *          untrusted regardless of sync recency (defensive; should not
+ *          occur once a sync has completed), and a device with
+ *          `Time.isValid()==true` is untrusted unless it ALSO has a recent
+ *          confirmed sync.
+ */
+bool isClockTrusted() {
+  return ClockTrust::isTrustedWrapAware(Time.isValid(), millis(), observedTimeSyncedLastMs(),
+                                         millisWrapGeneration, syncCaptureWrapGeneration);
+}
+
+/**
+ * @brief Item 9 / Round 6 (Stage 7 finding 1): a wrap-aware, sentinel-
+ *        bearing sync age for TELEMETRY ONLY - not a control-path signal.
+ *
+ * @details Stage 7 finding 1: `logTimeDiag()`'s `syncAgeMs` and the status
+ *          payload's `syncAgeSec` (`DeviceStatusPublisher.cpp`) both used
+ *          raw `ClockTrust::elapsedMs()`, which is correct for the TRUST
+ *          DECISION (bounded by `kMaxSyncAgeMs` before it can ever be
+ *          consulted again) but not for open-ended REPORTING: after a full
+ *          ~49.7-day `millis()` wrap with no further confirmed sync,
+ *          `isClockTrusted()` correctly goes false (via
+ *          `syncCaptureWrapGeneration` mismatch), while the raw age would
+ *          still wrap around to a small, deceptively "fresh-looking" number
+ *          - telemetry would then contradict the trust verdict, which is
+ *          exactly the confusion item 9 exists to prevent. Separately,
+ *          before any sync has completed this boot
+ *          (`observedTimeSyncedLastMs() == 0`), the raw age is elapsed-
+ *          since-zero, i.e. uptime - a real number that means nothing as a
+ *          "sync age".
+ *
+ *          This function reuses the EXACT SAME wrap-generation tracking
+ *          the trust decision already uses (`millisWrapGeneration` /
+ *          `syncCaptureWrapGeneration` - no parallel mechanism) and
+ *          collapses both defective cases to one sentinel,
+ *          `ClockTrust::kReportedSyncAgeUnavailableMs`, meaning "no
+ *          reliable sync age is available to report right now" - which is
+ *          true for both "never synced this boot" and "sync is stale
+ *          beyond one full wrap": in both cases the caller should not, and
+ *          per this function cannot, read a specific elapsed span out of
+ *          it, and `isClockTrusted()` is independently false. Callers
+ *          convert this raw-milliseconds sentinel to whatever
+ *          representation fits their format (see `logTimeDiag()` for the
+ *          log line and `DeviceStatusPublisher.cpp` for the JSON ledger
+ *          field).
+ *
+ *          Deliberately NOT used by `checkClockResync()`, `isClockTrusted()`,
+ *          or `ClockTrust::isTrustedWrapAware()`/`shouldResyncWrapAware()` -
+ *          this function does not feed back into any control path; it only
+ *          reports what those functions have already decided.
+ */
+uint32_t reportedSyncAgeMs() {
+  return ClockTrust::wrapAwareReportedSyncAgeMs(millis(), observedTimeSyncedLastMs(),
+                                                 millisWrapGeneration, syncCaptureWrapGeneration);
 }
 
 // Helper to compute seconds until next park opening time (local time)
@@ -2063,8 +2682,13 @@ void publishStartupStatus() {
   const uint8_t startupLastPmicAnomalyVbusStatus = lastPmicAnomalyVbusStatus;
 #endif
   const time_t lastConnection = sysStatus.get_lastConnection();
+  // WO-2026-08-29-002 item 8/Finding 3: Time.isValid() alone is NOT a trust
+  // signal - it was true throughout the incident this field misreported
+  // (a wrong RTC seeded system time, isValid() was true, and this computed
+  // 28796s instead of -1). Additionally require isClockTrusted() (sync
+  // recency), the actual trust signal.
   const long lastConnectionAgeSec =
-      (Time.isValid() && lastConnection != 0 && Time.now() > lastConnection)
+      (isClockTrusted() && lastConnection != 0 && Time.now() > lastConnection)
           ? (long)(Time.now() - lastConnection)
           : -1L;
   char hibernateFields[192] = "";
@@ -2194,6 +2818,41 @@ void publishWatchdogForensics(bool ab1805Confirmed) {
 }
 
 /**
+ * @brief Publishes a forensic snapshot of the hibernate-wake gate outcome
+ *        (WO-2026-08-29-001), mirroring publishWatchdogForensics() above.
+ *
+ * @details The gate at setup()'s `if (retainedHibernatePending)` block only
+ * ever made its SUCCESS outcome cloud-visible (via the status payload's
+ * hibernate fields). Its FAILURE outcome - the interesting case for
+ * diagnosing an oversleep/undersleep or a wake that never qualified -
+ * previously reached only a `Log.info()` line emitted before USB CDC
+ * re-enumerates, which the Pi serial forwarder structurally cannot capture
+ * (see the Work Order). This is a SEPARATE queued event from the status
+ * payload deliberately, so it does not compete with WO-2026-08-29-002's
+ * status payload byte budget and reaches every fleet device (not just the
+ * bench units with a serial forwarder attached), the same way the
+ * publish-queue-backed "watchdog" event above does. Called only when
+ * `retainedHibernatePending` was true this boot, before it is cleared.
+ *
+ * @param fields Gate-outcome fields already classified and assembled by
+ *        HibernateWakeDiagnostics::buildEventFields() at the call site
+ *        (which itself calls classifyGateArm()); this function only
+ *        formats and publishes them, it does not evaluate the gate itself.
+ */
+void publishHibernateWakeForensics(const HibernateWakeDiagnostics::EventFields &fields) {
+  char payload[256];
+  const int written = HibernateWakeDiagnostics::buildEventPayload(payload, sizeof(payload), fields);
+  if (written < 0 || (size_t)written >= sizeof(payload)) {
+    Log.warn("HibernateWake forensic payload truncated or failed (written=%d)", written);
+    return;
+  }
+
+  if (!PublishQueuePosix::instance().publish("hibernate_wake", payload, PRIVATE)) {
+    Log.warn("HibernateWake forensic event publish() returned false (queue full or not ready)");
+  }
+}
+
+/**
  * @brief Handle response from Ubidots webhook.
  *
  * @details This handler is necessary for webhook response supervision (alert 40).
@@ -2226,6 +2885,17 @@ void UbidotsHandler(const char *event, const char *data) {
   } else {
     // Any webhook response indicates the integration path is alive.
     // Update lastHookResponse even if it arrived after our short-term window.
+    // WO-2026-08-29-002 item 8: deliberately NOT gated on isClockTrusted().
+    // Both consumers (State_Report.cpp's `lastHook != 0` age-based alert-40
+    // escalation gate, and State_Error.cpp's `lastHook == 0` "no recorded
+    // response yet - defer corrective action" check) treat 0 as "never
+    // happened" - a control-flow branch, not just a recorded value. A real
+    // webhook response arriving while the clock is untrusted would, if
+    // written as 0, make both consumers behave as though the integration
+    // path had never succeeded, suppressing/skewing the age-based
+    // escalation and corrective-reset logic. Writing Time.now() even when
+    // untrusted preserves existing behavior; see the Implementation Report
+    // for the Chief Engineer's review.
     sysStatus.set_lastHookResponse(Time.now());
 
     if (session.awaitingWebhookResponse) {
@@ -2504,26 +3174,26 @@ void sensorISR() {
  * @brief Cleanup function that is run at the beginning of the day.
  *
  * @details Called from REPORTING_STATE once per local day. If connected, it
- *          requests a time sync and records lastTimeSync, then resets daily
- *          counters and related housekeeping state.
+ *          requests a time sync (completion is recorded by
+ *          `checkClockResync()`, not here - see WO-2026-08-29-002 Finding 1),
+ *          then resets daily counters and related housekeeping state.
  */
 void dailyCleanup() {
   if (Particle.connected()) {
     publishDiagnosticSafe("Daily Cleanup", "Running", PRIVATE);
     
-    // Force time sync once per day to prevent clock drift.
-    // dailyCleanup() is called once per day from REPORTING_STATE. All devices
-    // should connect at least daily, but LOW_POWER and DISCONNECTED mode devices
-    // may not be connected at the specific time dailyCleanup runs. If a device
-    // connects daily but misses the cleanup window each day, it won't sync time
-    // despite daily connections, causing drift to accumulate over multiple days.
-    // The AB1805 RTC has ±2.0 ppm accuracy (~±5 seconds/month typical), so
-    // missing sync for several days can accumulate noticeable drift. This ensures
-    // at least one time sync per day when the device happens to be connected
-    // during the cleanup window.
-    Log.info("Daily time sync requested");
-    Particle.syncTime();
-    sysStatus.set_lastTimeSync(Time.now());
+    // Opportunistic extra time sync request once per day, on top of the
+    // monotonic-gated resync in checkClockResync() (WO-2026-08-29-002 item
+    // 6), which is the primary defense against clock drift now - it isn't
+    // gated on this daily wall-clock schedule, so a wrong clock can't move
+    // or skip its own corrective sync (Finding 1's second defect). This call
+    // is routed through requestClockResync() so completion (RTC write-back
+    // + persisted lastTimeSync stamp) is recorded once, uniformly, by
+    // checkClockResync() - never at request time, which would use the very
+    // clock under suspicion (Finding 1's first defect; previously this
+    // function called sysStatus.set_lastTimeSync(Time.now()) immediately
+    // after Particle.syncTime(), before the request had even completed).
+    requestClockResync("daily-cleanup");
   }
   
   Log.info("Running Daily Cleanup");

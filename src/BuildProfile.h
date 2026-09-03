@@ -28,6 +28,7 @@
  * - PMIC charge cycle diagnostic test: -DENABLE_PMIC_CHARGE_CYCLE_TEST=1
  * - PMIC register dump diagnostic: -DENABLE_PMIC_REGISTER_DUMP=1
  * - Diagnostics publish mode: -DENABLE_DIAGNOSTICS_PUBLISH_MODE=1
+ * - RTC skew bench hook (Boron only): -DENABLE_RTC_SKEW_TEST=1
  *
  * WO-2026-08-24-001: the Boron USB power-source override in
  * PowerManager::refreshInputProfile() previously had its own build flag
@@ -196,6 +197,36 @@
 
 #if (ENABLE_PMIC_CHARGE_CYCLE_TEST != 0) && (ENABLE_PMIC_CHARGE_CYCLE_TEST != 1)
 #error "ENABLE_PMIC_CHARGE_CYCLE_TEST must be 0 or 1"
+#endif
+
+#ifndef ENABLE_RTC_SKEW_TEST
+/**
+ * @brief TEMPORARY DIAGNOSTIC: Write a deliberately wrong RTC value once on boot.
+ *
+ * Set to 1 to enable, then reflash. Runs automatically during setup(),
+ * immediately after ab1805.setup() and before the hibernate-wake
+ * classification block: it reads the current AB1805 RTC value, writes back
+ * a compile-time-skewed value (see RtcSkewTest::kSkewSeconds in
+ * src/time/RtcSkewTest.h), and logs both readings. This reproduces the
+ * Dev-11 field defect (RTC holding a plausible-but-wrong time, so
+ * Time.isValid() is true but the value is bad) on demand, which a simple
+ * LiPo/USB power-cycle cannot: that only clears the RTC to *unset*, a
+ * different state that cannot reach hibernate at all (see
+ * WO-2026-08-31-003).
+ *
+ * One-shot guard (backed by retained RAM - src/time/RtcSkewTest.h) fires
+ * ONCE ACROSS RESETS, not once per boot: it does not re-arm on a
+ * subsequent wake/reset while power is maintained, only on a fresh flash
+ * or an explicit reset of the latch (Amendment A.2). Boron-only (the
+ * AB1805 is Boron hardware). After the bench test completes, set back to 0
+ * and reflash to remove the test from the binary - this must never ship in
+ * a field build.
+ */
+#define ENABLE_RTC_SKEW_TEST 0
+#endif
+
+#if (ENABLE_RTC_SKEW_TEST != 0) && (ENABLE_RTC_SKEW_TEST != 1)
+#error "ENABLE_RTC_SKEW_TEST must be 0 or 1"
 #endif
 
 #ifndef ENABLE_DIAGNOSTICS_PUBLISH_MODE

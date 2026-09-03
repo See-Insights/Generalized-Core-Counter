@@ -14,6 +14,11 @@ p2_firmware_*.bin
 # Local build artifacts
 /target/
 
+# Visible scratch dir for temporary host-test build artifacts (must stay
+# visible - no leading dot - per AI_DEVELOPMENT_WORKFLOW.md's "Temporary
+# build and test artifacts" rule)
+/build-tmp/
+
 # Doxygen / docs output
 /docs/xml/
 
