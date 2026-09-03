@@ -44,6 +44,11 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 #include "time/LocalTimeCache.h"          // Cached LocalTimeRK conversions
 #include "time/ClockTrust.h"         // Sync-recency resync gate and trust signal (WO-2026-08-29-002)
 #include "time/HibernateWakeDiagnostics.h" // Hibernate-wake gate classification/payload (WO-2026-08-29-001)
+#include "time/RtcSkewTest.h"         // Bench-only RTC skew hook arithmetic/guard (WO-2026-08-31-003)
+
+#if ENABLE_RTC_SKEW_TEST
+#warning "ENABLE_RTC_SKEW_TEST=1 (bench-only RTC skew hook enabled - must not ship)"
+#endif
 
 
 // Persistent data and configuration
@@ -482,6 +487,26 @@ retained time_t retainedHibernateWakeTime = 0;
 retained uint32_t retainedHibernateRequestedSleep = 0;
 retained uint32_t retainedHibernateCount = 0;
 retained bool retainedHibernatePending = false;
+#if PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST
+// WO-2026-08-31-003 Amendment A.2 / round 3 HIGH fix: persists whether the
+// bench-only RTC skew hook (below, in setup()) has already fired.
+// `retained` RAM survives an MCU reset (soft reset, AB1805 watchdog reset,
+// HIBERNATE wake) as long as system power is maintained - see
+// src/time/RtcSkewTest.h's file-level doc comment for the full "what this
+// does and does not survive" reasoning. Guarded the same as the hook
+// itself so it compiles out of a default (ENABLE_RTC_SKEW_TEST=0) build
+// entirely.
+//
+// retainedRtcSkewTestArmToken pairs with the fired-flag below: a fresh
+// flash's build token will not match whatever token is already persisted
+// (a different build's token, or unconstrained bytes left by firmware
+// that never wrote this field) - see RtcSkewTest::rearmIfBuildTokenChanged()
+// and the header's "Round 3 HIGH" doc section for why the fired-flag's
+// OWN `= false` initializer is not sufficient to guarantee re-arming on a
+// fresh flash.
+retained uint64_t retainedRtcSkewTestArmToken = 0;
+retained bool retainedRtcSkewTestFired = false;
+#endif
 uint8_t startupPreviousBreadcrumb = BREADCRUMB_NONE;
 uint32_t startupPreviousBreadcrumbMs = 0;
 uint8_t startupPreviousLoopStage = LOOP_STAGE_NONE;
@@ -1070,6 +1095,83 @@ void setup() {
   const bool timeValidBeforeRtc = Time.isValid();
   ab1805.withFOUT(WKP).setup();                // Initialize AB1805 RTC - WKP is D10 on Photon2
 
+#if PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST
+  // ===== BENCH-ONLY: DELIBERATE RTC SKEW (WO-2026-08-31-003, Amendment A) =====
+  // Compiled in ONLY when ENABLE_RTC_SKEW_TEST=1 (see BuildProfile.h) on
+  // Boron. Fires ONCE - not once per boot, but once ever, across resets,
+  // until a fresh flash or an explicit reset of retainedRtcSkewTestFired
+  // (Amendment A.2) - right after ab1805.setup() and before the
+  // hibernate-wake classification block below, so the rest of setup() sees
+  // exactly the state the field defect produces: a "set" RTC holding a
+  // plausible-but-wrong value.
+  //
+  // A.3: RTC write only - ab1805.setRtcFromTime() - nothing else. In
+  // particular, no Time.setTime(): ab1805.setup() (above) already seeded
+  // system time from whatever the RTC held BEFORE this hook runs, so this
+  // boot's own Time stays whatever it already was. The skewed value only
+  // becomes the system's believed time on a LATER boot, when that boot's
+  // own ab1805.setup() reads the now-skewed RTC - matching the bench
+  // procedure's amended step 3 (verify Time.isValid()/wrong-time belief
+  // after the post-flash power-cycle, not on the flashing boot itself).
+  //
+  // A.4: the write's return value is checked before treating it as done -
+  // a failed write is logged distinctly and does NOT log a fabricated
+  // "after" time as if it had taken effect.
+  //
+  // Round 3 HIGH fix: before trusting retainedRtcSkewTestFired at all,
+  // compare the persisted arm-token against a token computed for THIS
+  // build (__DATE__/__TIME__/__FILE__, evaluated at compile time of this
+  // translation unit). A mismatch - a fresh flash of newly compiled
+  // firmware, or a persisted slot left unconstrained by firmware that
+  // never wrote it - forces retainedRtcSkewTestFired back to false
+  // unconditionally, so arming does not depend on that flag's own
+  // `retained` initializer having run (see RtcSkewTest.h's "Round 3 HIGH"
+  // doc section for the full root-cause analysis and what this does and
+  // does not guarantee).
+  //
+  // Round 4 HIGH fix: the token is now a 64-bit FNV-1a hash
+  // (fnv1aHash64(), retainedRtcSkewTestArmToken widened to uint64_t), not
+  // 32-bit - Stage 7 demonstrated two distinct real build-identity strings
+  // colliding at 32 bits, which silently left the fired-flag set across a
+  // genuine recompile. See RtcSkewTest.h's "Round 4 HIGH" doc section for
+  // what the 64-bit widening does and does not guarantee (in particular:
+  // it does not and cannot distinguish two builds completed within the
+  // same wall-clock second, since __TIME__ itself is then byte-identical
+  // - accepted as a residual limitation, not a defect, because a full
+  // Boron build takes minutes).
+  {
+    const uint64_t rtcSkewTestBuildToken = RtcSkewTest::fnv1aHash64(__DATE__ " " __TIME__ " " __FILE__);
+    RtcSkewTest::rearmIfBuildTokenChanged(retainedRtcSkewTestArmToken, retainedRtcSkewTestFired,
+                                           rtcSkewTestBuildToken);
+    RtcSkewTest::OneShotGuard rtcSkewTestGuard(retainedRtcSkewTestFired);
+    if (rtcSkewTestGuard.shouldRun()) {
+      time_t rtcSkewRawBefore = 0;
+      const bool rtcSkewReadBeforeOk = ab1805.getRtcAsTime(rtcSkewRawBefore);
+      const time_t rtcSkewAnchor = (time_t)RtcSkewTest::chooseAnchor(rtcSkewRawBefore, rtcSkewReadBeforeOk);
+      const time_t rtcSkewAfter = (time_t)RtcSkewTest::applySkew(rtcSkewAnchor);
+      const bool rtcSkewWriteOk = ab1805.setRtcFromTime(rtcSkewAfter);
+      if (rtcSkewWriteOk) {
+        time_t rtcSkewVerify = 0;
+        const bool rtcSkewVerifyReadOk = ab1805.getRtcAsTime(rtcSkewVerify);
+        Log.warn("RtcSkewTest: ONE-SHOT bench hook fired - before(raw=%ld readOk=%d) anchor=%s "
+                 "skew=%ldsec after=%s verify=%s verifyReadOk=%d",
+                 (long)rtcSkewRawBefore, rtcSkewReadBeforeOk ? 1 : 0,
+                 Time.format(rtcSkewAnchor, TIME_FORMAT_DEFAULT).c_str(),
+                 (long)RtcSkewTest::kSkewSeconds,
+                 Time.format(rtcSkewAfter, TIME_FORMAT_DEFAULT).c_str(),
+                 Time.format(rtcSkewVerify, TIME_FORMAT_DEFAULT).c_str(),
+                 rtcSkewVerifyReadOk ? 1 : 0);
+      } else {
+        // Write failed - the RTC still holds whatever it held before this
+        // hook ran. Do not claim the skew took effect (A.4).
+        Log.error("RtcSkewTest: ONE-SHOT bench hook FAILED - setRtcFromTime() write did not "
+                  "succeed; RTC left unchanged (before(raw=%ld readOk=%d) attemptedAfter=%s)",
+                  (long)rtcSkewRawBefore, rtcSkewReadBeforeOk ? 1 : 0,
+                  Time.format(rtcSkewAfter, TIME_FORMAT_DEFAULT).c_str());
+      }
+    }
+  }
+#endif
 
   // ===== AB1805 WATCHDOG WAKE-REASON CLASSIFICATION =====
   // Gated on RESET_REASON_PIN_RESET. Device OS reports an external MCU reset
