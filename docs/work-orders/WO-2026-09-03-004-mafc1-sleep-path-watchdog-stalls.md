@@ -49,20 +49,30 @@ MAFC-1's events in full:
 
 MAFC-2's five were **all** `diag`.
 
-## Breadcrumb decode - RESOLVED 2026-09-03, and it overturns the first hypothesis
+## Breadcrumb decode - RESOLVED 2026-09-03 for `bc=21`, partly corrected 2026-09-13
 
 The zero-cost step below was run immediately. Decoding `bc` against the v21 tree
-(`48692fe`) rather than `main` gives an unambiguous answer, and it **refutes the
-"stage-agnostic shared-bus stall" hypothesis this WO was opened on.**
+(`48692fe`) rather than `main` is what makes the values readable at all, and it
+**refutes the "stage-agnostic shared-bus stall" hypothesis this WO was opened on.**
+It resolves `bc=21` to a single site; it does **not** resolve `bc=18`, which the v21
+tree writes from two - see the correction below.
 
 | `bc` | v21 location | What the device was doing |
 |---|---|---|
-| **18** | `State_Sleep.cpp:852` | At the **sleep-precondition gate**, waiting for `!Particle.connected() && !isRadioPoweredOn()` - i.e. waiting for modem teardown to finish |
-| **21** | `State_Sleep.cpp:1078`, `:1322`, `:1371` | Immediately before `System.sleep(config)`, after `drainSerialBeforeSleep()` - the hibernate, ULP, and stop-fallback paths respectively |
+| **18** | **ambiguous** - `Generalized-Core-Counter.cpp:1215` **or** `State_Sleep.cpp:852` | Either the **publish-queue exit** or the **sleep-precondition gate** (waiting for `!Particle.connected() && !isRadioPoweredOn()`, i.e. for modem teardown to finish). Both sites write the literal 18 in this tree |
+| **21** | `State_Sleep.cpp:1078`, `:1322`, `:1371`, `:1383` | Immediately before `System.sleep(config)`, after `drainSerialBeforeSleep()` - the hibernate, ULP, and stop-fallback paths. `BREADCRUMB_IDLE_ENTRY` (21) is declared but never written in this tree, so this value **is** unambiguous |
 
-**Every one of MAFC-1's ten watchdog resets is in `State_Sleep.cpp`.** Six at the
-precondition gate (`bc=18`), four at the sleep call itself (`bc=21`). Nothing is
-in the connectivity state machine, the diagnostics path, or anywhere else.
+**Corrected 2026-09-13.** **MAFC-1's four `bc=21` resets are confirmed in
+`State_Sleep.cpp`**, immediately before `System.sleep()`. **The six `bc=18` resets are
+not attributable to a single site**: the v21 tree writes the literal 18 both at the
+publish-queue exit and at the sleep-precondition gate, so they are one of two
+possibilities pending further decode.
+
+The original claim here - *"every one of MAFC-1's ten watchdog resets is in
+`State_Sleep.cpp`"* - overstated this, and is retained in this sentence rather than
+deleted so the correction is visible. It held for `bc=21` and was assumed for `bc=18`.
+Surfaced by `particle-fleet-operations/tools/breadcrumb-decode.js`, which enumerates
+every `setAppBreadcrumb(` call site per tree rather than reading the enum alone.
 
 ### The error that produced the original hypothesis
 
@@ -103,7 +113,10 @@ Two distinct hang points, both in the sleep path:
 1. **`bc=18` - modem teardown does not complete.** The device requests cloud
    disconnect and radio-off, then waits at the precondition gate for
    `isRadioPoweredOn()` to go false. If the modem does not release, the app
-   watchdog eventually fires. Six of ten events.
+   watchdog eventually fires. Six of ten events - **but see the decode correction
+   above: these six are ambiguous between the sleep-precondition gate and the
+   publish-queue exit, so this hypothesis rests on the sleep-path reading of an
+   ambiguous value.**
 2. **`bc=21` - the sleep call does not return or does not wake as expected.**
    The breadcrumb is set after the AB1805 alarm has been programmed and after
    `stopWDT()`, immediately before `System.sleep()`. Four of ten events.
