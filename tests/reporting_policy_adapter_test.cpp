@@ -12,8 +12,8 @@
 #include <cstdio>
 
 #include "Config.h"
-#include "MyPersistentData.h"
 #include "Particle.h"
+#include "reporting/BatteryTierStore.h"
 #include "reporting/ReportingPolicy.h"
 #include "sensors/SensorManager.h"
 #include "state/State_Common.h"
@@ -21,7 +21,7 @@
 namespace {
 
 void resetGlobals() {
-	testSysStatus.currentBatteryTier = TIER_HEALTHY;
+	BatteryTierStore::testCurrentBatteryTier = TIER_HEALTHY;
 	Config::testReportingIntervalSec = 3600;
 	Time.valid = true;
 	testWindowOpen = true;

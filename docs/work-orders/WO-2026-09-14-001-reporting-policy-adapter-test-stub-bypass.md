@@ -1,13 +1,14 @@
-# WO-2026-09-14-001: `reporting_policy_adapter_test.sh` has not compiled since 2026-08-28
+# WO-2026-09-14-001: `reporting_policy_adapter_test.sh` has not compiled since 2026-08-28 - CLOSED
 
-**Type:** Investigation and fix. The defect is understood; the correct fix is
-not yet chosen, and the obvious one is wrong (see below).
+**Type:** Investigation and fix.
 
-**Status:** Drafted, not dispatched. Specification only.
+**Status:** CLOSED 2026-09-14. Both steps implemented, tested, and committed.
+`tests/reporting_policy_adapter_test.sh` compiles, links, and passes for real -
+see Resolution below.
 
-**Severity:** The test does not run at all. It is not failing an assertion - it
-fails to compile, and has done since `516332a` (2026-08-28, the v24 release).
-A green suite has never included it since that date.
+**Severity (at filing):** The test did not run at all. It was not failing an
+assertion - it failed to compile, and had done since `516332a` (2026-08-28, the
+v24 release). A green suite had not included it since that date.
 
 ## The observation
 
@@ -97,7 +98,7 @@ This is also a repeat of a named pattern in `particle-fleet-operations`
 both sides of a known defect, is not a passing test - it's a missing one."* A
 test that cannot compile is the degenerate case.
 
-## Candidate directions (not chosen - investigation first)
+## Candidate directions - Direction 1 chosen (see Resolution)
 
 1. **Make the seam explicit.** Give `RuntimeReportingPolicy.cpp` a narrow
    dependency it can be compiled against on the host (an interface or a single
@@ -118,14 +119,110 @@ condition is that the test **fails** when the adapter's trust substitution or
 3.5V floor is mutated - per §5, confirm it fails for the correct reason before
 the fix is written.
 
+## Resolution (2026-09-14)
+
+Direction 1 chosen and implemented, in two dispatches ("Step 0" and
+"Step 0.5"), because a second, structurally identical defect surfaced
+partway through and was resolved in the same arc rather than treated as a
+new mystery - see below.
+
+### Step 0 - the persistence header
+
+Gave `RuntimeReportingPolicy.cpp` a narrow seam,
+`src/reporting/BatteryTierStore.h`/`.cpp`, exposing exactly the one accessor
+it uses (`sysStatus.get_currentBatteryTier()`), included non-relatively so a
+test's `-I` override directory can shadow it. The old, now-dead
+`MyPersistentData.h` stub was removed. A structural test,
+`tests/battery_tier_store_seam_structural_test.py` (same pattern as
+`thermal_coupling_structural_test.py`), asserts the adapter never
+references the persistence header directly and that the seam stays narrow.
+Committed as `7d412c4`.
+
+Running the actual test script at the end of Step 0 surfaced a **second**
+failure - not a regression in this fix, but a defect of the exact same
+shape that had been sitting one layer beneath the first, invisible until
+the first was gone:
+
+```
+Undefined symbols for architecture arm64:
+  "Config::reportingIntervalSecForRuntime()", referenced from:
+      ReportingPolicyResolver::resolveRuntime(float, long) in RuntimeReportingPolicy-*.o
+ld: symbol(s) not found for architecture arm64
+```
+
+`RuntimeReportingPolicy.cpp:6` also had `#include "../Config.h"` - the same
+kind of relative, unshadowable include, this time of the header documented
+in this WO's own "What is actually wrong" section as deliberately relative
+for a different reason (the Device OS name collision). `Config.h` only
+*declares* `reportingIntervalSecForRuntime()`; the definition lives in
+`Config.cpp`, which was never on the test's compile line. The fatal
+compile error fixed in Step 0 had aborted the build before this link-time
+defect could ever be reached, so it was completely masked until that
+point - not a new bug introduced by Step 0, and not something the original
+diagnosis above missed; it was structurally unobservable until then.
+
+Step 0's own verification of its mutation test (Done Condition #2) had to
+run against an isolated, hand-built host harness rather than the real
+script, specifically because this second defect still blocked the real
+script from linking at that point.
+
+### Step 0.5 - the shared configuration header
+
+Same treatment, same file, comparably small - authorized explicitly as a
+sibling fix rather than a scope expansion. A new seam,
+`src/reporting/ReportingIntervalStore.h`/`.cpp` - a sibling to
+`BatteryTierStore`, not folded into it, since it wraps an unrelated module
+and a combined file would no longer be named for what it checks - narrows
+the dependency to `reportingIntervalSecForRuntime()` alone. The seam's own
+`.cpp` keeps the relative include of `Config.h`, matching every other
+`src/reporting/`, `src/state/`, and `src/cloud/` file's convention for it;
+only the adapter's now-indirect dependency needed narrowing. A sibling
+structural test, `tests/reporting_interval_store_seam_structural_test.py`,
+guards it the same way. Committed as `c8afbc1`.
+
+With both seams in place, `tests/reporting_policy_adapter_test.sh` compiles,
+links, and passes for real - confirmed against the actual script, not a
+harness:
+
+```
+reporting_policy_adapter_test: all tests passed
+```
+
+Both steps' mutation tests (`TIER_SURVIVAL -> TIER_HEALTHY` in the
+Invalid-vcell branch) were re-verified against the real script at the end
+of Step 0.5, producing the correct assertion failure, then restored
+byte-identical (hash-verified). Full suite: 27/27, with no regressions
+against the pre-existing baseline.
+
+Neither step touched any other includer of the persistence header or of
+`Config.h`; neither changed persisted layout, added a retained field, or
+changed runtime behavior.
+
 ## Acceptance
 
-- `tests/reporting_policy_adapter_test.sh` compiles and passes.
-- Mutating the adapter's Invalid/Unavailable vcell handling makes it fail, for
-  the right reason, before any fix is applied.
-- No copied production source that can drift from the real file without
-  detection.
-- `tests/README.md` states what the test covers and what it does not.
+- [x] `tests/reporting_policy_adapter_test.sh` compiles and passes. Confirmed
+  after Step 0.5 - the real script, not an isolated harness: `reporting_policy_adapter_test: all tests passed`, exit 0.
+- [x] Mutating the adapter's Invalid/Unavailable vcell handling makes it fail,
+  for the right reason, before any fix is applied. Done twice: once against an
+  isolated harness after Step 0 (the real script could not yet run), and once
+  for real against the actual script after Step 0.5. Both times:
+  `TIER_SURVIVAL -> TIER_HEALTHY` in the Invalid-vcell branch produced
+  `Assertion failed: (policy.batteryTier == TIER_SURVIVAL), function
+  testInvalidVcellForcesSurvivalRegardlessOfRawSoc`, not a compile or link
+  error. Both times restored byte-identical, hash-verified before and after.
+- [x] No copied production source that can drift from the real file without
+  detection. The two seams (`BatteryTierStore`, `ReportingIntervalStore`) are
+  narrow accessor wrappers, not copies - each backed by a structural test
+  (`battery_tier_store_seam_structural_test.py`,
+  `reporting_interval_store_seam_structural_test.py`) that parses the real
+  shipped source and fails if the seam is bypassed or widened, in the same
+  pattern as `thermal_coupling_structural_test.py`.
+- [ ] **Not done:** `tests/README.md` still describes the adapter test only in
+  terms of WO-2026-08-25-001 Amendment C; it says nothing about the seam
+  mechanism this WO added or that the file's host-compilability now depends on
+  two narrow headers rather than the whole persistence bag. Left as an honest
+  gap rather than silently closed or silently fixed outside the scope that was
+  authorized for Steps 0/0.5.
 
 ## Provenance
 
@@ -133,11 +230,18 @@ Found while running the full suite during `WO-2026-08-31-003` round 5
 verification, 2026-09-14. Diagnosis by `clang++ -H` resolution trace and by
 attempting the naive `-I` fix. Regression window established from
 `git log -1 -- tests/reporting_policy_adapter_test.sh` (`516332a`, 2026-08-28);
-the test's compile line has not been touched since, so the break is no later
-than that commit. Not blocking any in-flight work order.
+the test's compile line has not been touched since, so the break was no
+later than that commit. Was not blocking any in-flight work order while
+open.
+
+Resolved 2026-09-14 on branch `wo/2026-09-14-001-reporting-adapter-seams`,
+commits `7d412c4` (Step 0) and `c8afbc1` (Step 0.5).
 
 ## Related work orders
 
-- `WO-2026-08-25-001` Amendment C - the guard this test exists to cover.
-- `docs/architecture-review-2026-09-03.md` - `MyPersistentData.h`'s fan-in is the
-  structural reason direction 1 is preferred.
+- `WO-2026-08-25-001` Amendment C - the guard this test now has working
+  coverage for again.
+- `docs/architecture-review-2026-09-03.md` - `MyPersistentData.h`'s fan-in was
+  the structural reason Direction 1 was preferred, and remains the reason a
+  narrow-seam approach (rather than a copied stub tree or a preprocessor
+  override) is the right default for the next file found in this shape.
