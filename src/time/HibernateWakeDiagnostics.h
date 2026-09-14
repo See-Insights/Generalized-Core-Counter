@@ -67,33 +67,6 @@ struct GateInputs {
 
 /// Classifies which gate arm failed, mirroring the exact short-circuit
 /// order of the real `if` condition. Pure, no I/O.
-///
-/// ORDERING CONTRACT (must match production exactly - see rationale below):
-///   1. `resetReasonIsPowerManagement` false -> `GateArm::kResetReason`
-///   2. `wakeReasonIsAlarm`            false -> `GateArm::kWakeReason`
-///   3. `rtcReadOk`                    false -> `GateArm::kRtcRead`
-///   4. `rtcBefore > 0`                false -> `GateArm::kRtcBeforeZero`
-///   5. `requestedSleepSec > 0`        false -> `GateArm::kRequestedZero`
-///   6. `rtcAtWake >= rtcBefore`       false -> `GateArm::kRtcOrder`
-///      (all six pass)                       -> `GateArm::kNone`
-///
-/// This order MUST match, position for position, the short-circuit `&&`
-/// chain of the real gate `if` in `setup()` at
-/// `Generalized-Core-Counter.cpp` (search for
-/// `if (reason == RESET_REASON_POWER_MANAGEMENT &&`, currently around
-/// line 1221). When more than one condition is false simultaneously, C++
-/// `&&` short-circuits left-to-right and only ever evaluates/reports the
-/// FIRST false one - so if this function's internal order ever diverges
-/// from the real gate's (e.g. an accidental reordering of two `if`s
-/// below), it would report the WRONG arm whenever two or more conditions
-/// fail on the same boot. That is not a cosmetic bug: identifying which
-/// arm the real gate failed on, correctly, is the entire purpose of this
-/// Work Order - a forensic event that names the wrong arm is actively
-/// misleading, worse than reporting nothing. Any change to either the
-/// real gate's condition order or this list must change both together,
-/// and a reviewer should be able to check this doc comment against the
-/// two code sites directly, rather than re-deriving intended order from
-/// either implementation.
 inline GateArm classifyGateArm(const GateInputs &in) {
   if (!in.resetReasonIsPowerManagement) {
     return GateArm::kResetReason;

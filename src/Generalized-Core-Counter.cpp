@@ -1282,12 +1282,21 @@ void setup() {
   if (retainedHibernatePending) {
     const AB1805::WakeReason wakeReason = ab1805.getWakeReason();
     startupHibernateWakeReason = ab1805WakeReasonName(wakeReason);
-    if (reason == RESET_REASON_POWER_MANAGEMENT &&
-        wakeReason == AB1805::WakeReason::ALARM &&
-        rtcReadOk &&
-        retainedHibernateRtcBefore > 0 &&
-        retainedHibernateRequestedSleep > 0 &&
-        rtcTime >= retainedHibernateRtcBefore) {
+
+    // WO-2026-09-14-002 (Step 1): gateInputs is built once, here, and is the
+    // single thing the gate decision below and the forensic event further
+    // down both consume - there is no longer a second, hand-duplicated `if`
+    // for the classifier to merely mirror; the classifier IS the gate now.
+    HibernateWakeDiagnostics::GateInputs gateInputs{};
+    gateInputs.resetReasonIsPowerManagement = (reason == RESET_REASON_POWER_MANAGEMENT);
+    gateInputs.wakeReasonIsAlarm = (wakeReason == AB1805::WakeReason::ALARM);
+    gateInputs.rtcReadOk = rtcReadOk;
+    gateInputs.rtcBefore = (int64_t)retainedHibernateRtcBefore;
+    gateInputs.requestedSleepSec = retainedHibernateRequestedSleep;
+    gateInputs.rtcAtWake = (int64_t)rtcTime;
+
+    const HibernateWakeDiagnostics::GateArm gateArm = HibernateWakeDiagnostics::classifyGateArm(gateInputs);
+    if (gateArm == HibernateWakeDiagnostics::GateArm::kNone) {
       startupHibernateActualSleepSec = (uint32_t)(rtcTime - retainedHibernateRtcBefore);
       startupHibernateSleepErrorSec = (int32_t)startupHibernateActualSleepSec -
                                       (int32_t)retainedHibernateRequestedSleep;
@@ -1309,19 +1318,11 @@ void setup() {
     // WO-2026-08-29-001: queue a forensic event capturing the gate outcome
     // BEFORE retainedHibernatePending is cleared below, so the failure case
     // (previously invisible - see the Work Order) reaches the cloud too.
-    // buildEventFields() classifies via classifyGateArm(), which mirrors the
-    // exact same conditions/order as the `if` above; none of this alters
-    // startupHibernateStatusReady or any gate decision, it only identifies
+    // buildEventFields() re-derives the classification from the same
+    // gateInputs the decision above used; none of this alters
+    // startupHibernateStatusReady or the gate decision, it only identifies
     // which arm failed (or kNone on success) for reporting.
     {
-      HibernateWakeDiagnostics::GateInputs gateInputs{};
-      gateInputs.resetReasonIsPowerManagement = (reason == RESET_REASON_POWER_MANAGEMENT);
-      gateInputs.wakeReasonIsAlarm = (wakeReason == AB1805::WakeReason::ALARM);
-      gateInputs.rtcReadOk = rtcReadOk;
-      gateInputs.rtcBefore = (int64_t)retainedHibernateRtcBefore;
-      gateInputs.requestedSleepSec = retainedHibernateRequestedSleep;
-      gateInputs.rtcAtWake = (int64_t)rtcTime;
-
       const HibernateWakeDiagnostics::EventFields eventFields = HibernateWakeDiagnostics::buildEventFields(
           gateInputs, reason, startupHibernateWakeReason, retainedHibernateCount,
           startupHibernateActualSleepSec, startupHibernateSleepErrorSec);

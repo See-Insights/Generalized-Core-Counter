@@ -26,12 +26,27 @@ check() {
 }
 
 check "gate still requires retainedHibernatePending" "if (retainedHibernatePending) {"
-check "gate still requires RESET_REASON_POWER_MANAGEMENT" "reason == RESET_REASON_POWER_MANAGEMENT &&"
-check "gate still requires AB1805 ALARM wake" "wakeReason == AB1805::WakeReason::ALARM &&"
-check "gate still requires rtcReadOk" "rtcReadOk &&"
-check "gate still requires retainedHibernateRtcBefore > 0" "retainedHibernateRtcBefore > 0 &&"
-check "gate still requires retainedHibernateRequestedSleep > 0" "retainedHibernateRequestedSleep > 0 &&"
-check "gate still requires rtc ordering" "rtcTime >= retainedHibernateRtcBefore) {"
+
+# WO-2026-09-14-002 (Step 1): the six checks that used to live here each
+# pinned one term of a hand-written `if (... && ... && ...)` chain in
+# Generalized-Core-Counter.cpp - the exact chain classifyGateArm() mirrored
+# by hand, kept in sync only by reviewer discipline (Incident 1,
+# docs/architecture-review-2026-09-03.md). That chain is gone: the
+# production `if` now decides via classifyGateArm() directly, so there is
+# one decision site instead of two to keep textually in sync. The six
+# individual conditions are still fully covered - just one layer out from
+# here: the GateInputs mapping checks below prove each condition's INPUT is
+# wired from the correct production variable, and
+# hibernate_wake_diagnostics_test.cpp's Part 1 host test (testEachGateArmFailureIsIdentified)
+# proves classifyGateArm() combines those six inputs into kNone/each kArm
+# correctly - classifyGateArm() itself did not change in this step. What
+# these two checks add is the remaining gap: that the production `if`
+# actually branches on THAT classification, not a literal or an
+# independently reconstructed condition.
+check "gateArm is assigned from classifyGateArm(gateInputs), not a literal or a different input" \
+  "const HibernateWakeDiagnostics::GateArm gateArm = HibernateWakeDiagnostics::classifyGateArm(gateInputs);"
+check "gate now decides via classifyGateArm()'s result, not a hand-duplicated chain" \
+  "if (gateArm == HibernateWakeDiagnostics::GateArm::kNone) {"
 check "success path still sets startupHibernateStatusReady" "startupHibernateStatusReady = true;"
 check "existing serial Log.info line for success is unchanged" \
   "Log.info(\"HibernateWake: reason=%s req=%lu actual=%lu err=%ld count=%lu\","
