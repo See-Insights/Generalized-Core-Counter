@@ -36,6 +36,12 @@
 #include "BuildProfile.h"
 #include "Config.h"
 
+// WO-2026-08-29-002 item 8: forward-declared rather than pulling in
+// state/State_Common.h - that header transitively includes
+// state/StateHandlers.h and state/StateMachine.h, which this
+// data-persistence translation unit does not otherwise need.
+bool isClockTrusted();
+
 // Forward declaration for safe diagnostic publishing (defined in Generalized-Core-Counter.cpp)
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE);
 
@@ -680,7 +686,12 @@ void currentStatusData::loop() {
 }
 
 void currentStatusData::resetEverything() {                             // The device is waking up in a new day or is a new install
-  current.set_lastCountTime(Time.now());
+  // WO-2026-08-29-002 item 8: lastCountTime has no consumers anywhere in
+  // this codebase (write-only telemetry field) - gating it on the trust
+  // signal changes only the recorded value, never control flow. See
+  // isClockTrusted()'s doc comment (state/State_Common.h) for why
+  // Time.isValid() alone is not sufficient (Finding 3).
+  current.set_lastCountTime(isClockTrusted() ? Time.now() : 0);
   sysStatus.set_resetCount(0);                                          // Reset the reset count as well
   
   // ********** Reset Counting Mode Fields **********
@@ -877,6 +888,16 @@ void currentStatusData::raiseAlert(int8_t value) {
     int8_t existing = get_alertCode();
     if (getAlertSeverity(value) > getAlertSeverity(existing)) {
         set_alertCode(value);
+        // WO-2026-08-29-002 item 8: deliberately NOT gated on
+        // isClockTrusted(). State_Report.cpp's alert-40 escalation cooldown
+        // reads get_lastAlertTime() as `lastEscalation` and treats
+        // `lastEscalation == 0` as "no prior escalation - cooldown already
+        // passed" (a control-flow branch, not just a recorded value). If an
+        // alert were raised while the clock is untrusted and this wrote 0,
+        // a later trusted-clock read would see 0 and incorrectly bypass the
+        // 3-hour escalation cooldown. Writing Time.now() even when
+        // untrusted preserves the existing cooldown behavior; see the
+        // Implementation Report for the Chief Engineer's review.
         set_lastAlertTime(Time.now());
     }
 }

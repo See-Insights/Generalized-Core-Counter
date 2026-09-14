@@ -77,6 +77,7 @@ struct TestSystemStatus {
   uint8_t get_currentBatteryTier() const { return currentBatteryTier; }
   uint8_t get_resetCount() const { return resetCount; }
   time_t get_lastReport() const { return lastReport; }
+  time_t get_lastTimeSync() const { return 0; }
   bool get_verboseMode() const { return verboseMode; }
   uint16_t get_verboseTimeoutMin() const { return verboseTimeoutMin; }
   const char *get_timeZoneStrCStr() const { return timeZoneStrCStr; }

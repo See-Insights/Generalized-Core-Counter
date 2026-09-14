@@ -201,6 +201,9 @@ inline TestSystemClass System;
 
 struct TestParticleClass {
   bool connected() const { return false; }
+  unsigned long timeSyncedLast() const { return 0UL; }
+  bool syncTimeDone() const { return true; }
+  void syncTime() {}
 };
 inline TestParticleClass Particle;
 

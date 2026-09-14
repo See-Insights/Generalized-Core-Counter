@@ -42,6 +42,103 @@
 - Must not operate, configure, restart, or update Fleet devices.
 - Fleet Ops access must be read-only.
 - May write planning artifacts or draft GitHub issues only where specifically authorized.
+- Must not write hidden or cryptically named temporary artifacts. See
+  "Temporary build and test artifacts" below.
+
+### Verifying compile-time flags — all agents
+
+Applies to Copilot, Codex, and Claude Code equally.
+
+Several features in this project are gated by build flags in
+`src/BuildProfile.h` (`ENABLE_RTC_SKEW_TEST`, `ENABLE_PMIC_CHARGE_CYCLE_TEST`,
+`ENABLE_DIAGNOSTICS_PUBLISH_MODE`, `ENABLE_BORON_USB_SOURCE_OVERRIDE`). Some of
+them, when enabled, deliberately do harmful things — the RTC skew hook writes a
+knowingly wrong time to the AB1805. The claim "this compiles out of a default
+build" is therefore a **safety property**, and it is the property most likely to
+be verified against a binary that does not correspond to the source.
+
+**Required when verifying that a flag-gated feature is present or absent:**
+
+- **Delete the object file for the affected translation unit and rebuild.**
+  Clearing `target/` is *not* a clean build — it holds link output only. The
+  compiled objects live at
+  `~/.particle/toolchains/deviceOS/<ver>/build/target/user/platform-<id>-m/<app>/`.
+- Prove presence/absence with `nm` on the linked ELF **and** on the object
+  itself. Never with `strings`.
+- Record the `text`/`data` sizes at both flag values. A size that matches the
+  *other* flag setting is the signature of a stale link.
+
+**Prohibited:**
+
+- **Restoring a build-config file in any way that rewrites its timestamp
+  backwards.** `mv config.h.bak config.h` is the known example, but the rule is
+  general: `cp -p`, `git stash pop`, `rsync -t`, archive extraction, and editor
+  "revert file" can all restore content while preserving or backdating mtime.
+  Any restore-from-backup that touches file timestamps must be treated as
+  suspect for incremental builds. Restore by rewriting the file in place (an
+  edit, or `cat > file`), which advances mtime and forces the rebuild.
+- Reporting a flag-absence result from an incremental build.
+
+**Why this is a rule and not a preference.** On 2026-09-03, Copilot restored
+`src/BuildProfile.h` from a `.bak` with `mv` after temporarily enabling
+`ENABLE_RTC_SKEW_TEST`. The `mv` backdated the file to before its own flag=1
+builds, so `make` skipped the rebuild and relinked a stale object. The next
+build reported `text 148864` — the flag=1 size — while the source read
+`ENABLE_RTC_SKEW_TEST 0`, and `nm` found `retainedRtcSkewTestFired` in a
+binary that should not have contained it. A forced recompile of the single
+affected translation unit produced `text 148360` and no such symbol.
+
+The failure mode is the dangerous one: not a wrong answer, but a **stale answer
+delivered with full confidence**, by a build system with no notion that it was
+lying. It is the same lesson as agent self-certification — a claim needs
+independent reproduction, not a re-read of the same artifact — except the thing
+asserting the false claim was a file timestamp rather than a person or a model.
+Both directions are hazardous: this instance showed a feature *present* when it
+was absent; the reverse would certify a bench hook as absent while shipping it.
+
+### Temporary build and test artifacts — all agents
+
+Applies to Copilot, Codex, and Claude Code equally.
+
+Temporary files created during implementation or verification — compiled
+host-test binaries, mutation-testing backups, build logs, scratch
+directories — **must be visibly and descriptively named**, and must be
+removed when the work completes.
+
+**Required:**
+
+- Visible names. No leading `.` on files or directories.
+- Descriptive names that identify the tool and purpose, e.g.
+  `tests/rtc_skew_test_bin`, not `tests/.t`.
+- Placement under a path already covered by `.gitignore`, or added to it.
+- Cleanup on completion, including on failure paths.
+
+**Prohibited:**
+
+- Dot-prefixed temporary files or directories anywhere in the working
+  tree (`tests/.t`, `./.ctt`, `tests/.final_check`, `.hosttest_tmp`).
+- Single-letter or otherwise unidentifiable names.
+- Leaving artifacts behind after a dispatch completes.
+
+**Why this is a rule and not a preference.** On 2026-09-01, CrowdStrike
+raised a genuine security alert on this host. A Copilot dispatch round had
+run:
+
+```
+clang++ -std=c++17 -Wall -Wextra -pedantic -Isrc \
+  tests/rtc_skew_test.cpp -o tests/.t 2>&1 && ./tests/.t; rm -f tests/.t
+```
+
+That writes a freshly compiled, never-before-seen executable to a hidden
+path and immediately executes it — which is precisely the signature an EDR
+product should flag, and it did. The activity was benign and was
+attributed to a specific dispatch round from the session log, but only
+after an investigation that would have been unnecessary had the file been
+called `tests/rtc_skew_test_bin`.
+
+The hidden name bought nothing. It cost an incident-response cycle, and it
+made the artifact invisible to a routine `ls` and easy to miss in
+`git status`. Reviewers cannot audit what they cannot see.
 
 ### Codex — Independent Investigator and Verifier
 

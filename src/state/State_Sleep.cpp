@@ -1589,7 +1589,11 @@ void handleSleepingState() {
       if (sysStatus.get_sensorMode() == COUNTING) {
         current.set_hourlyCount(current.get_hourlyCount() + 1);
         current.set_dailyCount(current.get_dailyCount() + 1);
-        current.set_lastCountTime(Time.now());
+        // WO-2026-08-29-002 item 8: lastCountTime has no consumers anywhere
+        // in this codebase (write-only telemetry field) - gating on
+        // isClockTrusted() changes only the recorded value, never control
+        // flow.
+        current.set_lastCountTime(isClockTrusted() ? Time.now() : 0);
         signalLED(true, 1000);  // Flash for 1 second
         Log.info("Count detected from PIR wake - Hourly: %d, Daily: %d",
                  current.get_hourlyCount(), current.get_dailyCount());
@@ -1610,6 +1614,17 @@ void handleSleepingState() {
         
         if (!current.get_occupied()) {
           current.set_occupied(true);
+          // WO-2026-08-29-002 item 8: deliberately NOT gated on
+          // isClockTrusted(). Unlike lastCountTime, occupancyStartTime's 0
+          // value is a load-bearing sentinel for two consumers:
+          // MyPersistentData.cpp's validate() treats occupied=true with
+          // occupancyStartTime==0 as corrupt state and forces occupied=false
+          // (a real state-machine side effect, not just a recorded value),
+          // and State_Modes.cpp computes `Time.now() - occupancyStartTime`
+          // for a logged duration, which would become a multi-decade garbage
+          // span if this were 0 while occupied. Writing Time.now() here even
+          // when untrusted preserves existing behavior; see the
+          // Implementation Report for the Chief Engineer's review.
           current.set_occupancyStartTime(Time.now());
           // Treat the PIR wake as an occupancy event for debounce purposes.
           // If lastOccupancyEvent is left at 0, the debounce logic that uses

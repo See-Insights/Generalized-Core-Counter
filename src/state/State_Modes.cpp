@@ -27,7 +27,13 @@ void handleCountingMode() {
     // Increment counters
     current.set_hourlyCount(current.get_hourlyCount() + 1);
     current.set_dailyCount(current.get_dailyCount() + 1);
-    current.set_lastCountTime(Time.now());
+    // WO-2026-08-29-002 item 8 (Finding 6, Round 4 review): lastCountTime has
+    // no consumers anywhere in the codebase (see MyPersistentData.cpp and
+    // State_Sleep.cpp's identical gating for the consumer analysis) - safe
+    // to gate on isClockTrusted() so an untrusted clock records the 0
+    // sentinel instead of a wrong timestamp, rather than Time.isValid()
+    // alone (Finding 3).
+    current.set_lastCountTime(isClockTrusted() ? Time.now() : 0);
 
     // Log the new count once per event
     Log.info("Count detected - Hourly: %d, Daily: %d",

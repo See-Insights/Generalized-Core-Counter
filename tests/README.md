@@ -318,3 +318,70 @@ with its now-unreachable serialization branch and reason code.
 `ChargeInhibit::apply()` now retries once on an immediate
 `System.setPowerConfiguration()` failure as well as a successful-write-wrong-
 readback (previously only the latter retried).
+
+## WO-2026-08-31-003 (RTC skew bench hook) host tests
+
+Re-implemented against Amendment A (2026-09-02 Stage 7 findings A.1-A.6).
+`src/time/RtcSkewTest.h` (the skew-computation and one-shot-guard pure
+logic behind `ENABLE_RTC_SKEW_TEST` in `BuildProfile.h`) has zero Particle/
+AB1805 dependencies, the same pattern as `time/ClockTrust.h`. All temporary
+build artifacts go in the repo-local, gitignored `build-tmp/` directory -
+no dot-prefixed names, no `/tmp` (AI_DEVELOPMENT_WORKFLOW.md, "Temporary
+build and test artifacts"; Amendment A.5):
+
+```sh
+mkdir -p build-tmp
+c++ -std=c++17 -Wall -Wextra -pedantic -Isrc \
+  tests/rtc_skew_test.cpp -o build-tmp/rtc_skew_test_bin
+./build-tmp/rtc_skew_test_bin
+```
+
+Covers, among others: the exact `-28800` skew constant (A.1, replacing the
+unreachable `-48456`, with a host-test proof of bench-step-6 reachability
+at both constants against `kMaxHibernateSleepSec`); `OneShotGuard` firing
+once across simulated resets (same backing flag, new guard instance) and
+only re-arming on a simulated fresh flash (a fresh, default-false flag) -
+the A.2 requirement a per-boot `static` guard cannot satisfy; and an
+end-to-end flash -> skew -> correction -> hibernate -> fresh-boot sequence
+(A.6 gap 3) proving no re-fire and that step 6's condition is exercised
+correctly.
+
+The actual bench hook in `Generalized-Core-Counter.cpp` (the AB1805 reads/
+writes and the `#if PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST`
+gate) cannot be compiled standalone (heavy Particle/AB1805 dependencies).
+`tests/rtc_skew_test.sh` covers what can be checked without a full
+firmware build, writing its own scratch harness to
+`build-tmp/rtc_skew_harness.cpp` / `build-tmp/rtc_skew_harness_bin` and
+cleaning up on every exit path (success, failure, or interrupt) via a
+`trap ... EXIT INT TERM`:
+
+- Static guard-presence checks: the hook is gated behind
+  `PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST`, the flag
+  defaults to 0 in `BuildProfile.h` with the same `#error` 0/1 guard every
+  other flag carries, and an enabled build emits a `#warning`.
+- A.6 gap 1: brace-depth analysis proves `ab1805.setRtcFromTime(` is
+  lexically nested inside `if (rtcSkewTestGuard.shouldRun())` - an
+  unconditional block would fail this check, not just pass silently.
+- A.3: `Time.setTime(` is absent from the bench-hook block (comment lines
+  stripped first, so a mention of the banned call in a comment doesn't
+  produce a false pass).
+- A.4: `setRtcFromTime()`'s return value is checked (`if (rtcSkewWriteOk)`)
+  before the write is treated as done.
+- A.6 gap 2: extracts the REAL `isRtcTimeValidForHibernate()` function body
+  verbatim from `src/state/State_Sleep.cpp` (never reimplemented) and
+  compiles it into the host harness, then sweeps real per-year calendar
+  anchors from 2024-06-01 through 2034-06-01 inclusive (previously drifted
+  short, stopping at 2033-05-30) plus an edge case near the boundary that
+  is expected to be rejected - proving the check exercises the production
+  predicate, not a copy of its constants.
+
+These checks are NOT a substitute for proving the code is absent from a
+default, `ENABLE_RTC_SKEW_TEST=0` build - that requires a real Boron
+compile with a symbolicated build and an `nm` (not `strings`) diff against
+a default-flag build, run against the actual Device OS toolchain. See the
+Work Order's implementation report for the exact commands and output used
+for that verification.
+
+```sh
+zsh tests/rtc_skew_test.sh
+```
