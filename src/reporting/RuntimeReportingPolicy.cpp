@@ -1,11 +1,17 @@
 #include "reporting/ReportingPolicy.h"
 
-// NOTE: relative paths are required here. Device OS ships its own
+// NOTE: relative path required here. Device OS ships its own
 // services/inc/Config.h; a bare #include "Config.h" can resolve to that one
 // under the local toolchain's include order, giving "'Config' has not been
 // declared". This matches the convention in src/state/ and src/cloud/.
 #include "../Config.h"
-#include "../MyPersistentData.h"
+// WO-2026-09-14-001: this used to be a relative include of the main
+// persistence header. That header does not have the name-collision problem
+// above, so the relative path bought nothing here except the same
+// unshadowable-include defect. Replaced with a narrow, non-relative seam
+// exposing only the one accessor this file needs; see
+// reporting/BatteryTierStore.h for the full rationale.
+#include "reporting/BatteryTierStore.h"
 #include "power/ConnectivityPolicy.h"
 #include "reporting/BatteryTierGuard.h"
 #include "sensors/SensorManager.h"
@@ -22,7 +28,7 @@ bool runtimeWindowOpenAt(time_t epoch, void *) {
 namespace ReportingPolicyResolver {
 
 ReportingPolicy resolveRuntime(float currentSoC, time_t nowEpoch) {
-	uint8_t previousTierValue = sysStatus.get_currentBatteryTier();
+	uint8_t previousTierValue = BatteryTierStore::currentBatteryTier();
 	BatteryTier previousTier = previousTierValue <= TIER_SURVIVAL
 		? static_cast<BatteryTier>(previousTierValue)
 		: TIER_HEALTHY;
