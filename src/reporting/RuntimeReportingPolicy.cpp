@@ -1,10 +1,17 @@
 #include "reporting/ReportingPolicy.h"
 
-// NOTE: relative path required here. Device OS ships its own
-// services/inc/Config.h; a bare #include "Config.h" can resolve to that one
-// under the local toolchain's include order, giving "'Config' has not been
-// declared". This matches the convention in src/state/ and src/cloud/.
-#include "../Config.h"
+// WO-2026-09-14-001: this used to be a relative include of the shared
+// configuration header directly (relative because Device OS ships its own
+// services/inc header of the same name, and a bare non-relative include can
+// resolve to that one under the local toolchain's include order - see
+// reporting/ReportingIntervalStore.cpp, which still uses the relative form
+// for that reason, one file removed from here). The relative form here
+// bought nothing beyond that name-collision protection, and cost the same
+// unshadowable-include defect Step 0 fixed for the persistence header: a
+// test's -I override directory cannot shadow a relative include. Replaced
+// with a narrow, non-relative seam exposing only the one accessor this file
+// needs; see reporting/ReportingIntervalStore.h for the full rationale.
+#include "reporting/ReportingIntervalStore.h"
 // WO-2026-09-14-001: this used to be a relative include of the main
 // persistence header. That header does not have the name-collision problem
 // above, so the relative path bought nothing here except the same
@@ -96,7 +103,7 @@ ReportingPolicy resolveRuntime(float currentSoC, time_t nowEpoch) {
 	}
 
 	ReportingPolicyInputs inputs;
-	inputs.configuredIntervalSec = Config::reportingIntervalSecForRuntime();
+	inputs.configuredIntervalSec = ReportingIntervalStore::reportingIntervalSec();
 	inputs.batteryTier = tier;
 	inputs.batteryMultiplier = BatteryBackoff::intervalMultiplier(tier);
 	inputs.nowEpoch = nowEpoch;
