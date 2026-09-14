@@ -207,13 +207,20 @@
  *              a 1-in-2^64 coincidence (see "Round 4 HIGH" below for why
  *              this is now 2^64, not 2^32).
  *            - DOES NOT GUARANTEE anything at compile-granularity finer
- *              than "this translation unit was recompiled": relinking an
- *              unchanged object (no recompile of this file) leaves the
- *              embedded token identical, so re-flashing the EXACT SAME
- *              compiled binary twice does not re-arm - this is correct
- *              (nothing about the firmware changed) and consistent with
- *              "does not re-arm without a fresh flash", since no new
- *              content was flashed.
+ *              than "this translation unit was recompiled": the token
+ *              changes only when the translation unit that embeds it
+ *              (`Generalized-Core-Counter.cpp`) is itself recompiled. An
+ *              incremental rebuild that changes a DIFFERENT file and does
+ *              not touch this translation unit produces a genuinely
+ *              DIFFERENT firmware image WITHOUT re-arming the hook - the
+ *              new image carries the previous build's token. This is a
+ *              known, accepted limitation. It is NOT a claim that such a
+ *              rebuild produces an unchanged binary; it does not.
+ *              Demonstrated in round 4 review: editing `State_Sleep.cpp`,
+ *              rebuilding via the mandatory `make ... compile-user` path,
+ *              and confirming the changed code present in the resulting
+ *              ELF, left the embedded build stamp byte-identical to the
+ *              previous build's.
  *            - DOES NOT distinguish a meaningful source change from an
  *              incidental recompile of this same file with no functional
  *              difference (e.g. `make clean && make` with no edits): both
@@ -289,8 +296,11 @@
  *                `make -f .../Makefile compile-user` (the mandatory build
  *                method this WO's bench procedure and Stage 7 both use -
  *                see `AI_DEVELOPMENT_WORKFLOW.md`'s "Verifying
- *                compile-time flags") takes on the order of MINUTES, not
- *                sub-second, to complete. Two genuinely distinct, fully
+ *                compile-time flags") takes on the order of 10-20
+ *                SECONDS, not sub-second, to complete - measured in round
+ *                4 review at 16.8 s for a full build from an empty
+ *                `target/` and 11.9 s for an incremental rebuild of this
+ *                translation unit. Two genuinely distinct, fully
  *                completed builds of this firmware landing within the
  *                same wall-clock second is not a scenario the actual bench
  *                workflow can produce; it would require two independent
@@ -311,7 +321,8 @@
  *            indistinguishable by this mechanism and will NOT re-arm each
  *            other - this is a residual limitation, not eliminated by the
  *            64-bit widening, and is accepted because a real Boron
- *            firmware build takes minutes, making same-second distinct
+ *            firmware build takes on the order of 10-20 seconds (measured:
+ *            16.8 s full, 11.9 s incremental), making same-second distinct
  *            completed builds unreachable in this project's actual build
  *            workflow."
  *

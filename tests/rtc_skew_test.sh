@@ -203,15 +203,31 @@ echo "OK (A.4): setRtcFromTime()'s return value is checked before the write is t
 # composition (OneShotGuard directly over the retained bool, with no
 # re-arm ever applied) that previously failed Stage 7 while every other
 # check in this suite kept passing.
-rearm_call_line=$(grep -vn '^[[:space:]]*//' "$app_src" | grep 'RtcSkewTest::rearmIfBuildTokenChanged(' | head -1 | cut -d: -f1)
-guard_ctor_line=$(grep -vn '^[[:space:]]*//' "$app_src" | grep 'RtcSkewTest::OneShotGuard rtcSkewTestGuard(' | head -1 | cut -d: -f1)
+# Round 5: capture each search pipeline's exit status explicitly rather than
+# letting `set -euo pipefail` act on it. Previously these were bare command
+# substitutions, so deleting the re-arm call made the inner grep exit 1 and
+# aborted the script HERE - before either diagnostic below could run. The
+# suite still failed (exit 1), but silently, naming nothing. `|| status=$?`
+# defers the failure just long enough to report which check broke and why.
+rearm_grep_status=0
+rearm_call_line=$(grep -vn '^[[:space:]]*//' "$app_src" | grep 'RtcSkewTest::rearmIfBuildTokenChanged(' | head -1 | cut -d: -f1) || rearm_grep_status=$?
+guard_grep_status=0
+guard_ctor_line=$(grep -vn '^[[:space:]]*//' "$app_src" | grep 'RtcSkewTest::OneShotGuard rtcSkewTestGuard(' | head -1 | cut -d: -f1) || guard_grep_status=$?
 
+if (( rearm_grep_status != 0 )); then
+  echo "FAILED (round 4 MEDIUM): search for RtcSkewTest::rearmIfBuildTokenChanged( in $app_src found no non-comment match (pipeline exit $rearm_grep_status) - the production re-arm call may have been deleted" >&2
+  exit 1
+fi
 if [[ -z "$rearm_call_line" ]]; then
-  echo "FAILED (round 4 MEDIUM): RtcSkewTest::rearmIfBuildTokenChanged( call not found in $app_src - the production re-arm call may have been deleted" >&2
+  echo "FAILED (round 4 MEDIUM): RtcSkewTest::rearmIfBuildTokenChanged( matched in $app_src but no line number was extracted - this check's own search pipeline is broken, not the source" >&2
+  exit 1
+fi
+if (( guard_grep_status != 0 )); then
+  echo "FAILED (round 4 MEDIUM): search for RtcSkewTest::OneShotGuard rtcSkewTestGuard( in $app_src found no non-comment match (pipeline exit $guard_grep_status) - the guard construction may have been deleted" >&2
   exit 1
 fi
 if [[ -z "$guard_ctor_line" ]]; then
-  echo "FAILED (round 4 MEDIUM): RtcSkewTest::OneShotGuard rtcSkewTestGuard( construction not found in $app_src" >&2
+  echo "FAILED (round 4 MEDIUM): RtcSkewTest::OneShotGuard rtcSkewTestGuard( matched in $app_src but no line number was extracted - this check's own search pipeline is broken, not the source" >&2
   exit 1
 fi
 if (( rearm_call_line >= guard_ctor_line )); then
