@@ -1,17 +1,18 @@
-// Host-side regression test for the AB1805 wake-reason classification logic
-// in setup() in src/Generalized-Core-Counter.cpp (WO-2026-08-10-001, item 1,
-// corrected per the Stage 7 review documented in the WO's "Status" section).
-// The real setup() cannot be compiled standalone on the host - it pulls in
-// Particle.h, Wire, the AB1805_RK/PublishQueuePosixRK/StorageHelperRK
-// libraries, and a large amount of application state - so this test lifts the
-// exact classification decision (the block between "AB1805 WATCHDOG
-// WAKE-REASON CLASSIFICATION" and ab1805.setWDT()) into a small,
-// dependency-free function (classifyPinResetWatchdog(), below) that is a
-// byte-for-byte mirror of that block's control flow: it calls
-// ab1805.getWakeReason() only - no updateWakeReason() call - exactly like the
-// corrected source. Keeping it in sync with the source is a manual
-// responsibility; a code reviewer/CI addition could diff the two, but that is
-// out of scope for this WO.
+// Host-side regression test for the AB1805 PIN_RESET wake-reason
+// classification logic, originally in setup() in
+// src/Generalized-Core-Counter.cpp (WO-2026-08-10-001, item 1, corrected per
+// the Stage 7 review documented in the WO's "Status" section), absorbed into
+// src/time/HibernateCycle.cpp's classifyWake() by WO-2026-09-16 Step 2
+// (alongside the hibernate wake-validation gate, since both read the same
+// AB1805::getWakeReason() getter). The real classifyWake() cannot be
+// compiled standalone on the host - it takes a real AB1805& and pulls in
+// Particle.h/the AB1805_RK library - so this test lifts the exact
+// classification decision into a small, dependency-free function
+// (classifyPinResetWatchdog(), below) that is a byte-for-byte mirror of that
+// block's control flow: it calls ab1805.getWakeReason() only - no
+// updateWakeReason() call - exactly like the corrected source. Keeping it in
+// sync with the source is a manual responsibility; a code reviewer/CI
+// addition could diff the two, but that is out of scope for this WO.
 //
 // AB1805::WakeReason's enumerators are copied verbatim from
 // lib/AB1805_RK/src/AB1805_RK.h (UNKNOWN, WATCHDOG, DEEP_POWER_DOWN,

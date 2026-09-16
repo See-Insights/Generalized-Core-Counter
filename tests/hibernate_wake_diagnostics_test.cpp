@@ -10,7 +10,6 @@ namespace {
 
 using HibernateWakeDiagnostics::buildEventFields;
 using HibernateWakeDiagnostics::buildEventPayload;
-using HibernateWakeDiagnostics::classifyGateArm;
 using HibernateWakeDiagnostics::EventFields;
 using HibernateWakeDiagnostics::GateArm;
 using HibernateWakeDiagnostics::GateInputs;
@@ -29,13 +28,45 @@ GateInputs passingInputs() {
   return in;
 }
 
+// WO-2026-09-16 Step 2 absorbed the six-condition classification into
+// HibernateCycle::classifyWake() - it is no longer a separately callable
+// function in HibernateWakeDiagnostics.h ("absorb, don't wrap": the
+// production `if` in setup() now consumes classifyWake()'s WakeVerdict
+// directly, with no intermediate mirror function for it to call). This is
+// a byte-for-byte manually-maintained MIRROR of that absorbed logic, the
+// same pattern already used by watchdog_ab1805_classification_test.cpp for
+// the AB1805 PIN_RESET classification - keeping it in sync with
+// HibernateCycle.cpp is a manual responsibility, verified by this test's
+// .sh Part 2 fidelity checks against the real source.
+GateArm classifyGateArmMirror(const GateInputs &in) {
+  if (!in.resetReasonIsPowerManagement) {
+    return GateArm::kResetReason;
+  }
+  if (!in.wakeReasonIsAlarm) {
+    return GateArm::kWakeReason;
+  }
+  if (!in.rtcReadOk) {
+    return GateArm::kRtcRead;
+  }
+  if (!(in.rtcBefore > 0)) {
+    return GateArm::kRtcBeforeZero;
+  }
+  if (!(in.requestedSleepSec > 0)) {
+    return GateArm::kRequestedZero;
+  }
+  if (!(in.rtcAtWake >= in.rtcBefore)) {
+    return GateArm::kRtcOrder;
+  }
+  return GateArm::kNone;
+}
+
 void testGatePassesClassifiesNone() {
   const GateInputs in = passingInputs();
-  assert(classifyGateArm(in) == GateArm::kNone);
+  assert(classifyGateArmMirror(in) == GateArm::kNone);
 }
 
 // buildEventFields() is the exact function production calls immediately
-// after classifyGateArm() to combine the gate outcome with the
+// after HibernateCycle::classifyWake() classifies the gate outcome, to combine it with the
 // already-computed actual/error values (see Generalized-Core-Counter.cpp's
 // call site). On a passing gate it must report the success values verbatim
 // (WO requirement: event and status payload can never disagree, because
@@ -43,7 +74,7 @@ void testGatePassesClassifiesNone() {
 // i.e. setup(), already computed).
 void testBuildEventFieldsOnSuccessReportsProvidedActualAndError() {
   const GateInputs in = passingInputs();
-  const EventFields f = buildEventFields(in, /*osResetReason=*/30, "ALARM",
+  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "ALARM",
                                           /*hibernateCount=*/7,
                                           /*actualSleepSecOnSuccess=*/3605,
                                           /*sleepErrorSecOnSuccess=*/5);
@@ -60,7 +91,7 @@ void testBuildEventFieldsOnSuccessReportsProvidedActualAndError() {
 void testBuildEventFieldsOnFailureZeroesActualAndErrorRegardlessOfInput() {
   GateInputs in = passingInputs();
   in.rtcReadOk = false; // fails the kRtcRead arm
-  const EventFields f = buildEventFields(in, /*osResetReason=*/30, "ALARM",
+  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "ALARM",
                                           /*hibernateCount=*/7,
                                           /*actualSleepSecOnSuccess=*/9999,
                                           /*sleepErrorSecOnSuccess=*/9999);
@@ -88,7 +119,7 @@ void testBuildEventFieldsOnSuccessForwardsEveryForensicInputFaithfully() {
   in.requestedSleepSec = 424242;   // distinctive uint32_t
   in.rtcAtWake = 88154321;         // distinctive, > rtcBefore (gate passes)
 
-  const EventFields f = buildEventFields(in, /*osResetReason=*/90211, "COUNTDOWN_TIMER",
+  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/90211, "COUNTDOWN_TIMER",
                                           /*hibernateCount=*/13579,
                                           /*actualSleepSecOnSuccess=*/918273,
                                           /*sleepErrorSecOnSuccess=*/-31415);
@@ -135,7 +166,7 @@ void testBuildEventFieldsOnFailureForwardsEveryForensicInputFaithfully() {
   in.requestedSleepSec = 808080;   // distinctive uint32_t
   in.rtcAtWake = 66666666;         // distinctive int64_t
 
-  const EventFields f = buildEventFields(in, /*osResetReason=*/12321, "DEEP_POWER_DOWN",
+  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/12321, "DEEP_POWER_DOWN",
                                           /*hibernateCount=*/24680,
                                           /*actualSleepSecOnSuccess=*/555,
                                           /*sleepErrorSecOnSuccess=*/-555);
@@ -168,7 +199,7 @@ void testBuildEventFieldsOnFailureForwardsEveryForensicInputFaithfully() {
 
 void testGatePassesPayloadReportsSuccess() {
   const GateInputs in = passingInputs();
-  const EventFields f = buildEventFields(in, /*osResetReason=*/30, "ALARM",
+  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "ALARM",
                                           /*hibernateCount=*/7,
                                           /*actualSleepSecOnSuccess=*/3605,
                                           /*sleepErrorSecOnSuccess=*/5);
@@ -184,43 +215,43 @@ void testGatePassesPayloadReportsSuccess() {
 }
 
 // Each gate arm failing, one condition at a time, must be identified by
-// classifyGateArm() and must show up verbatim in the built payload.
+// classifyGateArmMirror() and must show up verbatim in the built payload.
 void testEachGateArmFailureIsIdentified() {
   {
     GateInputs in = passingInputs();
     in.resetReasonIsPowerManagement = false;
-    assert(classifyGateArm(in) == GateArm::kResetReason);
-    assert(strcmp(gateArmName(classifyGateArm(in)), "reset_reason") == 0);
+    assert(classifyGateArmMirror(in) == GateArm::kResetReason);
+    assert(strcmp(gateArmName(classifyGateArmMirror(in)), "reset_reason") == 0);
   }
   {
     GateInputs in = passingInputs();
     in.wakeReasonIsAlarm = false;
-    assert(classifyGateArm(in) == GateArm::kWakeReason);
-    assert(strcmp(gateArmName(classifyGateArm(in)), "wake_reason") == 0);
+    assert(classifyGateArmMirror(in) == GateArm::kWakeReason);
+    assert(strcmp(gateArmName(classifyGateArmMirror(in)), "wake_reason") == 0);
   }
   {
     GateInputs in = passingInputs();
     in.rtcReadOk = false;
-    assert(classifyGateArm(in) == GateArm::kRtcRead);
-    assert(strcmp(gateArmName(classifyGateArm(in)), "rtc_read") == 0);
+    assert(classifyGateArmMirror(in) == GateArm::kRtcRead);
+    assert(strcmp(gateArmName(classifyGateArmMirror(in)), "rtc_read") == 0);
   }
   {
     GateInputs in = passingInputs();
     in.rtcBefore = 0;
-    assert(classifyGateArm(in) == GateArm::kRtcBeforeZero);
-    assert(strcmp(gateArmName(classifyGateArm(in)), "rtc_before_zero") == 0);
+    assert(classifyGateArmMirror(in) == GateArm::kRtcBeforeZero);
+    assert(strcmp(gateArmName(classifyGateArmMirror(in)), "rtc_before_zero") == 0);
   }
   {
     GateInputs in = passingInputs();
     in.requestedSleepSec = 0;
-    assert(classifyGateArm(in) == GateArm::kRequestedZero);
-    assert(strcmp(gateArmName(classifyGateArm(in)), "requested_zero") == 0);
+    assert(classifyGateArmMirror(in) == GateArm::kRequestedZero);
+    assert(strcmp(gateArmName(classifyGateArmMirror(in)), "requested_zero") == 0);
   }
   {
     GateInputs in = passingInputs();
     in.rtcAtWake = in.rtcBefore - 1; // woke "before" the recorded sleep time
-    assert(classifyGateArm(in) == GateArm::kRtcOrder);
-    assert(strcmp(gateArmName(classifyGateArm(in)), "rtc_order") == 0);
+    assert(classifyGateArmMirror(in) == GateArm::kRtcOrder);
+    assert(strcmp(gateArmName(classifyGateArmMirror(in)), "rtc_order") == 0);
   }
 }
 
@@ -233,13 +264,13 @@ void testFirstFailingArmInEvaluationOrderWins() {
   in.resetReasonIsPowerManagement = false;
   in.wakeReasonIsAlarm = false;
   in.rtcReadOk = false;
-  assert(classifyGateArm(in) == GateArm::kResetReason);
+  assert(classifyGateArmMirror(in) == GateArm::kResetReason);
 }
 
-// Stage 7 (round 5): classifyGateArm()'s ORDER of checks - not just each
-// check's individual correctness - must match the real gate's
-// short-circuit order (see the ordering contract in classifyGateArm()'s
-// doc comment). Codex demonstrated that swapping two ADJACENT checks
+// Stage 7 (round 5): the mirror's ORDER of checks - not just each check's
+// individual correctness - must match HibernateCycle::classifyWake()'s
+// absorbed six-condition order (verified against the real source by this
+// test's .sh Part 2 fidelity checks). Codex demonstrated that swapping two ADJACENT checks
 // (specifically wake_reason <-> rtc_read) passed every existing test,
 // because testEachGateArmFailureIsIdentified() only ever fails ONE
 // condition at a time (so an internal reordering can't be observed - each
@@ -253,41 +284,42 @@ void testFirstFailingArmInEvaluationOrderWins() {
 // asserting the EARLIER one in the documented order is what gets
 // reported. This is control-flow coverage, not another value-mutation
 // test: it would catch an accidental swap of any two adjacent `if`s
-// inside classifyGateArm(), which no single-arm-failure test can, because
+// inside this mirror (and, by the same shape of bug, inside the real
+// classifyWake()), which no single-arm-failure test can, because
 // a swap only changes behavior when the swapped pair fails together.
 void testAdjacentArmOrdering_ResetReasonBeforeWakeReason() {
   GateInputs in = passingInputs();
   in.resetReasonIsPowerManagement = false; // fails check 1
   in.wakeReasonIsAlarm = false;             // fails check 2
-  assert(classifyGateArm(in) == GateArm::kResetReason);
+  assert(classifyGateArmMirror(in) == GateArm::kResetReason);
 }
 
 void testAdjacentArmOrdering_WakeReasonBeforeRtcRead() {
   GateInputs in = passingInputs();
   in.wakeReasonIsAlarm = false; // fails check 2
   in.rtcReadOk = false;         // fails check 3
-  assert(classifyGateArm(in) == GateArm::kWakeReason);
+  assert(classifyGateArmMirror(in) == GateArm::kWakeReason);
 }
 
 void testAdjacentArmOrdering_RtcReadBeforeRtcBeforeZero() {
   GateInputs in = passingInputs();
   in.rtcReadOk = false; // fails check 3
   in.rtcBefore = 0;     // fails check 4
-  assert(classifyGateArm(in) == GateArm::kRtcRead);
+  assert(classifyGateArmMirror(in) == GateArm::kRtcRead);
 }
 
 void testAdjacentArmOrdering_RtcBeforeZeroBeforeRequestedZero() {
   GateInputs in = passingInputs();
   in.rtcBefore = 0;         // fails check 4
   in.requestedSleepSec = 0; // fails check 5
-  assert(classifyGateArm(in) == GateArm::kRtcBeforeZero);
+  assert(classifyGateArmMirror(in) == GateArm::kRtcBeforeZero);
 }
 
 void testAdjacentArmOrdering_RequestedZeroBeforeRtcOrder() {
   GateInputs in = passingInputs();
   in.requestedSleepSec = 0;             // fails check 5
   in.rtcAtWake = in.rtcBefore - 1;      // fails check 6
-  assert(classifyGateArm(in) == GateArm::kRequestedZero);
+  assert(classifyGateArmMirror(in) == GateArm::kRequestedZero);
 }
 
 void testFailurePayloadIdentifiesArmAndOmitsFabricatedTiming() {
@@ -297,7 +329,7 @@ void testFailurePayloadIdentifiesArmAndOmitsFabricatedTiming() {
   // Same "both outcomes" contract as testBuildEventFieldsOnFailureZeroesActualAndErrorRegardlessOfInput():
   // pass deliberately non-zero success-path values to prove buildEventFields()
   // - not the caller - is what zeroes them on a failed gate.
-  const EventFields f = buildEventFields(in, /*osResetReason=*/30, "ALARM",
+  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "ALARM",
                                           /*hibernateCount=*/2,
                                           /*actualSleepSecOnSuccess=*/1234,
                                           /*sleepErrorSecOnSuccess=*/1234);

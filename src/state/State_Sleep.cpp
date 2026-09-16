@@ -16,6 +16,7 @@
 #include "observability/WakeCycleStats.h"
 #include "ThrashGuard.h"
 #include "state/SleepPrepSpanTiming.h"
+#include "time/HibernateCycle.h"
 
 namespace {
 
@@ -1075,11 +1076,12 @@ void handleSleepingState() {
               Log.warn("SleepCall: watchdog-stop failed mode=HIBERNATE dur=%ds", wakeInSeconds);
             }
 
-            retainedHibernateRtcBefore = rtcNow;
-            retainedHibernateWakeTime = wakeTime;
-            retainedHibernateRequestedSleep = (uint32_t)wakeInSeconds;
-            retainedHibernateCount++;
-            retainedHibernatePending = true;
+            // WO-2026-09-16 Step 2: HibernateCycle now owns the retained
+            // hibernate-cycle fields; wakeTime itself is used above for
+            // ab1805.interruptAtTime() only - nothing reads it back on
+            // wake (confirmed dead as a retained field), so it is not
+            // passed through here.
+            HibernateCycle::armForSleep(rtcNow, (uint32_t)wakeInSeconds);
 
             Log.info("ModemTeardown: radioOn=%d point=hibernate", (int)Connectivity::isRadioPoweredOn());
             Log.info("Sleep: HIBERNATE reason=closed dur=%ds wakePin=%d", wakeInSeconds, (int)WAKEUP_PIN);
@@ -1099,7 +1101,7 @@ void handleSleepingState() {
             const SystemSleepResult hibernateResult = System.sleep(config);
 
             // HIBERNATE should reset the MCU. If we return here, treat it as failed and fall back.
-            retainedHibernatePending = false;
+            HibernateCycle::abandon();
             ab1805.resumeWDT();
             restoreAwakeWatchdogAfterWake("hibernate");
             Log.warn("HIBERNATE sleep failed err=%d - falling back to ULTRA_LOW_POWER",
