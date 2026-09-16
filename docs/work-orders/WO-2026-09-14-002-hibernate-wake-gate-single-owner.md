@@ -2,10 +2,10 @@
 
 **Type:** Structural fix (Step 1 of the Structural Ownership Map roadmap).
 
-**Status:** Code complete and fully tested on the host and via cloud compile
-(Boron, target 6.4.1). **Bench validation outstanding** - two nights each on
-Dev-09 and Dev-14 - before this closes. No behaviour change is intended;
-bench data is the check that none occurred.
+**Status:** CLOSED 2026-09-16. Code complete, fully tested on the host and via
+cloud compile (Boron, target 6.4.1), and bench-validated on Dev-09 and Dev-14
+across two nights each - see Bench validation below. No behaviour change was
+intended, and none was observed.
 
 ## The observation
 
@@ -114,23 +114,91 @@ reconstructed condition.
   Flash 149550 / RAM 3414 bytes - consistent with a call-site refactor
   (no new retained state, no new library dependency).
 
-## Outstanding
+## Bench validation
 
-- **Bench validation (blocks closing this WO).** Dev-09 and Dev-14, two
-  nights each, post-flash. Acceptance: `hibernate_wake` payload shape and
-  gate-arm classification match the prior week's pattern exactly - Dev-14
-  `ok`, Dev-09 `fail`/`wake_reason`, byte-for-byte comparable field sets.
-  This is the check that moving the decision produced no behaviour change.
-- Not in scope for this step, named per the roadmap and not touched: moving
-  the retained hibernate fields, `time/HibernateCycle.{h,cpp}`,
-  `sensors/SensorManager.cpp:490`. Those are Step 2.
+Two nights each, post-flash, Dev-09 and Dev-14. Acceptance: `hibernate_wake`
+payload shape and gate-arm classification match the prior week's pattern
+exactly - this is the check that moving the decision produced no behaviour
+change.
+
+Binary compiled from commit `aaf687a` (`particle compile boron . --target
+6.4.1`, sha256 `1e0176ad5e9086891f74f8e7fa4afcf9134b5fa6bdd1c6d6f69b7978945e2756`).
+The binary itself is not a committed artifact - there is nothing to look up
+in the repository beyond the source at that commit; the hash is recorded
+here as the record of exactly what was flashed.
+
+**Dev-14 - two clean nights, exactly as required:**
+
+| | Night 1 | Night 2 | Pre-flash baseline (6 nights) |
+|---|---|---|---|
+| result | ok | ok | ok |
+| gateArm | none | none | none |
+| wakeReason | ALARM | ALARM | ALARM |
+| rtcOk | 1 | 1 | 1 |
+| req | 28487 | 28798 | 28797-28798 |
+| actual | 28488 | 28799 | 28798-28799 |
+| err | 1 | 1 | 1 |
+| count | 1 | 2 | (pre-flash: 12-17) |
+
+`count` incremented by exactly 1 (1->2), continuing cleanly from the
+post-flash retained-memory reset. Every other field matches both nights and
+the 6-night pre-flash baseline exactly. **Dev-14's acceptance criterion is
+met.**
+
+**Dev-09 - correct classification both nights, matching its established
+pre-flash pattern, validating the gate logic even under connectivity
+stress:**
+
+| | Night 1 | Night 2 | Pre-flash baseline |
+|---|---|---|---|
+| result | fail | fail | fail |
+| gateArm | wake_reason | wake_reason | wake_reason |
+| wakeReason | DEEP_POWER_DOWN | DEEP_POWER_DOWN | DEEP_POWER_DOWN |
+| rtcOk | 1 | 1 | 1 |
+
+Dev-09 is a Singapore poor-connectivity bench unit
+([[poor-connectivity-test-devices]]) and independently hit an unrelated
+`CELLULAR_ACQUIRE` registration stall during this validation window - filed
+separately as `WO-2026-09-15-002`, confirmed not caused by and not related to
+this change (it delayed when night 1's already-correct `hibernate_wake`
+event reached the cloud, not what the gate decided). The gate itself
+classified correctly, on time, on both nights regardless.
+
+### Side note: `retainedHibernateCount` reset between Dev-09's two nights (1, 1, instead of 1, 2) - resolved, not a defect
+
+Investigated in detail (call sites traced, publish-timing ruled out as a
+mechanism, watchdog reset and battery brownout both ruled out against
+telemetry) before the actual cause came to light: the field was cleared by a
+**manual antenna swap** - a deliberate board power cycle at approximately
+19:55 SGT on 2026-09-15, confirmed directly against Dev-09's serial log (the
+boot-uptime counter resets from ~50,000,000 ms to `0000009733` ms at
+`2026-09-15T11:55:09Z`) and corroborated by the subsequent signal-strength
+jump (`sig=0/0` before, `sig=55/6` and similar immediately after - the new
+antenna working as intended).
+
+This is expected, documented behaviour, not a defect: `retained` SRAM
+(what `retainedHibernateCount` and its four sibling fields live in) clears
+on a genuine loss of board power, by design - `time/RtcSkewTest.h`'s own doc
+comment already states retained RAM survives a soft reset, a watchdog
+reset, and a HIBERNATE wake, only "as long as system power is maintained."
+This is a different retention domain from `sysStatus` (a
+`StorageHelperRK::PersistentDataFile` - a real file on non-volatile flash
+storage) and from the AB1805's own battery-backed RTC, neither of which this
+power cycle affected. No Step 2 precondition follows from this, and no
+separate WO was needed.
+
+## Not in scope for this step
+
+Named per the roadmap and not touched here: moving the retained hibernate
+fields, `time/HibernateCycle.{h,cpp}`, `sensors/SensorManager.cpp:490`.
+Those are Step 2.
 
 ## Provenance
 
 Scoped by `docs/architecture-review-2026-09-03.md` ("Incident 1") and the
 Structural Ownership Map roadmap agreed 2026-09-03 (Step 1 of that
-roadmap). Implemented 2026-09-14 on branch
-`wo/2026-09-14-002-wake-gate-single-owner`.
+roadmap). Implemented 2026-09-14 and bench-validated 2026-09-14 through
+2026-09-16 on branch `wo/2026-09-14-002-wake-gate-single-owner`.
 
 ## Related work orders
 
@@ -145,3 +213,9 @@ roadmap). Implemented 2026-09-14 on branch
 - `WO-2026-09-14-001` - the prior step in this same session, same
   narrow-seam-over-duplication pattern applied to a different coupling
   (persistence/config headers rather than a boolean gate).
+- `WO-2026-09-15-001` - excessive repeat logging in PowerDiag/
+  LedgerPayloadStatus, noticed during this WO's bench validation; unrelated
+  to this change, filed separately.
+- `WO-2026-09-15-002` - the `CELLULAR_ACQUIRE` registration stall that
+  delayed (not altered) Dev-09's night 1 `hibernate_wake` publish; confirmed
+  unrelated to this change, filed separately.
