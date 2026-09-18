@@ -43,7 +43,8 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 #include "LocalTimeRK.h"             // Timezone conversion (UTC to local)
 #include "time/LocalTimeCache.h"          // Cached LocalTimeRK conversions
 #include "time/ClockTrust.h"         // Sync-recency resync gate and trust signal (WO-2026-08-29-002)
-#include "time/HibernateWakeDiagnostics.h" // Hibernate-wake gate classification/payload (WO-2026-08-29-001)
+#include "time/HibernateWakeDiagnostics.h" // Hibernate-wake gate data types/cloud-event rendering (WO-2026-08-29-001)
+#include "time/HibernateCycle.h"           // Hibernate-cycle owner: retained fields, wake classification (WO-2026-09-16 Step 2)
 #include "time/RtcSkewTest.h"         // Bench-only RTC skew hook arithmetic/guard (WO-2026-08-31-003)
 
 #if ENABLE_RTC_SKEW_TEST
@@ -291,8 +292,12 @@ const char *appBreadcrumbName(uint8_t code) {
 // Not Boron-specific: the AB1805 RTC/watchdog chip is used on every supported
 // platform (ab1805.setup()/setWDT() run unconditionally below), so this name
 // lookup must be available generally, not just under the Boron-only hibernate
-// wake-reason path.
-const char *ab1805WakeReasonName(AB1805::WakeReason reason) {
+// wake-reason path. Named "...Local" because this definition sits inside
+// this file's anonymous namespace (internal linkage) - HibernateCycle.cpp
+// needs it too (WO-2026-09-16 Step 2), so a thin external-linkage wrapper
+// is defined below the namespace, the same pattern already used here for
+// failsafeDeferReasonName()/failsafeDeferReasonNameLocal().
+const char *ab1805WakeReasonNameLocal(AB1805::WakeReason reason) {
   switch (reason) {
   case AB1805::WakeReason::WATCHDOG:
     return "WATCHDOG";
@@ -449,6 +454,10 @@ const char *failsafeDeferReasonName(FailsafeDeferReason reason) {
   return failsafeDeferReasonNameLocal(reason);
 }
 
+const char *ab1805WakeReasonName(AB1805::WakeReason reason) {
+  return ab1805WakeReasonNameLocal(reason);
+}
+
 bool claimFailsafeDeferLog(FailsafeDeferReason reason) {
   return claimFailsafeDeferLogLocal(reason);
 }
@@ -482,11 +491,10 @@ retained bool bootStormAlertPending = false;
 retained uint8_t appBreadcrumb = BREADCRUMB_NONE;
 retained uint32_t appBreadcrumbMs = 0;
 retained RetainedLoopForensics retainedLoopForensics = {};
-retained time_t retainedHibernateRtcBefore = 0;
-retained time_t retainedHibernateWakeTime = 0;
-retained uint32_t retainedHibernateRequestedSleep = 0;
-retained uint32_t retainedHibernateCount = 0;
-retained bool retainedHibernatePending = false;
+// WO-2026-09-16 Step 2: the hibernate-cycle retained fields formerly
+// declared here (retainedHibernateRtcBefore/WakeTime/RequestedSleep/Count/
+// Pending) now live in time/HibernateCycle.cpp, the single owner of that
+// lifecycle - see HibernateCycle.h.
 #if PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST
 // WO-2026-08-31-003 Amendment A.2 / round 3 HIGH fix: persists whether the
 // bench-only RTC skew hook (below, in setup()) has already fired.
@@ -1173,44 +1181,27 @@ void setup() {
   }
 #endif
 
-  // ===== AB1805 WATCHDOG WAKE-REASON CLASSIFICATION =====
-  // Gated on RESET_REASON_PIN_RESET. Device OS reports an external MCU reset
-  // (e.g. the carrier board's AB1805 watchdog firing via the reset pin) as
-  // PIN_RESET, not WATCHDOG - so the only way to confirm the AB1805 was the
-  // cause is to ask it directly. Placed right after ab1805.setup() and
-  // before setWDT() so we read the chip's wake-reason register before
-  // re-arming the watchdog.
-  //
-  // IMPORTANT: do NOT call ab1805.updateWakeReason() again here.
-  // AB1805::setup() (above) already called detectChip() + updateWakeReason()
-  // internally on a successful chip detection, and that single read is the
-  // only one we may rely on: updateWakeReason() destructively clears the
-  // status bit it classifies (e.g. clearRegisterBit(REG_STATUS,
-  // REG_STATUS_WDT) once it reports WATCHDOG). If the status register had
-  // multiple bits set simultaneously (WDT+TIMER or WDT+ALARM), a second call
-  // here would re-read the now-stale register, no longer see the WDT bit
-  // (already cleared by setup()'s call), and silently overwrite the correct
-  // WATCHDOG classification with whichever other bit remained. Reusing
-  // ab1805.getWakeReason() here relies on - and is correct because of - the
-  // library's own WDT-first priority ordering inside updateWakeReason()'s
-  // if/else-if chain (WDT checked before TIMER/ALARM in that single read).
-  //
-  // There is no separate success/fail signal available without repeating
-  // that destructive read: WakeReason defaults to UNKNOWN and only changes
-  // if AB1805::setup()'s internal detectChip()+updateWakeReason() sequence
-  // ran and found a recognized status bit. So WakeReason::UNKNOWN already
-  // and correctly covers both "chip detection failed" and "no wake-reason
-  // bit was set" - both must stay inconclusive, never "not the AB1805".
-  bool ab1805ConfirmedWatchdog = false;
-  if (reason == RESET_REASON_PIN_RESET) {
-    startupPinResetAb1805Checked = true;
-    const AB1805::WakeReason pinResetWakeReason = ab1805.getWakeReason();
-    startupAb1805WakeReasonName = ab1805WakeReasonName(pinResetWakeReason);
+  // ===== AB1805 WAKE-REASON CLASSIFICATION (HibernateCycle) =====
+  // WO-2026-09-16 Step 2: PIN_RESET/AB1805-watchdog confirmation and the
+  // hibernate wake-validation gate both used to read ab1805.getWakeReason()
+  // independently, at two different points in setup(). Both are safe to
+  // call more than once - see HibernateCycle.cpp's own comment for why
+  // (getWakeReason() is a plain getter onto the one destructive
+  // updateWakeReason() call AB1805::setup() already made) - but there is no
+  // longer a reason to keep them apart: HibernateCycle::classifyWake() does
+  // both in one call, here, before setWDT() re-arms the watchdog, exactly
+  // where the PIN_RESET classification used to run alone.
+  const HibernateCycle::WakeVerdict wakeVerdict = HibernateCycle::classifyWake(reason, ab1805);
 
-    if (pinResetWakeReason == AB1805::WakeReason::WATCHDOG) {
+  bool ab1805ConfirmedWatchdog = false;
+  if (wakeVerdict.pinResetChecked) {
+    startupPinResetAb1805Checked = true;
+    startupAb1805WakeReasonName = wakeVerdict.pinResetWakeReasonName;
+
+    if (wakeVerdict.pinResetConfirmedWatchdog) {
       ab1805ConfirmedWatchdog = true;
       Log.warn("PIN_RESET confirmed as AB1805 watchdog reset");
-    } else if (pinResetWakeReason == AB1805::WakeReason::UNKNOWN) {
+    } else if (wakeVerdict.pinResetWakeReasonUnknown) {
       // Explicitly inconclusive - do NOT treat UNKNOWN as "not the AB1805".
       Log.info("PIN_RESET with AB1805 wake reason UNKNOWN - inconclusive, not ruling out AB1805 watchdog");
     } else {
@@ -1254,8 +1245,15 @@ void setup() {
     publishWatchdogForensics(ab1805ConfirmedWatchdog);
   }
 
-  time_t rtcTime = 0;
-  const bool rtcReadOk = ab1805.getRtcAsTime(rtcTime);
+  // wakeVerdict.rtcReadOk/rtcAtWake were computed inside classifyWake()
+  // (called above, before setWDT()) - nothing between that call and here
+  // touches Time's validity (confirmed: the RtcSkewTest bench hook
+  // explicitly does not call Time.setTime(), and neither setWDT() nor the
+  // watchdog forensics block touches Time), so sampling Time.isValid() here
+  // observes the same transition it always did (seeded by ab1805.setup()
+  // earlier in setup(), not by this read itself).
+  const time_t rtcTime = (time_t)wakeVerdict.rtcAtWake;
+  const bool rtcReadOk = wakeVerdict.rtcReadOk;
   const bool timeValidAfterRtc = Time.isValid();
   if (!timeValidBeforeRtc && timeValidAfterRtc) {
     if (rtcReadOk) {
@@ -1279,35 +1277,20 @@ void setup() {
   startupHibernateActualSleepSec = 0;
   startupHibernateSleepErrorSec = 0;
 #if PLATFORM_ID == PLATFORM_BORON
-  if (retainedHibernatePending) {
-    const AB1805::WakeReason wakeReason = ab1805.getWakeReason();
-    startupHibernateWakeReason = ab1805WakeReasonName(wakeReason);
+  if (wakeVerdict.hibernateGateEvaluated) {
+    startupHibernateWakeReason = wakeVerdict.wakeReasonName;
 
-    // WO-2026-09-14-002 (Step 1): gateInputs is built once, here, and is the
-    // single thing the gate decision below and the forensic event further
-    // down both consume - there is no longer a second, hand-duplicated `if`
-    // for the classifier to merely mirror; the classifier IS the gate now.
-    HibernateWakeDiagnostics::GateInputs gateInputs{};
-    gateInputs.resetReasonIsPowerManagement = (reason == RESET_REASON_POWER_MANAGEMENT);
-    gateInputs.wakeReasonIsAlarm = (wakeReason == AB1805::WakeReason::ALARM);
-    gateInputs.rtcReadOk = rtcReadOk;
-    gateInputs.rtcBefore = (int64_t)retainedHibernateRtcBefore;
-    gateInputs.requestedSleepSec = retainedHibernateRequestedSleep;
-    gateInputs.rtcAtWake = (int64_t)rtcTime;
-
-    const HibernateWakeDiagnostics::GateArm gateArm = HibernateWakeDiagnostics::classifyGateArm(gateInputs);
-    if (gateArm == HibernateWakeDiagnostics::GateArm::kNone) {
-      startupHibernateActualSleepSec = (uint32_t)(rtcTime - retainedHibernateRtcBefore);
-      startupHibernateSleepErrorSec = (int32_t)startupHibernateActualSleepSec -
-                                      (int32_t)retainedHibernateRequestedSleep;
+    if (wakeVerdict.gateArm == HibernateWakeDiagnostics::GateArm::kNone) {
+      startupHibernateActualSleepSec = wakeVerdict.actualSleepSec;
+      startupHibernateSleepErrorSec = wakeVerdict.sleepErrorSec;
       startupHibernateStatusReady = true;
 
       Log.info("HibernateWake: reason=%s req=%lu actual=%lu err=%ld count=%lu",
                startupHibernateWakeReason,
-               (unsigned long)retainedHibernateRequestedSleep,
+               (unsigned long)wakeVerdict.requestedSleepSec,
                (unsigned long)startupHibernateActualSleepSec,
                (long)startupHibernateSleepErrorSec,
-               (unsigned long)retainedHibernateCount);
+               (unsigned long)wakeVerdict.hibernateCount);
     } else {
       Log.info("HibernateWake: pending=1 reason=%d wake=%s rtcOk=%d",
                reason,
@@ -1316,22 +1299,22 @@ void setup() {
     }
 
     // WO-2026-08-29-001: queue a forensic event capturing the gate outcome
-    // BEFORE retainedHibernatePending is cleared below, so the failure case
+    // BEFORE HibernateCycle::abandon() below, so the failure case
     // (previously invisible - see the Work Order) reaches the cloud too.
-    // buildEventFields() re-derives the classification from the same
-    // gateInputs the decision above used; none of this alters
-    // startupHibernateStatusReady or the gate decision, it only identifies
-    // which arm failed (or kNone on success) for reporting.
+    // buildEventFields() takes wakeVerdict.gateArm directly now (Step 2) -
+    // it used to re-derive it via a second call to classifyGateArm() with
+    // the same inputs, which is why that function no longer exists as a
+    // separately callable thing (WO-2026-09-16 Step 2).
     {
       const HibernateWakeDiagnostics::EventFields eventFields = HibernateWakeDiagnostics::buildEventFields(
-          gateInputs, reason, startupHibernateWakeReason, retainedHibernateCount,
-          startupHibernateActualSleepSec, startupHibernateSleepErrorSec);
+          wakeVerdict.gateArm, wakeVerdict.gateInputs, reason, startupHibernateWakeReason,
+          wakeVerdict.hibernateCount, startupHibernateActualSleepSec, startupHibernateSleepErrorSec);
 
       publishHibernateWakeForensics(eventFields);
     }
   }
 #endif
-  retainedHibernatePending = false;
+  HibernateCycle::abandon();
 
   Cloud::instance().setup(); // Initialize the cloud functions
 
@@ -2700,7 +2683,7 @@ void publishStartupStatus() {
              startupHibernateWakeReason,
              (unsigned long)startupHibernateActualSleepSec,
              (long)startupHibernateSleepErrorSec,
-             (unsigned long)retainedHibernateCount);
+             (unsigned long)HibernateCycle::currentHibernateCount());
   }
 
   // Only present when the OS reset reason was PIN_RESET (see the AB1805
@@ -2822,8 +2805,9 @@ void publishWatchdogForensics(bool ab1805Confirmed) {
  * @brief Publishes a forensic snapshot of the hibernate-wake gate outcome
  *        (WO-2026-08-29-001), mirroring publishWatchdogForensics() above.
  *
- * @details The gate at setup()'s `if (retainedHibernatePending)` block only
- * ever made its SUCCESS outcome cloud-visible (via the status payload's
+ * @details The gate in setup() (fed by `HibernateCycle::classifyWake()`,
+ * evaluated when `wakeVerdict.hibernateGateEvaluated` is true) only ever
+ * made its SUCCESS outcome cloud-visible (via the status payload's
  * hibernate fields). Its FAILURE outcome - the interesting case for
  * diagnosing an oversleep/undersleep or a wake that never qualified -
  * previously reached only a `Log.info()` line emitted before USB CDC
@@ -2832,13 +2816,14 @@ void publishWatchdogForensics(bool ab1805Confirmed) {
  * payload deliberately, so it does not compete with WO-2026-08-29-002's
  * status payload byte budget and reaches every fleet device (not just the
  * bench units with a serial forwarder attached), the same way the
- * publish-queue-backed "watchdog" event above does. Called only when
- * `retainedHibernatePending` was true this boot, before it is cleared.
+ * publish-queue-backed "watchdog" event above does. Called only when a
+ * hibernate wake was pending this boot, before `HibernateCycle::abandon()`.
  *
- * @param fields Gate-outcome fields already classified and assembled by
- *        HibernateWakeDiagnostics::buildEventFields() at the call site
- *        (which itself calls classifyGateArm()); this function only
- *        formats and publishes them, it does not evaluate the gate itself.
+ * @param fields Gate-outcome fields already classified by
+ *        `HibernateCycle::classifyWake()` and assembled by
+ *        `HibernateWakeDiagnostics::buildEventFields()` at the call site;
+ *        this function only formats and publishes them, it does not
+ *        evaluate the gate itself.
  */
 void publishHibernateWakeForensics(const HibernateWakeDiagnostics::EventFields &fields) {
   char payload[256];

@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """
-WO-2026-09-14-002 (Step 1 of the Structural Ownership Map roadmap) -
-structural regression test for the hibernate wake-validation gate.
+Structural regression test for the hibernate wake-validation gate's single
+decision site - originated in WO-2026-09-14-002 (Step 1 of the Structural
+Ownership Map roadmap), current invariant updated by WO-2026-09-16 Step 2
+(HibernateCycle). Read this docstring before assuming the file name or the
+WO number in the title tells you which step's shape it currently checks -
+as of Step 2, invariant 1 asserts a HibernateCycle::classifyWake() call
+site, not a classifyGateArm() one; see below for why.
 
 Background: the production gate at Generalized-Core-Counter.cpp used to be a
 hand-written six-term `&&` chain, duplicated position-for-position by
@@ -12,9 +17,19 @@ docs/architecture-review-2026-09-03.md and the reason
 WO-2026-08-31-002 Amendment B (the DEEP_POWER_DOWN finding) had nowhere
 single to land.
 
-The fix retires the duplicate: the production `if` now calls
-classifyGateArm() directly and branches on `GateArm::kNone`, so there is
-exactly one place that decides whether the gate passed.
+Step 1's fix retired that duplicate: the production `if` called
+classifyGateArm() directly and branched on `GateArm::kNone`, so there was
+exactly one place that decided whether the gate passed.
+
+WO-2026-09-16 Step 2 went further: classifyGateArm() itself was absorbed
+into HibernateCycle::classifyWake() ("absorb, don't wrap" - not a second
+thing calling into a third thing), so Generalized-Core-Counter.cpp no
+longer references classifyGateArm() at all - it consumes classifyWake()'s
+WakeVerdict instead. This test's invariant 1 was updated accordingly: it
+now asserts a single classifyWake() call site rather than a single
+classifyGateArm() call site. Invariant 2 (the old raw `&&` chain must stay
+gone) is unchanged - that regression is possible regardless of which file
+owns the classification.
 
 This is a source-invariant check on the REAL checked-in file, not a mirror.
 Comments are stripped before each check so prose (including this file's own
@@ -22,8 +37,8 @@ history, if pasted into the source) cannot produce a false positive or a
 false negative.
 
   1. Generalized-Core-Counter.cpp contains exactly one call to
-     classifyGateArm() - if it contains zero, the production gate has
-     stopped consulting the classifier (silently reintroducing a
+     HibernateCycle::classifyWake() - if it contains zero, the production
+     gate has stopped consulting the classifier (silently reintroducing a
      hand-written duplicate); if it contains more than one, a second
      decision site has crept back in.
   2. Generalized-Core-Counter.cpp contains no occurrence of the old raw
@@ -39,7 +54,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PRODUCTION_SOURCE = REPO_ROOT / "src" / "Generalized-Core-Counter.cpp"
 
-CLASSIFY_CALL_PATTERN = re.compile(r"classifyGateArm\s*\(")
+CLASSIFY_CALL_PATTERN = re.compile(r"HibernateCycle::classifyWake\s*\(")
 RAW_CHAIN_FRAGMENT_PATTERN = re.compile(r"WakeReason::ALARM\s*&&")
 
 
@@ -67,11 +82,12 @@ def main():
     call_count = len(CLASSIFY_CALL_PATTERN.findall(code_only))
     if call_count != 1:
         fail(
-            f"{PRODUCTION_SOURCE} contains {call_count} classifyGateArm( "
+            f"{PRODUCTION_SOURCE} contains {call_count} HibernateCycle::classifyWake( "
             "call(s) in code, expected exactly 1 - the wake-validation gate "
-            "must have a single decision site (WO-2026-09-14-002 Step 1); "
-            "either the production `if` has stopped calling the classifier, "
-            "or a second decision site has been added"
+            "must have a single decision site (WO-2026-09-14-002 Step 1, "
+            "absorbed further by WO-2026-09-16 Step 2); either the production "
+            "`if` has stopped calling the classifier, or a second decision "
+            "site has been added"
         )
 
     # --- Invariant 2 (positive control): the old hand-written chain is
@@ -88,7 +104,7 @@ def main():
             "problem this step fixed"
         )
 
-    print("OK: exactly one classifyGateArm( call decides the wake-validation gate")
+    print("OK: exactly one HibernateCycle::classifyWake( call decides the wake-validation gate")
     print("OK: the old raw WakeReason::ALARM && chain fragment is gone")
     print("wake_gate_single_owner_structural_test: all invariants hold")
 
