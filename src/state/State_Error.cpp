@@ -9,6 +9,7 @@
 #include "sensors/SensorDefinitions.h"
 #include "AB1805_RK.h"
 #include "power/Connectivity.h"
+#include "time/Clock.h"
 
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
@@ -55,7 +56,7 @@ static int resolveErrorAction() {
     return 2;   // start with soft reset
 
   case 40: { // repeated webhook failures
-    if (!Time.isValid()) {
+    if (!Clock::isTimeValid()) {
       Log.info("Alert 40 set but time is invalid - deferring corrective action");
       return 0;
     }

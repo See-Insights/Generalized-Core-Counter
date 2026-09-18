@@ -11,6 +11,7 @@
 #include "device_pinout.h"
 #include "sensors/SensorDefinitions.h"
 #include "reporting/ReportingPolicy.h"
+#include "time/Clock.h"
 
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
@@ -31,7 +32,7 @@ void handleReportingState() {
   time_t now = Time.now();
   // If this is the first report after a calendar *local* day boundary,
   // run the daily cleanup once to reset daily counters and housekeeping.
-  if (Time.isValid()) {
+  if (Clock::isTimeValid()) {
     time_t lastReport = sysStatus.get_lastReport();
     if (lastReport != 0) {
       const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
@@ -76,7 +77,7 @@ void handleReportingState() {
   // escalating corrective action, but only during OPEN hours and with backoff
   // to prevent thrashing.
   bool forceConnectForLongTermWebhook = false;
-  if (Time.isValid() && isWithinOpenHours() && !session.suppressAlert40ThisSession) {
+  if (Clock::isTimeValid() && isWithinOpenHours() && !session.suppressAlert40ThisSession) {
     time_t lastHook = sysStatus.get_lastHookResponse();
     if (lastHook != 0) {
       const long ageSec = (long)(now - lastHook);

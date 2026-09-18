@@ -10,6 +10,7 @@
 #include "power/Connectivity.h"
 #include "power/PowerManager.h"
 #include "ThrashGuard.h"
+#include "time/Clock.h"
 
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
@@ -103,7 +104,7 @@ void handleIdleState() {
   // In CONNECTED operating mode, the device stays awake during park open hours.
   // When the park is closed, it should disconnect, power down the sensor, and
   // deep-sleep until the next opening time.
-  if (Time.isValid() && sysStatus.get_connectionMode() == CONNECTED) {
+  if (Clock::isTimeValid() && sysStatus.get_connectionMode() == CONNECTED) {
     const bool openNow = isWithinOpenHours();
     logTimeDiag(openNow);
     if (!openNow) {
@@ -119,7 +120,7 @@ void handleIdleState() {
   // SCHEDULED mode uses time-based sampling (non-interrupt).
   // Interrupt-driven modes (COUNTING/OCCUPANCY) are handled centrally in main loop().
   if (sysStatus.get_sensorMode() == MEASUREMENT) {
-    if (Time.isValid()) {
+    if (Clock::isTimeValid()) {
       static time_t lastScheduledSample = 0;
       uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
 
@@ -159,7 +160,7 @@ void handleIdleState() {
   // ********** Scheduled Reporting **********
   // Use the configured reportingIntervalSec to determine when to
   // generate a periodic report, regardless of trigger mode.
-  if (Time.isValid() && isWithinOpenHours()) {
+  if (Clock::isTimeValid() && isWithinOpenHours()) {
     // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, do not generate periodic
     // reports while occupied. Occupancy=1 should only be reported on the
     // transition 0->1 (and 1->0 when it clears).
@@ -190,7 +191,7 @@ void handleIdleState() {
   // In INTERMITTENT (1) or DISCONNECTED (2) modes, manage connection lifecycle.
   if (sysStatus.get_connectionMode() != CONNECTED) {
     // In CONNECTED mode during open hours, never auto-sleep.
-    if (Time.isValid() && sysStatus.get_connectionMode() == CONNECTED && isWithinOpenHours()) {
+    if (Clock::isTimeValid() && sysStatus.get_connectionMode() == CONNECTED && isWithinOpenHours()) {
       return;
     }
 
@@ -252,7 +253,7 @@ void handleIdleState() {
       queueCanSleep = PublishQueuePosix::instance().getCanSleep();
     }
 
-    const bool openHoursKeepAwakeValid = Time.isValid() && isWithinOpenHours();
+    const bool openHoursKeepAwakeValid = Clock::isTimeValid() && isWithinOpenHours();
     const bool healthyConnectedAwakePath =
       (sysStatus.get_connectionMode() == CONNECTED) &&
       openHoursKeepAwakeValid &&

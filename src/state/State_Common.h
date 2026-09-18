@@ -4,6 +4,7 @@
 #include "MyPersistentData.h"
 #include "state/StateHandlers.h"
 #include "state/StateMachine.h"
+#include "time/Clock.h"
 
 /**
  * @file State_Common.h
@@ -275,7 +276,7 @@ inline OccupancyCloseResult closeOccupancySessionSafely(const char *path) {
 	OccupancyCloseResult result;
 	const bool occupied = current.get_occupied();
 	const int8_t alertCode = current.get_alertCode();
-	const bool timeValid = Time.isValid();
+	const bool timeValid = Clock::isTimeValid();
 	const time_t now = Time.now();
 	const time_t start = current.get_occupancyStartTime();
 	const uint32_t previousTotal = current.get_totalOccupiedSeconds();

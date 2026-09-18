@@ -36,11 +36,12 @@
 #include "BuildProfile.h"
 #include "Config.h"
 
-// WO-2026-08-29-002 item 8: forward-declared rather than pulling in
-// state/State_Common.h - that header transitively includes
-// state/StateHandlers.h and state/StateMachine.h, which this
-// data-persistence translation unit does not otherwise need.
-bool isClockTrusted();
+// WO-2026-09-18 Step 3a: isClockTrusted() is now declared by time/Clock.h,
+// a small, real header (not state/State_Common.h, which transitively
+// includes state/StateHandlers.h and state/StateMachine.h - more than this
+// data-persistence translation unit needs) - the correct-direction include
+// a forward declaration used to stand in for.
+#include "time/Clock.h"
 
 // Forward declaration for safe diagnostic publishing (defined in Generalized-Core-Counter.cpp)
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE);

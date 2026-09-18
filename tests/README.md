@@ -367,9 +367,10 @@ cleaning up on every exit path (success, failure, or interrupt) via a
   produce a false pass).
 - A.4: `setRtcFromTime()`'s return value is checked (`if (rtcSkewWriteOk)`)
   before the write is treated as done.
-- A.6 gap 2: extracts the REAL `isRtcTimeValidForHibernate()` function body
-  verbatim from `src/state/State_Sleep.cpp` (never reimplemented) and
-  compiles it into the host harness, then sweeps real per-year calendar
+- A.6 gap 2: extracts the REAL `isPlausibleEpoch()` function body verbatim
+  from `src/time/Clock.cpp` (never reimplemented - folded in from
+  `State_Sleep.cpp`'s former `isRtcTimeValidForHibernate()` by WO-2026-09-18
+  Step 3a) and compiles it into the host harness, then sweeps real per-year calendar
   anchors from 2024-06-01 through 2034-06-01 inclusive (previously drifted
   short, stopping at 2033-05-30) plus an edge case near the boundary that
   is expected to be rejected - proving the check exercises the production
