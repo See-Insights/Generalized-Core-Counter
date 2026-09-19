@@ -56,8 +56,10 @@ static int resolveErrorAction() {
     return 2;   // start with soft reset
 
   case 40: { // repeated webhook failures
-    if (!Clock::isTimeValid()) {
-      Log.info("Alert 40 set but time is invalid - deferring corrective action");
+    // WO-2026-09-19 Step 3b: Clock::isTrusted(), not isTimeValid() - the
+    // age check below (now - lastHook) must not run on an untrusted clock.
+    if (!Clock::isTrusted()) {
+      Log.info("Alert 40 set but clock is untrusted - deferring corrective action");
       return 0;
     }
 

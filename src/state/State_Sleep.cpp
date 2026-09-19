@@ -387,7 +387,13 @@ void handleSleepingState() {
   // If a ledger update (or time progression) moves the park into OPEN hours
   // while we are in SLEEPING_STATE, abort sleeping immediately in CONNECTED
   // mode so we stay awake/connected and resume counting.
-  if (Clock::isTimeValid() && sysStatus.get_connectionMode() == CONNECTED && isWithinOpenHours()) {
+  //
+  // WO-2026-09-19 Step 3b: Clock::openness() != Closed, not
+  // isTimeValid()+isWithinOpenHours(). Unknown is treated as Open here,
+  // consistent with every other CONNECTED-mode site this step converts:
+  // abort the sleep and stay awake/connected so a resync can occur, rather
+  // than committing to a sleep the device can't actually justify.
+  if (sysStatus.get_connectionMode() == CONNECTED && Clock::openness() != Clock::Openness::Closed) {
     ensureSensorEnabled("SLEEP abort: CONNECTED+OPEN");
     transitionTo(IDLE_STATE, "sleep-abort-open-hours");
     return;
@@ -945,10 +951,20 @@ void handleSleepingState() {
 
   setAppBreadcrumb(23); // BREADCRUMB_SLEEP_GATE_DONE (was stale literal 19, colliding with BREADCRUMB_REPORT_POST_LEDGER)
 
+  // WO-2026-09-19 Step 3b: the behavioral core of this step. parkOpenness is
+  // computed ONCE here and reused below (line ~1006 used to re-derive
+  // isWithinOpenHours() a second time, redundantly) - Closed is the only
+  // verdict that commits the device to the night-sleep branch below. An
+  // untrusted clock (Unknown) must NOT commit to an overnight hibernate
+  // based on a wrong belief about what time it is - see Clock::openness()'s
+  // doc comment. logTimeDiag()'s isOpen= stays sourced from the raw,
+  // fail-open isWithinOpenHours() (not parkOpenness) so its openness= field
+  // in the same log line can be compared against it - the two are expected
+  // to diverge exactly when the clock is untrusted.
   int nightSleepSec = -1;
-  const bool openNow = isWithinOpenHours();
-  logTimeDiag(openNow);
-  if (!openNow) {
+  const Clock::Openness parkOpenness = Clock::openness();
+  logTimeDiag(isWithinOpenHours());
+  if (parkOpenness == Clock::Openness::Closed) {
     // Notify sensor layer we are entering full night sleep so sensors and
     // indicator LEDs can be powered down. During daytime naps we keep
     // interrupt-driven sensors (like PIR) powered so they can wake the
@@ -996,14 +1012,23 @@ void handleSleepingState() {
 
   const char *sleepReason = "scheduled";
   int wakeInSeconds;
-  const bool overnightFallbackSleep = (!isWithinOpenHours() && nightSleepSec > 0);
+  // Reuses parkOpenness computed above rather than re-deriving
+  // isWithinOpenHours() a second time - both checks are the identical
+  // question, and re-deriving it separately is exactly how this site could
+  // silently drift from the commitment decision above.
+  const bool overnightFallbackSleep = (parkOpenness == Clock::Openness::Closed && nightSleepSec > 0);
   if (overnightFallbackSleep) {
     wakeInSeconds = nightSleepSec;
     sleepReason = "closed";
   } else {
-    // Within opening hours, align wake to the reporting boundary.
-    // Add 1 second margin to ensure we wake slightly after the boundary.
-    if (Clock::isTimeValid() && intervalSec > 0) {
+    // Within opening hours (or clock Unknown - the short-nap path), align
+    // wake to the reporting boundary. Add 1 second margin to ensure we wake
+    // slightly after the boundary.
+    // WO-2026-09-19 Step 3b: Clock::isTrusted(), not isTimeValid() - this is
+    // a plain "can I trust Time.now() for this arithmetic" question, not an
+    // open/closed one, so it stays a boolean rather than routing through
+    // openness().
+    if (Clock::isTrusted() && intervalSec > 0) {
       int boundary = (int)intervalSec;
       time_t now = Time.now();
       int offset = (int)(now % boundary);
@@ -1681,7 +1706,11 @@ void handleSleepingState() {
     }
 
     // For PIR wakes, check if reporting is also due (opportunistic reporting)
-    if (pirWake && Clock::isTimeValid() && isWithinOpenHours()) {
+    // WO-2026-09-19 Step 3b: Clock::openness() != Closed, not
+    // isTimeValid()+isWithinOpenHours() - Unknown is treated as Open, same
+    // reasoning as the scheduled-reporting site in State_Idle.cpp: an
+    // opportunistic report is a resync opportunity, not a commitment.
+    if (pirWake && Clock::openness() != Clock::Openness::Closed) {
       // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, do not opportunistically
       // report while occupied; PIR hits should only reset debounce.
       if (sysStatus.get_sensorMode() == OCCUPANCY && current.get_occupied() &&

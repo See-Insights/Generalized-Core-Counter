@@ -276,7 +276,10 @@ inline OccupancyCloseResult closeOccupancySessionSafely(const char *path) {
 	OccupancyCloseResult result;
 	const bool occupied = current.get_occupied();
 	const int8_t alertCode = current.get_alertCode();
-	const bool timeValid = Clock::isTimeValid();
+	// WO-2026-09-19 Step 3b: Clock::isTrusted(), not isTimeValid() - the
+	// duration arithmetic below (now - start) must not run on an RTC-seeded-
+	// but-unconfirmed epoch, which can produce a wildly wrong session length.
+	const bool timeValid = Clock::isTrusted();
 	const time_t now = Time.now();
 	const time_t start = current.get_occupancyStartTime();
 	const uint32_t previousTotal = current.get_totalOccupiedSeconds();

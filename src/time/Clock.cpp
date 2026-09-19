@@ -549,3 +549,32 @@ bool isPlausibleEpoch(time_t epoch) {
 }
 
 } // namespace Clock
+
+// ===== New in Step 3b =====
+
+namespace Clock {
+
+bool isTrusted() {
+  return isClockTrusted();
+}
+
+Openness openness() {
+  // Never fail open: an untrusted clock or unloaded config both return
+  // Unknown, explicitly - see this function's doc comment in Clock.h for
+  // why isWithinOpenHours()'s fail-OPEN behavior is wrong for a decision
+  // that commits the device to state.
+  if (!isTrusted()) {
+    return Openness::Unknown;
+  }
+  if (!Config::isValid(false)) {
+    return Openness::Unknown;
+  }
+
+  uint8_t openHour = sysStatus.get_openTime();
+  uint8_t closeHour = sysStatus.get_closeTime();
+  const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
+  const bool openNow = isWithinOpenHoursForHour(snapshot.localHour, openHour, closeHour);
+  return openNow ? Openness::Open : Openness::Closed;
+}
+
+} // namespace Clock

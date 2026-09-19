@@ -39,6 +39,18 @@
  *          via a structural test, that it is only a move. Restructuring the
  *          ~8 sites that gate sleep/connect/report decisions on clock state
  *          is explicitly Step 3b's job, not this one's.
+ *
+ *          WO-2026-09-19 Step 3b update: that restructuring landed here.
+ *          `Clock::isTrusted()` (a thin wrapper around `isClockTrusted()`)
+ *          and `Clock::openness()` (a NEW, trust-aware replacement for
+ *          `isWithinOpenHours()`'s boolean, fail-open answer) are what the
+ *          decision sites now consume - `Time.isValid()` alone was never a
+ *          trust signal (see `ClockTrust.h`), so a decision resting on
+ *          `Clock::isTimeValid()`/`isWithinOpenHours()` was resting on "an
+ *          epoch exists," not "this epoch can be trusted." `isWithinOpenHours()`
+ *          and `isClockTrusted()` themselves are UNCHANGED - they remain the
+ *          fail-open/telemetry-only helpers for the callers Step 3b did not
+ *          touch (see `docs/work-orders/` for the exact reviewed list).
  */
 
 #ifndef __CLOCK_H
@@ -137,6 +149,47 @@ bool isTimeValid();
  *          consumer before this move.
  */
 bool isPlausibleEpoch(time_t epoch);
+
+/**
+ * @brief WO-2026-09-19 Step 3b: thin wrapper around `isClockTrusted()`.
+ *
+ * @details Deliberately just `return isClockTrusted();` - `isClockTrusted()`
+ *          is already correct (WO-2026-08-29-002 item 8) and keeps its own
+ *          six existing telemetry-only callers unchanged. This wrapper exists
+ *          so the decision sites this step converts go through `Clock::`
+ *          rather than the bare global name, the same "new seam gets a
+ *          namespaced name" idiom `Clock::isTimeValid()` established in
+ *          Step 3a - not a rename or a reimplementation.
+ */
+bool isTrusted();
+
+/**
+ * @brief Whether the park is Open, Closed, or Unknown right now.
+ *
+ * @details The trust-aware replacement for `isWithinOpenHours()`'s boolean
+ *          answer at the decision sites Step 3b converts. `isWithinOpenHours()`
+ *          fails OPEN (returns true) when `Time.isValid()` is false OR the
+ *          open/close-hour config isn't loaded yet - a deliberate choice for
+ *          its own callers (mostly telemetry/diagnostics, or "let the device
+ *          start sensing before it has configuration"), but wrong for a
+ *          decision that commits the device to state (an overnight hibernate,
+ *          a sleep-ceiling exemption): failing open there means a clock that
+ *          is merely RTC-seeded - not confirmed by a recent cloud sync, and
+ *          therefore possibly hours wrong (see this file's Step 3a note on
+ *          why `Time.isValid()` is not a trust signal) - can commit the
+ *          device to a decision based on a wrong belief about what time it
+ *          is. `openness()` never fails open: an untrusted clock or missing
+ *          config both return `Unknown`, explicitly, so every caller must
+ *          decide what `Unknown` means for its own decision rather than
+ *          silently inheriting `true`.
+ */
+enum class Openness : uint8_t {
+  Open,
+  Closed,
+  Unknown,
+};
+
+Openness openness();
 
 } // namespace Clock
 

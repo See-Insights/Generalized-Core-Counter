@@ -32,7 +32,10 @@ void handleReportingState() {
   time_t now = Time.now();
   // If this is the first report after a calendar *local* day boundary,
   // run the daily cleanup once to reset daily counters and housekeeping.
-  if (Clock::isTimeValid()) {
+  // WO-2026-09-19 Step 3b: Clock::isTrusted(), not isTimeValid() - the day-
+  // boundary comparison below must not run on an untrusted clock, which
+  // could spuriously trigger (or miss) dailyCleanup() on the wrong day.
+  if (Clock::isTrusted()) {
     time_t lastReport = sysStatus.get_lastReport();
     if (lastReport != 0) {
       const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
@@ -76,8 +79,16 @@ void handleReportingState() {
   // Requirement: when >3 hours have passed without a webhook response, take
   // escalating corrective action, but only during OPEN hours and with backoff
   // to prevent thrashing.
+  //
+  // WO-2026-09-19 Step 3b: Clock::openness() == Open, not
+  // Clock::isTimeValid() && isWithinOpenHours() - this block's own age math
+  // (now - lastHook) and its ERROR_STATE escalation must not fire on an
+  // untrusted clock's guess about open hours. Unknown is treated the same
+  // as Closed here (skip this cycle) - the least change from today's
+  // already-safe fail path, and the right call for a block whose worst case
+  // is an unwarranted reset.
   bool forceConnectForLongTermWebhook = false;
-  if (Clock::isTimeValid() && isWithinOpenHours() && !session.suppressAlert40ThisSession) {
+  if (Clock::openness() == Clock::Openness::Open && !session.suppressAlert40ThisSession) {
     time_t lastHook = sysStatus.get_lastHookResponse();
     if (lastHook != 0) {
       const long ageSec = (long)(now - lastHook);
