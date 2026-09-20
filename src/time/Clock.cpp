@@ -1,7 +1,7 @@
 #include "Particle.h"
 #include "time/Clock.h"
 
-#include "Config.h"
+#include "../Config.h"
 #include "MyPersistentData.h"       // sysStatus (openTime/closeTime/lastTimeSync)
 #include "LocalTimeRK.h"            // LocalTimeConvert, LocalTime::instance()
 #include "time/LocalTimeCache.h"    // Cached LocalTimeRK conversions
