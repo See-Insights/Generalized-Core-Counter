@@ -104,15 +104,26 @@ void handleIdleState() {
   // In CONNECTED operating mode, the device stays awake during park open hours.
   // When the park is closed, it should disconnect, power down the sensor, and
   // deep-sleep until the next opening time.
-  if (Clock::isTimeValid() && sysStatus.get_connectionMode() == CONNECTED) {
-    const bool openNow = isWithinOpenHours();
-    logTimeDiag(openNow);
-    if (!openNow) {
+  //
+  // WO-2026-09-19 Step 3b: Clock::openness(), not isTimeValid()+isWithinOpenHours()
+  // - a plausible-but-wrong RTC-seeded clock could otherwise compute a wrong
+  // CLOSED verdict and commit this device to an overnight hibernate based on
+  // a wrong belief about what time it is. Unknown is treated as Open here:
+  // stay awake/connected rather than transition to sleep, so a resync can
+  // occur.
+  if (sysStatus.get_connectionMode() == CONNECTED) {
+    const Clock::Openness parkOpenness = Clock::openness();
+    // logTimeDiag()'s own isOpen= stays sourced from isWithinOpenHours() (its
+    // existing fail-open answer), not parkOpenness - openness= in that same
+    // log line is Clock::openness()'s verdict, and the two are meant to be
+    // compared, not merged into one value here.
+    logTimeDiag(isWithinOpenHours());
+    if (parkOpenness == Clock::Openness::Closed) {
       Log.info("CONNECTED mode: park CLOSED - transitioning to SLEEPING_STATE for overnight sleep");
       transitionTo(SLEEPING_STATE, "park closed");
       return;
     }
-    // Park is open: remain awake in CONNECTED mode.
+    // Park is Open, or clock is Unknown: remain awake in CONNECTED mode.
 
   }
 
@@ -120,7 +131,10 @@ void handleIdleState() {
   // SCHEDULED mode uses time-based sampling (non-interrupt).
   // Interrupt-driven modes (COUNTING/OCCUPANCY) are handled centrally in main loop().
   if (sysStatus.get_sensorMode() == MEASUREMENT) {
-    if (Clock::isTimeValid()) {
+    // WO-2026-09-19 Step 3b: Clock::isTrusted(), not isTimeValid() - the
+    // interval arithmetic below (now - lastScheduledSample) must not run on
+    // an untrusted clock.
+    if (Clock::isTrusted()) {
       static time_t lastScheduledSample = 0;
       uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
 
@@ -160,7 +174,13 @@ void handleIdleState() {
   // ********** Scheduled Reporting **********
   // Use the configured reportingIntervalSec to determine when to
   // generate a periodic report, regardless of trigger mode.
-  if (Clock::isTimeValid() && isWithinOpenHours()) {
+  //
+  // WO-2026-09-19 Step 3b: Clock::openness() != Closed, not
+  // isTimeValid()+isWithinOpenHours() - Unknown is treated as Open here: a
+  // periodic report is itself a connect/resync opportunity, so permitting it
+  // under an untrusted clock helps rather than risks anything (unlike the
+  // sleep-duration decision, this block never commits to hours of sleep).
+  if (Clock::openness() != Clock::Openness::Closed) {
     // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, do not generate periodic
     // reports while occupied. Occupancy=1 should only be reported on the
     // transition 0->1 (and 1->0 when it clears).
@@ -191,7 +211,13 @@ void handleIdleState() {
   // In INTERMITTENT (1) or DISCONNECTED (2) modes, manage connection lifecycle.
   if (sysStatus.get_connectionMode() != CONNECTED) {
     // In CONNECTED mode during open hours, never auto-sleep.
-    if (Clock::isTimeValid() && sysStatus.get_connectionMode() == CONNECTED && isWithinOpenHours()) {
+    // NOTE (WO-2026-09-19 Step 3b, flagged not fixed): this condition's own
+    // `connectionMode() == CONNECTED` term can never be true here - it is
+    // nested inside a block already gated on `connectionMode() != CONNECTED`
+    // above. Pre-existing dead code, unrelated to the trust-standard fix;
+    // converting it mechanically for consistency costs nothing since it
+    // never executes either way. Not touching the surrounding logic.
+    if (Clock::openness() == Clock::Openness::Open && sysStatus.get_connectionMode() == CONNECTED) {
       return;
     }
 
@@ -253,7 +279,21 @@ void handleIdleState() {
       queueCanSleep = PublishQueuePosix::instance().getCanSleep();
     }
 
-    const bool openHoursKeepAwakeValid = Clock::isTimeValid() && isWithinOpenHours();
+    // WO-2026-09-19 Step 3b: Clock::openness() == Open, not
+    // isTimeValid()+isWithinOpenHours(). Unlike the other sites this step
+    // converts, Unknown is deliberately NOT treated as Open here - this
+    // exemption is otherwise unbounded (there is no separate timeout once
+    // exempted), so an untrusted clock must not grant it. This also matches
+    // what this site already does TODAY when isTimeValid() is false: the
+    // exemption is denied and the ceiling applies (this fleet has a device,
+    // Dev-11, whose clock can go untrusted for extended periods for reasons
+    // no resync fixes - an unbounded exemption there would be a real
+    // battery-drain regression, not a hypothetical one). This is also a
+    // narrow correctness improvement over today: a plausible-but-wrong
+    // RTC-seeded clock (isTimeValid()==true) that happened to compute "open"
+    // could previously grant this exemption on a clock nobody had confirmed;
+    // now it requires an actual confirmed sync.
+    const bool openHoursKeepAwakeValid = (Clock::openness() == Clock::Openness::Open);
     const bool healthyConnectedAwakePath =
       (sysStatus.get_connectionMode() == CONNECTED) &&
       openHoursKeepAwakeValid &&

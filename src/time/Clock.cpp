@@ -1,7 +1,7 @@
 #include "Particle.h"
 #include "time/Clock.h"
 
-#include "Config.h"
+#include "../Config.h"
 #include "MyPersistentData.h"       // sysStatus (openTime/closeTime/lastTimeSync)
 #include "LocalTimeRK.h"            // LocalTimeConvert, LocalTime::instance()
 #include "time/LocalTimeCache.h"    // Cached LocalTimeRK conversions
@@ -546,6 +546,35 @@ bool isPlausibleEpoch(time_t epoch) {
   static const time_t kEpochMin = 1704067200; // 2024-01-01 00:00:00 UTC
   static const time_t kEpochMax = 2051222400; // 2035-01-01 00:00:00 UTC
   return epoch >= kEpochMin && epoch < kEpochMax;
+}
+
+} // namespace Clock
+
+// ===== New in Step 3b =====
+
+namespace Clock {
+
+bool isTrusted() {
+  return isClockTrusted();
+}
+
+Openness openness() {
+  // Never fail open: an untrusted clock or unloaded config both return
+  // Unknown, explicitly - see this function's doc comment in Clock.h for
+  // why isWithinOpenHours()'s fail-OPEN behavior is wrong for a decision
+  // that commits the device to state.
+  if (!isTrusted()) {
+    return Openness::Unknown;
+  }
+  if (!Config::isValid(false)) {
+    return Openness::Unknown;
+  }
+
+  uint8_t openHour = sysStatus.get_openTime();
+  uint8_t closeHour = sysStatus.get_closeTime();
+  const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
+  const bool openNow = isWithinOpenHoursForHour(snapshot.localHour, openHour, closeHour);
+  return openNow ? Openness::Open : Openness::Closed;
 }
 
 } // namespace Clock

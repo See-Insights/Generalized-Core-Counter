@@ -825,7 +825,16 @@ void setup() {
     }
   }
 
-  if (Clock::isTimeValid()) {
+  // WO-2026-09-19 Step 3b: gated on Clock::isTrusted(), not just
+  // Clock::isTimeValid() - this window-reset arithmetic (now -
+  // bootStormWindowStart) would otherwise run on an RTC-seeded-but-unconfirmed
+  // epoch, which could prematurely reset the storm counter (masking a real
+  // storm) or corrupt the baseline. Not updating the window during an
+  // untrusted-clock boot does not defeat detection: bootStormCount already
+  // incremented unconditionally above, so an untrusted clock simply leaves
+  // the 600s cooldown from firing on a wrong baseline - the trip threshold at
+  // line below is unaffected either way.
+  if (Clock::isTrusted()) {
     const time_t now = Time.now();
     if (bootStormWindowStart == 0) {
       bootStormWindowStart = now;
@@ -1380,6 +1389,17 @@ void setup() {
   // permitted to touch the sleep gate and connection-mode policy that a
   // correct fix actually requires; this WO no longer claims a wake-time
   // guarantee and reverts to the plain Round-4 condition below.
+  // WO-2026-09-19 Step 3b: deliberately NOT converted to Clock::isTrusted().
+  // isTrusted()/isClockTrusted() is false on every boot (including every
+  // hibernate wake) until a sync completes THIS boot - see this function's
+  // own comment a few lines above, which already hit this exact trap once.
+  // Swapping the isTimeValid() term here would force CONNECTING_STATE on
+  // every single wake, the precise regression neverConfirmedSyncEver (a
+  // PERSISTED, cross-boot flag) exists to avoid: this condition already
+  // correctly forces a connect when the RTC has never been set at all
+  // (isTimeValid()==false) OR when this device has never, across its whole
+  // history, completed a confirmed sync - a different, already-correct
+  // question from "is the clock trustworthy right now."
   const bool neverConfirmedSyncEver = (sysStatus.get_lastTimeSync() == 0);
   if (!Clock::isTimeValid() || neverConfirmedSyncEver) {
     transitionTo(CONNECTING_STATE, !Clock::isTimeValid() ? "time invalid" : "no confirmed time sync ever (Finding 3)");
@@ -1872,7 +1892,16 @@ void logTimeDiag(bool isOpen) {
   const bool clockTrusted = isClockTrusted();
   const time_t lastTimeSyncEpoch = sysStatus.get_lastTimeSync();
 
-  Log.info("TimeDiag: tz=%s valid=%d epoch=%lu utc=%04d-%02d-%02d %02d:%02d:%02d local=%04d-%02d-%02d %02d:%02d:%02d open=%d close=%d isOpen=%d trusted=%d syncAgeMs=%lu lastSyncEpoch=%ld",
+  // WO-2026-09-19 Step 3b: openness=0/1/2 (Open/Closed/Unknown) surfaces
+  // Clock::openness()'s verdict directly, alongside the pre-existing isOpen=
+  // (the caller's own boolean, usually from isWithinOpenHours() - fail-open,
+  // and NOT necessarily the same source as openness()). The two are expected
+  // to diverge exactly when the clock is untrusted: isOpen=1/openness=2 is
+  // the signature of "fail-open would have said open, openness() correctly
+  // says Unknown" - the acceptance evidence Step 3b's bench run looks for.
+  const int opennessCode = static_cast<int>(Clock::openness());
+
+  Log.info("TimeDiag: tz=%s valid=%d epoch=%lu utc=%04d-%02d-%02d %02d:%02d:%02d local=%04d-%02d-%02d %02d:%02d:%02d open=%d close=%d isOpen=%d trusted=%d openness=%d syncAgeMs=%lu lastSyncEpoch=%ld",
            tz,
            timeValid ? 1 : 0,
            (unsigned long)epoch,
@@ -1892,6 +1921,7 @@ void logTimeDiag(bool isOpen) {
            (int)sysStatus.get_closeTime(),
            isOpen ? 1 : 0,
            clockTrusted ? 1 : 0,
+           opennessCode,
            (unsigned long)reportedSyncAgeMs(),
            (long)lastTimeSyncEpoch);
 }
@@ -2523,6 +2553,21 @@ void connectivityFailsafeSupervisor() {
     return;
   }
 
+  // WO-2026-09-19 Step 3b: deliberately NOT converted to Clock::isTrusted(),
+  // even though this function's connectionAgeSec math below is exactly the
+  // kind of untrusted-clock arithmetic Step 3b otherwise guards against.
+  // This escalation ladder (radio reset -> system reset -> deep power-down)
+  // exists to recover a wedged modem/radio - and a device with a wedged
+  // radio has, by definition, never completed a sync this boot either, so
+  // gating the recovery on Clock::isTrusted() would disable the recovery
+  // mechanism in exactly the case it exists for (circular: the fault this
+  // supervisor recovers from is often the same fault that prevents the
+  // trust signal from ever going true). The narrower risk of staying on
+  // isTimeValid() (a plausible-but-wrong RTC-seeded epoch skewing
+  // connectionAgeSec) is judged acceptable against the alternative of
+  // silently disabling hardware recovery. Revisit only with a case that
+  // demonstrates the escalation firing on a genuinely wrong clock in the
+  // field - do not "fix" this speculatively.
   if (!Clock::isTimeValid()) {
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
     ConnectivityFailsafeTest::logDeferInvalidTime();
