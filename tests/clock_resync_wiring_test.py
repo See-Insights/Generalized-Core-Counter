@@ -92,6 +92,22 @@ instead traces the actual shipped source to prove:
 14. Round 4 review, Finding 6 (MEDIUM): `State_Modes.cpp`'s COUNTING-mode
     `lastCountTime` write (previously missed by the item-8 sweep) must also
     be gated on `isClockTrusted()`.
+
+WO-2026-09-18 Step 3a update: `checkClockResync()`, `requestClockResync()`,
+`isClockTrusted()`, `observedTimeSyncedLastMs()`, and `reportedSyncAgeMs()`
+relocated verbatim from `Generalized-Core-Counter.cpp` to the new
+`time/Clock.cpp` (the Structural Ownership Map's single clock owner) - same
+global-scope names, same bodies, only the defining file moved. Checks 1-11
+and 13 that used to extract these functions' bodies from `Generalized-Core-Counter.cpp`
+now extract them from `time/Clock.cpp` instead; `logTimeDiag()`, `dailyCleanup()`,
+`setup()`'s time-validation gate, and the `lastConnectionAgeSec` computation
+(checks 3/5/9/12) were NOT moved and are still extracted from
+`Generalized-Core-Counter.cpp`, now calling the relocated functions by their
+unchanged global names. Separately, `setup()`'s time-validation gate itself
+now reads `Clock::isTimeValid()` rather than a bare `Time.isValid()` - a
+same-step, zero-behavior-change wrapper (Step 3a's own structural test,
+`tests/clock_owner_structural_test.py`, is the authoritative check for that
+substitution across the tree); check 12 below matches the updated spelling.
 """
 import re
 import sys
@@ -103,6 +119,7 @@ STATUS_SRC = REPO_ROOT / "src" / "cloud" / "DeviceStatusPublisher.cpp"
 COMMON_HDR = REPO_ROOT / "src" / "state" / "State_Common.h"
 AB1805_CPP = REPO_ROOT / "lib" / "AB1805_RK" / "src" / "AB1805_RK.cpp"
 MODES_SRC = REPO_ROOT / "src" / "state" / "State_Modes.cpp"
+CLOCK_SRC = REPO_ROOT / "src" / "time" / "Clock.cpp"
 
 
 def fail(msg: str) -> None:
@@ -110,10 +127,10 @@ def fail(msg: str) -> None:
     sys.exit(1)
 
 
-def extract_function(text: str, signature_pattern: str, name: str) -> str:
+def extract_function(text: str, signature_pattern: str, name: str, src_name: str = None) -> str:
     match = re.search(signature_pattern, text)
     if not match:
-        fail(f"could not locate {name}() in {APP_SRC.name}")
+        fail(f"could not locate {name}() in {src_name or APP_SRC.name}")
     start = match.start()
     # The signature pattern's own trailing `\{` already matched the
     # function's opening brace, so match.end() - 1 is its position - do NOT
@@ -150,6 +167,7 @@ def main() -> None:
     status_text = STATUS_SRC.read_text()
     common_text = COMMON_HDR.read_text()
     ab1805_text = AB1805_CPP.read_text()
+    clock_text = CLOCK_SRC.read_text()  # WO-2026-09-18 Step 3a: the relocated clock owner
 
     # --- Confirm the vendored AB1805::loop() latch is untouched (out of ---
     # --- scope per the Work Order) and still exists as documented.      ---
@@ -162,7 +180,7 @@ def main() -> None:
 
     # --- 1/2/3: checkClockResync() body. ---
     check_fn = extract_function(
-        app_text, r"void\s+checkClockResync\s*\(\s*\)\s*\{", "checkClockResync"
+        clock_text, r"void\s+checkClockResync\s*\(\s*\)\s*\{", "checkClockResync", CLOCK_SRC.name
     )
 
     if "ab1805.setRtcFromSystem()" not in check_fn:
@@ -173,7 +191,7 @@ def main() -> None:
     # --- bookkeeping (clockResyncPending/syncTimeDone() raced and    ---
     # --- could silently drop the write - see the Work Order review  ---
     # --- history). No request/pending machinery may gate the write. ---
-    if "clockResyncPending" in strip_line_comments(app_text):
+    if "clockResyncPending" in strip_line_comments(clock_text):
         fail(
             "clockResyncPending must be fully removed (2nd review fix): the "
             "RTC write-back must not depend on request/pending bookkeeping, "
@@ -424,7 +442,7 @@ def main() -> None:
             "ClockTrust::canRetryResyncNow() so a device whose sync never "
             "completes does not re-request on every loop() iteration"
         )
-    if "clockResyncLastAttemptMs" not in app_text:
+    if "clockResyncLastAttemptMs" not in clock_text:
         fail("checkClockResync()/requestClockResync() must track clockResyncLastAttemptMs for retry pacing")
 
     # --- dailyCleanup() must no longer stamp lastTimeSync at request time. ---
@@ -454,9 +472,10 @@ def main() -> None:
     # pacing bookkeeping (clockResyncLastAttemptMs) to be updated in the
     # same function, not merely referenced elsewhere.
     request_fn = extract_function(
-        app_text,
+        clock_text,
         r"void\s+requestClockResync\s*\(\s*const\s+char\s*\*\s*\w+\s*\)\s*\{",
         "requestClockResync",
+        CLOCK_SRC.name,
     )
     request_code_text = strip_line_comments(request_fn)
     if "Particle.syncTime()" not in request_code_text:
@@ -479,7 +498,8 @@ def main() -> None:
     # --- would still pass even if the actual callers were deleted.        -
     get_last_time_sync_callers = len(
         re.findall(r"get_lastTimeSync\(\)", strip_line_comments(app_text))
-    ) + len(re.findall(r"get_lastTimeSync\(\)", strip_line_comments(status_text)))
+    ) + len(re.findall(r"get_lastTimeSync\(\)", strip_line_comments(status_text))
+    ) + len(re.findall(r"get_lastTimeSync\(\)", strip_line_comments(clock_text)))
     if get_last_time_sync_callers < 1:
         fail("sysStatus.get_lastTimeSync() must have at least one real (non-comment) caller (item 6)")
 
@@ -506,7 +526,7 @@ def main() -> None:
 
     # --- isClockTrusted() must be defined in terms of ClockTrust::isTrustedWrapAware(). ---
     trusted_fn = extract_function(
-        app_text, r"bool\s+isClockTrusted\s*\(\s*\)\s*\{", "isClockTrusted"
+        clock_text, r"bool\s+isClockTrusted\s*\(\s*\)\s*\{", "isClockTrusted", CLOCK_SRC.name
     )
     if "ClockTrust::isTrustedWrapAware(" not in trusted_fn:
         fail(
@@ -710,15 +730,17 @@ def main() -> None:
     # resetReason/RESET_REASON_POWER_MANAGEMENT term (which would make the
     # alert-40 `else` branch unreachable again).
     setup_gate_match = re.search(
-        r"if\s*\(\s*!Time\.isValid\(\)\s*\|\|\s*(\w+)\s*\)\s*\{",
+        r"if\s*\(\s*!Clock::isTimeValid\(\)\s*\|\|\s*(\w+)\s*\)\s*\{",
         app_text,
     )
     if not setup_gate_match:
         fail(
             "setup()'s time-validation gate must be "
-            "`if (!Time.isValid() || <never-confirmed-sync-flag>)` (Finding "
-            "3, Round 4 review) - a bare `if (!Time.isValid())` no longer "
-            "guarantees a connect attempt for a wrong RTC that reads valid"
+            "`if (!Clock::isTimeValid() || <never-confirmed-sync-flag>)` "
+            "(Finding 3, Round 4 review; WO-2026-09-18 Step 3a: spelled via "
+            "Clock::isTimeValid(), not a bare Time.isValid()) - a bare "
+            "`if (!Clock::isTimeValid())` no longer guarantees a connect "
+            "attempt for a wrong RTC that reads valid"
         )
     never_synced_flag = setup_gate_match.group(1)
     flag_def_match = re.search(

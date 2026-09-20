@@ -14,8 +14,8 @@
 //      kFallbackAnchor otherwise (read failed, or a garbage/zero reading
 //      from a power-cycled/unset RTC).
 //   3. The combination of chooseAnchor()+applySkew() lands inside
-//      isRtcTimeValidForHibernate()'s real accepted range
-//      (src/state/State_Sleep.cpp) for representative anchor times -
+//      isPlausibleEpoch()'s real accepted range
+//      (src/time/Clock.cpp) for representative anchor times -
 //      cross-checked against the REAL kRtcMin/kRtcMax extracted verbatim
 //      from that file by tests/rtc_skew_test.sh, not hardcoded here, so
 //      this claim can't silently drift from the real acceptance gate.
@@ -66,9 +66,9 @@ namespace {
 // Mirrors the real bounds from src/state/State_Sleep.cpp's
 // shouldUseBoronRtcAlarmHibernate() (kMinHibernateSleepSec=900,
 // kMaxHibernateSleepSec=36000). This test file only needs the bounds to
-// sweep actualSleepSec, not to reproduce isRtcTimeValidForHibernate()
+// sweep actualSleepSec, not to reproduce isPlausibleEpoch()
 // itself - tests/rtc_skew_test.sh independently extracts and compiles the
-// REAL isRtcTimeValidForHibernate() body (A.6 gap 2), so that acceptance
+// REAL isPlausibleEpoch() body (A.6 gap 2), so that acceptance
 // gate cannot silently drift out of sync with what is hardcoded here.
 const uint32_t kMinHibernateSleepSec = 900;
 const uint32_t kMaxHibernateSleepSec = 36000;

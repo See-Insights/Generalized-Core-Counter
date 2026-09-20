@@ -38,12 +38,12 @@ set -euo pipefail
 #     Boron build + nm, which this script does not perform - see the
 #     Work Order report for the actual nm-based verification run).
 #
-#   Step 2 - A.6 gap 2: extracts isRtcTimeValidForHibernate()'s REAL
-#     function body verbatim from src/state/State_Sleep.cpp (not a
+#   Step 2 - A.6 gap 2: extracts isPlausibleEpoch()'s REAL
+#     function body verbatim from src/time/Clock.cpp (not a
 #     reimplementation of its two bounds) and compiles it, unmodified,
 #     into a host harness alongside the real RtcSkewTest::applySkew()/
 #     chooseAnchor() from src/time/RtcSkewTest.h. This means a mutation
-#     that changes the REAL isRtcTimeValidForHibernate() to always return
+#     that changes the REAL isPlausibleEpoch() to always return
 #     false is exercised by this test directly - not sidestepped by a
 #     separate reimplementation of the bounds it happens to use today.
 #     Also fixes the previously-broken sweep, which claimed to cover
@@ -54,7 +54,7 @@ set -euo pipefail
 
 repo_root="${0:A:h:h}"
 app_src="$repo_root/src/Generalized-Core-Counter.cpp"
-sleep_src="$repo_root/src/state/State_Sleep.cpp"
+clock_src="$repo_root/src/time/Clock.cpp"
 build_profile="$repo_root/src/BuildProfile.h"
 rtc_skew_header="$repo_root/src/time/RtcSkewTest.h"
 
@@ -237,13 +237,13 @@ fi
 echo "OK (round 4 MEDIUM): RtcSkewTest::rearmIfBuildTokenChanged( (line $rearm_call_line) appears before RtcSkewTest::OneShotGuard rtcSkewTestGuard( is constructed (line $guard_ctor_line)"
 
 echo ""
-echo "--- Step 2: A.6 gap 2 - isRtcTimeValidForHibernate() acceptance, using the REAL function body ---"
+echo "--- Step 2: A.6 gap 2 - isPlausibleEpoch() acceptance, using the REAL function body ---"
 
-# Extract isRtcTimeValidForHibernate()'s real body VERBATIM from
-# State_Sleep.cpp - not a reimplementation - so a mutation to the real
+# Extract isPlausibleEpoch()'s real body VERBATIM from
+# time/Clock.cpp - not a reimplementation - so a mutation to the real
 # predicate (e.g. "always return false") is exercised by this test
 # directly.
-real_predicate=$(python3 - "$sleep_src" <<'PY'
+real_predicate=$(python3 - "$clock_src" <<'PY'
 import sys
 
 path = sys.argv[1]
@@ -252,7 +252,7 @@ with open(path) as f:
 
 start_idx = None
 for i, line in enumerate(lines):
-    if "bool isRtcTimeValidForHibernate(time_t rtcNow) {" in line:
+    if "bool isPlausibleEpoch(time_t epoch) {" in line:
         start_idx = i
         break
 
@@ -280,10 +280,10 @@ sys.stdout.write("".join(lines[start_idx:end_idx + 1]))
 PY
 )
 if [[ -z "$real_predicate" ]]; then
-  echo "FAILED: could not extract isRtcTimeValidForHibernate() verbatim from $sleep_src" >&2
+  echo "FAILED: could not extract isPlausibleEpoch() verbatim from $clock_src" >&2
   exit 1
 fi
-echo "Extracted the real isRtcTimeValidForHibernate() body verbatim from $sleep_src"
+echo "Extracted the real isPlausibleEpoch() body verbatim from $clock_src"
 
 # Build the real calendar-date sweep (2024-06-01 through 2034-06-01
 # inclusive, one anchor per year) using `date`, not a fixed-step
@@ -303,8 +303,8 @@ echo "Sweep anchors (2024-06-01 .. 2034-06-01, one per year): ${sweep_anchors[*]
   echo '#include <cstdint>'
   echo '#include <ctime>'
   echo ""
-  echo "// ---- REAL isRtcTimeValidForHibernate() body, extracted verbatim from"
-  echo "// $sleep_src - NOT reimplemented (A.6 gap 2)."
+  echo "// ---- REAL isPlausibleEpoch() body, extracted verbatim from"
+  echo "// $clock_src - NOT reimplemented (A.6 gap 2)."
   echo "$real_predicate"
   echo ""
   echo 'int main() {'
@@ -313,7 +313,7 @@ echo "Sweep anchors (2024-06-01 .. 2034-06-01, one per year): ${sweep_anchors[*]
   echo '  // is not sane) must itself land in range after the skew is applied.'
   echo '  {'
   echo '    time_t after = (time_t)RtcSkewTest::applySkew(RtcSkewTest::kFallbackAnchor);'
-  echo '    bool ok = isRtcTimeValidForHibernate(after);'
+  echo '    bool ok = isPlausibleEpoch(after);'
   echo '    std::printf("fallback anchor=%lld after=%lld inRange=%d\\n", (long long)RtcSkewTest::kFallbackAnchor, (long long)after, ok);'
   echo '    allOk = allOk && ok;'
   echo '  }'
@@ -324,20 +324,20 @@ echo "Sweep anchors (2024-06-01 .. 2034-06-01, one per year): ${sweep_anchors[*]
     echo "  {"
     echo "    time_t anchor = ${anchor};"
     echo '    time_t after = (time_t)RtcSkewTest::applySkew(anchor);'
-    echo '    bool ok = isRtcTimeValidForHibernate(after);'
+    echo '    bool ok = isPlausibleEpoch(after);'
     echo '    std::printf("sweep anchor=%lld after=%lld inRange=%d\\n", (long long)anchor, (long long)after, ok);'
     echo '    allOk = allOk && ok;'
     echo "  }"
   done
   echo '  // Sensitivity check: the harness must NOT be vacuously true. An anchor'
   echo '  // within the skew magnitude of the real kRtcMin must be REJECTED once'
-  echo '  // skewed below it - proving isRtcTimeValidForHibernate() actually'
+  echo '  // skewed below it - proving isPlausibleEpoch() actually'
   echo '  // discriminates. (kRtcMin is not re-extracted separately here - this'
   echo '  // reuses the same compiled-in real predicate above.)'
   echo '  {'
   echo '    time_t anchor = (time_t)1704067200 + 100; // 100s after the real kRtcMin (2024-01-01 UTC)'
   echo '    time_t after = (time_t)RtcSkewTest::applySkew(anchor);'
-  echo '    bool ok = isRtcTimeValidForHibernate(after);'
+  echo '    bool ok = isPlausibleEpoch(after);'
   echo '    std::printf("edge anchor=%lld after=%lld inRange=%d (expected 0)\\n", (long long)anchor, (long long)after, ok);'
   echo '    allOk = allOk && !ok;'
   echo '  }'
@@ -359,7 +359,7 @@ set -e
 echo "$output"
 
 if [[ $result -ne 0 ]]; then
-  echo "FAILED: isRtcTimeValidForHibernate() acceptance-range check failed" >&2
+  echo "FAILED: isPlausibleEpoch() acceptance-range check failed" >&2
   exit 1
 fi
 

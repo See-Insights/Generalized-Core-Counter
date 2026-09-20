@@ -1,9 +1,10 @@
 // Host test for the RTC write-back state machine added to
 // checkClockResync() (WO-2026-08-29-002, review fixes through Round 5).
 //
-// checkClockResync() itself lives in Generalized-Core-Counter.cpp and can't
-// be compiled standalone on the host (heavy Particle/AB1805/PublishQueue
-// dependencies - see tests/README.md's established precedent). Its
+// checkClockResync() itself lives in time/Clock.cpp (WO-2026-09-18 Step 3a;
+// previously Generalized-Core-Counter.cpp) and can't be compiled standalone
+// on the host (heavy Particle/AB1805/PublishQueue dependencies - see
+// tests/README.md's established precedent). Its
 // write-back gate DECISION, however, is now a small, pure, shared function
 // (Round 5 cleanup task 4, Stage 7 finding 7) that this test calls directly
 // - not a hand-written mirror of it:

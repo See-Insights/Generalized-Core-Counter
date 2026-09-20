@@ -17,6 +17,7 @@
 #include "ThrashGuard.h"
 #include "state/SleepPrepSpanTiming.h"
 #include "time/HibernateCycle.h"
+#include "time/Clock.h"
 
 namespace {
 
@@ -228,12 +229,6 @@ bool isDeviceOsAtLeast6400() {
   return minor >= 4;
 }
 
-bool isRtcTimeValidForHibernate(time_t rtcNow) {
-  static const time_t kRtcMin = 1704067200; // 2024-01-01 00:00:00 UTC
-  static const time_t kRtcMax = 2051222400; // 2035-01-01 00:00:00 UTC
-  return rtcNow >= kRtcMin && rtcNow < kRtcMax;
-}
-
 bool clearAb1805StaleAlarmInterrupts() {
   static const uint8_t kRegStatus = 0x0f;
   static const uint8_t kRegIntMask = 0x12;
@@ -295,7 +290,7 @@ bool shouldUseBoronRtcAlarmHibernate(uint32_t requestedSleepSec, time_t &rtcNow)
     return false;
   }
 
-  if (!isRtcTimeValidForHibernate(rtcNow)) {
+  if (!Clock::isPlausibleEpoch(rtcNow)) {
     Log.info("HibernateDiag: fail=rtc_invalid epoch=%ld", (long)rtcNow);
     return false;
   }
@@ -392,7 +387,7 @@ void handleSleepingState() {
   // If a ledger update (or time progression) moves the park into OPEN hours
   // while we are in SLEEPING_STATE, abort sleeping immediately in CONNECTED
   // mode so we stay awake/connected and resume counting.
-  if (Time.isValid() && sysStatus.get_connectionMode() == CONNECTED && isWithinOpenHours()) {
+  if (Clock::isTimeValid() && sysStatus.get_connectionMode() == CONNECTED && isWithinOpenHours()) {
     ensureSensorEnabled("SLEEP abort: CONNECTED+OPEN");
     transitionTo(IDLE_STATE, "sleep-abort-open-hours");
     return;
@@ -1008,7 +1003,7 @@ void handleSleepingState() {
   } else {
     // Within opening hours, align wake to the reporting boundary.
     // Add 1 second margin to ensure we wake slightly after the boundary.
-    if (Time.isValid() && intervalSec > 0) {
+    if (Clock::isTimeValid() && intervalSec > 0) {
       int boundary = (int)intervalSec;
       time_t now = Time.now();
       int offset = (int)(now % boundary);
@@ -1686,7 +1681,7 @@ void handleSleepingState() {
     }
 
     // For PIR wakes, check if reporting is also due (opportunistic reporting)
-    if (pirWake && Time.isValid() && isWithinOpenHours()) {
+    if (pirWake && Clock::isTimeValid() && isWithinOpenHours()) {
       // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, do not opportunistically
       // report while occupied; PIR hits should only reset debounce.
       if (sysStatus.get_sensorMode() == OCCUPANCY && current.get_occupied() &&

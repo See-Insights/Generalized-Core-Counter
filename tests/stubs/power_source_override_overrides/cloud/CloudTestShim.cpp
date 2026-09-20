@@ -62,8 +62,9 @@ uint32_t Cloud::noteLedgerSyncRequest(LedgerRequestKind /*kind*/,
 void Cloud::noteLedgerSyncFail(uint32_t /*seq*/, int /*error*/) {}
 
 // WO-2026-08-29-002 item 8: DeviceStatusPublisher.cpp calls the real
-// isClockTrusted() defined in Generalized-Core-Counter.cpp, which this
-// power-source-focused harness does not compile/link. Provided only to
+// isClockTrusted() defined in time/Clock.cpp (WO-2026-09-18 Step 3a;
+// previously Generalized-Core-Counter.cpp), which this power-source-focused
+// harness does not compile/link. Provided only to
 // satisfy the linker; always reports "trusted" so this harness's existing
 // assertions about the rest of the status payload are unaffected.
 bool isClockTrusted() { return true; }
