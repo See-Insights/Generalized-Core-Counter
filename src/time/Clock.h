@@ -17,7 +17,7 @@
  *
  *          This is a RELOCATION, not a redesign: every function below kept
  *          its existing global-scope name and signature so every existing
- *          call site across the tree (`state/*.cpp`, `reporting/`,
+ *          call site across the tree (every `.cpp` file under `state/`, `reporting/`,
  *          `cloud/`, `diagnostics/`) keeps working unchanged - only the
  *          `.cpp` file that defines them moved. `time/ClockTrust.h` (the
  *          pure, dependency-free trust-gate math these functions call into)
@@ -27,7 +27,7 @@
  *          Two functions are genuinely NEW, added by this step, and are
  *          namespaced under `Clock::` to mark that distinction at a glance:
  *          `Clock::isTimeValid()` (a thin, semantics-preserving wrapper
- *          around `Time.isValid()` that `src/state/*.cpp`'s decision sites
+ *          around `Time.isValid()` that decision sites in `src/state/`'s `.cpp` files
  *          now call instead of reaching for the Particle API directly) and
  *          `Clock::isPlausibleEpoch()` (absorbing the former
  *          `State_Sleep.cpp`-local `isRtcTimeValidForHibernate()`, which
@@ -110,7 +110,7 @@ namespace Clock {
 /**
  * @brief Thin, semantics-preserving wrapper around `Time.isValid()`.
  *
- * @details Introduced so `src/state/*.cpp` decision sites go through this
+ * @details Introduced so decision sites in `src/state/`'s `.cpp` files go through this
  *          module instead of calling the Particle API directly - the same
  *          "single owner" reasoning as every other function in this file.
  *          Deliberately just `return Time.isValid();` - Step 3a moves code,
