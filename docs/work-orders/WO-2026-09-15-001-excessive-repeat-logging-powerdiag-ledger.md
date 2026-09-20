@@ -69,3 +69,17 @@ every connect cycle.
 Any code change. This is filed for backlog prioritization alongside the
 roadmap's Steps 2-7; not on the critical path of `WO-2026-09-14-002` (Step 1)
 or the ownership work, and shouldn't block either.
+
+## Amendment A (2026-09-20): stronger evidence from Step 3b's bench run
+
+`WO-2026-09-19-001` (Step 3b)'s Dev-14 acceptance run produced a
+considerably more severe instance of the same `LedgerPayloadStatus` pattern
+than the original observation: roughly **300** identical
+`LedgerPayloadStatus: bytes=670/896 schema=2` lines in about 9 seconds
+during a single ledger sync - an order of magnitude more repeats, in a
+comparable window, than the original 20-30-line observation. Confirms this
+is not a one-off or device-specific volume; the log-every-check-not-every-
+change shape holds under a second, independent bench run. Still not
+attributed to a root cause and still no fix authorized - recorded here
+because it materially strengthens the severity case for whoever picks this
+WO up next.
