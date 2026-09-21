@@ -101,6 +101,35 @@ void formatConfigGeneration(char *buffer, size_t bufferSize) {
     snprintf(buffer, bufferSize, "%08lX", (unsigned long)hash);
 }
 
+// WO-2026-09-21 Step 4 (bench telemetry): named-string renderers for the two
+// enums BatteryAuthority::evaluate()'s guard pipeline consumes, so the cloud
+// status payload can show which path a SURVIVAL/CRITICAL verdict took
+// (unconditional vcell floor vs. SoC-driven) without a serial connection.
+// Neither enum had an existing label function to reuse.
+const char *vcellSampleStateLabel(SensorManager::VcellSampleState state) {
+    switch (state) {
+    case SensorManager::VcellSampleState::Known:
+        return "Known";
+    case SensorManager::VcellSampleState::Invalid:
+        return "Invalid";
+    case SensorManager::VcellSampleState::Unavailable:
+    default:
+        return "Unavailable";
+    }
+}
+
+const char *socTrustLabel(BatteryHealth::SocTrust trust) {
+    switch (trust) {
+    case BatteryHealth::SocTrust::Trusted:
+        return "Trusted";
+    case BatteryHealth::SocTrust::Suspect:
+        return "Suspect";
+    case BatteryHealth::SocTrust::Untrusted:
+    default:
+        return "Untrusted";
+    }
+}
+
 } // namespace
 
 bool Cloud::writeDeviceStatusToCloud(const char *source) {
@@ -144,6 +173,13 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     const auto &cycleStats = Observability::cycleStats();
     float batteryVoltage = -1.0f;
     SensorManager::instance().cachedBatteryVoltage(batteryVoltage);
+    // Bench telemetry only (WO-2026-09-21 Step 4): a second, separate read of
+    // the same cache via the state-returning accessor, kept apart from the
+    // vcell field above so that field's existing Invalid/Unavailable ->
+    // -1.0f behavior is untouched.
+    float vcellForState = 0.0f;
+    const SensorManager::VcellSampleState vcellState =
+        SensorManager::instance().cachedBatteryVoltageState(vcellForState);
     const ReportingPolicy reportingPolicy = ReportingPolicyResolver::resolveRuntime(
         current.get_stateOfCharge(), Time.now());
     const Observability::StartupSnapshot &startup = Observability::currentStartupSnapshot();
@@ -216,6 +252,15 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     writerBase.name("soc").value(PowerManager::instance().soc(), 1);
     writerBase.name("vcell").value(batteryVoltage, 2);
     writerBase.name("chargeState").value(SensorManager::instance().cachedChargeStateLabel());
+    // WO-2026-09-21 Step 4 (bench telemetry): read-and-publish only, no new
+    // sampling and no change to evaluate()/commit(). tier/lowBatteryMode are
+    // the two values BatteryAuthority::commit() persists; vcellState/socTrust
+    // distinguish which guard-pipeline path a SURVIVAL/CRITICAL verdict took
+    // (unconditional vcell floor vs. SoC-driven) - see BatteryAuthority.cpp.
+    writerBase.name("tier").value(ReportingPolicyResolver::batteryTierName(reportingPolicy.batteryTier));
+    writerBase.name("lowBatteryMode").value(sysStatus.get_lowBatteryMode());
+    writerBase.name("vcellState").value(vcellSampleStateLabel(vcellState));
+    writerBase.name("socTrust").value(socTrustLabel(SensorManager::instance().cachedSocTrust()));
     writerBase.endObject();
     writerBase.name("connection").beginObject();
     writerBase.name("lastResult").value(Observability::toString(cycleStats.connect_result));
