@@ -364,20 +364,6 @@ public:
     bool areLedgersSynced() const;
 
     /**
-     * @brief Calculate battery tier from current state of charge
-     * 
-     * @details Implements 4-tier system with hysteresis to prevent tier thrashing:
-     *          - TIER_HEALTHY (0):    >70% SoC (recover at >75%)
-     *          - TIER_CONSERVING (1): 50-70% SoC (recover at >55%)
-     *          - TIER_CRITICAL (2):   30-50% SoC (recover at >35%)
-     *          - TIER_SURVIVAL (3):   <30% SoC
-     * 
-     * @param currentSoC Current state of charge percentage (0-100)
-     * @return BatteryTier enum value (0-3)
-     */
-    static BatteryTier calculateBatteryTier(float currentSoC);
-
-    /**
      * @brief Calculate connection interval multiplier based on battery tier
      * 
      * @details Returns multiplier to apply to base reportingInterval:
@@ -404,17 +390,6 @@ public:
      * @return Backoff multiplier (1.0, 1.5, or 2.0)
      */
     static float getConnectionBackoffMultiplier(uint16_t lastDurationSec);
-
-    /**
-     * @brief Unit test function to validate battery-aware backoff calculations
-     * 
-     * @details Iterates through all combinations of battery levels and connection durations,
-     *          printing the calculated tier, multipliers, and effective intervals.
-     *          Use this to verify the logic produces expected results across all scenarios.
-     * 
-     * Call via uncommenting in setup() or from a test mode.
-     */
-    static void testBatteryBackoffLogic();
 
 private:
 	// Match the device-status writer capacity so additive fields cannot make

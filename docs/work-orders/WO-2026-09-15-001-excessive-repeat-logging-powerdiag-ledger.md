@@ -1,7 +1,8 @@
 # WO-2026-09-15-001: Excessive repeat logging in PowerDiag and LedgerPayloadStatus
 
-**Status:** Drafted, not dispatched. Specification only - **diagnostic first,
-no fix authorized.**
+**Status:** Root cause confirmed for both PowerDiag and LedgerPayloadStatus
+(2026-09-21, Amendment B). **Still no fix authorized** - this WO remains
+scoped to diagnosis only; a follow-on WO will authorize implementation.
 
 **Origin:** Observed on both Dev-14 and Dev-09 during Step 1
 (`WO-2026-09-14-002`) bench validation flashes, 2026-09-14. Confirmed present
@@ -83,3 +84,68 @@ change shape holds under a second, independent bench run. Still not
 attributed to a root cause and still no fix authorized - recorded here
 because it materially strengthens the severity case for whoever picks this
 WO up next.
+
+## Amendment B (2026-09-21): root cause confirmed for both, via real telemetry
+
+Investigation-only dispatch, no code changed. Pulled real evidence via the
+fleet `telemetry` CLI (timeline + S3-archived event payloads) and the
+cloud-forwarded serial reconstruction, rather than reasoning from source
+alone.
+
+### PowerDiag - confirmed logging-only, cosmetic, no cloud cost
+
+Traced to `PowerDiagnostics::logPowerState()` (`src/power/PowerDiagnostics.cpp:218`),
+called from 7 sites (`Generalized-Core-Counter.cpp`, `PowerPlatform.cpp`,
+`PowerManager.cpp`, `State_Connect.cpp`, `State_Sleep.cpp` x2). Confirmed via
+a real serial trace of one entirely normal Dev-14 wake-report-connect-idle
+cycle (2026-09-21, 12:50:15-12:50:37 SGT): 5 near-duplicate `PowerDiag[N]:`
+lines fired from separate call sites in 22 seconds, values essentially
+unchanged. This is purely a serial-readability issue - `logPowerState()`
+only logs and appends to the in-RAM diag batch; it does not itself publish.
+
+Genuinely good news for the eventual fix: `logPowerState()` already takes a
+`bool forceLog` parameter, wired through all 7 call sites (some pass `true`,
+most the default `false`) - but inside the function it is dead:
+`(void)forceLog; // Suppression disabled for diagnostic purposes`. The
+suppression mechanism was apparently built and then switched off, not never
+built. **Fix size: small, single-site** - all 7 callers already funnel
+through one function, and the plumbing to gate on it already exists end to
+end.
+
+### LedgerPayloadStatus - confirmed as a real publish-volume problem, root cause fully traced
+
+`Cloud::loop()` (`src/cloud/Cloud.cpp:673-696`) has zero backoff: every main
+loop pass, if `pendingStatusPublish` is true and connected, it calls
+`Cloud::writeDeviceStatusToCloud()` again. That function only clears the
+flag when it returns `true`; it returns `false` (retry next pass, no delay)
+whenever `noteLedgerSyncRequest()` reports the status ledger sync is
+*already in-flight*. Every repeated `LedgerPayloadStatus:` line therefore
+corresponds to a genuine repeated `deviceStatusLedger.set()` attempt, not
+just a log call - a real publish-class cost, not merely cosmetic.
+
+Located and pulled the actual 2026-09-19 Amendment-A-class instance directly
+from the fleet archive: Dev-14, 2026-09-20 06:00:39-06:01:01 SGT, 24
+`LedgerPayloadStatus:` lines in ~23 seconds, triggered by that boot's first
+`ClockResync` (`requestClockResync` -> `Cloud::instance().requestStatusPublish("ClockResync")`).
+The retry stopped in the exact same second `LedgerCb: kind=STATUS ...
+countAfter=0` confirmed the underlying ledger sync had finally completed -
+direct confirmation of the busy-retry-until-ledger-confirms mechanism. The
+rate is not fixed - it tracks however fast the main loop happens to be
+spinning while stuck retrying, which is exactly why one observed instance
+was ~1/sec (this one) and another (the original Amendment A) was ~33/sec.
+**Fix size: small, single-site** - the retry lives entirely inside
+`Cloud::loop()`; it needs a minimum retry interval or an in-flight check
+before re-attempting.
+
+### Not both from one root cause
+
+Confirmed these are two independent problems (Task 1 of the investigating
+dispatch), not one call site feeding both - traced to genuinely different
+functions with no shared trigger.
+
+### pdiag - investigated separately, NOT folded into this WO
+
+A third diagnostic-noise candidate (`pdiag` cloud events) was investigated
+in the same dispatch. It turned out not to be a logging-cadence defect at
+all - see `WO-2026-09-21-003-pdiag-rapid-wake-cycle.md` for why this needed
+its own WO rather than an Amendment here.

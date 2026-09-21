@@ -2,7 +2,7 @@
 
 #include "Config.h"
 #include "MyPersistentData.h"
-#include "cloud/Cloud.h"
+#include "power/BatteryAuthority.h"
 #include "power/ConnectivityPolicy.h"
 #include "power/PowerManager.h"
 #include "power/PowerPlatform.h"
@@ -59,7 +59,10 @@ BatteryTier currentBatteryTierForFailsafeLocal() {
   if (tierValue <= TIER_SURVIVAL) {
     return static_cast<BatteryTier>(tierValue);
   }
-  return Cloud::calculateBatteryTier(PowerManager::instance().soc());
+  // WO-2026-09-21 Step 4 (corrected same day, twice): mirrors
+  // Generalized-Core-Counter.cpp's currentBatteryTierForFailsafe() exactly -
+  // read-only, never commits.
+  return BatteryAuthority::evaluateCurrent(PowerManager::instance().soc()).tier;
 }
 
 bool connectivityFailsafeHasExternalPowerLocal() {

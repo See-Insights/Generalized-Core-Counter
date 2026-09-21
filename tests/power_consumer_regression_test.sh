@@ -42,10 +42,47 @@ TestSystemStatus testSysStatus;
 CPP
 
   cat <<'CPP'
-class Cloud {
+// WO-2026-09-21 Step 4 (corrected same day): Cloud::calculateBatteryTier()
+// was deleted (unguarded path, no vcell floor/trust check - superseded by
+// power/BatteryAuthority.h's pure evaluate()). currentBatteryTierForFailsafe()'s
+// extracted body below now samples SensorManager and calls
+// BatteryAuthority::evaluate(...).tier - both stubbed here, the same way
+// Cloud::calculateBatteryTier() used to be, since this test only needs the
+// two extracted mirrors to agree with each other
+// (testFailsafeDuplicatesStayIdentical()), not a specific tier value for
+// the fallback branch.
+namespace BatteryHealth {
+enum class SocTrust : uint8_t { Trusted, Suspect, Untrusted };
+} // namespace BatteryHealth
+
+class SensorManager {
 public:
-  static BatteryTier calculateBatteryTier(float currentSoC);
+  enum class VcellSampleState : uint8_t { Known, Invalid, Unavailable };
+  static SensorManager &instance() {
+    static SensorManager inst;
+    return inst;
+  }
+  VcellSampleState cachedBatteryVoltageState(float &vcell) const {
+    vcell = 0.0f;
+    return VcellSampleState::Unavailable;
+  }
+  BatteryHealth::SocTrust cachedSocTrust() const { return BatteryHealth::SocTrust::Trusted; }
 };
+
+namespace BatteryAuthority {
+struct Verdict {
+  BatteryTier tier;
+};
+inline Verdict evaluate(float /*currentSoC*/, SensorManager::VcellSampleState /*vcellState*/,
+                         float /*vcell*/, BatteryHealth::SocTrust /*trust*/, BatteryTier /*previousTier*/) {
+  return Verdict{TIER_HEALTHY};
+}
+inline BatteryTier currentTier() { return TIER_HEALTHY; }
+inline Verdict evaluateCurrent(float currentSoC) {
+  return evaluate(currentSoC, SensorManager::VcellSampleState::Unavailable, 0.0f,
+                   BatteryHealth::SocTrust::Trusted, currentTier());
+}
+} // namespace BatteryAuthority
 
 struct RecordedValue {
   std::string name;
@@ -71,7 +108,6 @@ CPP
 
   extract_braced_block "$repo_root/src/state/State_Connect.cpp" "struct ConnectBudgetContext"
   extract_braced_block "$repo_root/src/state/State_Connect.cpp" "ConnectBudgetContext evaluateConnectBudget()"
-  extract_braced_block "$repo_root/src/cloud/BatteryBackoff.cpp" "BatteryTier Cloud::calculateBatteryTier(float currentSoC)"
   extract_braced_block "$repo_root/src/Generalized-Core-Counter.cpp" "BatteryTier currentBatteryTierForFailsafe()"
   extract_braced_block "$repo_root/src/diagnostics/ConnectivityFailsafeTest.cpp" "BatteryTier currentBatteryTierForFailsafeLocal()"
 

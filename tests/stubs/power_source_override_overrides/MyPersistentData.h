@@ -71,10 +71,14 @@ struct TestSystemStatus {
   // behavior (previously the undefined-FIELD_BUILD `#else` branch, which
   // always returned UsbBench unconditionally).
   bool solarPowerMode = false;
+  // WO-2026-09-21 Step 4 (bench telemetry): DeviceStatusPublisher.cpp now
+  // also reads the sticky low-battery flag for the cloud status payload.
+  bool lowBatteryMode = false;
 
   uint16_t get_connectAttemptBudgetSec() const { return connectAttemptBudgetSec; }
   uint8_t get_connectionAttemptCounter() const { return connectionAttemptCounter; }
   uint8_t get_currentBatteryTier() const { return currentBatteryTier; }
+  bool get_lowBatteryMode() const { return lowBatteryMode; }
   uint8_t get_resetCount() const { return resetCount; }
   time_t get_lastReport() const { return lastReport; }
   time_t get_lastTimeSync() const { return 0; }

@@ -9,7 +9,7 @@ clang++ -std=c++17 -Wall -Wextra -pedantic \
   "$repo_root/tests/pmic_fault_monitor_test.cpp" \
   "$repo_root/src/power/PmicFaultMonitor.cpp" \
   "$repo_root/src/power/PowerManager.cpp" \
-  "$repo_root/src/sensors/BatteryAuthorityPolicy.cpp" \
+  "$repo_root/src/power/BatteryAuthorityPolicy.cpp" \
   -o "$binary"
 
 # Each scenario runs as its own process - pollAndRemediate()'s remediation

@@ -1,6 +1,7 @@
 #include "state/State_Common.h"
 #include "../Config.h"
 #include "cloud/Cloud.h"
+#include "power/BatteryAuthority.h"
 #include "power/ConnectivityPolicy.h"
 #include "power/PowerManager.h"
 #include "time/LocalTimeCache.h"
@@ -152,7 +153,22 @@ void handleReportingState() {
     float currentSoC = PowerManager::instance().soc();
     const ReportingPolicy reportingPolicy =
         ReportingPolicyResolver::resolveRuntime(currentSoC, now);
-    applyBatteryAwareConnectionModePolicy(currentSoC, reportingPolicy.batteryTier);
+
+    // WO-2026-09-21 Step 4 (corrected same day): resolveRuntime() only reads
+    // (BatteryAuthority::evaluate() is pure) - this is the deliberate
+    // policy-application site the retired applyBatteryAwareConnectionModePolicy()
+    // call used to be, restored as an explicit commit(). Re-evaluates rather
+    // than reusing reportingPolicy.batteryTier directly so the commit sees
+    // the same vcell/trust snapshot evaluate() itself would use.
+    {
+      float vcell = 0.0f;
+      const SensorManager::VcellSampleState vcellState =
+          SensorManager::instance().cachedBatteryVoltageState(vcell);
+      const BatteryHealth::SocTrust trust = SensorManager::instance().cachedSocTrust();
+      BatteryAuthority::commit(
+          BatteryAuthority::evaluate(currentSoC, vcellState, vcell, trust, BatteryAuthority::currentTier()),
+          currentSoC);
+    }
 
     const char *tierName = ReportingPolicyResolver::batteryTierName(
         reportingPolicy.batteryTier);

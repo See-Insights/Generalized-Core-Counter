@@ -5,7 +5,7 @@
 #include "PowerDiagnostics.h"
 #include "MyPersistentData.h"
 #include "observability/WakeCycleStats.h"
-#include "sensors/BatteryAuthorityPolicy.h"
+#include "power/BatteryAuthorityPolicy.h"
 
 // Defined in sensors/SensorManager.cpp - shared with the pre-charge
 // stabilization retry path there, so it stays defined in one place.
