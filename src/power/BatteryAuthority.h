@@ -54,17 +54,19 @@ namespace BatteryAuthority {
 
 /**
  * @brief Result of one battery-tier evaluation.
+ *
+ * @details Deliberately has no lowBatteryMode field. The real low-battery
+ *          mode is sticky and connection-mode-aware, computed only inside
+ *          commit() (it needs sysStatus's current connectionMode/sensorMode/
+ *          lowBatteryMode, none of which a pure evaluate() may read) - it
+ *          can disagree with tier alone (the sticky flag stays set after
+ *          the tier recovers). A field here that didn't equal the device's
+ *          actual low-battery mode would be a trap for the next reader; a
+ *          caller that needs the real persisted flag should read
+ *          sysStatus.get_lowBatteryMode() directly.
  */
 struct Verdict {
   BatteryTier tier;
-  // A pure derivation from tier alone (tier >= TIER_CONSERVING) - NOT the
-  // sticky, connection-mode-aware persisted low-battery-mode flag, which
-  // only commit() computes (it needs sysStatus's current connectionMode/
-  // sensorMode/lowBatteryMode, none of which evaluate() may read). Read
-  // paths that need the real persisted flag should read
-  // sysStatus.get_lowBatteryMode() themselves or accept eventual
-  // consistency with the next commit().
-  bool lowBatteryMode;
   BatteryHealth::SocTrust trust;
   SensorManager::VcellSampleState vcellState;
 };
@@ -103,6 +105,28 @@ Verdict evaluate(float currentSoC, SensorManager::VcellSampleState vcellState,
  *          device).
  */
 BatteryTier currentTier();
+
+/**
+ * @brief Gathers evaluate()'s inputs from SensorManager/currentTier() and
+ *        evaluates them - the one input-gathering path all read paths share.
+ *
+ * @param currentSoC Current fuel-gauge state of charge (0-100).
+ * @return The same Verdict evaluate() itself would return, given this
+ *         moment's SensorManager/persisted-tier snapshot.
+ *
+ * @details Read-only - a query, despite living in
+ *          power/BatteryAuthorityCommand.cpp rather than the pure
+ *          power/BatteryAuthority.cpp. It lives there specifically because
+ *          it needs SensorManager, which evaluate()'s own translation unit
+ *          must not depend on (see battery_authority_seam_structural_test.py) -
+ *          not because it writes anything. resolveRuntime(),
+ *          currentBatteryTierForFailsafe(), and
+ *          currentBatteryTierForFailsafeLocal() all call this instead of
+ *          each independently sampling SensorManager, so the three read
+ *          paths cannot silently drift from each other on how vcell/trust
+ *          are gathered.
+ */
+Verdict evaluateCurrent(float currentSoC);
 
 /**
  * @brief The only function that writes set_currentBatteryTier/

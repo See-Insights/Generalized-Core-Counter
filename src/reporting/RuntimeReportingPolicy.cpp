@@ -12,18 +12,16 @@
 // with a narrow, non-relative seam exposing only the one accessor this file
 // needs; see reporting/ReportingIntervalStore.h for the full rationale.
 #include "reporting/ReportingIntervalStore.h"
-// WO-2026-09-21 Step 4 (corrected same day): reporting/BatteryTierStore.h -
+// WO-2026-09-21 Step 4 (corrected same day, twice): reporting/BatteryTierStore.h -
 // Step 0's narrow read seam onto sysStatus.get_currentBatteryTier() - folds
-// into power/BatteryAuthority.h's currentTier(), this file's own equally-
-// narrow, equally-shadowable seam onto the persisted tier. The guard
-// pipeline itself (BatteryTierGuard, PowerTier, BatteryBackoff) now lives in
-// BatteryAuthority::evaluate() - a PURE function - so this file gathers the
-// vcell/trust inputs itself (via SensorManager, as it always has) and passes
-// them in, rather than evaluate() reaching for SensorManager internally.
-// This is a read-only call: resolveRuntime() never commits anything.
+// into power/BatteryAuthority.h's currentTier(). This file no longer samples
+// SensorManager itself either: BatteryAuthority::evaluateCurrent() is the
+// one input-gathering path all read paths (this adapter, the connectivity
+// failsafe) share, so they cannot silently drift from each other on how
+// vcell/trust are gathered. This is a read-only call: resolveRuntime()
+// never commits anything.
 #include "power/BatteryAuthority.h"
 #include "power/ConnectivityPolicy.h"
-#include "sensors/SensorManager.h"
 #include "state/State_Common.h"
 
 namespace {
@@ -37,13 +35,7 @@ bool runtimeWindowOpenAt(time_t epoch, void *) {
 namespace ReportingPolicyResolver {
 
 ReportingPolicy resolveRuntime(float currentSoC, time_t nowEpoch) {
-	float vcell = 0.0f;
-	const SensorManager::VcellSampleState vcellState =
-		SensorManager::instance().cachedBatteryVoltageState(vcell);
-	const BatteryHealth::SocTrust trust = SensorManager::instance().cachedSocTrust();
-
-	const BatteryTier tier = BatteryAuthority::evaluate(
-		currentSoC, vcellState, vcell, trust, BatteryAuthority::currentTier()).tier;
+	const BatteryTier tier = BatteryAuthority::evaluateCurrent(currentSoC).tier;
 
 	ReportingPolicyInputs inputs;
 	inputs.configuredIntervalSec = ReportingIntervalStore::reportingIntervalSec();

@@ -78,6 +78,10 @@ inline Verdict evaluate(float /*currentSoC*/, SensorManager::VcellSampleState /*
   return Verdict{TIER_HEALTHY};
 }
 inline BatteryTier currentTier() { return TIER_HEALTHY; }
+inline Verdict evaluateCurrent(float currentSoC) {
+  return evaluate(currentSoC, SensorManager::VcellSampleState::Unavailable, 0.0f,
+                   BatteryHealth::SocTrust::Trusted, currentTier());
+}
 } // namespace BatteryAuthority
 
 struct RecordedValue {

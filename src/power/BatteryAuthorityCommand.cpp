@@ -5,10 +5,16 @@
 // and lives in its own translation unit specifically so linking
 // BatteryAuthority.cpp alone (as tests/reporting_policy_adapter_test.sh
 // does) never pulls this in.
+//
+// evaluateCurrent() also lives here, alongside the genuinely stateful
+// functions - not because it writes anything (it doesn't; it's a query),
+// but because it needs SensorManager, which evaluate()'s own translation
+// unit must not depend on.
 #include "Particle.h"
 #include "power/BatteryAuthority.h"
 
-#include "MyPersistentData.h" // sysStatus (currentBatteryTier/lowBatteryMode/connectionMode/sensorMode)
+#include "MyPersistentData.h"      // sysStatus (currentBatteryTier/lowBatteryMode/connectionMode/sensorMode)
+#include "sensors/SensorManager.h" // evaluateCurrent()'s vcell/trust source
 
 namespace BatteryAuthority {
 
@@ -32,6 +38,14 @@ void commitLowBatteryMode(bool value) {
 BatteryTier currentTier() {
   const uint8_t tierValue = sysStatus.get_currentBatteryTier();
   return tierValue <= TIER_SURVIVAL ? static_cast<BatteryTier>(tierValue) : TIER_HEALTHY;
+}
+
+Verdict evaluateCurrent(float currentSoC) {
+  float vcell = 0.0f;
+  const SensorManager::VcellSampleState vcellState =
+      SensorManager::instance().cachedBatteryVoltageState(vcell);
+  const BatteryHealth::SocTrust trust = SensorManager::instance().cachedSocTrust();
+  return evaluate(currentSoC, vcellState, vcell, trust, currentTier());
 }
 
 void clearLowBatteryMode() {

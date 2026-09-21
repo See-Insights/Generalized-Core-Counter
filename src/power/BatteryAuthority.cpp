@@ -58,12 +58,6 @@ Verdict evaluate(float currentSoC, SensorManager::VcellSampleState vcellState,
     break;
   }
 
-  // Pure derivation, NOT the sticky persisted flag - see the doc comment on
-  // Verdict::lowBatteryMode. Matches the exact trigger threshold the sticky
-  // logic (now in BatteryAuthorityCommand.cpp's commit()) uses to enter the
-  // downgrade in the first place.
-  verdict.lowBatteryMode = (verdict.tier >= TIER_CONSERVING);
-
   return verdict;
 }
 

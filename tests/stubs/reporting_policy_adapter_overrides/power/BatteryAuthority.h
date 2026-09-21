@@ -21,16 +21,21 @@
 // unnecessary, since evaluate() is now pure and needs no persistence-backed
 // stubbing at all.
 //
-// Only currentTier() - the narrow read seam onto the persisted previous
-// tier, which evaluate() cannot read itself without depending on
-// MyPersistentData.h - is faked, via a test-controllable global. Same
-// pattern reporting/BatteryTierStore.h's stub used before that seam folded
-// into this module.
+// WO-2026-09-21 Step 4 (corrected same day, twice): resolveRuntime() now
+// calls evaluateCurrent() (production: power/BatteryAuthorityCommand.cpp)
+// instead of gathering vcell/trust/previousTier itself and calling
+// evaluate() directly. evaluateCurrent() genuinely needs real
+// SensorManager/sysStatus in production, so it cannot be linked here the
+// way evaluate() is - it is faked inline instead, using the SAME stubbed
+// SensorManager this override directory already provides and the same
+// currentTier() test global below, then delegating to the REAL evaluate().
+// This keeps the actual guard pipeline under test while faking only the
+// "which global object do I read this from" glue, the same scope
+// currentTier() alone used to cover.
 namespace BatteryAuthority {
 
 struct Verdict {
   BatteryTier tier;
-  bool lowBatteryMode;
   BatteryHealth::SocTrust trust;
   SensorManager::VcellSampleState vcellState;
 };
@@ -44,6 +49,14 @@ inline BatteryTier currentTier() {
   return testPreviousBatteryTier <= TIER_SURVIVAL
       ? static_cast<BatteryTier>(testPreviousBatteryTier)
       : TIER_HEALTHY;
+}
+
+inline Verdict evaluateCurrent(float currentSoC) {
+  float vcell = 0.0f;
+  const SensorManager::VcellSampleState vcellState =
+      SensorManager::instance().cachedBatteryVoltageState(vcell);
+  const BatteryHealth::SocTrust trust = SensorManager::instance().cachedSocTrust();
+  return evaluate(currentSoC, vcellState, vcell, trust, currentTier());
 }
 
 } // namespace BatteryAuthority

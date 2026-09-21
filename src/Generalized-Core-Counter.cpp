@@ -352,20 +352,13 @@ BatteryTier currentBatteryTierForFailsafe() {
   if (tierValue <= TIER_SURVIVAL) {
     return static_cast<BatteryTier>(tierValue);
   }
-  // WO-2026-09-21 Step 4 (corrected same day): BatteryAuthority::evaluate() -
-  // the pure guarded pipeline (vcell floor + trust substitution) - not the
-  // deleted, unguarded Cloud::calculateBatteryTier(). Read-only: this
-  // fallback never commits. It only fires when the persisted tier is not
-  // yet valid (fresh device), so there is no real previous tier to honor -
-  // TIER_HEALTHY, matching BatteryAuthority::currentTier()'s own fallback
-  // default. The failsafe's low-battery block must be reachable only
-  // through this guarded path.
-  float vcell = 0.0f;
-  const SensorManager::VcellSampleState vcellState =
-      SensorManager::instance().cachedBatteryVoltageState(vcell);
-  const BatteryHealth::SocTrust trust = SensorManager::instance().cachedSocTrust();
-  return BatteryAuthority::evaluate(
-      PowerManager::instance().soc(), vcellState, vcell, trust, TIER_HEALTHY).tier;
+  // WO-2026-09-21 Step 4 (corrected same day, twice):
+  // BatteryAuthority::evaluateCurrent() - the pure guarded pipeline (vcell
+  // floor + trust substitution), fed by the one input-gathering path all
+  // read paths share - not the deleted, unguarded Cloud::calculateBatteryTier().
+  // Read-only: this fallback never commits. The failsafe's low-battery block
+  // must be reachable only through this guarded path.
+  return BatteryAuthority::evaluateCurrent(PowerManager::instance().soc()).tier;
 }
 
 bool connectivityFailsafeHasExternalPower() {
