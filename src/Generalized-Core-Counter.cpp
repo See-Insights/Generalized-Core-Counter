@@ -1116,6 +1116,27 @@ void setup() {
   const bool timeValidBeforeRtc = Time.isValid();
   ab1805.withFOUT(WKP).setup();                // Initialize AB1805 RTC - WKP is D10 on Photon2
 
+  // WO-2026-08-31-004 Amendment A: log AB1805 oscillator state once at
+  // boot. Read-only - no gate, no branch, no retry, no state, nothing
+  // conditional on the result, no build flag; firmware behaves identically
+  // regardless of the answer. Investigates whether the field-observed
+  // rate-halving (56.5%-82.1% across 10 days on Dev-11, never below ~50%
+  // or above ~83%, no settled pattern) correlates with AOS/FOS automatic
+  // oscillator switching rather than a fixed RC-vs-XT misconfiguration - a
+  // fixed divider fault could not produce a varying daily rate, but a part
+  // that spends part of each interval on the wrong oscillator source
+  // could. A single boot-time read is a snapshot, not a definitive answer,
+  // if the part is genuinely switching between reads.
+  {
+    const bool oscUsingRC = ab1805.usingRCOscillator();
+    const uint8_t oscStatusReg = ab1805.readRegister(AB1805::REG_OSC_STATUS);
+    const uint8_t oscCtrlReg = ab1805.readRegister(AB1805::REG_OSC_CTRL);
+    Log.info("OscState: usingRC=%d oscStatus=0x%02x oscCtrl=0x%02x aos=%d fos=%d",
+             oscUsingRC ? 1 : 0, oscStatusReg, oscCtrlReg,
+             (oscCtrlReg & AB1805::REG_OSC_CTRL_AOS) ? 1 : 0,
+             (oscCtrlReg & AB1805::REG_OSC_CTRL_FOS) ? 1 : 0);
+  }
+
 #if PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST
   // ===== BENCH-ONLY: DELIBERATE RTC SKEW (WO-2026-08-31-003, Amendment A) =====
   // Compiled in ONLY when ENABLE_RTC_SKEW_TEST=1 (see BuildProfile.h) on

@@ -193,4 +193,23 @@ Openness openness();
 
 } // namespace Clock
 
+// ===== New in WO-2026-08-31-004 Amendment A-2 =====
+
+namespace Clock {
+
+/**
+ * @brief Signed seconds the RTC was corrected by at the most recent
+ *        CONFIRMED successful `checkClockResync()` write.
+ *
+ * @details Time.now() at write time minus the RTC's own pre-write reading -
+ *          positive means the RTC was behind, negative means it was ahead.
+ *          -1 is the same "no confirmed sync yet this boot" sentinel
+ *          convention `reportedSyncAgeMs()`/`syncAgeSec` already use in the
+ *          cloud status payload. Telemetry only, not a control-path signal -
+ *          no decision anywhere reads this value.
+ */
+long lastSyncCorrectionSec();
+
+} // namespace Clock
+
 #endif

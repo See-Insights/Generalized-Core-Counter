@@ -66,3 +66,12 @@ bool testClockTrusted = false;
 bool isClockTrusted() { return testClockTrusted; }
 uint32_t observedTimeSyncedLastMs() { return testClockTrusted ? 12345u : 0u; }
 uint32_t reportedSyncAgeMs() { return testClockTrusted ? 5000u : 0xFFFFFFFFu; }
+
+// WO-2026-08-31-004 Amendment A-2: DeviceStatusPublisher.cpp now also calls
+// the real Clock::lastSyncCorrectionSec() defined in time/Clock.cpp, which
+// this harness does not compile/link. Provided only to satisfy the linker,
+// in the same spirit as the three stubs above - this test's assertions are
+// about clock.trusted, not correctionSec.
+namespace Clock {
+long lastSyncCorrectionSec() { return -1; }
+} // namespace Clock

@@ -170,6 +170,16 @@ uint32_t lastLoopMs = 0;
 bool millisWrapTrackerInitialized = false;
 uint32_t syncCaptureWrapGeneration = 0;
 uint32_t lastSeenSyncRawMs = 0;
+
+// WO-2026-08-31-004 Amendment A-2: signed seconds the RTC was corrected by
+// at the most recent CONFIRMED successful checkClockResync() write -
+// Time.now() at write time minus the RTC's own pre-write reading. Positive
+// means the RTC was behind; negative means it was ahead. -1 is the same
+// "no confirmed sync yet this boot" sentinel convention reportedSyncAgeMs()/
+// syncAgeSec already use in the cloud status payload - a real correction of
+// exactly -1 second is possible but rare, and this field is diagnostic
+// telemetry, not a control-path signal.
+long lastRtcCorrectionSec = -1;
 } // namespace
 
 /**
@@ -406,14 +416,33 @@ void checkClockResync() {
   if (ClockTrust::shouldAttemptRtcWriteNow(lastSyncMs, lastRtcWriteSyncedLastMs,
                                             nowMs, lastRtcWriteFailedAttemptMs,
                                             lastRtcWriteFailedSyncMs)) {
+    // WO-2026-08-31-004 Amendment A-2: read the RTC's own value immediately
+    // before correcting it, purely to report how far off it was - this read
+    // does not gate or alter the write below in any way. If the read fails,
+    // the delta is reported as unavailable (-1) rather than fabricated; see
+    // this file's Amendment A note (mirroring RtcSkewTest's own "do not log
+    // a fabricated value" rule) for the same reasoning applied here.
+    time_t rtcPreWriteValue = 0;
+    const bool rtcPreWriteReadOk = ab1805.getRtcAsTime(rtcPreWriteValue);
     const bool rtcUpdated = ab1805.setRtcFromSystem();
-    Log.info("ClockResync: sync advanced, rtcUpdated=%d epoch=%ld",
-             rtcUpdated ? 1 : 0, (long)Time.now());
+    const long rtcCorrectionSec = rtcPreWriteReadOk
+        ? (long)(Time.now() - rtcPreWriteValue)
+        : -1;
+    Log.info("ClockResync: sync advanced, rtcUpdated=%d epoch=%ld correctionSec=%ld",
+             rtcUpdated ? 1 : 0, (long)Time.now(), rtcCorrectionSec);
     if (rtcUpdated) {
       // Finding 1: only mark this sync value as "written" once the RTC
       // write is confirmed successful, and only then stamp lastTimeSync.
       lastRtcWriteSyncedLastMs = lastSyncMs;
       sysStatus.set_lastTimeSync(Time.now());
+
+      // Only persist the correction for cloud reporting once the write it
+      // describes is confirmed - same "confirmed, not attempted" standard
+      // Finding 1 already applies to lastRtcWriteSyncedLastMs/lastTimeSync
+      // above. A failed pre-write read (rtcPreWriteReadOk == false) leaves
+      // the prior confirmed value in place rather than overwriting it with
+      // -1, so a transient read failure cannot erase real history.
+      lastRtcCorrectionSec = rtcPreWriteReadOk ? rtcCorrectionSec : lastRtcCorrectionSec;
 
       // Round 5 cleanup task 3 (Stage 7 finding 3): the status payload is
       // published on connect, BEFORE this corrective sync completes (see
@@ -423,7 +452,8 @@ void checkClockResync() {
       // trusted=true. Flag the EXISTING deferred-republish mechanism
       // (Cloud::loop() already drains pendingStatusPublish, retrying on
       // failure) rather than publishing synchronously here - this cannot
-      // block or reorder anything checkClockResync() does.
+      // block or reorder anything checkClockResync() does. The same
+      // republish also carries this sync's correctionSec, computed above.
       Cloud::instance().requestStatusPublish("ClockResync");
     } else {
       // Round 6 (second follow-up): record the failure-only timestamp/value
@@ -575,6 +605,16 @@ Openness openness() {
   const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
   const bool openNow = isWithinOpenHoursForHour(snapshot.localHour, openHour, closeHour);
   return openNow ? Openness::Open : Openness::Closed;
+}
+
+} // namespace Clock
+
+// ===== New in WO-2026-08-31-004 Amendment A-2 =====
+
+namespace Clock {
+
+long lastSyncCorrectionSec() {
+  return lastRtcCorrectionSec;
 }
 
 } // namespace Clock
