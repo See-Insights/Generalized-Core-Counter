@@ -33,6 +33,17 @@ long lastSyncCorrectionSec();
 // External firmware version string (defined in Version.cpp)
 extern const char* FIRMWARE_VERSION;
 
+// WO-2026-08-31-004 Amendment A (cloud follow-up): the AB1805 oscillator
+// state captured once at boot in Generalized-Core-Counter.cpp's setup(),
+// same "forward-declare rather than pull in a heavy header" reasoning as
+// isClockTrusted()/reportedSyncAgeMs() above - these are plain globals in
+// the main app translation unit, not worth a dedicated header for.
+extern bool startupOscUsingRC;
+extern uint8_t startupOscStatusReg;
+extern uint8_t startupOscCtrlReg;
+extern bool startupOscAos;
+extern bool startupOscFos;
+
 namespace {
 
 constexpr int kLedgerSchemaVersion = 2;
@@ -313,6 +324,20 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
         // function (comparing against lastPublishedStatus) cannot silently
         // swallow it.
         writerBase.name("correctionSec").value((int)Clock::lastSyncCorrectionSec());
+        // WO-2026-08-31-004 Amendment A (cloud follow-up): read-and-publish
+        // only, no new I2C read - these are exactly the values Amendment
+        // A's boot-time read already captured, kept in scope past that one
+        // log line (see the startupOsc* globals). Unlike correctionSec
+        // above, these are stable per-boot: expect them to appear once on
+        // the first post-boot publish and then stay unchanged (module-
+        // identical payload) until the next reset - duplicate-suppression
+        // is exactly what should hold them steady across that stretch, not
+        // something to work around.
+        writerBase.name("usingRC").value(startupOscUsingRC);
+        writerBase.name("oscStatus").value((int)startupOscStatusReg);
+        writerBase.name("oscCtrl").value((int)startupOscCtrlReg);
+        writerBase.name("aos").value(startupOscAos);
+        writerBase.name("fos").value(startupOscFos);
         writerBase.endObject();
     }
     writerBase.endObject();

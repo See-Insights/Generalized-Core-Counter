@@ -540,6 +540,19 @@ bool startupPinResetAb1805Checked = false;
 const char *startupAb1805WakeReasonName = "N/A";
 bool startupAb1805ConfirmedWatchdog = false;
 
+// WO-2026-08-31-004 Amendment A (cloud follow-up): the AB1805 oscillator
+// state read once at boot in setup(), kept in scope past that single log
+// line so DeviceStatusPublisher.cpp can also publish it. No new I2C read -
+// these are the exact values Amendment A's boot-time read already
+// captured. Defaults are overwritten within milliseconds of boot, long
+// before any cloud publish is possible, so they are never themselves
+// reported.
+bool startupOscUsingRC = false;
+uint8_t startupOscStatusReg = 0;
+uint8_t startupOscCtrlReg = 0;
+bool startupOscAos = false;
+bool startupOscFos = false;
+
 template <typename T>
 bool updateRetainedValue(T &slot, const T &value) {
   if (slot == value) {
@@ -1127,15 +1140,18 @@ void setup() {
   // that spends part of each interval on the wrong oscillator source
   // could. A single boot-time read is a snapshot, not a definitive answer,
   // if the part is genuinely switching between reads.
-  {
-    const bool oscUsingRC = ab1805.usingRCOscillator();
-    const uint8_t oscStatusReg = ab1805.readRegister(AB1805::REG_OSC_STATUS);
-    const uint8_t oscCtrlReg = ab1805.readRegister(AB1805::REG_OSC_CTRL);
-    Log.info("OscState: usingRC=%d oscStatus=0x%02x oscCtrl=0x%02x aos=%d fos=%d",
-             oscUsingRC ? 1 : 0, oscStatusReg, oscCtrlReg,
-             (oscCtrlReg & AB1805::REG_OSC_CTRL_AOS) ? 1 : 0,
-             (oscCtrlReg & AB1805::REG_OSC_CTRL_FOS) ? 1 : 0);
-  }
+  //
+  // Amendment A (cloud follow-up): written into the startupOsc* globals
+  // above (not locals) so DeviceStatusPublisher.cpp can also publish this
+  // same boot-time read - no new I2C read added for that.
+  startupOscUsingRC = ab1805.usingRCOscillator();
+  startupOscStatusReg = ab1805.readRegister(AB1805::REG_OSC_STATUS);
+  startupOscCtrlReg = ab1805.readRegister(AB1805::REG_OSC_CTRL);
+  startupOscAos = (startupOscCtrlReg & AB1805::REG_OSC_CTRL_AOS) != 0;
+  startupOscFos = (startupOscCtrlReg & AB1805::REG_OSC_CTRL_FOS) != 0;
+  Log.info("OscState: usingRC=%d oscStatus=0x%02x oscCtrl=0x%02x aos=%d fos=%d",
+           startupOscUsingRC ? 1 : 0, startupOscStatusReg, startupOscCtrlReg,
+           startupOscAos ? 1 : 0, startupOscFos ? 1 : 0);
 
 #if PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST
   // ===== BENCH-ONLY: DELIBERATE RTC SKEW (WO-2026-08-31-003, Amendment A) =====

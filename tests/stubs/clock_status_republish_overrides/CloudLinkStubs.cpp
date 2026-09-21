@@ -47,6 +47,17 @@ bool Cloud::applyConfigurationFromLedger(const LedgerData &, const LedgerData &)
 // DeviceStatusPublisher.cpp's writeDeviceStatusToCloud().
 const char *FIRMWARE_VERSION = "test-fw";
 
+// WO-2026-08-31-004 Amendment A (cloud follow-up): required by
+// DeviceStatusPublisher.cpp's `extern` declarations of the boot-time
+// oscillator-state globals normally set once in Generalized-Core-Counter.cpp's
+// setup(), which this harness does not compile/link. Fixed values only -
+// this test's assertions are about clock.trusted, not the oscillator fields.
+bool startupOscUsingRC = false;
+uint8_t startupOscStatusReg = 0;
+uint8_t startupOscCtrlReg = 0;
+bool startupOscAos = false;
+bool startupOscFos = false;
+
 // Round 6 follow-up (Stage 7 finding 2): test-controlled clock-trust
 // telemetry inputs. The REAL implementations of these three functions live
 // in Generalized-Core-Counter.cpp, which this harness deliberately does not
