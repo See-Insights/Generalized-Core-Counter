@@ -2,10 +2,11 @@
 
 #include "Config.h"
 #include "MyPersistentData.h"
-#include "cloud/Cloud.h"
+#include "power/BatteryAuthority.h"
 #include "power/ConnectivityPolicy.h"
 #include "power/PowerManager.h"
 #include "power/PowerPlatform.h"
+#include "sensors/SensorManager.h"
 #include "state/StateMachine.h"
 
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
@@ -59,7 +60,15 @@ BatteryTier currentBatteryTierForFailsafeLocal() {
   if (tierValue <= TIER_SURVIVAL) {
     return static_cast<BatteryTier>(tierValue);
   }
-  return Cloud::calculateBatteryTier(PowerManager::instance().soc());
+  // WO-2026-09-21 Step 4 (corrected same day): mirrors
+  // Generalized-Core-Counter.cpp's currentBatteryTierForFailsafe() exactly -
+  // read-only, never commits.
+  float vcell = 0.0f;
+  const SensorManager::VcellSampleState vcellState =
+      SensorManager::instance().cachedBatteryVoltageState(vcell);
+  const BatteryHealth::SocTrust trust = SensorManager::instance().cachedSocTrust();
+  return BatteryAuthority::evaluate(
+      PowerManager::instance().soc(), vcellState, vcell, trust, TIER_HEALTHY).tier;
 }
 
 bool connectivityFailsafeHasExternalPowerLocal() {

@@ -26,6 +26,7 @@
 #include "power/PowerManager.h"
 #include "power/PowerPlatform.h"
 #include "power/PowerDiagnostics.h"
+#include "power/BatteryAuthority.h"        // Battery tier/low-battery-mode owner (WO-2026-09-21 Step 4)
 #include "observability/WakeCycleStats.h"
 #include "observability/StartupSnapshotRuntime.h"
 #include "diagnostics/ConnectivityFailsafeTest.h"
@@ -121,8 +122,6 @@ void publishStartupStatus();  // One-time status summary at boot
 void publishWatchdogForensics(bool ab1805Confirmed = false); // One-time watchdog forensic snapshot at boot
 void publishHibernateWakeForensics(const HibernateWakeDiagnostics::EventFields &fields); // WO-2026-08-29-001
 bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags flags = PRIVATE); // Safe diagnostic publish with queue guard
-void applyBatteryAwareConnectionModePolicy(float currentSoC, BatteryTier resolvedTier);
-void applyBatteryAwareConnectionModePolicy(float currentSoC);
 void clearConnectivityFailsafeRecovery(const char *reason);
 void connectivityFailsafeSupervisor();
 // requestClockResync()/checkClockResync()/isClockTrusted()/
@@ -353,7 +352,20 @@ BatteryTier currentBatteryTierForFailsafe() {
   if (tierValue <= TIER_SURVIVAL) {
     return static_cast<BatteryTier>(tierValue);
   }
-  return Cloud::calculateBatteryTier(PowerManager::instance().soc());
+  // WO-2026-09-21 Step 4 (corrected same day): BatteryAuthority::evaluate() -
+  // the pure guarded pipeline (vcell floor + trust substitution) - not the
+  // deleted, unguarded Cloud::calculateBatteryTier(). Read-only: this
+  // fallback never commits. It only fires when the persisted tier is not
+  // yet valid (fresh device), so there is no real previous tier to honor -
+  // TIER_HEALTHY, matching BatteryAuthority::currentTier()'s own fallback
+  // default. The failsafe's low-battery block must be reachable only
+  // through this guarded path.
+  float vcell = 0.0f;
+  const SensorManager::VcellSampleState vcellState =
+      SensorManager::instance().cachedBatteryVoltageState(vcell);
+  const BatteryHealth::SocTrust trust = SensorManager::instance().cachedSocTrust();
+  return BatteryAuthority::evaluate(
+      PowerManager::instance().soc(), vcellState, vcell, trust, TIER_HEALTHY).tier;
 }
 
 bool connectivityFailsafeHasExternalPower() {
@@ -1532,7 +1544,19 @@ void setup() {
   measure.batteryState(BatterySampleContext::Setup);
   PowerDiagnostics::logPowerState("setup", true);
   if (sysStatus.get_lowBatteryMode()) {
-    applyBatteryAwareConnectionModePolicy(PowerManager::instance().soc());
+    // WO-2026-09-21 Step 4 (corrected same day): evaluate() then commit() -
+    // this is one of the four deliberate policy-application sites (the
+    // retired applyBatteryAwareConnectionModePolicy(float) 1-arg overload
+    // used to resolve the tier via ReportingPolicyResolver::resolveRuntime()
+    // itself before doing this same check).
+    const float soc = PowerManager::instance().soc();
+    float vcell = 0.0f;
+    const SensorManager::VcellSampleState vcellState =
+        SensorManager::instance().cachedBatteryVoltageState(vcell);
+    const BatteryHealth::SocTrust trust = SensorManager::instance().cachedSocTrust();
+    BatteryAuthority::commit(
+        BatteryAuthority::evaluate(soc, vcellState, vcell, trust, BatteryAuthority::currentTier()),
+        soc);
   }
   // ===================================
 
@@ -1788,68 +1812,13 @@ static void appWatchdogHandler() {
 
 // ===== Policy and publishing helpers =====
 
-/**
- * @brief Calculates battery tier and downgrades connection mode when critically low.
- *
- * Maps state-of-charge to HEALTHY/CONSERVING/CRITICAL/SURVIVAL tiers with hysteresis
- * to prevent thrashing. Automatically downgrades occupancy device connection modes
- * (CONNECTED → INTERMITTENT, INTERMITTENT_KEEP_ALIVE → INTERMITTENT) to preserve
- * battery life during poor solar conditions.
- *
- * @param currentSoC Battery state of charge percentage (0.0 - 100.0)
- * @return BatteryTier Current battery health tier
- *
- * @note Downgrades are sticky - device will not auto-upgrade even if SoC recovers.
- *       Critical for preventing premature battery death in remote solar deployments.
- */
-void applyBatteryAwareConnectionModePolicy(float currentSoC, BatteryTier resolvedTier) {
-  BatteryTier newTier = resolvedTier;
-  uint8_t prevTierValue = sysStatus.get_currentBatteryTier();
-  const char* tierNames[] = {"HEALTHY", "CONSERVING", "CRITICAL", "SURVIVAL"};
-
-  if (newTier != prevTierValue) {
-    const char* prevName = (prevTierValue < 4) ? tierNames[prevTierValue] : "UNKNOWN";
-    const char* newName = tierNames[newTier];
-    Log.info("Battery tier transition: %s -> %s (SoC=%.1f%%)", prevName, newName, (double)currentSoC);
-    sysStatus.set_currentBatteryTier(static_cast<uint8_t>(newTier));
-  }
-
-  if (sysStatus.get_sensorMode() == OCCUPANCY) {
-    ConnectionMode currentMode = static_cast<ConnectionMode>(sysStatus.get_connectionMode());
-    bool lowBatteryDowngradeActive = sysStatus.get_lowBatteryMode();
-
-    if (currentMode == INTERMITTENT_KEEP_ALIVE && newTier >= TIER_CONSERVING) {
-      Log.info("Battery conservation: Disabling KEEP_ALIVE mode (tier=%s, SoC=%.1f%%) - switching to INTERMITTENT",
-               tierNames[newTier], (double)currentSoC);
-      sysStatus.set_connectionMode(INTERMITTENT);
-      sysStatus.set_lowBatteryMode(true);
-    } else if (currentMode == INTERMITTENT && lowBatteryDowngradeActive && newTier == TIER_HEALTHY) {
-      Log.info("Battery recovery: clearing lowBatteryMode (tier=HEALTHY, SoC=%.1f%%)",
-               (double)currentSoC);
-      Log.info("Battery recovery: restoring INTERMITTENT_KEEP_ALIVE (tier=HEALTHY, SoC=%.1f%%)",
-               (double)currentSoC);
-      sysStatus.set_connectionMode(INTERMITTENT_KEEP_ALIVE);
-      sysStatus.set_lowBatteryMode(false);
-    } else if (currentMode != INTERMITTENT && lowBatteryDowngradeActive) {
-      Log.info("Battery recovery: clearing lowBatteryMode (tier=%s, SoC=%.1f%%)",
-               tierNames[newTier],
-               (double)currentSoC);
-      sysStatus.set_lowBatteryMode(false);
-    }
-  } else if (sysStatus.get_lowBatteryMode()) {
-    Log.info("Battery recovery: clearing lowBatteryMode (tier=%s, SoC=%.1f%%)",
-             tierNames[newTier],
-             (double)currentSoC);
-    sysStatus.set_lowBatteryMode(false);
-  }
-
-}
-
-void applyBatteryAwareConnectionModePolicy(float currentSoC) {
-  const ReportingPolicy policy = ReportingPolicyResolver::resolveRuntime(
-      currentSoC, Time.now());
-  applyBatteryAwareConnectionModePolicy(currentSoC, policy.batteryTier);
-}
+// WO-2026-09-21 Step 4: applyBatteryAwareConnectionModePolicy() (both the
+// 2-arg form and the 1-arg convenience wrapper that resolved its own tier
+// via ReportingPolicyResolver::resolveRuntime()) is retired - its entire
+// body (the persisted tier write, the persisted low-battery-mode write, and
+// the paired connection-mode downgrade/recovery side effect) is now
+// BatteryAuthority::evaluate()'s single implementation. Every former caller
+// calls BatteryAuthority::evaluate(soc) directly instead.
 
 void logTimeDiag(bool isOpen) {
   const char *tz = sysStatus.get_timeZoneStrCStr();

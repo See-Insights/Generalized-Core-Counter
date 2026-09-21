@@ -1,5 +1,6 @@
 #include "cloud/Cloud.h"
 
+#include "power/BatteryAuthority.h"
 #include "power/ChargeInhibitPolicy.h"
 
 namespace {
@@ -444,7 +445,11 @@ bool Cloud::applyModesConfig(const LedgerData &defaults, const LedgerData &devic
             if (sysStatus.get_connectionMode() != static_cast<ConnectionMode>(connectionMode) ||
                 sysStatus.get_lowBatteryMode()) {
                 sysStatus.set_connectionMode(static_cast<ConnectionMode>(connectionMode));
-                sysStatus.set_lowBatteryMode(false);
+                // WO-2026-09-21 Step 4: routes through BatteryAuthority, the
+                // single owner of the persisted low-battery-mode field -
+                // this operator override should clear any sticky downgrade
+                // rather than have it silently reassert itself.
+                BatteryAuthority::clearLowBatteryMode();
                 const char *modeStr = connectionMode == CONNECTED ? "CONNECTED" :
                                      connectionMode == INTERMITTENT ? "INTERMITTENT" :
                                      connectionMode == DISCONNECTED ? "DISCONNECTED" : "INTERMITTENT_KEEP_ALIVE";

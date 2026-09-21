@@ -109,14 +109,10 @@ void dailyCleanup();
  */
 void publishData();
 
-/**
- * @brief Applies battery-aware policy overrides to the current connection mode.
- *
- * @param currentSoC Latest battery state of charge
- * @param resolvedTier Tier already selected by the shared reporting resolver
- */
-void applyBatteryAwareConnectionModePolicy(float currentSoC, BatteryTier resolvedTier);
-void applyBatteryAwareConnectionModePolicy(float currentSoC);
+// WO-2026-09-21 Step 4: applyBatteryAwareConnectionModePolicy() is retired -
+// see power/BatteryAuthority.h's evaluate(), the single owner its entire
+// body (persisted tier/low-battery-mode writes, connection-mode side
+// effect) folded into.
 
 /**
  * @brief Tests whether an epoch falls within configured local open hours.

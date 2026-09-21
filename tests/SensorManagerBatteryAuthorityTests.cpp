@@ -1,4 +1,4 @@
-#include "sensors/BatteryAuthorityPolicy.h"
+#include "power/BatteryAuthorityPolicy.h"
 
 #include <cassert>
 #include <cmath>

@@ -13,7 +13,7 @@
 
 #include "Config.h"
 #include "Particle.h"
-#include "reporting/BatteryTierStore.h"
+#include "power/BatteryAuthority.h"
 #include "reporting/ReportingPolicy.h"
 #include "sensors/SensorManager.h"
 #include "state/State_Common.h"
@@ -21,7 +21,7 @@
 namespace {
 
 void resetGlobals() {
-	BatteryTierStore::testCurrentBatteryTier = TIER_HEALTHY;
+	BatteryAuthority::testPreviousBatteryTier = TIER_HEALTHY;
 	Config::testReportingIntervalSec = 3600;
 	Time.valid = true;
 	testWindowOpen = true;

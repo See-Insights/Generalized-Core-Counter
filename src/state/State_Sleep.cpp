@@ -6,6 +6,7 @@
 #include "power/ConnectivityPolicy.h"
 #include "power/PowerDiagnostics.h"
 #include "power/PowerManager.h"
+#include "power/BatteryAuthority.h"
 #include "LocalTimeRK.h"
 #include "MyPersistentData.h"
 #include "PublishQueuePosixRK.h"
@@ -1570,8 +1571,17 @@ void handleSleepingState() {
       // If KEEP_ALIVE was previously disabled due to low battery, re-evaluate
       // battery policy immediately after the post-wake sample so this wake's
       // occupancy and sleep decisions do not use a stale downgraded mode.
+      // WO-2026-09-21 Step 4 (corrected same day): evaluate() then commit() -
+      // one of the four deliberate policy-application sites.
       if (sysStatus.get_lowBatteryMode()) {
-        applyBatteryAwareConnectionModePolicy(PowerManager::instance().soc());
+        const float soc = PowerManager::instance().soc();
+        float vcell = 0.0f;
+        const SensorManager::VcellSampleState vcellState =
+            SensorManager::instance().cachedBatteryVoltageState(vcell);
+        const BatteryHealth::SocTrust trust = SensorManager::instance().cachedSocTrust();
+        BatteryAuthority::commit(
+            BatteryAuthority::evaluate(soc, vcellState, vcell, trust, BatteryAuthority::currentTier()),
+            soc);
       }
 
       // In CONNECTED operating mode, the device should reconnect at the
@@ -1630,8 +1640,17 @@ void handleSleepingState() {
         // If KEEP_ALIVE was temporarily disabled for low battery, refresh the
         // battery policy on wake so recovered power can restore the intended
         // occupancy behavior before we decide whether to report or sleep again.
+        // WO-2026-09-21 Step 4 (corrected same day): evaluate() then commit() -
+        // one of the four deliberate policy-application sites.
         if (sysStatus.get_lowBatteryMode()) {
-          applyBatteryAwareConnectionModePolicy(PowerManager::instance().soc());
+          const float soc = PowerManager::instance().soc();
+          float vcell = 0.0f;
+          const SensorManager::VcellSampleState vcellState =
+              SensorManager::instance().cachedBatteryVoltageState(vcell);
+          const BatteryHealth::SocTrust trust = SensorManager::instance().cachedSocTrust();
+          BatteryAuthority::commit(
+              BatteryAuthority::evaluate(soc, vcellState, vcell, trust, BatteryAuthority::currentTier()),
+              soc);
         }
         
         if (!current.get_occupied()) {

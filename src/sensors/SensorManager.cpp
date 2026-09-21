@@ -18,7 +18,7 @@ const char *batteryContext[7] = {"Unknown",    "Not Charging", "Charging",
 #include "power/ChargeInhibitPolicy.h"
 #include "power/PmicFaultMonitor.h"
 #include "state/StateMachine.h"
-#include "sensors/BatteryAuthorityPolicy.h"
+#include "power/BatteryAuthorityPolicy.h"
 #include "sensors/SensorFactory.h"
 #include "device_pinout.h"     // TMP36_SENSE_PIN for enclosure temperature
 #include "PublishQueuePosixRK.h"
