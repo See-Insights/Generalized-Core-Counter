@@ -707,14 +707,29 @@ public:
 	bool validate(size_t dataSize);
 
 	/**
+	 * @brief Re-run the occupancyStartTime future-date corruption clamp once a
+	 *        time source exists this boot.
+	 *
+	 * validate()'s own future-date clamp for occupancyStartTime runs once,
+	 * from the .load() call in setup() - which is called long before
+	 * ab1805.setup() seeds Time, so that clamp can never fire (see
+	 * WO-2026-09-22-001). Call this once, opportunistically, from global
+	 * setup() as soon as a time source is available (Clock::isTimeValid()),
+	 * to give the same corruption check a point in boot where it can
+	 * actually run. No-op if occupied is false or occupancyStartTime is
+	 * already plausible.
+	 */
+	void revalidateOccupancyStartTimeIfTimeAvailable();
+
+	/**
 	 * @brief Will reinitialize data if it is found not to be valid
-	 * 
+	 *
 	 * Be careful doing this, because when MyData is extended to add new fields,
 	 * the initialize method is not called! This is only called when first
 	 * initialized.
-	 * 
+	 *
 	 */
-	void initialize();  
+	void initialize();
 
 	class CurrentData {
 	public:

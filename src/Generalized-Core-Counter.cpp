@@ -1159,6 +1159,14 @@ void setup() {
            startupOscUsingRC ? 1 : 0, startupOscStatusReg, startupOscCtrlReg,
            startupOscAos ? 1 : 0, startupOscFos ? 1 : 0);
 
+  // WO-2026-09-22-001: currentStatusData::validate()'s occupancyStartTime
+  // future-date clamp runs earlier in setup(), before ab1805.setup() (just
+  // above) has seeded Time, so it can never fire there. Re-run it once,
+  // right here, now that a time source exists this boot - a no-op if
+  // occupied is false, Time is still not valid, or the stored value is
+  // already plausible.
+  current.revalidateOccupancyStartTimeIfTimeAvailable();
+
 #if PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST
   // ===== BENCH-ONLY: DELIBERATE RTC SKEW (WO-2026-08-31-003, Amendment A) =====
   // Compiled in ONLY when ENABLE_RTC_SKEW_TEST=1 (see BuildProfile.h) on

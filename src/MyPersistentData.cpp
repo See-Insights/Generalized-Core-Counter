@@ -732,27 +732,11 @@ bool currentStatusData::validate(size_t dataSize) {
                 Log.warn("Current: occupied=true but occupancyStartTime=0 - forcing unoccupied");
                 current.set_occupied(false);
                 current.set_lastOccupancyEvent(0);
-            } else {
-                // WO-2026-09-22: this branch was `else if (Time.isValid())`,
-                // guarding a clamp of a future-dated occupancyStartTime.
-                // Structurally unreachable, not merely usually-false:
-                // validate() runs exactly once per boot, from
-                // currentStatusData::setup()'s .load() call
-                // (Generalized-Core-Counter.cpp:977), which executes over
-                // 150 lines before ab1805.withFOUT(WKP).setup()
-                // (Generalized-Core-Counter.cpp:1130) - the first thing that
-                // seeds Time from the RTC on any boot. Time.isValid() is
-                // therefore false here on every boot, unconditionally,
-                // Clock::isTrusted() even more so (it needs a completed
-                // sync, further still from this point in boot) - converting
-                // to the trust signal would not fix this, only rename an
-                // always-false condition. If this future-dated-timestamp
-                // corruption guard matters, it needs to run somewhere it
-                // can actually fire (e.g. re-checked opportunistically once
-                // a time source becomes available later in boot) - filed as
-                // WO-2026-09-22-001, not solved here to keep this dispatch's
-                // diff to the Clock-routing question it was scoped for.
             }
+            // else: no time source yet this boot (see WO-2026-09-22-001) -
+            // this same start value is re-checked, once a time source
+            // exists, by revalidateOccupancyStartTimeIfTimeAvailable()
+            // below, called once from global setup().
 
             // lastOccupancyEvent drives debounce logic; if missing, seed to now to avoid immediate expiry.
             if (current.get_lastOccupancyEvent() == 0) {
@@ -764,6 +748,20 @@ bool currentStatusData::validate(size_t dataSize) {
         Log.warn("Current data is not valid");
     }
     return valid;
+}
+
+void currentStatusData::revalidateOccupancyStartTimeIfTimeAvailable() {
+    if (!Clock::isTimeValid() || !current.get_occupied()) {
+        return;
+    }
+
+    time_t start = current.get_occupancyStartTime();
+    time_t now = Time.now();
+    // If start is in the future by more than a few seconds, clamp.
+    if (start > now + 5) {
+        Log.warn("Current: occupancyStartTime in future (%lu > %lu) - clamping", (unsigned long)start, (unsigned long)now);
+        current.set_occupancyStartTime(now);
+    }
 }
 
 void currentStatusData::initialize() {
