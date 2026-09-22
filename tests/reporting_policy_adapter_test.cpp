@@ -17,6 +17,7 @@
 #include "reporting/ReportingPolicy.h"
 #include "sensors/SensorManager.h"
 #include "state/State_Common.h"
+#include "time/Clock.h"
 
 namespace {
 
@@ -24,6 +25,7 @@ void resetGlobals() {
 	BatteryAuthority::testPreviousBatteryTier = TIER_HEALTHY;
 	Config::testReportingIntervalSec = 3600;
 	Time.valid = true;
+	Clock::testClockTrusted = true;
 	testWindowOpen = true;
 	SensorManager::instance().testVcellState = SensorManager::VcellSampleState::Unavailable;
 	SensorManager::instance().testVcell = 0.0f;
@@ -139,6 +141,38 @@ void testUnavailableVcellUntrustedSocForcesSurvivalEvenAtLowRawSoc() {
 	assert(policy.batteryTier == TIER_SURVIVAL);
 }
 
+// --- WO-2026-09-22: clockTrusted routing, exercised through the real
+// adapter (not just ReportingPolicy::resolve() in isolation) - confirms
+// resolveRuntime() actually calls Clock::isTrusted(), not Time.isValid(),
+// and that Time.valid alone can no longer make cadence appear due. ---
+
+void testClockTrustedDrivesCadenceNotRawTimeValid() {
+	resetGlobals();
+	// Time.valid stays true (the stub's default) but Clock is untrusted -
+	// if resolveRuntime() still read Time.isValid() directly, this would
+	// exercise the OLD (trusted-looking) path instead of the new one.
+	Clock::testClockTrusted = false;
+
+	const ReportingPolicy policy = ReportingPolicyResolver::resolveRuntime(90.0f, 43200);
+	// Untrusted resolves cadence to due-now (see ReportingPolicy.cpp's
+	// design comment) rather than deferring, and never computes a real
+	// future boundary from an unconfirmed epoch.
+	assert(policy.cadenceDue);
+	assert(policy.nextReportEpoch == 0);
+}
+
+void testClockTrustedAndWindowClosedStillDefers() {
+	resetGlobals();
+	Clock::testClockTrusted = false;
+	testWindowOpen = false;
+
+	const ReportingPolicy policy = ReportingPolicyResolver::resolveRuntime(90.0f, 43200);
+	// Untrusted does not override windowOpen - an untrusted clock forces
+	// "due now" only within whatever window the (separately-scoped, already
+	// fail-open) isWithinOpenHoursAt() already says is open.
+	assert(!policy.cadenceDue);
+}
+
 } // namespace
 
 int main() {
@@ -151,6 +185,8 @@ int main() {
 	testUnavailableVcellLowSocResolvesAccordingly();
 	testUnavailableVcellUntrustedSocDoesNotResolveHealthy();
 	testUnavailableVcellUntrustedSocForcesSurvivalEvenAtLowRawSoc();
+	testClockTrustedDrivesCadenceNotRawTimeValid();
+	testClockTrustedAndWindowClosedStillDefers();
 
 	printf("reporting_policy_adapter_test: all tests passed\n");
 	return 0;

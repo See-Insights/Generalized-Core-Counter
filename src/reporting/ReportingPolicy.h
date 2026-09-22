@@ -15,7 +15,13 @@ struct ReportingPolicyInputs {
 	BatteryTier batteryTier = TIER_HEALTHY;
 	uint16_t batteryMultiplier = 1;
 	time_t nowEpoch = 0;
-	bool timeValid = false;
+	// WO-2026-09-22 (RuntimeReportingPolicy Clock routing): this is the
+	// clock's TRUST verdict (Clock::isTrusted()), not raw epoch-existence
+	// (Time.isValid()) - the same distinction Step 3b drew everywhere else.
+	// nowEpoch can hold a plausible-looking but wrong value even when
+	// clockTrusted is false (an RTC-seeded, not-yet-confirmed clock), which
+	// is exactly why boundary alignment below must not trust it either.
+	bool clockTrusted = false;
 	bool windowOpen = true;
 	uint32_t alignmentToleranceSec = 0;
 };
@@ -40,8 +46,8 @@ namespace ReportingPolicyResolver {
  *
  * Future opportunities retain the existing epoch-boundary alignment and are
  * filtered through the supplied open-hours predicate. A zero next epoch means
- * time is invalid, the interval is unusable, or no valid opportunity was found
- * in the bounded search horizon.
+ * the clock is untrusted, the interval is unusable, or no valid opportunity
+ * was found in the bounded search horizon.
  */
 ReportingPolicy resolve(const ReportingPolicyInputs &inputs,
 		ReportingWindowPredicate windowPredicate = nullptr,
