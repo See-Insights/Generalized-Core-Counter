@@ -540,6 +540,19 @@ bool startupPinResetAb1805Checked = false;
 const char *startupAb1805WakeReasonName = "N/A";
 bool startupAb1805ConfirmedWatchdog = false;
 
+// WO-2026-08-31-004 Amendment A (cloud follow-up): the AB1805 oscillator
+// state read once at boot in setup(), kept in scope past that single log
+// line so DeviceStatusPublisher.cpp can also publish it. No new I2C read -
+// these are the exact values Amendment A's boot-time read already
+// captured. Defaults are overwritten within milliseconds of boot, long
+// before any cloud publish is possible, so they are never themselves
+// reported.
+bool startupOscUsingRC = false;
+uint8_t startupOscStatusReg = 0;
+uint8_t startupOscCtrlReg = 0;
+bool startupOscAos = false;
+bool startupOscFos = false;
+
 template <typename T>
 bool updateRetainedValue(T &slot, const T &value) {
   if (slot == value) {
@@ -1115,6 +1128,30 @@ void setup() {
   // Initialize AB1805 RTC and hardware watchdog, then restore system time if needed
   const bool timeValidBeforeRtc = Time.isValid();
   ab1805.withFOUT(WKP).setup();                // Initialize AB1805 RTC - WKP is D10 on Photon2
+
+  // WO-2026-08-31-004 Amendment A: log AB1805 oscillator state once at
+  // boot. Read-only - no gate, no branch, no retry, no state, nothing
+  // conditional on the result, no build flag; firmware behaves identically
+  // regardless of the answer. Investigates whether the field-observed
+  // rate-halving (56.5%-82.1% across 10 days on Dev-11, never below ~50%
+  // or above ~83%, no settled pattern) correlates with AOS/FOS automatic
+  // oscillator switching rather than a fixed RC-vs-XT misconfiguration - a
+  // fixed divider fault could not produce a varying daily rate, but a part
+  // that spends part of each interval on the wrong oscillator source
+  // could. A single boot-time read is a snapshot, not a definitive answer,
+  // if the part is genuinely switching between reads.
+  //
+  // Amendment A (cloud follow-up): written into the startupOsc* globals
+  // above (not locals) so DeviceStatusPublisher.cpp can also publish this
+  // same boot-time read - no new I2C read added for that.
+  startupOscUsingRC = ab1805.usingRCOscillator();
+  startupOscStatusReg = ab1805.readRegister(AB1805::REG_OSC_STATUS);
+  startupOscCtrlReg = ab1805.readRegister(AB1805::REG_OSC_CTRL);
+  startupOscAos = (startupOscCtrlReg & AB1805::REG_OSC_CTRL_AOS) != 0;
+  startupOscFos = (startupOscCtrlReg & AB1805::REG_OSC_CTRL_FOS) != 0;
+  Log.info("OscState: usingRC=%d oscStatus=0x%02x oscCtrl=0x%02x aos=%d fos=%d",
+           startupOscUsingRC ? 1 : 0, startupOscStatusReg, startupOscCtrlReg,
+           startupOscAos ? 1 : 0, startupOscFos ? 1 : 0);
 
 #if PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST
   // ===== BENCH-ONLY: DELIBERATE RTC SKEW (WO-2026-08-31-003, Amendment A) =====

@@ -54,6 +54,17 @@ JSONFieldObserver g_statusJsonObserver;
 // Required by DeviceStatusPublisher.cpp (`extern const char* FIRMWARE_VERSION;`).
 const char *FIRMWARE_VERSION = "test-fw";
 
+// WO-2026-08-31-004 Amendment A (cloud follow-up): required by
+// DeviceStatusPublisher.cpp's `extern` declarations of the boot-time
+// oscillator-state globals normally set once in Generalized-Core-Counter.cpp's
+// setup(), which this harness does not compile/link. Fixed values only -
+// this harness does not assert on them.
+bool startupOscUsingRC = false;
+uint8_t startupOscStatusReg = 0;
+uint8_t startupOscCtrlReg = 0;
+bool startupOscAos = false;
+bool startupOscFos = false;
+
 PowerPlatform::TestPowerPlatformState PowerPlatform::testPowerPlatformState;
 
 namespace {

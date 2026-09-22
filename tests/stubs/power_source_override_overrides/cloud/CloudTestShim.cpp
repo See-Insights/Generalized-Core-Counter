@@ -85,3 +85,11 @@ uint32_t observedTimeSyncedLastMs() { return 1000; }
 // assertions unaffected (this harness does not itself assert on
 // syncAgeSec's numeric value - see power_source_override_test.cpp).
 uint32_t reportedSyncAgeMs() { return 1000; }
+
+// WO-2026-08-31-004 Amendment A-2: DeviceStatusPublisher.cpp now also calls
+// the real Clock::lastSyncCorrectionSec() defined in time/Clock.cpp, which
+// this harness does not compile/link. Provided only to satisfy the linker;
+// this harness does not assert on correctionSec's numeric value.
+namespace Clock {
+long lastSyncCorrectionSec() { return -1; }
+} // namespace Clock

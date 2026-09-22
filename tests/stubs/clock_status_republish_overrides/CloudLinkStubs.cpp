@@ -47,6 +47,17 @@ bool Cloud::applyConfigurationFromLedger(const LedgerData &, const LedgerData &)
 // DeviceStatusPublisher.cpp's writeDeviceStatusToCloud().
 const char *FIRMWARE_VERSION = "test-fw";
 
+// WO-2026-08-31-004 Amendment A (cloud follow-up): required by
+// DeviceStatusPublisher.cpp's `extern` declarations of the boot-time
+// oscillator-state globals normally set once in Generalized-Core-Counter.cpp's
+// setup(), which this harness does not compile/link. Fixed values only -
+// this test's assertions are about clock.trusted, not the oscillator fields.
+bool startupOscUsingRC = false;
+uint8_t startupOscStatusReg = 0;
+uint8_t startupOscCtrlReg = 0;
+bool startupOscAos = false;
+bool startupOscFos = false;
+
 // Round 6 follow-up (Stage 7 finding 2): test-controlled clock-trust
 // telemetry inputs. The REAL implementations of these three functions live
 // in Generalized-Core-Counter.cpp, which this harness deliberately does not
@@ -66,3 +77,12 @@ bool testClockTrusted = false;
 bool isClockTrusted() { return testClockTrusted; }
 uint32_t observedTimeSyncedLastMs() { return testClockTrusted ? 12345u : 0u; }
 uint32_t reportedSyncAgeMs() { return testClockTrusted ? 5000u : 0xFFFFFFFFu; }
+
+// WO-2026-08-31-004 Amendment A-2: DeviceStatusPublisher.cpp now also calls
+// the real Clock::lastSyncCorrectionSec() defined in time/Clock.cpp, which
+// this harness does not compile/link. Provided only to satisfy the linker,
+// in the same spirit as the three stubs above - this test's assertions are
+// about clock.trusted, not correctionSec.
+namespace Clock {
+long lastSyncCorrectionSec() { return -1; }
+} // namespace Clock
