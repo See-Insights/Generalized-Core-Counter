@@ -23,6 +23,11 @@
 #include "power/BatteryAuthority.h"
 #include "power/ConnectivityPolicy.h"
 #include "state/State_Common.h"
+// WO-2026-09-22: clockTrusted now comes from the actual owner
+// (Clock::isTrusted()), not raw Time.isValid() - the same class of gap
+// Step 3b's decision-site sweep closed everywhere else, missed here because
+// this file wasn't in that sweep's original ~13-site list.
+#include "time/Clock.h"
 
 namespace {
 
@@ -42,7 +47,7 @@ ReportingPolicy resolveRuntime(float currentSoC, time_t nowEpoch) {
 	inputs.batteryTier = tier;
 	inputs.batteryMultiplier = BatteryBackoff::intervalMultiplier(tier);
 	inputs.nowEpoch = nowEpoch;
-	inputs.timeValid = Time.isValid();
+	inputs.clockTrusted = Clock::isTrusted();
 	inputs.windowOpen = isWithinOpenHoursAt(nowEpoch);
 	inputs.alignmentToleranceSec = ConnectivityPolicy::CONNECT_ALIGNMENT_TOLERANCE_SEC;
 	return resolve(inputs, runtimeWindowOpenAt, nullptr);

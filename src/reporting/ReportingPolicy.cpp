@@ -29,7 +29,7 @@ time_t nextValidBoundary(const ReportingPolicyInputs &inputs,
 		uint32_t intervalSec,
 		ReportingWindowPredicate windowPredicate,
 		void *windowContext) {
-	if (!inputs.timeValid || inputs.nowEpoch < 0 || intervalSec == 0) {
+	if (!inputs.clockTrusted || inputs.nowEpoch < 0 || intervalSec == 0) {
 		return 0;
 	}
 
@@ -63,8 +63,24 @@ ReportingPolicy resolve(const ReportingPolicyInputs &inputs,
 	policy.effectiveIntervalSec = effectiveInterval(
 		inputs.configuredIntervalSec, policy.batteryMultiplier);
 	policy.windowOpen = inputs.windowOpen;
-	policy.cadenceDue = inputs.windowOpen && isBoundaryDue(
-		inputs.nowEpoch, policy.effectiveIntervalSec, inputs.alignmentToleranceSec);
+	// WO-2026-09-22: when the clock is untrusted, nowEpoch cannot be relied
+	// on to compute a real alignment boundary (isBoundaryDue()'s modulo
+	// arithmetic on a wrong-but-plausible epoch is no more meaningful than
+	// on an outright invalid one - see nextValidBoundary()'s own gate just
+	// below). Withholding the report until trust returns is the wrong
+	// direction to be conservative in here, though: unlike a sleep-duration
+	// decision (Step 3b's Clock::openness() domain, where over-committing to
+	// a long sleep on a wrong clock is the costly mistake), the costly
+	// mistake for REPORT CADENCE is under-connecting - skipping a connect
+	// opportunity is also skipping the one thing (checkClockResync()'s
+	// connected-side resync) that could restore trust. So an untrusted
+	// clock resolves cadenceDue to due-now (subject to the same windowOpen
+	// this file already applies in the trusted case) rather than to
+	// not-due - the reporting-domain analogue of 3b's "short nap, don't
+	// commit to overnight", not a copy of its literal fail-to-Unknown
+	// polarity.
+	policy.cadenceDue = inputs.windowOpen && (!inputs.clockTrusted || isBoundaryDue(
+		inputs.nowEpoch, policy.effectiveIntervalSec, inputs.alignmentToleranceSec));
 	policy.adjustmentReason = policy.batteryMultiplier > 1
 		? REPORTING_ADJUSTMENT_LOW_BATTERY
 		: REPORTING_ADJUSTMENT_NONE;
