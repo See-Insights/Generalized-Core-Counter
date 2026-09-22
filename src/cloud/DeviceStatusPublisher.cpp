@@ -358,10 +358,34 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     strncpy(bufferPublish, bufferBase, sizeof(bufferPublish) - 1);
     bufferPublish[sizeof(bufferPublish) - 1] = '\0';
     const size_t statusPayloadSize = strlen(bufferPublish);
-    Log.info("LedgerPayloadStatus: bytes=%lu/%lu schema=%d",
-             (unsigned long)statusPayloadSize,
-             (unsigned long)DEVICE_STATUS_PAYLOAD_CAPACITY,
-             kLedgerSchemaVersion);
+
+    // WO-2026-09-15-001 Amendment C: the strcmp() above (comparing the full
+    // JSON) already decides whether a write is even attempted - that logic
+    // is untouched. This guard is narrower and separate: it decides only
+    // whether THIS log line repeats. The line above it can only be reached
+    // when the full payload differs from lastPublishedStatus - but the
+    // documented spam (WO-2026-09-15-001's original ~20-30-line and
+    // Amendment A's ~300-line instances) comes from Cloud::loop() retrying
+    // an already-in-flight ledger sync every main-loop pass with no
+    // backoff: lastPublishedStatus is only updated on a CONFIRMED
+    // successful write, so every retry attempt sees "different" (a
+    // fast-moving field like clock.syncAgeSec keeps the strcmp from ever
+    // matching) and re-reaches this line, even though the one value THIS
+    // line actually displays - the byte count - is unchanged across the
+    // whole retry storm. Suppressing on that displayed value, not the full
+    // payload, catches exactly that shape without touching the retry
+    // behavior itself (a separate, not-yet-authorized fix - see
+    // WO-2026-09-15-001 Amendment B).
+    static bool hasLoggedStatusPayloadSize = false;
+    static unsigned long lastLoggedStatusPayloadSize = 0;
+    if (!hasLoggedStatusPayloadSize || lastLoggedStatusPayloadSize != (unsigned long)statusPayloadSize) {
+        hasLoggedStatusPayloadSize = true;
+        lastLoggedStatusPayloadSize = (unsigned long)statusPayloadSize;
+        Log.info("LedgerPayloadStatus: bytes=%lu/%lu schema=%d",
+                 (unsigned long)statusPayloadSize,
+                 (unsigned long)DEVICE_STATUS_PAYLOAD_CAPACITY,
+                 kLedgerSchemaVersion);
+    }
 
     LedgerData data = LedgerData::fromJSON(bufferPublish);
 

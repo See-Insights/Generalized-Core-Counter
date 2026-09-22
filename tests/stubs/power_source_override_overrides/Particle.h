@@ -10,8 +10,16 @@
 constexpr int SYSTEM_ERROR_NONE = 0;
 
 struct TestLog {
+  // WO-2026-09-15-001 Amendment C: real call counter, additive to the
+  // existing no-op behavior - existing assertions in this test suite don't
+  // read it, so this is inert for them. Used by the LedgerPayloadStatus
+  // log-guard tests in power_source_override_test.cpp.
+  int infoCallCount = 0;
+
   template <typename... Args>
-  void info(const char *, Args...) {}
+  void info(const char *, Args...) {
+    infoCallCount++;
+  }
 
   template <typename... Args>
   void warn(const char *, Args...) {}
@@ -136,29 +144,83 @@ class JSONBufferWriter {
 
   JSONBufferWriter &name(const char *n) {
     lastName_ = n ? n : "";
+    appendRaw(lastName_.c_str());
+    appendRaw(":");
     return *this;
   }
 
   JSONBufferWriter &value(bool v) {
     g_statusJsonObserver.record(lastName_.c_str(), v);
+    appendRaw(v ? "true," : "false,");
     return *this;
   }
   JSONBufferWriter &value(int v) {
     g_statusJsonObserver.recordInt(lastName_.c_str(), v);
+    char buf[16];
+    std::snprintf(buf, sizeof(buf), "%d,", v);
+    appendRaw(buf);
     return *this;
   }
-  JSONBufferWriter &value(long) { return *this; }
-  JSONBufferWriter &value(unsigned long) { return *this; }
-  JSONBufferWriter &value(float, int) { return *this; }
-  JSONBufferWriter &value(double, int) { return *this; }
-  JSONBufferWriter &value(const char *) { return *this; }
+  JSONBufferWriter &value(long v) {
+    char buf[24];
+    std::snprintf(buf, sizeof(buf), "%ld,", v);
+    appendRaw(buf);
+    return *this;
+  }
+  JSONBufferWriter &value(unsigned long v) {
+    char buf[24];
+    std::snprintf(buf, sizeof(buf), "%lu,", v);
+    appendRaw(buf);
+    return *this;
+  }
+  JSONBufferWriter &value(float f, int) {
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%f,", (double)f);
+    appendRaw(buf);
+    return *this;
+  }
+  JSONBufferWriter &value(double d, int) {
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%f,", d);
+    appendRaw(buf);
+    return *this;
+  }
+  JSONBufferWriter &value(const char *s) {
+    appendRaw(s ? s : "");
+    appendRaw(",");
+    return *this;
+  }
 
   char *buffer() const { return buffer_; }
-  size_t dataSize() const { return 0; }
+  size_t dataSize() const { return pos_; }
 
  private:
+  // WO-2026-09-15-001 Amendment C: earlier this stub never wrote into
+  // buffer_ at all (dataSize() was hardcoded to 0), which made the
+  // production strcmp() duplicate-suppression gate at
+  // DeviceStatusPublisher.cpp always compare two empty strings and made the
+  // per-call byte count constant regardless of payload content - neither
+  // condition holds on real hardware, and both defeated the
+  // LedgerPayloadStatus log-guard tests below. This does not need to
+  // produce byte-for-byte spec-compliant JSON (see the class comment
+  // above); it only needs the written length to actually track what was
+  // named and valued, so downstream code that reads dataSize()/buffer()
+  // observes a size that moves when a real payload's size would move.
+  void appendRaw(const char *s) {
+    if (!buffer_ || capacity_ == 0) return;
+    const size_t len = std::strlen(s);
+    // Leave room for the production code's own bufferBase[dataSize()]='\0'
+    // write, which lands one byte past what we report here.
+    const size_t maxPos = capacity_ - 1;
+    const size_t avail = maxPos > pos_ ? maxPos - pos_ : 0;
+    const size_t toCopy = len < avail ? len : avail;
+    std::memcpy(buffer_ + pos_, s, toCopy);
+    pos_ += toCopy;
+  }
+
   char *buffer_;
   size_t capacity_;
+  size_t pos_ = 0;
   std::string lastName_;
 };
 
