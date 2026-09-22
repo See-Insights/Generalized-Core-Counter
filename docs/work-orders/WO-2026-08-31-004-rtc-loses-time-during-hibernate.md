@@ -251,3 +251,118 @@ three `hibernate_wake` events published 02:24:22-02:24:29Z. Rate arithmetic from
 those payloads against serial timestamps of the 21:08:47 `ClockResync` and the
 22:07:22 sleep entry. Oscillator register semantics from
 `lib/AB1805_RK/src/AB1805_RK.h:866-878`.
+
+---
+
+# Amendment B (2026-09-21/22): Amendment A dispatched - CLOSED, prediction resolved
+
+**Status:** CLOSED. Both parts of Amendment A's queued scope, plus one related
+addition, implemented, bench-verified on Dev-09/Dev-11/Dev-14, and merged.
+
+## Part 1 - the falsifiable prediction, resolved
+
+Amendment A's exact queued scope was dispatched: `usingRCOscillator()`,
+`REG_OSC_STATUS`, and `REG_OSC_CTRL` (decoding `AOS`/`FOS`) logged once at
+every boot, unconditionally, on all three bench devices - no gate, no branch,
+no behaviour change, one I2C read.
+
+Between when Amendment A was drafted (2026-09-03) and this dispatch, ten more
+days of field data refined the framing: the daily rate is not a fixed ~50%
+but varies 56.5%-82.1%, never below ~50%, never above ~83%, with no settled
+pattern. A fixed divider or static oscillator misselection cannot produce a
+*varying* daily rate; a part that spends part of each interval on the wrong
+source could. This dispatch therefore also decoded `AOS`/`FOS` explicitly (not
+just `OMODE`), since a part with automatic switching armed could show the
+static read as XT while still switching during the interval.
+
+**Result, all three devices, identical:**
+
+| Device | `usingRC` | `oscStatus` | `oscCtrl` | `aos` | `fos` |
+|---|---|---|---|---|---|
+| Dev-09 | false | 34 (`0x22`) | 0 | false | false |
+| Dev-11 | false | 34 (`0x22`) | 0 | false | false |
+| Dev-14 | false | 34 (`0x22`) | 0 | false | false |
+
+Confirmed stable and unchanged across a full overnight soak (multiple resets
+per device, including a genuine multi-hour HIBERNATE on each - see the
+`hibernate_wake` table below) - not a one-boot fluke.
+
+**Per Amendment A's own pre-registered criterion - *"if all three report the
+same oscillator state, this hypothesis is wrong"* - the RC-oscillator/AOS-FOS-
+switching hypothesis is FALSIFIED.** Dev-11 is not running on the RC
+oscillator, and it is not merely reading XT at boot while armed to switch:
+`oscCtrl=0` means `AOS` and `FOS` are both disabled, so the automatic-switch
+mechanism this hypothesis rested on is not even armed, on any of the three
+devices.
+
+This is corroborated at the source level, not just by the register read:
+grepped every write site to `REG_OSC_CTRL` in both the vendored library and
+this application. There are exactly two:
+`AB1805::resetConfig(RESET_DISABLE_XT)` (`AB1805_RK.cpp:150-159`, the only
+site that ever sets `OSEL`/`FOS`) and a `PWGT`-only bit-set inside the
+library's own sleep-prep routine (`AB1805_RK.cpp:565`, unrelated to
+`AOS`/`FOS`). `resetConfig()` has **zero callers anywhere in `src/`** - this
+application never disables XT or arms automatic RC fallback. `oscCtrl=0`
+is not a coincidence of read timing; nothing in this codebase can produce
+anything else.
+
+**The rate-halving mystery is therefore still open.** This closes out
+Amendment A's specific, narrow question - it does not solve the parent WO.
+The RC-oscillator/AOS-FOS hypothesis is retired; a new hypothesis is needed
+before further register-level instrumentation is worth adding.
+
+## Part 2 (Amendment A-2) - sync-correction magnitude
+
+A related but separately-scoped addition, approved alongside Amendment A:
+`Clock::checkClockResync()` now reads the RTC's own pre-write value (one new
+`ab1805.getRtcAsTime()` call, immediately before the existing
+`setRtcFromSystem()` write) and logs/publishes the resulting correction delta
+(`Time.now()` at write time minus that pre-write reading) on every confirmed
+resync. This does not explain the rate fault - it is a lower-cost, ongoing
+instrument for tracking how large each correction is over time, without
+needing to reconstruct it from cross-referencing serial timestamps by hand
+the way the original 2026-09-03 rate arithmetic in this WO had to.
+
+Confirmed live on real hardware, e.g. Dev-11: `ClockResync: sync advanced,
+rtcUpdated=1 epoch=1789982254 correctionSec=0`.
+
+## Cloud telemetry added
+
+Both the oscillator state and the correction magnitude are now published to
+the `device-status` cloud ledger's `clock` object
+(`trusted`/`syncAgeSec`/`lastSyncEpoch`/`correctionSec`/`usingRC`/`oscStatus`/
+`oscCtrl`/`aos`/`fos`), not serial-only - this bench rig (benchtop supply
+through Battery-In, and later the Pi-forwarder USB transfer) cannot
+guarantee a serial connection, and the cloud-forwarded serial reconstruction
+was independently confirmed to miss anything logged before cellular/cloud
+connectivity is established in a given boot (verified by checking that even
+a long-pre-existing, unrelated boot line, `AppWDT:`, is equally invisible in
+that reconstruction). The oscillator fields are stable per-boot by
+construction (set once in `setup()`, never rewritten) - duplicate
+suppression holding them steady between reports is expected behaviour, not
+a defect.
+
+## Bench validation
+
+Dev-09, Dev-11, Dev-14, overnight soak 2026-09-21 into 2026-09-22, all three
+on identical firmware. All three completed a genuine multi-hour HIBERNATE
+overnight:
+
+| Device | Hibernate start (SGT) | Wake (SGT) | Requested | Result |
+|---|---|---|---|---|
+| Dev-14 | 9/21 22:02:20 | 9/22 06:00:19 | 7.97h | OK - clean `ALARM` wake |
+| Dev-11 | 9/21 23:03:30 | 9/22 06:00:23 | 6.95h | OK - clean `ALARM` wake |
+| Dev-09 | 9/21 22:09:51 | 9/22 06:00:39 | 7.85h | FAIL - AB1805 reported `DEEP_POWER_DOWN`, not `ALARM`; `HibernateCycle`'s own gate correctly withheld a fabricated duration |
+
+Dev-09's failed gate is noted here as a live example of the gate this WO's
+own `WO-2026-08-29-001` exists to report - not a rate-fault symptom, and not
+investigated further under this WO.
+
+## Provenance
+
+Implemented and bench-validated 2026-09-21/22 on branch
+`wo/2026-08-31-004-oscillator-sync-magnitude`, commits `1628192` (Amendment A
++ A-2 implementation) and `1c5819b` (Amendment A cloud follow-up). Falsifiable
+prediction stated in the original Amendment A section (2026-09-03), resolved
+against real hardware readings pulled via the Particle Ledger API 2026-09-21
+and 2026-09-22.

@@ -258,3 +258,59 @@ where to look. Not pursued in this pass.
 - Morrisville pair both have `desired_firmware_version = None` and can never
   leave v21 without an explicit target being set. Tracked as a fleet-management
   gap, not part of this WO.
+
+## Amendment A (2026-09-22): two `bc=28` instances on the Singapore bench units - same code shape, different population, do not merge
+
+Two new watchdog resets, same "hangs entering sleep, rescued by the watchdog"
+shape as this WO's `bc=21` (v21) findings, observed 2026-09-21 on the
+Singapore bench devices during unrelated bench-testing work
+(`WO-2026-08-31-004`'s Amendment A/A-2 dispatch):
+
+```
+Boron-Dev-14  2026-09-21T11:51:19.929Z  {"reset":"watchdog","osReason":60,"bc":28,"stage":"sleep","elapsed":38,"queue":4,"state":3,"connAge":0}
+Boron-Dev-09  2026-09-21T12:23:50.758Z  {"reset":"watchdog","osReason":60,"bc":28,"stage":"sleep","elapsed":39,"queue":4,"state":3,"connAge":244260}
+```
+
+**Decoded against the current tree (`main`, v24), per this WO's own rule -
+decode the breadcrumb before citing the number.** `bc=28` is
+`BREADCRUMB_SLEEP_CALL_ENTER` (`Generalized-Core-Counter.cpp:224`), written at
+four sites in `State_Sleep.cpp` (lines 1121, 1373, 1424, 1438), all
+functionally the same point: immediately before `System.sleep()`, across the
+hibernate/ULP/stop-fallback paths. Unambiguous - unlike v21's `bc=18`, no
+collision exists among these four v24 sites. This is the v24 equivalent, in
+kind, of this WO's own `bc=21` (v21): "the last breadcrumb recorded before
+the sleep call, and the watchdog fired before it returned or woke." The
+numbers differ because the enum differs per firmware version - do not read
+`28` against `21` as evidence of anything on its own; the equivalence is in
+what each number decodes to in its own tree, not in the digits.
+
+**Do not read this as confirmation of MAFC-1's specific hypothesis, and do
+not merge the two populations - the same rule this WO already states above
+for Dev-11 applies here.** Dev-09 and Dev-14 are Singapore bench units under
+a deliberately poor cellular-registration test condition; MAFC-1 is a
+healthy-sited Morrisville production unit with a clean site-mate control.
+`elapsed=38`/`elapsed=39` on the bench units and `connAge=0`/`244260` are not
+compared against MAFC-1's numbers here, and no claim is made that the
+underlying stall cause is the same - only that the *code shape* ("hangs at
+the sleep-call boundary, watchdog rescues it") recurs on a third and fourth
+device, on a different firmware version, which is worth this WO knowing about
+even though it is not this WO's population.
+
+Also decoded while checking this, as a correction to an informal
+characterization made in conversation (not previously written into any WO):
+`bc=18` in the current (v24) tree is unambiguously
+`BREADCRUMB_PUBLISH_QUEUE_EXIT` (`Generalized-Core-Counter.cpp:1676`, inside
+the main loop's publish-queue servicing, not the sleep path) - v24 resolved
+the v21 collision this WO documents above by moving the sleep-precondition
+gate to its own code (`BREADCRUMB_SLEEP_GATE_START = 22`,
+`State_Sleep.cpp:865`, whose comment records the old collision directly:
+"was stale literal 18, colliding with BREADCRUMB_PUBLISH_QUEUE_EXIT"). A
+`bc=18` stall on the Singapore bench units today is therefore about the
+publish-queue exit point in the main loop, not a cellular-registration or
+sleep-path stall - not yet characterized further, and not part of this
+amendment's scope.
+
+Not investigated further here - recorded for whoever next looks at either
+this WO or a future `bc=18`/`bc=28` occurrence on any device, so the same
+decode-before-comparing discipline this WO already established is applied
+again rather than re-derived from scratch.
