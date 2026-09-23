@@ -2,7 +2,8 @@
 #include "../Config.h"
 #include "cloud/Cloud.h"
 #include "DeviceInfoLedger.h"
-#include "MyPersistentData.h"
+#include "persist/RecoveryState.h"
+#include "persist/SystemConfig.h"
 #include "PublishQueuePosixRK.h"
 #include "sensors/SensorManager.h"
 #include "device_pinout.h"
@@ -103,7 +104,7 @@ struct ConnectBudgetContext {
 
 ConnectBudgetContext evaluateConnectBudget() {
   ConnectBudgetContext context;
-  context.configuredBudgetSec = sysStatus.get_connectAttemptBudgetSec();
+  context.configuredBudgetSec = SystemConfig::get_connectAttemptBudgetSec();
   if (context.configuredBudgetSec >= ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MIN_SEC &&
       context.configuredBudgetSec <= ConnectivityPolicy::CONNECT_BUDGET_CONFIG_MAX_SEC) {
     context.budgetMs = (unsigned long)context.configuredBudgetSec * 1000UL;
@@ -113,7 +114,7 @@ ConnectBudgetContext evaluateConnectBudget() {
     context.budgetMs = ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS;
   }
 
-  context.attemptCounter = sysStatus.get_connectionAttemptCounter();
+  context.attemptCounter = SystemConfig::get_connectionAttemptCounter();
   context.currentSoC = PowerManager::instance().soc();
   context.allowDeepAttempt =
       (context.attemptCounter >= ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD) ||
@@ -176,7 +177,7 @@ bool activeConnectAttemptWithinBudget() {
   }
 
   const unsigned long elapsedMs =
-      (unsigned long)sysStatus.get_lastConnectionDuration() * 1000UL;
+      (unsigned long)SystemConfig::get_lastConnectionDuration() * 1000UL;
   return elapsedMs <= budgetMs;
 }
 
@@ -237,7 +238,7 @@ void handleConnectingState() {
   if (state != oldState) {
     publishStateTransition();
     lastEnteredFromReporting = (oldState == REPORTING_STATE);
-    sysStatus.set_lastConnectionDuration(0);
+    SystemConfig::set_lastConnectionDuration(0);
     connectionStartTimeStamp = millis();
     connectRequested = false;
     postConnectDone = false;
@@ -277,7 +278,7 @@ void handleConnectingState() {
         Log.info("Deep connection attempt #%d - allowing 11 min for modem reset",
                  budgetContext.attemptCounter + 1);
 #endif
-        sysStatus.set_connectionAttemptCounter(0);  // Reset counter after deep attempt
+        SystemConfig::set_connectionAttemptCounter(0);  // Reset counter after deep attempt
       } else {
 #if ENABLE_CONNECT_DECISION_TRACE
         Log.info("Healthy battery (%.1f%%) - allowing 11 min connection budget",
@@ -313,7 +314,7 @@ void handleConnectingState() {
   }
 
   unsigned long elapsedMs = millis() - connectionStartTimeStamp;
-  sysStatus.set_lastConnectionDuration(int(elapsedMs / 1000));
+  SystemConfig::set_lastConnectionDuration(int(elapsedMs / 1000));
 
   bool cellularReady = true;
 #if Wiring_Cellular
@@ -435,7 +436,7 @@ void handleConnectingState() {
   #if ENABLE_CONNECT_TRACE
       const uint16_t queueDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
       const bool standbyRequested =
-          (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) &&
+          (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) &&
           isWithinOpenHours();
       const bool standbyEffective = standbyRequested && !session.modemStandbySuppressed;
   #else
@@ -530,14 +531,14 @@ void handleConnectingState() {
       thrashGuard.markProgress("CLOUD_CONNECTED");
       setAppBreadcrumb(7);
       connectedStartMs = millis();
-      sysStatus.set_lastConnection(Time.now());
+      SystemConfig::set_lastConnection(Time.now());
       clearConnectivityFailsafeRecovery("cloud-ok");
 
       // Observability: connect succeeded + begin service window.
       Observability::cycleStats().markConnectSuccess(
           (uint32_t)(connectedStartMs - connectionStartTimeStamp),
           (uint16_t)PublishQueuePosix::instance().getNumEvents(),
-          sysStatus.get_lastConnection());
+          SystemConfig::get_lastConnection());
       Observability::cycleStats().markServiceStart((uint32_t)connectedStartMs);
 
       // Short-term webhook supervision: start the response window only after
@@ -550,14 +551,14 @@ void handleConnectingState() {
       
       // Increment connection attempt counter for periodic deep attempts
       // (unless we just did a deep attempt which already reset counter to 0)
-      uint8_t attemptCounter = sysStatus.get_connectionAttemptCounter();
+      uint8_t attemptCounter = SystemConfig::get_connectionAttemptCounter();
       if (attemptCounter < ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD) {
-        sysStatus.set_connectionAttemptCounter(attemptCounter + 1);
+        SystemConfig::set_connectionAttemptCounter(attemptCounter + 1);
         Log.trace("Connection attempt counter: %d → %d", attemptCounter, attemptCounter + 1);
       }
       
-      if (current.get_alertCode() == 31) {
-        current.set_alertCode(0);
+      if (RecoveryState::get_alertCode() == 31) {
+        RecoveryState::set_alertCode(0);
       }
       measure.batteryState();
       PowerDiagnostics::logPowerState("connect-success");
@@ -566,9 +567,9 @@ void handleConnectingState() {
         Log.warn("Connect status ledger update skipped or failed");
       }
       
-      if (sysStatus.get_verboseMode()) {
+      if (SystemConfig::get_verboseMode()) {
         char data[64];
-        snprintf(data, sizeof(data), "Connected in %i secs", sysStatus.get_lastConnectionDuration());
+        snprintf(data, sizeof(data), "Connected in %i secs", SystemConfig::get_lastConnectionDuration());
         publishDiagnosticSafe("Cellular", data, PRIVATE);
       }
 
@@ -583,7 +584,7 @@ void handleConnectingState() {
         Log.warn("Alert 41 context: ledgersSynced=%s connectDuration=%lu ms",
                  ledgersSynced ? "true" : "false",
                  connectDuration);
-        current.raiseAlert(41);
+        RecoveryState::raiseAlert(41);
       } else {
         thrashGuard.markProgress("LEDGER_SYNC_OK");
       }
@@ -591,17 +592,17 @@ void handleConnectingState() {
       bool ledgerPublishOk = true;
       if (!lastEnteredFromReporting) {
         if (!Cloud::instance().publishDataToLedger("ConnectState")) {
-          current.raiseAlert(42); // data ledger publish failure
+          RecoveryState::raiseAlert(42); // data ledger publish failure
           ledgerPublishOk = false;
         }
       }
 
       // Boot-storm alert is intended as a one-shot incident marker.
       // After one successful post-boot cloud service pass, clear it.
-      if (current.get_alertCode() == 17 && configOk && ledgerPublishOk) {
+      if (RecoveryState::get_alertCode() == 17 && configOk && ledgerPublishOk) {
         Log.info("Boot-storm recovery verified - clearing alert 17");
-        current.set_alertCode(0);
-        current.set_lastAlertTime(0);
+        RecoveryState::set_alertCode(0);
+        RecoveryState::set_lastAlertTime(0);
       }
 
       size_t pending = PublishQueuePosix::instance().getNumEvents();
@@ -711,7 +712,7 @@ void handleConnectingState() {
 
     markModemUnstableFromConnectTimeout();
 
-    current.raiseAlert(31);
+    RecoveryState::raiseAlert(31);
     Connectivity::requestFullDisconnectAndRadioOff();
     clearActiveConnectAttempt();
     transitionTo(SLEEPING_STATE, "connect-timeout");

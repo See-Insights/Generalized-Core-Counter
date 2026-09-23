@@ -1,7 +1,7 @@
 #include "ThrashGuard.h"
 #include "state/StateMachine.h"
 #include "power/Connectivity.h"
-#include "MyPersistentData.h"
+#include "persist/RecoveryState.h"
 
 /**
  * @file ThrashGuard.cpp
@@ -137,7 +137,7 @@ void ThrashGuard::loop(int currentState, uint32_t nowMs) {
 
   if (tier == 2) {
     logTrip(currentState, noprogSec, lastTag_, 2, "disconnect+sleep");
-    current.raiseAlert(18);  // Alert 18: Thrash detected (tier 2)
+    RecoveryState::raiseAlert(18);  // Alert 18: Thrash detected (tier 2)
     Connectivity::requestFullDisconnectAndRadioOff();
     if (state != SLEEPING_STATE) {
       transitionTo(SLEEPING_STATE, "thrash tier 2");
@@ -146,7 +146,7 @@ void ThrashGuard::loop(int currentState, uint32_t nowMs) {
   }
 
   logTrip(currentState, noprogSec, lastTag_, 3, "reset");
-  current.raiseAlert(18);  // Alert 18: Severe thrash detected (tier 3 - reset)
+  RecoveryState::raiseAlert(18);  // Alert 18: Severe thrash detected (tier 3 - reset)
   thrashResetCount++;
   System.reset();
 }

@@ -44,77 +44,9 @@
 #define sysStatus sysStatusData::instance()
 #define sensorConfig sensorConfigData::instance()
 
-// *************** Operating Mode Enumerations ***************
-/**
- * @brief Sensor mode defines how the device processes sensor data
- * 
- * COUNTING:     Interrupt-driven event counting.
- * OCCUPANCY:    Interrupt-driven occupied/unoccupied state tracking.
- * MEASUREMENT:  Analog readings and threshold-based reporting.
- */
-enum SensorMode {
-	COUNTING     = 0,  // Count each detection event
-	OCCUPANCY    = 1,  // Track occupied/unoccupied state
-	MEASUREMENT  = 2   // Analog sensor readings
-};
-
-/**
- * @brief Connection mode defines power and connectivity behavior
- * 
- * CONNECTED:                Device stays connected to cloud, reports frequently.
- * INTERMITTENT:             Device disconnects between reports to save battery.
- * DISCONNECTED:             Device never auto-connects (test / bench mode).
- * INTERMITTENT_KEEP_ALIVE:  During open hours, maintain network standby for fast reconnects.
- *                           Used for occupancy sensors with frequent state changes.
- *                           Automatically disabled below 65% battery (CONSERVING tier)
- *                           to extend battery life. Re-enabled at 75% (HEALTHY tier).
- */
-enum ConnectionMode {
-	CONNECTED               = 0,  // Always connected, frequent reporting
-	INTERMITTENT            = 1,  // Disconnect and sleep between reports
-	DISCONNECTED            = 2,  // Stay offline unless manually overridden
-	INTERMITTENT_KEEP_ALIVE = 3   // Network standby during open hours
-};
-
-/**
- * @brief Reporting mode defines what triggers a report
- * 
- * SCHEDULED:              Time-based reporting at fixed intervals.
- * ON_CHANGE:              Report when state changes (occupancy, threshold crossing).
- * THRESHOLD:              Report when sensor value crosses threshold.
- * SCHEDULED_OR_THRESHOLD: Report on either schedule OR threshold (whichever comes first).
- */
-enum ReportingMode {
-	SCHEDULED              = 0,  // Time-based reporting
-	ON_CHANGE              = 1,  // State change triggers
-	THRESHOLD              = 2,  // Threshold crossing
-	SCHEDULED_OR_THRESHOLD = 3   // Either condition triggers
-};
-
-/**
- * @brief Sampling mode defines how sensor is read
- * 
- * INTERRUPT:  Hardware interrupt-driven (event-driven).
- * POLLING:    Periodic timer-based sampling.
- */
-enum SamplingMode {
-	INTERRUPT = 0,  // Hardware interrupt-driven
-	POLLING   = 1   // Periodic timer-based
-};
-
-/**
- * @brief Identifies which mechanism was responsible for the most recently
- * recorded watchdog reset (persisted in SysData::lastWatchdogSource).
- *
- * DEVICE_OS:  Device OS itself reported RESET_REASON_WATCHDOG.
- * AB1805_PIN: Device OS reported RESET_REASON_PIN_RESET, but the AB1805
- *             RTC/watchdog chip's own wake-reason register confirmed it
- *             fired the reset pin externally (WakeReason::WATCHDOG).
- */
-enum WatchdogSource : uint8_t {
-	WATCHDOG_SOURCE_DEVICE_OS  = 0,
-	WATCHDOG_SOURCE_AB1805_PIN = 1
-};
+// WO-2026-09-23-001: the operating-mode enums now live in persist/SystemConfig.h
+// and WatchdogSource in persist/RecoveryState.h, alongside the accessors that
+// read and write them. Persisted values are unchanged.
 
 /**
  * This class is a singleton; you do not create one as a global, on the stack, or with new.

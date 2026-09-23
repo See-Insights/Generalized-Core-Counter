@@ -32,5 +32,3 @@ struct TestSystemStatus {
 extern TestCurrentStatus testCurrent;
 extern TestSystemStatus testSysStatus;
 
-#define current testCurrent
-#define sysStatus testSysStatus

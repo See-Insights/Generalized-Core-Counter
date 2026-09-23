@@ -6,7 +6,9 @@
 #include "power/PowerManager.h"
 #include "time/LocalTimeCache.h"
 #include "LocalTimeRK.h"
-#include "MyPersistentData.h"
+#include "persist/CurrentReadings.h"
+#include "persist/RecoveryState.h"
+#include "persist/SystemConfig.h"
 #include "PublishQueuePosixRK.h"
 #include "sensors/SensorManager.h"
 #include "device_pinout.h"
@@ -37,7 +39,7 @@ void handleReportingState() {
   // boundary comparison below must not run on an untrusted clock, which
   // could spuriously trigger (or miss) dailyCleanup() on the wrong day.
   if (Clock::isTrusted()) {
-    time_t lastReport = sysStatus.get_lastReport();
+    time_t lastReport = SystemConfig::get_lastReport();
     if (lastReport != 0) {
       const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
       LocalTimeConvert convLast;
@@ -53,7 +55,7 @@ void handleReportingState() {
                  ymdLast.getYear(), ymdLast.getMonth(), ymdLast.getDay(),
                  ymdNow.getYear(), ymdNow.getMonth(), ymdNow.getDay());
         dailyCleanup();
-        sysStatus.set_lastDailyCleanup(now);
+        SystemConfig::set_lastDailyCleanup(now);
       }
     }
   }
@@ -68,12 +70,12 @@ void handleReportingState() {
 
   // This timestamp is the authoritative application-report generation time.
   // Transport acceptance and successful delivery have separate diagnostics.
-  sysStatus.set_lastReport(now);
+  SystemConfig::set_lastReport(now);
 
   // After each hourly report, reset the hourly counter so
   // the next report contains only the counts for that hour.
-  if (sysStatus.get_sensorMode() == COUNTING) {
-    current.set_hourlyCount(0);
+  if (SystemConfig::get_sensorMode() == SystemConfig::COUNTING) {
+    CurrentReadings::set_hourlyCount(0);
   }
 
   // Long-term webhook supervision
@@ -90,7 +92,7 @@ void handleReportingState() {
   // is an unwarranted reset.
   bool forceConnectForLongTermWebhook = false;
   if (Clock::openness() == Clock::Openness::Open && !session.suppressAlert40ThisSession) {
-    time_t lastHook = sysStatus.get_lastHookResponse();
+    time_t lastHook = SystemConfig::get_lastHookResponse();
     if (lastHook != 0) {
       const long ageSec = (long)(now - lastHook);
 
@@ -98,16 +100,16 @@ void handleReportingState() {
       // the short-term response window.
       if (!session.awaitingWebhookResponse) {
         if (ageSec > ConnectivityPolicy::WEBHOOK_LONGTERM_ALERT40_SEC) {
-          if (current.get_alertCode() != 40) {
+          if (RecoveryState::get_alertCode() != 40) {
             Log.info("No successful webhook response for >3 hours during OPEN hours (age=%ld sec) - raising alert 40",
                      ageSec);
           }
-          current.raiseAlert(40);
+          RecoveryState::raiseAlert(40);
 
           // Corrective action stage 1: periodically force a connection attempt
           // so we can validate the integration path during open hours.
           // Backoff: do not force connect more often than every 30 minutes.
-          time_t lastConn = sysStatus.get_lastConnection();
+          time_t lastConn = SystemConfig::get_lastConnection();
           if (lastConn == 0 || (now - lastConn) > ConnectivityPolicy::WEBHOOK_LONGTERM_FORCE_CONNECT_MIN_INTERVAL_SEC) {
             forceConnectForLongTermWebhook = true;
           }
@@ -117,15 +119,15 @@ void handleReportingState() {
         // we have connected recently but still aren't seeing hook responses,
         // escalate via ERROR_STATE (soft reset policy applies there).
         // Backoff: at most once every 3 hours.
-        if (ageSec > ConnectivityPolicy::WEBHOOK_LONGTERM_ESCALATE_TO_ERROR_SEC && current.get_alertCode() == 40) {
-          time_t lastConn = sysStatus.get_lastConnection();
+        if (ageSec > ConnectivityPolicy::WEBHOOK_LONGTERM_ESCALATE_TO_ERROR_SEC && RecoveryState::get_alertCode() == 40) {
+          time_t lastConn = SystemConfig::get_lastConnection();
           bool connectedRecently = (lastConn != 0 && (now - lastConn) < ConnectivityPolicy::WEBHOOK_LONGTERM_CONNECTED_RECENTLY_SEC);
-          time_t lastEscalation = current.get_lastAlertTime();
+          time_t lastEscalation = RecoveryState::get_lastAlertTime();
           bool cooldownPassed = (lastEscalation == 0 || (now - lastEscalation) > ConnectivityPolicy::WEBHOOK_LONGTERM_ESCALATION_COOLDOWN_SEC);
           if (connectedRecently && cooldownPassed) {
             Log.warn("Webhook long-term failure persists (age=%ld sec) - escalating to ERROR_STATE (backoff ok)", ageSec);
             // Repurpose lastAlertTime as our escalation timestamp for alert 40.
-            current.set_lastAlertTime(now);
+            RecoveryState::set_lastAlertTime(now);
             transitionTo(ERROR_STATE, "webhook long-term failure");
             return;
           }
@@ -187,7 +189,7 @@ void handleReportingState() {
     
     // Check if occupied in low-power mode - need to return to sleep after reporting
     // to wake periodically and check debounce timeout
-    if (current.get_occupied() && sysStatus.get_connectionMode() != CONNECTED) {
+    if (CurrentReadings::get_occupied() && SystemConfig::get_connectionMode() != SystemConfig::CONNECTED) {
 #if ENABLE_CONNECT_DECISION_TRACE
       Log.info("REPORTING: Occupied in low-power mode - will return to sleep after report tier=%s",
                tierName);
@@ -214,7 +216,7 @@ void handleReportingState() {
       Log.info("REPORTING: Forcing connection due to long-term webhook health (OPEN hours)");
 #endif
       transitionTo(CONNECTING_STATE, "webhook health check");
-    } else if (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
+    } else if (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
       // In INTERMITTENT_KEEP_ALIVE mode, connect immediately for all reports
       if (deferAutoConnectForUnstableModem) {
         Log.warn("MODEM_POLICY: reconnect deferred reason=unstable_modem remaining=%lu ms trigger=keep_alive",
@@ -266,7 +268,7 @@ void handleReportingState() {
   // error supervisor can still evaluate alert 40 via resolveErrorAction,
   // but we no longer override the connection decision here, so the
   // device can continue to attempt hourly connections.
-  if (current.get_alertCode() == 40) {
+  if (RecoveryState::get_alertCode() == 40) {
     Log.info("Alert 40 active after report - continuing normal state flow (no immediate ERROR_STATE)");
   }
 }

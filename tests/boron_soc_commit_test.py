@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 Regression/evidence test for WO-2026-08-25-001 Amendment B, Blocker 2 / AC-B4:
-an accepted Boron fuel-gauge sample must reach current.stateOfCharge().
+an accepted Boron fuel-gauge sample must reach CurrentReadings::stateOfCharge().
 
-At HEAD (before this round) there were three current.set_stateOfCharge()
+At HEAD (before this round) there were three CurrentReadings::set_stateOfCharge()
 call sites in SensorManager.cpp::batteryState(): the non-cellular guard, the
 Boron path (inside FuelGaugeResyncActions::commitSoc(), reached via the
 STALE_SOC resync machinery's resolveSocCommit()), and the Photon path.
@@ -25,7 +25,7 @@ This test instead traces the actual shipped source to prove the commit is
 restored, on the correct (Boron) path, and gated on the pre-existing
 authoritative-sample fence rather than any retired stale-SOC condition:
 
-  1. There are (again) three current.set_stateOfCharge(soc) call sites.
+  1. There are (again) three CurrentReadings::set_stateOfCharge(soc) call sites.
   2. Exactly one of them is INSIDE the
      `#if HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)` region
      that also contains the Boron authority-fence machinery
@@ -55,11 +55,11 @@ def main() -> None:
     lines = text.splitlines()
 
     commit_line_numbers = [
-        i + 1 for i, line in enumerate(lines) if "current.set_stateOfCharge(soc);" in line
+        i + 1 for i, line in enumerate(lines) if "CurrentReadings::set_stateOfCharge(soc);" in line
     ]
     if len(commit_line_numbers) != 3:
         fail(
-            "expected exactly 3 current.set_stateOfCharge(soc) call sites "
+            "expected exactly 3 CurrentReadings::set_stateOfCharge(soc) call sites "
             f"(non-cellular guard, Boron, Photon); found {len(commit_line_numbers)} "
             f"at lines {commit_line_numbers}"
         )
@@ -132,7 +132,7 @@ def main() -> None:
     ]
     if len(boron_commit_lines) != 1:
         fail(
-            "expected exactly 1 current.set_stateOfCharge(soc) call site inside the "
+            "expected exactly 1 CurrentReadings::set_stateOfCharge(soc) call site inside the "
             f"Boron '#if HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)' region "
             f"(lines {boron_if_line + 1}-{boron_region_end + 1}); found {len(boron_commit_lines)} "
             f"at {boron_commit_lines}"
@@ -145,12 +145,12 @@ def main() -> None:
     guard_line = lines[boron_commit_line_idx - 1].strip()
     if guard_line != "if (!rejectAuthoritativeOverwrite) {":
         fail(
-            "Boron current.set_stateOfCharge(soc) commit is not directly gated by "
+            "Boron CurrentReadings::set_stateOfCharge(soc) commit is not directly gated by "
             f"'if (!rejectAuthoritativeOverwrite) {{' on the preceding line; found: {guard_line!r}"
         )
 
     print(
-        "PASS: Boron current.set_stateOfCharge(soc) commit restored at line "
+        "PASS: Boron CurrentReadings::set_stateOfCharge(soc) commit restored at line "
         f"{boron_commit_lines[0]}, inside the Boron platform region, gated on "
         "rejectAuthoritativeOverwrite, with no retired STALE_SOC identifiers reintroduced"
     )

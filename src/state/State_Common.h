@@ -1,7 +1,8 @@
 #pragma once
 
 #include "Particle.h"
-#include "MyPersistentData.h"
+#include "persist/CurrentReadings.h"
+#include "persist/RecoveryState.h"
 #include "state/StateHandlers.h"
 #include "state/StateMachine.h"
 #include "time/Clock.h"
@@ -270,15 +271,15 @@ struct OccupancyCloseResult {
  */
 inline OccupancyCloseResult closeOccupancySessionSafely(const char *path) {
 	OccupancyCloseResult result;
-	const bool occupied = current.get_occupied();
-	const int8_t alertCode = current.get_alertCode();
+	const bool occupied = CurrentReadings::get_occupied();
+	const int8_t alertCode = RecoveryState::get_alertCode();
 	// WO-2026-09-19 Step 3b: Clock::isTrusted(), not isTimeValid() - the
 	// duration arithmetic below (now - start) must not run on an RTC-seeded-
 	// but-unconfirmed epoch, which can produce a wildly wrong session length.
 	const bool timeValid = Clock::isTrusted();
 	const time_t now = Time.now();
-	const time_t start = current.get_occupancyStartTime();
-	const uint32_t previousTotal = current.get_totalOccupiedSeconds();
+	const time_t start = CurrentReadings::get_occupancyStartTime();
+	const uint32_t previousTotal = CurrentReadings::get_totalOccupiedSeconds();
 	result.totalSeconds = previousTotal;
 
 	bool durationComputable = false;
@@ -305,7 +306,7 @@ inline OccupancyCloseResult closeOccupancySessionSafely(const char *path) {
 		if (sessionSeconds > 86400UL || newTotal > 86400UL) {
 			invalid = true;
 		} else {
-			current.set_totalOccupiedSeconds(newTotal);
+			CurrentReadings::set_totalOccupiedSeconds(newTotal);
 			result.valid = true;
 			result.sessionSeconds = sessionSeconds;
 			result.totalSeconds = newTotal;
@@ -332,7 +333,7 @@ inline OccupancyCloseResult closeOccupancySessionSafely(const char *path) {
 					 (int)alertCode);
 	}
 
-	current.set_occupied(false);
-	current.set_occupancyStartTime(0);
+	CurrentReadings::set_occupied(false);
+	CurrentReadings::set_occupancyStartTime(0);
 	return result;
 }

@@ -13,7 +13,7 @@
 // needs; see reporting/ReportingIntervalStore.h for the full rationale.
 #include "reporting/ReportingIntervalStore.h"
 // WO-2026-09-21 Step 4 (corrected same day, twice): reporting/BatteryTierStore.h -
-// Step 0's narrow read seam onto sysStatus.get_currentBatteryTier() - folds
+// Step 0's narrow read seam onto PowerConfig::get_currentBatteryTier() - folds
 // into power/BatteryAuthority.h's currentTier(). This file no longer samples
 // SensorManager itself either: BatteryAuthority::evaluateCurrent() is the
 // one input-gathering path all read paths (this adapter, the connectivity

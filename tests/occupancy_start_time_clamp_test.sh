@@ -65,10 +65,10 @@ fi
 # Time - otherwise this is the same structurally-unreachable bug moved
 # to a new location.
 check_file "$app_src" "revalidateOccupancyStartTimeIfTimeAvailable() called from setup()" \
-  "current.revalidateOccupancyStartTimeIfTimeAvailable();"
+  "CurrentReadings::revalidateOccupancyStartTimeIfTimeAvailable();"
 
 ab1805_line=$(grep -n "ab1805.withFOUT(WKP).setup();" "$app_src" | head -1 | cut -d: -f1)
-call_line=$(grep -n "current.revalidateOccupancyStartTimeIfTimeAvailable();" "$app_src" | head -1 | cut -d: -f1)
+call_line=$(grep -n "CurrentReadings::revalidateOccupancyStartTimeIfTimeAvailable();" "$app_src" | head -1 | cut -d: -f1)
 if [[ -z "$ab1805_line" || -z "$call_line" ]]; then
   echo "FIDELITY CHECK FAILED: could not locate both ab1805.setup() and the revalidate call site in $app_src" >&2
   exit 1

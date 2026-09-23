@@ -2,7 +2,8 @@
 #include "../Config.h"
 #include "cloud/Cloud.h"
 #include "LocalTimeRK.h"
-#include "MyPersistentData.h"
+#include "persist/RecoveryState.h"
+#include "persist/SystemConfig.h"
 #include "PublishQueuePosixRK.h"
 #include "sensors/SensorManager.h"
 #include "device_pinout.h"
@@ -28,8 +29,8 @@
 //    a couple of soft resets, then a hard power-cycle, then stop.
 //  - Sleep failures (16): soft reset, then hard power-cycle, then stop.
 static int resolveErrorAction() {
-  int8_t alert   = current.get_alertCode();
-  uint8_t resets = sysStatus.get_resetCount();
+  int8_t alert   = RecoveryState::get_alertCode();
+  uint8_t resets = RecoveryState::get_resetCount();
 
   if (alert <= 0) {
     return 0;
@@ -63,7 +64,7 @@ static int resolveErrorAction() {
       return 0;
     }
 
-    time_t lastHook = sysStatus.get_lastHookResponse();
+    time_t lastHook = SystemConfig::get_lastHookResponse();
     if (lastHook == 0) {
       Log.info("Alert 40 set but no recorded lastHookResponse - deferring corrective action");
       return 0;
@@ -125,12 +126,12 @@ void handleErrorState() {
     Connectivity::requestFullDisconnectAndRadioOff();
 
     // In INTERMITTENT or DISCONNECTED modes, avoid reset loops for connectivity/sleep alerts.
-    if (sysStatus.get_connectionMode() != CONNECTED) {
-      int8_t alert = current.get_alertCode();
+    if (SystemConfig::get_connectionMode() != SystemConfig::CONNECTED) {
+      int8_t alert = RecoveryState::get_alertCode();
       if (alert == 15 || alert == 16 || alert == 31) {
         Log.warn("Low-power mode: clearing alert %d to avoid reset loop", alert);
-        current.set_alertCode(0);
-        current.set_lastAlertTime(0);
+        RecoveryState::set_alertCode(0);
+        RecoveryState::set_lastAlertTime(0);
         resolution = 0;
       } else {
         resolution = resolveErrorAction();
@@ -139,7 +140,7 @@ void handleErrorState() {
       resolution = resolveErrorAction();
     }
     Log.info("Entering ERROR_STATE with alert=%d, resetCount=%u, resolution=%d",
-             current.get_alertCode(), sysStatus.get_resetCount(), resolution);
+             RecoveryState::get_alertCode(), RecoveryState::get_resetCount(), resolution);
     resetTimer = millis();
   }
 
@@ -166,7 +167,7 @@ void handleErrorState() {
     // power-cycles the device and modem but is limited by resolveErrorAction
     // avoid thrashing.
     if (millis() - resetTimer > resetWait) {
-      Log.info("Executing deep power down from ERROR_STATE (alert=%d)", current.get_alertCode());
+      Log.info("Executing deep power down from ERROR_STATE (alert=%d)", RecoveryState::get_alertCode());
       ab1805.deepPowerDown();
     }
     break;

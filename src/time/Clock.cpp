@@ -2,7 +2,7 @@
 #include "time/Clock.h"
 
 #include "../Config.h"
-#include "MyPersistentData.h"       // sysStatus (openTime/closeTime/lastTimeSync)
+#include "persist/SystemConfig.h"
 #include "LocalTimeRK.h"            // LocalTimeConvert, LocalTime::instance()
 #include "time/LocalTimeCache.h"    // Cached LocalTimeRK conversions
 #include "time/ClockTrust.h"        // Sync-recency resync gate and trust signal (WO-2026-08-29-002)
@@ -75,8 +75,8 @@ bool isWithinOpenHours() {
     return true;
   }
 
-  uint8_t openHour = sysStatus.get_openTime();
-  uint8_t closeHour = sysStatus.get_closeTime();
+  uint8_t openHour = SystemConfig::get_openTime();
+  uint8_t closeHour = SystemConfig::get_closeTime();
   const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
   const uint8_t hour = snapshot.localHour;
   const bool openNow = isWithinOpenHoursForHour(hour, openHour, closeHour);
@@ -93,7 +93,7 @@ bool isWithinOpenHoursAt(time_t epoch) {
   converter.withConfig(LocalTime::instance().getConfig()).withTime(epoch).convert();
   const uint8_t localHour = (uint8_t)(converter.getLocalTimeHMS().toSeconds() / 3600);
   return isWithinOpenHoursForHour(
-      localHour, sysStatus.get_openTime(), sysStatus.get_closeTime());
+      localHour, SystemConfig::get_openTime(), SystemConfig::get_closeTime());
 }
 
 // ===== WO-2026-08-29-002: monotonic-gated resync, RTC write-back, and =====
@@ -434,7 +434,7 @@ void checkClockResync() {
       // Finding 1: only mark this sync value as "written" once the RTC
       // write is confirmed successful, and only then stamp lastTimeSync.
       lastRtcWriteSyncedLastMs = lastSyncMs;
-      sysStatus.set_lastTimeSync(Time.now());
+      SystemConfig::set_lastTimeSync(Time.now());
 
       // Only persist the correction for cloud reporting once the write it
       // describes is confirmed - same "confirmed, not attempted" standard
@@ -554,8 +554,8 @@ int secondsUntilNextOpen() {
     return Config::DEFAULT_REPORT_INTERVAL_SEC;
   }
 
-  uint8_t openHour = sysStatus.get_openTime();
-  uint8_t closeHour = sysStatus.get_closeTime();
+  uint8_t openHour = SystemConfig::get_openTime();
+  uint8_t closeHour = SystemConfig::get_closeTime();
   const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
   const bool openNow = isWithinOpenHoursForHour(snapshot.localHour, openHour, closeHour);
   const int secondsUntil = secondsUntilNextOpenForSeconds(
@@ -600,8 +600,8 @@ Openness openness() {
     return Openness::Unknown;
   }
 
-  uint8_t openHour = sysStatus.get_openTime();
-  uint8_t closeHour = sysStatus.get_closeTime();
+  uint8_t openHour = SystemConfig::get_openTime();
+  uint8_t closeHour = SystemConfig::get_closeTime();
   const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
   const bool openNow = isWithinOpenHoursForHour(snapshot.localHour, openHour, closeHour);
   return openNow ? Openness::Open : Openness::Closed;

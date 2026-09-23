@@ -61,11 +61,11 @@ fi
 
 # current.raiseAlert(19) must actually be called somewhere (the classification
 # call site added in setup()).
-check_file "$app_src" "current.raiseAlert(19) call site present" "current.raiseAlert(19);"
+check_file "$app_src" "RecoveryState::raiseAlert(19) call site present" "RecoveryState::raiseAlert(19);"
 
 # The webhook payload's "alerts" field must be fed directly from
 # current.get_alertCode() (confirms no new plumbing needed, per the WO).
-check_file "$app_src" "reportedAlertCode sourced from current.get_alertCode()" "const int8_t reportedAlertCode = current.get_alertCode();"
+check_file "$app_src" "reportedAlertCode sourced from RecoveryState::get_alertCode()" "const int8_t reportedAlertCode = RecoveryState::get_alertCode();"
 check_file "$app_src" "\"alerts\" field present in OCCUPANCY payload format" "\\\\\"alerts\\\\\":%i"
 
 echo "Fidelity checks passed: alert-code 19 severity/auto-clear mirror matches real source"

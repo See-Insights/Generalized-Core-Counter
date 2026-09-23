@@ -37,7 +37,7 @@
 
 #include "Particle.h"
 #include "device_pinout.h"
-#include "MyPersistentData.h"
+#include "cloud/BatteryBackoffPolicy.h"
 
 /**
  * This class is a singleton; you do not create one as a global, on the stack, or with new.

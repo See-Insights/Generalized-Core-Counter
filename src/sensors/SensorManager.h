@@ -89,7 +89,7 @@ public:
     /**
      * @brief Create and initialize the active sensor based on configuration.
      *
-     * Uses sysStatus.get_sensorType() and SensorFactory to select the
+     * Uses SystemConfig::get_sensorType() and SensorFactory to select the
      * concrete implementation, then calls the sensor's initializeHardware().
      */
     void initializeFromConfig();
@@ -281,7 +281,7 @@ private:
      * call site, inside measureTemperatureAndApplyChargeDecision(). If a
      * caller needs a temperature value, it must come from that coupled
      * call's result or from the persisted telemetry field
-     * (current.get_internalTempC()) - never from an independent acquisition.
+     * (CurrentReadings::get_internalTempC()) - never from an independent acquisition.
      *
      * @param[out] tempC Filled with temperature in degrees Celsius on success.
      * @return true on success, false on I2C error or missing device.

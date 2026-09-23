@@ -13,7 +13,8 @@
 #include "Particle.h"
 #include "power/BatteryAuthority.h"
 
-#include "MyPersistentData.h"      // sysStatus (currentBatteryTier/lowBatteryMode/connectionMode/sensorMode)
+#include "persist/PowerConfig.h"
+#include "persist/SystemConfig.h"
 #include "sensors/SensorManager.h" // evaluateCurrent()'s vcell/trust source
 
 namespace BatteryAuthority {
@@ -25,18 +26,18 @@ const char *tierName(BatteryTier tier) {
   return (tier <= TIER_SURVIVAL) ? kTierNames[tier] : "UNKNOWN";
 }
 
-// The one and only call site for sysStatus.set_lowBatteryMode() outside
+// The one and only call site for PowerConfig::set_lowBatteryMode() outside
 // MyPersistentData.cpp - both commit()'s own tier-driven decision and
 // clearLowBatteryMode() (ConfigApply.cpp's operator-override case) commit
 // through this single wrapper.
 void commitLowBatteryMode(bool value) {
-  sysStatus.set_lowBatteryMode(value);
+  PowerConfig::set_lowBatteryMode(value);
 }
 
 } // namespace
 
 BatteryTier currentTier() {
-  const uint8_t tierValue = sysStatus.get_currentBatteryTier();
+  const uint8_t tierValue = PowerConfig::get_currentBatteryTier();
   return tierValue <= TIER_SURVIVAL ? static_cast<BatteryTier>(tierValue) : TIER_HEALTHY;
 }
 
@@ -53,7 +54,7 @@ void clearLowBatteryMode() {
 }
 
 void commit(const Verdict &verdict, float currentSoC) {
-  const uint8_t prevTierValue = sysStatus.get_currentBatteryTier();
+  const uint8_t prevTierValue = PowerConfig::get_currentBatteryTier();
   const BatteryTier previousTier = prevTierValue <= TIER_SURVIVAL
       ? static_cast<BatteryTier>(prevTierValue)
       : TIER_HEALTHY;
@@ -61,7 +62,7 @@ void commit(const Verdict &verdict, float currentSoC) {
   if (verdict.tier != prevTierValue) {
     Log.info("Battery tier transition: %s -> %s (SoC=%.1f%%)",
              tierName(previousTier), tierName(verdict.tier), (double)currentSoC);
-    sysStatus.set_currentBatteryTier(static_cast<uint8_t>(verdict.tier));
+    PowerConfig::set_currentBatteryTier(static_cast<uint8_t>(verdict.tier));
   }
 
   // Sticky low-battery connection-mode downgrade/recovery, OCCUPANCY mode
@@ -72,28 +73,28 @@ void commit(const Verdict &verdict, float currentSoC) {
   // here, in command, and not in the pure evaluate(): it depends on the
   // CURRENT persisted connectionMode/sensorMode/lowBatteryMode, none of
   // which a pure function may read.
-  if (sysStatus.get_sensorMode() == OCCUPANCY) {
-    const ConnectionMode currentMode = static_cast<ConnectionMode>(sysStatus.get_connectionMode());
-    const bool lowBatteryDowngradeActive = sysStatus.get_lowBatteryMode();
+  if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY) {
+    const SystemConfig::ConnectionMode currentMode = static_cast<SystemConfig::ConnectionMode>(SystemConfig::get_connectionMode());
+    const bool lowBatteryDowngradeActive = PowerConfig::get_lowBatteryMode();
 
-    if (currentMode == INTERMITTENT_KEEP_ALIVE && verdict.tier >= TIER_CONSERVING) {
+    if (currentMode == SystemConfig::INTERMITTENT_KEEP_ALIVE && verdict.tier >= TIER_CONSERVING) {
       Log.info("Battery conservation: Disabling KEEP_ALIVE mode (tier=%s, SoC=%.1f%%) - switching to INTERMITTENT",
                tierName(verdict.tier), (double)currentSoC);
-      sysStatus.set_connectionMode(INTERMITTENT);
+      SystemConfig::set_connectionMode(SystemConfig::INTERMITTENT);
       commitLowBatteryMode(true);
-    } else if (currentMode == INTERMITTENT && lowBatteryDowngradeActive && verdict.tier == TIER_HEALTHY) {
+    } else if (currentMode == SystemConfig::INTERMITTENT && lowBatteryDowngradeActive && verdict.tier == TIER_HEALTHY) {
       Log.info("Battery recovery: clearing lowBatteryMode (tier=HEALTHY, SoC=%.1f%%)",
                (double)currentSoC);
       Log.info("Battery recovery: restoring INTERMITTENT_KEEP_ALIVE (tier=HEALTHY, SoC=%.1f%%)",
                (double)currentSoC);
-      sysStatus.set_connectionMode(INTERMITTENT_KEEP_ALIVE);
+      SystemConfig::set_connectionMode(SystemConfig::INTERMITTENT_KEEP_ALIVE);
       commitLowBatteryMode(false);
-    } else if (currentMode != INTERMITTENT && lowBatteryDowngradeActive) {
+    } else if (currentMode != SystemConfig::INTERMITTENT && lowBatteryDowngradeActive) {
       Log.info("Battery recovery: clearing lowBatteryMode (tier=%s, SoC=%.1f%%)",
                tierName(verdict.tier), (double)currentSoC);
       commitLowBatteryMode(false);
     }
-  } else if (sysStatus.get_lowBatteryMode()) {
+  } else if (PowerConfig::get_lowBatteryMode()) {
     Log.info("Battery recovery: clearing lowBatteryMode (tier=%s, SoC=%.1f%%)",
              tierName(verdict.tier), (double)currentSoC);
     commitLowBatteryMode(false);

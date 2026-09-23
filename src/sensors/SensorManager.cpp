@@ -6,7 +6,9 @@ const char *batteryContext[7] = {"Unknown",    "Not Charging", "Charging",
 
 // Particle Functions
 #include "sensors/SensorManager.h"
-#include "MyPersistentData.h"  // Access sysStatus/sensorConfig
+#include "persist/CurrentReadings.h"
+#include "persist/PowerConfig.h"
+#include "persist/SystemConfig.h"
 #include "observability/WakeCycleStats.h"
 #include "power/Connectivity.h"
 #include "power/PowerManager.h"
@@ -302,7 +304,7 @@ void SensorManager::setSensor(ISensor* sensor) {
 }
 
   void SensorManager::initializeFromConfig() {
-    SensorType sensorType = static_cast<SensorType>(sysStatus.get_sensorType());
+    SensorType sensorType = static_cast<SensorType>(SystemConfig::get_sensorType());
     ISensor* sensor = SensorFactory::createSensor(sensorType);
 
     if (!sensor) {
@@ -333,7 +335,7 @@ bool SensorManager::loop() {
     // Future polling sensors would use sensor.setting2 or setting3 for polling interval.
     if (_sensor->usesInterrupt()) {
         bool event = _sensor->loop();
-        if (event && sysStatus.get_verboseMode()) {
+        if (event && SystemConfig::get_verboseMode()) {
             Log.info("SensorManager: event reported by interrupt-driven sensor");
         }
         return event;
@@ -342,7 +344,7 @@ bool SensorManager::loop() {
     // Polling mode - for future sensors that don't use interrupts
     // Polling interval would come from sensor.setting2 (in milliseconds)
     unsigned long currentTime = millis();
-    uint32_t pollingInterval = sensorConfig.get_sensorSetting2(); // Polling interval in ms
+    uint32_t pollingInterval = SystemConfig::SensorSettings::get_sensorSetting2(); // Polling interval in ms
     
     if (pollingInterval == 0) {
         // No polling interval set, check every loop
@@ -490,7 +492,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   if (!_firstBatterySampleTaken && System.resetReason() == RESET_REASON_POWER_MANAGEMENT) {
     shouldConsiderStabilization = true;
   }
-  const float previousKnownGoodSoc = current.get_stateOfCharge();
+  const float previousKnownGoodSoc = CurrentReadings::get_stateOfCharge();
   const bool previousKnownGoodSocValid = batterySocIsValid(previousKnownGoodSoc);
 
   auto readBatterySample = [&](uint8_t &battState,
@@ -680,7 +682,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
     authorityTag = "ignored-post-connect";
   }
 
-  const bool logBatteryDetail = sysStatus.get_verboseMode() || shouldStabilize ||
+  const bool logBatteryDetail = SystemConfig::get_verboseMode() || shouldStabilize ||
       fallbackUsed || previousKnownGoodUsed || rejectAuthoritativeOverwrite;
   const float loggedSoc = rejectAuthoritativeOverwrite ? _authoritativeBatterySoc : soc;
   // Captured now (before vcell can be reassigned later) so the detail log
@@ -706,8 +708,8 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   }
 
   if (!rejectAuthoritativeOverwrite) {
-    current.set_batteryState(battState);
-    current.set_stateOfCharge(soc);
+    CurrentReadings::set_batteryState(battState);
+    CurrentReadings::set_stateOfCharge(soc);
   }
 #endif
 
@@ -752,7 +754,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   if (sampleCanBeAuthoritative) {
     _authoritativeBatteryState = pmicBattState;
   }
-  current.set_batteryState(pmicBattState);
+  CurrentReadings::set_batteryState(pmicBattState);
   // Blocker 2 (WO-2026-08-25-001 round 3, AC-B4): the retired STALE_SOC
   // resync machinery's ResyncActions::commitSoc() was the only path that
   // committed an accepted Boron fuel-gauge sample to current.stateOfCharge.
@@ -763,9 +765,9 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   // accepted sample commits; a rejected post-connect candidate does not
   // overwrite the pre-radio authoritative value.
   if (!rejectAuthoritativeOverwrite) {
-    current.set_stateOfCharge(soc);
+    CurrentReadings::set_stateOfCharge(soc);
   }
-  float finalAcceptedSoc = current.get_stateOfCharge();
+  float finalAcceptedSoc = CurrentReadings::get_stateOfCharge();
 
 #if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
   // Instrument contradictory PMIC state without changing charging behavior.
@@ -810,8 +812,8 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
              (unsigned)vbusStatus,
              powerGood ? 1 : 0,
              powerSource,
-             (double)current.get_internalTempC(),
-             sysStatus.get_lowBatteryMode() ? 1 : 0,
+             (double)CurrentReadings::get_internalTempC(),
+             PowerConfig::get_lowBatteryMode() ? 1 : 0,
              (unsigned long)millis(),
              (int)System.resetReason(),
              PowerManager::compactProfileLabel(powerReport.activeInputProfile));
@@ -894,7 +896,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   } else if (soc > 100.0f) {
     soc = 100.0f;
   }
-  current.set_stateOfCharge(soc);
+  CurrentReadings::set_stateOfCharge(soc);
 
   // Photon 2/P2 cannot reliably determine charging state without a PMIC.
   // Always report "Unknown" since voltage alone can't distinguish between
@@ -903,7 +905,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
 
   const bool allowPreSleepBatteryLog =
       (sampleContext != BatterySampleContext::PreSleep) || (ENABLE_SLEEP_TRACE != 0);
-  if ((shouldLogBatterySample(sampleContext) || sysStatus.get_verboseMode()) &&
+  if ((shouldLogBatterySample(sampleContext) || SystemConfig::get_verboseMode()) &&
       allowPreSleepBatteryLog) {
     Log.info("%s: soc=%.2f raw=-1.00 norm=-1.00 vcell=%.3f authority=voltage-estimated state=%s(%d) power=-1",
              batterySampleContextPrefix(sampleContext),
@@ -913,7 +915,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
              battState);
   }
   
-  current.set_batteryState(battState);
+  CurrentReadings::set_batteryState(battState);
 
 #else
   // Other Wi-Fi / SoM platforms: leave battery fields unchanged for now.
@@ -930,7 +932,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
 #endif
 
   // Convenience: indicate whether battery is in a healthy range.
-  return current.get_stateOfCharge() > 20.0f;
+  return CurrentReadings::get_stateOfCharge() > 20.0f;
 }
 
 bool SensorManager::measureTemperatureAndApplyChargeDecision() {
@@ -944,7 +946,7 @@ bool SensorManager::measureTemperatureAndApplyChargeDecision() {
   // failed/invalid reading, a still-accumulating TMP36 partial sample, or
   // the no-sensor platform stub - falls through unconditionally to the
   // decision at the bottom. `tempC`/`measuredThisCall` are plain locals;
-  // the decision consumes THEM directly, never current.get_internalTempC()
+  // the decision consumes THEM directly, never CurrentReadings::get_internalTempC()
   // (that field is written below purely for telemetry, strictly AFTER the
   // local values it is derived from are already fixed for this call).
   //
@@ -966,7 +968,7 @@ bool SensorManager::measureTemperatureAndApplyChargeDecision() {
   //  - Define MUON_HAS_TMP112 to force enable the TMP112A path.
   //  - Define DISABLE_TMP112_AUTODETECT to skip probing for TMP112A.
 
-  float tempC = current.get_internalTempC(); // seed; every branch below overwrites or falls back explicitly
+  float tempC = CurrentReadings::get_internalTempC(); // seed; every branch below overwrites or falls back explicitly
   bool measuredThisCall = false;             // set true ONLY by a genuine, in-range reading taken this call
 
 #if defined(MUON_TMP112_I2C_ADDR)
@@ -985,7 +987,7 @@ bool SensorManager::measureTemperatureAndApplyChargeDecision() {
     Wire.begin();
     tmp112Present = probeTmp112Present(tmp112Addr);
     tmp112ProbeDone = true;
-    if (sysStatus.get_verboseMode()) {
+    if (SystemConfig::get_verboseMode()) {
       Log.info("TMP112A probe at 0x%02X: %s", tmp112Addr, tmp112Present ? "present" : "not found");
     }
   }
@@ -1002,11 +1004,11 @@ bool SensorManager::measureTemperatureAndApplyChargeDecision() {
       tempC = reading;
       measuredThisCall = true;
     } else {
-      float prev = current.get_internalTempC();
+      float prev = CurrentReadings::get_internalTempC();
       tempC = (prev > -50.0f && prev < 120.0f) ? prev : 25.0f;
       Log.warn("TMP112A read failed/invalid - falling back to %4.2f C", (double)tempC);
     }
-    current.set_internalTempC(tempC);
+    CurrentReadings::set_internalTempC(tempC);
   }
 
 #if (PLATFORM_ID == 32 || PLATFORM_ID == 34) && !defined(MUON_HAS_TMP36)
@@ -1017,17 +1019,17 @@ bool SensorManager::measureTemperatureAndApplyChargeDecision() {
   // example, set manually for testing), falling back to 25C if unset. This
   // is never a genuine measurement, so measuredThisCall is left false.
   {
-    float stubTempC = current.get_internalTempC();
+    float stubTempC = CurrentReadings::get_internalTempC();
     if (!(stubTempC > -50.0f && stubTempC < 120.0f)) {
       stubTempC = 25.0f;
     }
     tempC = stubTempC;
 
-    if (sysStatus.get_verboseMode()) {
+    if (SystemConfig::get_verboseMode()) {
       Log.info("P2/Photon2 stub: using internalTempC=%4.2f C (no TMP36 ADC)", (double)tempC);
     }
 
-    current.set_internalTempC(tempC);
+    CurrentReadings::set_internalTempC(tempC);
   }
 #else
   if (!tmp112Present) {
@@ -1074,7 +1076,7 @@ bool SensorManager::measureTemperatureAndApplyChargeDecision() {
     // AC-C3 fall-through path for TMP36: a bad/disconnected sensor still
     // leaves measuredThisCall=false and falls through to the decision below.
     if (!sensorOk || sampledTempC < -20.0f || sampledTempC > 80.0f) {
-      float prev = current.get_internalTempC();
+      float prev = CurrentReadings::get_internalTempC();
       float fallback = 25.0f; // conservative room-temperature default
 
       if (prev > -20.0f && prev < 80.0f) {
@@ -1089,10 +1091,10 @@ bool SensorManager::measureTemperatureAndApplyChargeDecision() {
       measuredThisCall = true;
     }
 
-    current.set_internalTempC(tempC);
+    CurrentReadings::set_internalTempC(tempC);
 
     // Optional debug: log enclosure temperature when verbose logging is enabled.
-    if (sysStatus.get_verboseMode()) {
+    if (SystemConfig::get_verboseMode()) {
       Log.info("Enclosure temperature (effective): %4.2f C (raw=%d)", (double)tempC, tmpRaw);
     }
   }
@@ -1106,7 +1108,7 @@ bool SensorManager::measureTemperatureAndApplyChargeDecision() {
   // Half 2: evaluate and apply the thermal charge-inhibit decision.
   //
   // Consumes tempC / measuredThisCall LOCALS directly - never re-reads
-  // current.get_internalTempC() (AC-C1 point 2). Reached unconditionally
+  // CurrentReadings::get_internalTempC() (AC-C1 point 2). Reached unconditionally
   // from every measurement path above (AC-C1 point 3 / AC-C3).
   // -------------------------------------------------------------------------
 
@@ -1119,10 +1121,10 @@ bool SensorManager::measureTemperatureAndApplyChargeDecision() {
   static bool inhibitedSyncedWithHardware = false;
 
   const ChargeInhibitPolicy::ThermalThresholds thresholds{
-      sysStatus.get_thermalChargeArmHighC(),
-      sysStatus.get_thermalChargeArmLowC(),
-      sysStatus.get_thermalChargeReleaseHighC(),
-      sysStatus.get_thermalChargeReleaseLowC(),
+      PowerConfig::get_thermalChargeArmHighC(),
+      PowerConfig::get_thermalChargeArmLowC(),
+      PowerConfig::get_thermalChargeReleaseHighC(),
+      PowerConfig::get_thermalChargeReleaseLowC(),
   };
 
 #if HAL_PLATFORM_CELLULAR
@@ -1200,7 +1202,7 @@ bool SensorManager::measureTemperatureAndApplyChargeDecision() {
       ChargeInhibit::apply(inhibited, activeReport.activeInputProfile);
 
   if (inhibited) {
-    current.set_batteryState(1); // Reflect that we are "Not Charging"
+    CurrentReadings::set_batteryState(1); // Reflect that we are "Not Charging"
   }
 
   if (inhibited && !previouslyInhibited) {
@@ -1291,8 +1293,8 @@ int SensorManager::runPmicChargeCycleTest() {
   Log.info("PMIC_TEST: ========== BEGIN CHARGE CYCLE DIAGNOSTIC ==========");
 
   // Safety checks before proceeding
-  const float currentSoc = current.get_stateOfCharge();
-  const float currentTemp = current.get_internalTempC();
+  const float currentSoc = CurrentReadings::get_stateOfCharge();
+  const float currentTemp = CurrentReadings::get_internalTempC();
   const int powerSource = System.powerSource();
   
   PMIC pmic(true);
@@ -1335,7 +1337,7 @@ int SensorManager::runPmicChargeCycleTest() {
     
     const float soc = fuelGauge.getSoC();
     const float vcell = fuelGauge.getVCell();
-    const float temp = current.get_internalTempC();
+    const float temp = CurrentReadings::get_internalTempC();
     const int src = System.powerSource();
     
     // Power profile context

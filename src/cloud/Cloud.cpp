@@ -11,6 +11,7 @@
 
 #include "../Config.h"
 #include "cloud/Cloud.h"
+#include "persist/SystemConfig.h"
 
 namespace {
 
@@ -561,24 +562,24 @@ namespace {
 
 void logConfigApplySnapshot() {
 #if ENABLE_CONFIG_TRACE
-    const char *tz = sysStatus.get_timeZoneStrCStr();
+    const char *tz = SystemConfig::get_timeZoneStrCStr();
     if (!tz) {
         tz = "";
     }
 
     Log.info("ConfigApply: tz=%s open=%d close=%d report=%lu debounce=%lu sourceBefore=%u ledgerValidBefore=%d",
              tz,
-             (int)sysStatus.get_openTime(),
-             (int)sysStatus.get_closeTime(),
-             (unsigned long)sysStatus.get_reportingInterval(),
-             (unsigned long)sensorConfig.get_sensorSetting1(),
-             (unsigned)sysStatus.get_configSource(),
-             sysStatus.get_hasValidLedgerConfig() ? 1 : 0);
+             (int)SystemConfig::get_openTime(),
+             (int)SystemConfig::get_closeTime(),
+             (unsigned long)SystemConfig::get_reportingInterval(),
+             (unsigned long)SystemConfig::SensorSettings::get_sensorSetting1(),
+             (unsigned)SystemConfig::get_configSource(),
+             SystemConfig::get_hasValidLedgerConfig() ? 1 : 0);
 #endif
 }
 
 void logConfigDiagFailure(const char *reason) {
-    const char *tz = sysStatus.get_timeZoneStrCStr();
+    const char *tz = SystemConfig::get_timeZoneStrCStr();
     if (!tz) {
         tz = "";
     }
@@ -586,9 +587,9 @@ void logConfigDiagFailure(const char *reason) {
     Log.warn("ConfigDiag: source=%s valid=0 timezone=%s open=%d close=%d report=%lu reason=%s",
              Config::sourceToString(Config::getSource()),
              tz,
-             (int)sysStatus.get_openTime(),
-             (int)sysStatus.get_closeTime(),
-             (unsigned long)sysStatus.get_reportingInterval(),
+             (int)SystemConfig::get_openTime(),
+             (int)SystemConfig::get_closeTime(),
+             (unsigned long)SystemConfig::get_reportingInterval(),
              reason ? reason : "unknown");
 }
 
@@ -608,8 +609,8 @@ bool finalizeLedgerAppliedConfig(const char *invalidLogPrefix) {
     Log.info("ConfigValidate: fieldsValid=%d configValid=%d source=%u ledgerValid=%d",
              fieldsValid ? 1 : 0,
              configValid ? 1 : 0,
-             (unsigned)sysStatus.get_configSource(),
-             sysStatus.get_hasValidLedgerConfig() ? 1 : 0);
+             (unsigned)SystemConfig::get_configSource(),
+             SystemConfig::get_hasValidLedgerConfig() ? 1 : 0);
 #endif
 
     if (fieldsValid && configValid) {
@@ -644,23 +645,23 @@ bool Cloud::loadConfigurationFromCloud() {
 
 const char *Cloud::getWebhookName() const {
     // Priority 1: Cloud configuration (explicitly set)
-    const char *cloudWebhookName = sysStatus.get_webhookNameCStr();
+    const char *cloudWebhookName = SystemConfig::get_webhookNameCStr();
     if (cloudWebhookName && cloudWebhookName[0] != '\0') {
         return cloudWebhookName;
     }
 
     // Priority 2: Convention-based (mode-specific)
-    uint8_t mode = sysStatus.get_sensorMode();
+    uint8_t mode = SystemConfig::get_sensorMode();
     const char *conventionName = "unknown-webhook-v1";
 
     switch (mode) {
-        case COUNTING:
+        case SystemConfig::COUNTING:
             conventionName = "counting-webhook-v1";
             break;
-        case OCCUPANCY:
+        case SystemConfig::OCCUPANCY:
             conventionName = "occupancy-webhook-v1";
             break;
-        case MEASUREMENT:
+        case SystemConfig::MEASUREMENT:
             conventionName = "measurement-webhook-v1";
             break;
         default:

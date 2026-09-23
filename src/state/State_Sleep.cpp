@@ -8,7 +8,10 @@
 #include "power/PowerManager.h"
 #include "power/BatteryAuthority.h"
 #include "LocalTimeRK.h"
-#include "MyPersistentData.h"
+#include "persist/CurrentReadings.h"
+#include "persist/PowerConfig.h"
+#include "persist/RecoveryState.h"
+#include "persist/SystemConfig.h"
 #include "PublishQueuePosixRK.h"
 #include "sensors/SensorManager.h"
 #include "device_pinout.h"
@@ -31,15 +34,15 @@ enum ModemUnstableReason : uint8_t {
   MODEM_UNSTABLE_REASON_CONNECT_TIMEOUT = 2,
 };
 
-const char *connectionModeLabel(ConnectionMode mode) {
+const char *connectionModeLabel(SystemConfig::ConnectionMode mode) {
   switch (mode) {
-  case CONNECTED:
+  case SystemConfig::CONNECTED:
     return "CONN";
-  case INTERMITTENT:
+  case SystemConfig::INTERMITTENT:
     return "INT";
-  case DISCONNECTED:
+  case SystemConfig::DISCONNECTED:
     return "DISC";
-  case INTERMITTENT_KEEP_ALIVE:
+  case SystemConfig::INTERMITTENT_KEEP_ALIVE:
     return "IKA";
   default:
     return "?";
@@ -66,24 +69,24 @@ void logWakeSummary(const char *reason) {
            reason,
            isWithinOpenHours() ? 1 : 0,
            SensorManager::instance().isSensorReady() ? 1 : 0,
-           current.get_occupied() ? 1 : 0,
+           CurrentReadings::get_occupied() ? 1 : 0,
            (unsigned long)(signalLEDTimeRemaining() / 1000UL));
 }
 
 void logTeardownContext(const char *prefix,
                        bool standbyRequested,
                        bool standbyEffective) {
-  if (!sysStatus.get_verboseMode()) {
+  if (!SystemConfig::get_verboseMode()) {
     return;
   }
 
   Log.info("%s mode=%s standby=%d/%d tier=%s occ=%d",
            prefix,
-           connectionModeLabel(static_cast<ConnectionMode>(sysStatus.get_connectionMode())),
+           connectionModeLabel(static_cast<SystemConfig::ConnectionMode>(SystemConfig::get_connectionMode())),
            standbyRequested ? 1 : 0,
            standbyEffective ? 1 : 0,
-           batteryTierLabel(sysStatus.get_currentBatteryTier()),
-           current.get_occupied() ? 1 : 0);
+           batteryTierLabel(PowerConfig::get_currentBatteryTier()),
+           CurrentReadings::get_occupied() ? 1 : 0);
 }
 
 // Drain USB CDC serial buffer before sleep to prevent split log lines (bench testing only)
@@ -262,9 +265,9 @@ bool clearAb1805StaleAlarmInterrupts() {
 
 bool shouldUseBoronRtcAlarmHibernate(uint32_t requestedSleepSec, time_t &rtcNow) {
   Log.info("HibernateDiag: check enabled=%d requested=%lu",
-           sysStatus.get_enableHibernateSleep() ? 1 : 0,
+           SystemConfig::get_enableHibernateSleep() ? 1 : 0,
            (unsigned long)requestedSleepSec);
-  if (!sysStatus.get_enableHibernateSleep()) {
+  if (!SystemConfig::get_enableHibernateSleep()) {
     Log.info("HibernateDiag: fail=disabled");
     return false;
   }
@@ -361,7 +364,7 @@ void handleSleepingState() {
   // wake cycle; if connect never succeeded, preserving the modem state buys
   // nothing and can carry a bad NCP state into the next wake.
   bool useNetworkStandbyRequested =
-      (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) &&
+      (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) &&
       isWithinOpenHours();
   bool preserveStandbyForThisPass = false;
 #if HAL_PLATFORM_CELLULAR
@@ -394,7 +397,7 @@ void handleSleepingState() {
   // consistent with every other CONNECTED-mode site this step converts:
   // abort the sleep and stay awake/connected so a resync can occur, rather
   // than committing to a sleep the device can't actually justify.
-  if (sysStatus.get_connectionMode() == CONNECTED && Clock::openness() != Clock::Openness::Closed) {
+  if (SystemConfig::get_connectionMode() == SystemConfig::CONNECTED && Clock::openness() != Clock::Openness::Closed) {
     ensureSensorEnabled("SLEEP abort: CONNECTED+OPEN");
     transitionTo(IDLE_STATE, "sleep-abort-open-hours");
     return;
@@ -605,19 +608,19 @@ void handleSleepingState() {
       // Only raise one alert - check in priority order (queue > ledger > updates > webhook)
       if (!queueEmpty) {
         Log.warn("SLEEP: Publish queue not empty - raising alert 43");
-        current.raiseAlert(43); // Queue drainage failure (highest priority)
+        RecoveryState::raiseAlert(43); // Queue drainage failure (highest priority)
       } else if (!ledgersSynced) {
         Log.warn("SLEEP: ledger sync incomplete after %lu ms (budget=%lu ms) - raising alert 44",
                  elapsedMs,
                  cloudSyncBudgetMs);
         Cloud::instance().logLedgerSleepTimeoutState();
-        current.raiseAlert(44); // Ledger sync timeout before sleep (minor - config already applied)
+        RecoveryState::raiseAlert(44); // Ledger sync timeout before sleep (minor - config already applied)
       } else if (!updatesChecked) {
         Log.warn("SLEEP: OTA updates pending - raising alert 42");
-        current.raiseAlert(42); // OTA updates pending
+        RecoveryState::raiseAlert(42); // OTA updates pending
       } else if (!webhookConfirmed) {
         Log.warn("SLEEP: Webhook response not received - raising alert 40");
-        current.raiseAlert(40); // Webhook response timeout
+        RecoveryState::raiseAlert(40); // Webhook response timeout
       }
 
       // Proceed with disconnect despite incomplete operations
@@ -665,10 +668,10 @@ void handleSleepingState() {
     }
 
     if (!operationsCompleteLogged) {
-      if (sysStatus.get_verboseMode()) {
+      if (SystemConfig::get_verboseMode()) {
         Log.info("SLEEP: Cloud operations gate passed - ready to disconnect");
         Log.info("SLEEP: disconnect context connected=%d radioOn=%d standbyEffective=%d occupied=%d",
-                 Particle.connected(), Connectivity::isRadioPoweredOn(), useNetworkStandbyEffective, current.get_occupied());
+                 Particle.connected(), Connectivity::isRadioPoweredOn(), useNetworkStandbyEffective, CurrentReadings::get_occupied());
       }
 
       // Observability: end of service window (ledger sync + queue drain + OTA check + webhook).
@@ -700,13 +703,13 @@ void handleSleepingState() {
   // Compute disconnect budget once per loop to avoid duplicated logic.
   auto computeDisconnectBudgetMs = [&]() -> unsigned long {
     // Use ledger-configured budgets when available, with conservative defaults.
-    uint16_t cloudBudgetSec = sysStatus.get_cloudDisconnectBudgetSec();
+    uint16_t cloudBudgetSec = SystemConfig::get_cloudDisconnectBudgetSec();
     if (cloudBudgetSec < ConnectivityPolicy::DISCONNECT_BUDGET_MIN_SEC ||
         cloudBudgetSec > ConnectivityPolicy::DISCONNECT_BUDGET_MAX_SEC) {
       cloudBudgetSec = ConnectivityPolicy::DISCONNECT_CLOUD_DEFAULT_SEC;
     }
 
-    uint16_t modemBudgetSec = sysStatus.get_modemOffBudgetSec();
+    uint16_t modemBudgetSec = SystemConfig::get_modemOffBudgetSec();
     if (modemBudgetSec < ConnectivityPolicy::DISCONNECT_BUDGET_MIN_SEC ||
         modemBudgetSec > ConnectivityPolicy::DISCONNECT_BUDGET_MAX_SEC) {
       modemBudgetSec = ConnectivityPolicy::DISCONNECT_MODEM_DEFAULT_SEC;
@@ -734,7 +737,7 @@ void handleSleepingState() {
     unsigned long requestMs = millis();
     cloudDisconnectCompleteLogged = true;
     cloudDisconnectElapsedMs = 0;
-    if (sysStatus.get_verboseMode()) {
+    if (SystemConfig::get_verboseMode()) {
       Log.info("SLEEP: cloud disconnect complete elapsed=0 ms");
     }
   #if HAL_PLATFORM_CELLULAR
@@ -779,7 +782,7 @@ void handleSleepingState() {
   // If disconnect was requested, wait (bounded) for it to take effect before sleeping.
   if (disconnectRequested && !cloudDisconnectCompleteLogged && !Particle.connected()) {
     cloudDisconnectElapsedMs = (cloudDisconnectStartMs == 0) ? 0UL : (millis() - cloudDisconnectStartMs);
-    if (sysStatus.get_verboseMode()) {
+    if (SystemConfig::get_verboseMode()) {
       Log.info("SLEEP: cloud disconnect complete elapsed=%lu ms standby=%d",
                cloudDisconnectElapsedMs,
                useNetworkStandbyEffective ? 1 : 0);
@@ -790,7 +793,7 @@ void handleSleepingState() {
   if (disconnectRequested && !useNetworkStandbyEffective &&
       !radioOffCompleteLogged && !Connectivity::isRadioPoweredOn()) {
     modemOffElapsedMs = (disconnectRequestStartMs == 0) ? 0UL : (millis() - disconnectRequestStartMs);
-    if (sysStatus.get_verboseMode()) {
+    if (SystemConfig::get_verboseMode()) {
       Log.info("SLEEP: modem-off complete elapsed=%lu ms", modemOffElapsedMs);
     }
     radioOffCompleteLogged = true;
@@ -806,7 +809,7 @@ void handleSleepingState() {
                useNetworkStandbyEffective ? 1 : 0);
       markModemUnstable(MODEM_UNSTABLE_REASON_SLOW_TEARDOWN,
                         (unsigned long)(millis() - disconnectRequestStartMs));
-      current.raiseAlert(15);
+      RecoveryState::raiseAlert(15);
       transitionTo(ERROR_STATE, "sleep-disconnect-timeout");
       disconnectRequested = false;
       disconnectRequestStartMs = 0;
@@ -842,9 +845,9 @@ void handleSleepingState() {
              modemOffElapsedMs,
              useNetworkStandbyRequested ? 1 : 0,
              useNetworkStandbyEffective ? 1 : 0,
-         connectionModeLabel(static_cast<ConnectionMode>(sysStatus.get_connectionMode())),
-             batteryTierLabel(sysStatus.get_currentBatteryTier()),
-             current.get_occupied() ? 1 : 0);
+         connectionModeLabel(static_cast<SystemConfig::ConnectionMode>(SystemConfig::get_connectionMode())),
+             batteryTierLabel(PowerConfig::get_currentBatteryTier()),
+             CurrentReadings::get_occupied() ? 1 : 0);
     session.lastCloudDisconnectElapsedMs = cloudDisconnectElapsedMs;
     session.lastModemOffElapsedMs = modemOffElapsedMs;
     session.lastTotalTeardownElapsedMs = teardownElapsedMs;
@@ -900,7 +903,7 @@ void handleSleepingState() {
         Log.warn("SLEEP: pre-sleep gate blocked (cloud=0 radioOn=1 standby=0) - requesting modem off");
         cloudDisconnectCompleteLogged = true;
         cloudDisconnectElapsedMs = 0;
-        if (sysStatus.get_verboseMode()) {
+        if (SystemConfig::get_verboseMode()) {
           Log.info("SLEEP: cloud disconnect complete elapsed=0 ms");
         }
         logTeardownContext("SLEEP: modem-off start", useNetworkStandbyRequested, useNetworkStandbyEffective);
@@ -926,7 +929,7 @@ void handleSleepingState() {
                (int)Connectivity::isRadioPoweredOn(),
                useNetworkStandbyEffective ? 1 : 0);
       markModemUnstable(MODEM_UNSTABLE_REASON_SLOW_TEARDOWN, elapsedMs);
-      current.raiseAlert(15);
+      RecoveryState::raiseAlert(15);
       transitionTo(ERROR_STATE, "sleep-precondition-timeout");
       disconnectRequested = false;
       disconnectRequestStartMs = 0;
@@ -1046,7 +1049,7 @@ void handleSleepingState() {
   }
 
   // COUNTING MODE: Defer sleep until LED flash completes
-  if (sysStatus.get_sensorMode() == COUNTING) {
+  if (SystemConfig::get_sensorMode() == SystemConfig::COUNTING) {
     uint32_t ledRemaining = signalLEDTimeRemaining();
     if (sensorDetect || ledRemaining > 0) {
       Log.info("COUNTING: Deferring sleep - sensor=%d LED remaining=%lu sec", 
@@ -1061,10 +1064,10 @@ void handleSleepingState() {
   }
 
   // OCCUPANCY MODE: Calculate sleep duration based on debounce timer or scheduled wake
-  if (sysStatus.get_sensorMode() == OCCUPANCY) {
-    if (current.get_occupied()) {
+  if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY) {
+    if (CurrentReadings::get_occupied()) {
       // Occupied - wake for debounce timeout check
-      uint32_t setting1Raw = sensorConfig.get_sensorSetting1();
+      uint32_t setting1Raw = SystemConfig::SensorSettings::get_sensorSetting1();
       uint32_t debounceSeconds = (setting1Raw > 0) ? (setting1Raw / 1000) : 60;
       if (debounceSeconds < (uint32_t)wakeInSeconds) {
         wakeInSeconds = (int)debounceSeconds;
@@ -1201,7 +1204,7 @@ void handleSleepingState() {
         qDepth,
         socTenths,
         isCharging,
-        sysStatus.get_lastConnection());
+        SystemConfig::get_lastConnection());
 
     // Invariants (log-only): detect regressions without affecting behavior.
     // Ceiling is derived from existing budgets and includes firmware update time.
@@ -1239,7 +1242,7 @@ void handleSleepingState() {
     }
 
     // One compact line for field parsing.
-    if (sysStatus.get_verboseMode()) {
+    if (SystemConfig::get_verboseMode()) {
       Log.info(
         "CYCLE end awake=%lums conn=%s/%s/%lums svc=%lums td=%lums q=%d/%d/%d soc=%.1f%% chg=%d lastOk=%ld",
           (unsigned long)Observability::cycleStats().total_awake_ms,
@@ -1302,7 +1305,7 @@ void handleSleepingState() {
       wifiOffGuardRetries = 0;
     } else if (wifiOffGuardActive) {
       unsigned long guardElapsedMs = millis() - wifiOffGuardStartMs;
-      if (sysStatus.get_verboseMode()) {
+      if (SystemConfig::get_verboseMode()) {
         Log.info("SLEEP: WiFi radio powered off before sleep (%lu ms)", guardElapsedMs);
       }
       wifiOffGuardActive = false;
@@ -1352,14 +1355,14 @@ void handleSleepingState() {
            useNetworkStandby ? 1 : 0,
            sleepReason,
            wakeInSeconds,
-           current.get_occupied() ? 1 : 0,
+           CurrentReadings::get_occupied() ? 1 : 0,
            (double)PowerManager::instance().soc());
 #else
   Log.info("Sleep: ULP standby=%d reason=%s dur=%ds occ=%d soc=%.1f",
            useNetworkStandby ? 1 : 0,
            sleepReason,
            wakeInSeconds,
-           current.get_occupied() ? 1 : 0,
+           CurrentReadings::get_occupied() ? 1 : 0,
            (double)PowerManager::instance().soc());
 #endif
 
@@ -1383,7 +1386,7 @@ void handleSleepingState() {
       preserveStandbyAfterNormalReturn = true;
       forceModemOffAfterStandbyFailure = false;
       standbySleepFailureError = SYSTEM_ERROR_NONE;
-      if (sysStatus.get_verboseMode()) {
+      if (SystemConfig::get_verboseMode()) {
         Log.info("SLEEP: standby sleep returned normally; preserving modem standby");
       }
     } else {
@@ -1407,7 +1410,7 @@ void handleSleepingState() {
   if (result.error() != SYSTEM_ERROR_NONE) {
     thrashGuard.markProgress("SLEEP_RETURNED");
     Log.error("ULTRA_LOW_POWER sleep failed err=%d (wakeIn=%d sec, button=%d pir=%d) - falling back to STOP", (int)result.error(), wakeInSeconds, (int)BUTTON_PIN, (int)intPin);
-    current.raiseAlert(16);
+    RecoveryState::raiseAlert(16);
 
    // STOP generally supports a wider set of wake pins on some platforms.
     setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START (was stale literal 20, colliding with BREADCRUMB_REPORT_EXIT)
@@ -1486,7 +1489,7 @@ void handleSleepingState() {
   PowerDiagnostics::flushDiagBatch();
 #endif
 
-  if (sysStatus.get_serialConnected() || (ALLOW_BLOCKING_SERIAL_WAITS != 0)) {
+  if (SystemConfig::get_serialConnected() || (ALLOW_BLOCKING_SERIAL_WAITS != 0)) {
     // Re-initialize USB serial after wake and give the host a bounded chance
     // to re-enumerate before we continue through another short wake cycle.
     Serial.begin(9600);
@@ -1573,7 +1576,7 @@ void handleSleepingState() {
       // occupancy and sleep decisions do not use a stale downgraded mode.
       // WO-2026-09-21 Step 4 (corrected same day): evaluate() then commit() -
       // one of the four deliberate policy-application sites.
-      if (sysStatus.get_lowBatteryMode()) {
+      if (PowerConfig::get_lowBatteryMode()) {
         const float soc = PowerManager::instance().soc();
         float vcell = 0.0f;
         const SensorManager::VcellSampleState vcellState =
@@ -1586,7 +1589,7 @@ void handleSleepingState() {
 
       // In CONNECTED operating mode, the device should reconnect at the
       // start of open hours so it can resume normal connected behavior.
-      if (sysStatus.get_connectionMode() == CONNECTED && !Particle.connected()) {
+      if (SystemConfig::get_connectionMode() == SystemConfig::CONNECTED && !Particle.connected()) {
         logWakeSummary(wakeReasonLabel);
         transitionTo(CONNECTING_STATE, "sleep-open-hours-reconnect");
         return;
@@ -1595,9 +1598,9 @@ void handleSleepingState() {
 
     // Check if LED timeout expired FIRST (before processing new PIR wake)
     // This ensures we don't immediately undo state changes from PIR processing
-    if (sysStatus.get_sensorMode() == OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
+    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
       // LED timeout expired - debounce period elapsed without motion
-      const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
+      const bool reportNow = (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
       const OccupancyCloseResult closeResult = closeOccupancySessionSafely("sleep");
       signalLED(false);  // Turn off LED
       if (closeResult.valid) {
@@ -1618,22 +1621,22 @@ void handleSleepingState() {
     // detection event so that the motion that woke the device is counted
     // even if the ISR flag did not survive ULTRA_LOW_POWER sleep.
     if (pirWake) {
-      if (sysStatus.get_sensorMode() == COUNTING) {
-        current.set_hourlyCount(current.get_hourlyCount() + 1);
-        current.set_dailyCount(current.get_dailyCount() + 1);
+      if (SystemConfig::get_sensorMode() == SystemConfig::COUNTING) {
+        CurrentReadings::set_hourlyCount(CurrentReadings::get_hourlyCount() + 1);
+        CurrentReadings::set_dailyCount(CurrentReadings::get_dailyCount() + 1);
         // WO-2026-08-29-002 item 8: lastCountTime has no consumers anywhere
         // in this codebase (write-only telemetry field) - gating on
         // isClockTrusted() changes only the recorded value, never control
         // flow.
-        current.set_lastCountTime(isClockTrusted() ? Time.now() : 0);
+        CurrentReadings::set_lastCountTime(isClockTrusted() ? Time.now() : 0);
         signalLED(true, 1000);  // Flash for 1 second
         Log.info("Count detected from PIR wake - Hourly: %d, Daily: %d",
-                 current.get_hourlyCount(), current.get_dailyCount());
+                 CurrentReadings::get_hourlyCount(), CurrentReadings::get_dailyCount());
         if (Serial && Serial.isConnected()) {
           Serial.printf("Count detected from PIR wake - Hourly: %d, Daily: %d\r\n",
-                        current.get_hourlyCount(), current.get_dailyCount());
+                        CurrentReadings::get_hourlyCount(), CurrentReadings::get_dailyCount());
         }
-      } else if (sysStatus.get_sensorMode() == OCCUPANCY) {
+      } else if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY) {
         // Occupancy mode: PIR wakes are expected behavior, not thrashing
         thrashGuard.markProgress("PIR_WAKE_OCCUPANCY");
 
@@ -1642,7 +1645,7 @@ void handleSleepingState() {
         // occupancy behavior before we decide whether to report or sleep again.
         // WO-2026-09-21 Step 4 (corrected same day): evaluate() then commit() -
         // one of the four deliberate policy-application sites.
-        if (sysStatus.get_lowBatteryMode()) {
+        if (PowerConfig::get_lowBatteryMode()) {
           const float soc = PowerManager::instance().soc();
           float vcell = 0.0f;
           const SensorManager::VcellSampleState vcellState =
@@ -1653,8 +1656,8 @@ void handleSleepingState() {
               soc);
         }
         
-        if (!current.get_occupied()) {
-          current.set_occupied(true);
+        if (!CurrentReadings::get_occupied()) {
+          CurrentReadings::set_occupied(true);
           // WO-2026-08-29-002 item 8: deliberately NOT gated on
           // isClockTrusted(). Unlike lastCountTime, occupancyStartTime's 0
           // value is a load-bearing sentinel for two consumers:
@@ -1666,19 +1669,19 @@ void handleSleepingState() {
           // span if this were 0 while occupied. Writing Time.now() here even
           // when untrusted preserves existing behavior; see the
           // Implementation Report for the Chief Engineer's review.
-          current.set_occupancyStartTime(Time.now());
+          CurrentReadings::set_occupancyStartTime(Time.now());
           // Treat the PIR wake as an occupancy event for debounce purposes.
           // If lastOccupancyEvent is left at 0, the debounce logic that uses
           // millis()-based timing will immediately expire and mark UNOCCUPIED.
-          current.set_lastOccupancyEvent(millis());
+          CurrentReadings::set_lastOccupancyEvent(millis());
 
           // Keep LED on for the debounce window (sensor.setting1 is milliseconds).
-          uint32_t debounceMs = sensorConfig.get_sensorSetting1();
+          uint32_t debounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
           if (debounceMs == 0) {
             debounceMs = Config::occupancyDebounceMsForRuntime();
           }
           signalLED(true, debounceMs);
-          const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
+          const bool reportNow = (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
           logOccupiedEvent("pir-wake", debounceMs / 1000UL, reportNow);
           
           // Match the rest of the occupancy state machine: only KEEP_ALIVE mode
@@ -1691,21 +1694,21 @@ void handleSleepingState() {
           }
         } else {
           // Already occupied - motion detected during debounce, restart timer
-          uint32_t debounceMs = sensorConfig.get_sensorSetting1();
+          uint32_t debounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
           if (debounceMs == 0) {
             debounceMs = Config::occupancyDebounceMsForRuntime();
           }
           signalLED(true, debounceMs);  // Restart LED timer
           logOccupiedEvent("pir-wake", debounceMs / 1000UL, false, true);
         }
-        current.set_lastOccupancyEvent(millis());
+        CurrentReadings::set_lastOccupancyEvent(millis());
       }
     }
 
     logWakeSummary(wakeReasonLabel);
 
     // For COUNTING mode: Turn off LED if flash completed during sleep
-    if (sysStatus.get_sensorMode() == COUNTING && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
+    if (SystemConfig::get_sensorMode() == SystemConfig::COUNTING && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
       signalLED(false);
     }
 
@@ -1714,8 +1717,8 @@ void handleSleepingState() {
     if (timerWake) {
       // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, suppress periodic reports
       // while occupied so occupancy=1 is only reported on 0->1 transition.
-      if (sysStatus.get_sensorMode() == OCCUPANCY && current.get_occupied() &&
-          sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
+      if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && CurrentReadings::get_occupied() &&
+          SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
         transitionTo(SLEEPING_STATE, "sleep-timer-occupied-suppress-report");
         return;
       }
@@ -1732,14 +1735,14 @@ void handleSleepingState() {
     if (pirWake && Clock::openness() != Clock::Openness::Closed) {
       // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, do not opportunistically
       // report while occupied; PIR hits should only reset debounce.
-      if (sysStatus.get_sensorMode() == OCCUPANCY && current.get_occupied() &&
-          sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
+      if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && CurrentReadings::get_occupied() &&
+          SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
         // Skip overdue-report check while occupied.
       } else {
       uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
 
       time_t now = Time.now();
-      time_t lastReport = sysStatus.get_lastReport();
+      time_t lastReport = SystemConfig::get_lastReport();
       if (lastReport > 0 && (now - lastReport) >= intervalSec) {
         transitionTo(REPORTING_STATE, "sleep-pir-overdue-report");
         return;
@@ -1750,7 +1753,7 @@ void handleSleepingState() {
     // If PIR woke us in INTERMITTENT or DISCONNECTED mode and no report is needed,
     // return immediately to sleep. This check comes AFTER opportunistic reporting
     // so overdue reports are not missed.
-    if (pirWake && sysStatus.get_connectionMode() != CONNECTED) {
+    if (pirWake && SystemConfig::get_connectionMode() != SystemConfig::CONNECTED) {
       transitionTo(SLEEPING_STATE, "sleep-pir-return-to-sleep");
       return;
     }

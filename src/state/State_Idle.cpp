@@ -2,7 +2,8 @@
 #include "../Config.h"
 #include "cloud/Cloud.h"
 #include "LocalTimeRK.h"
-#include "MyPersistentData.h"
+#include "persist/CurrentReadings.h"
+#include "persist/SystemConfig.h"
 #include "PublishQueuePosixRK.h"
 #include "sensors/SensorManager.h"
 #include "device_pinout.h"
@@ -41,24 +42,24 @@ void handleIdleState() {
   signalLEDUpdate();
 
   // Maintain LED state for OCCUPANCY mode and check debounce timeout
-  if (sysStatus.get_sensorMode() == OCCUPANCY) {
+  if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY) {
     // Check if debounce timeout expired (no motion for debounce period)
-    if (current.get_occupied()) {
-      uint32_t debounceMs = sensorConfig.get_sensorSetting1();
+    if (CurrentReadings::get_occupied()) {
+      uint32_t debounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
       if (debounceMs == 0) {
         debounceMs = Config::occupancyDebounceMsForRuntime();
       }
 
-      uint32_t lastEvent = current.get_lastOccupancyEvent();
+      uint32_t lastEvent = CurrentReadings::get_lastOccupancyEvent();
       if (lastEvent == 0) {
         lastEvent = millis();
-        current.set_lastOccupancyEvent(lastEvent);
+        CurrentReadings::set_lastOccupancyEvent(lastEvent);
       }
       uint32_t timeSinceLastEvent = millis() - lastEvent;
 
       if (timeSinceLastEvent >= debounceMs) {
         // Debounce timeout expired - space is now unoccupied
-        const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
+        const bool reportNow = (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
         const OccupancyCloseResult closeResult = closeOccupancySessionSafely("idle");
         signalLED(false);  // Turn off LED
         if (closeResult.valid) {
@@ -77,9 +78,9 @@ void handleIdleState() {
     }
     
     // Maintain LED state based on occupancy
-    if (current.get_occupied() && !signalLEDStatus()) {
+    if (CurrentReadings::get_occupied() && !signalLEDStatus()) {
       signalLED(true);   // Keep LED on while occupied
-    } else if (!current.get_occupied() && signalLEDStatus()) {
+    } else if (!CurrentReadings::get_occupied() && signalLEDStatus()) {
       signalLED(false);  // Ensure LED off when unoccupied
     }
   }
@@ -111,7 +112,7 @@ void handleIdleState() {
   // a wrong belief about what time it is. Unknown is treated as Open here:
   // stay awake/connected rather than transition to sleep, so a resync can
   // occur.
-  if (sysStatus.get_connectionMode() == CONNECTED) {
+  if (SystemConfig::get_connectionMode() == SystemConfig::CONNECTED) {
     const Clock::Openness parkOpenness = Clock::openness();
     // logTimeDiag()'s own isOpen= stays sourced from isWithinOpenHours() (its
     // existing fail-open answer), not parkOpenness - openness= in that same
@@ -130,7 +131,7 @@ void handleIdleState() {
   // ********** Scheduled Mode Sampling **********
   // SCHEDULED mode uses time-based sampling (non-interrupt).
   // Interrupt-driven modes (COUNTING/OCCUPANCY) are handled centrally in main loop().
-  if (sysStatus.get_sensorMode() == MEASUREMENT) {
+  if (SystemConfig::get_sensorMode() == SystemConfig::MEASUREMENT) {
     // WO-2026-09-19 Step 3b: Clock::isTrusted(), not isTimeValid() - the
     // interval arithmetic below (now - lastScheduledSample) must not run on
     // an untrusted clock.
@@ -184,14 +185,14 @@ void handleIdleState() {
     // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, do not generate periodic
     // reports while occupied. Occupancy=1 should only be reported on the
     // transition 0->1 (and 1->0 when it clears).
-    if (sysStatus.get_sensorMode() == OCCUPANCY && current.get_occupied() &&
-        sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE) {
+    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && CurrentReadings::get_occupied() &&
+        SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
       // Skip periodic reporting while occupied in this mode.
     } else {
     uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
 
     time_t now = Time.now();
-    time_t lastReport = sysStatus.get_lastReport();
+    time_t lastReport = SystemConfig::get_lastReport();
     if (lastReport == 0 || (now - lastReport) >= intervalSec) {
       int secondsOverdue = (lastReport == 0) ? 0 : (int)(now - lastReport - intervalSec);
       if (secondsOverdue > 0) {
@@ -209,7 +210,7 @@ void handleIdleState() {
 
   // ********** Power Management **********
   // In INTERMITTENT (1) or DISCONNECTED (2) modes, manage connection lifecycle.
-  if (sysStatus.get_connectionMode() != CONNECTED) {
+  if (SystemConfig::get_connectionMode() != SystemConfig::CONNECTED) {
     // In CONNECTED mode during open hours, never auto-sleep.
     // NOTE (WO-2026-09-19 Step 3b, flagged not fixed): this condition's own
     // `connectionMode() == CONNECTED` term can never be true here - it is
@@ -217,7 +218,7 @@ void handleIdleState() {
     // above. Pre-existing dead code, unrelated to the trust-standard fix;
     // converting it mechanically for consistency costs nothing since it
     // never executes either way. Not touching the surrounding logic.
-    if (Clock::openness() == Clock::Openness::Open && sysStatus.get_connectionMode() == CONNECTED) {
+    if (Clock::openness() == Clock::Openness::Open && SystemConfig::get_connectionMode() == SystemConfig::CONNECTED) {
       return;
     }
 
@@ -245,7 +246,7 @@ void handleIdleState() {
       // for new motion, and SLEEPING_STATE already wakes on timer to evaluate
       // the debounce timeout. Keeping the device awake here causes it to
       // remain connected and burn power during continued motion.
-      if (sensorDetect || (sysStatus.get_sensorMode() == COUNTING && signalLEDTimeRemaining() > 0)) {
+      if (sensorDetect || (SystemConfig::get_sensorMode() == SystemConfig::COUNTING && signalLEDTimeRemaining() > 0)) {
         return;
       }
 
@@ -295,7 +296,7 @@ void handleIdleState() {
     // now it requires an actual confirmed sync.
     const bool openHoursKeepAwakeValid = (Clock::openness() == Clock::Openness::Open);
     const bool healthyConnectedAwakePath =
-      (sysStatus.get_connectionMode() == CONNECTED) &&
+      (SystemConfig::get_connectionMode() == SystemConfig::CONNECTED) &&
       openHoursKeepAwakeValid &&
       cloudConnected;
 
@@ -309,7 +310,7 @@ void handleIdleState() {
       idleCeilingStartMs = 0;
     } else {
       // Reuse existing connectAttemptBudgetSec behavior with conservative fallback.
-      uint16_t budgetSec = sysStatus.get_connectAttemptBudgetSec();
+      uint16_t budgetSec = SystemConfig::get_connectAttemptBudgetSec();
       if (budgetSec < 30 || budgetSec > 900) {
         budgetSec = 300;
       }
@@ -324,7 +325,7 @@ void handleIdleState() {
         const unsigned long elapsedMs = nowMs - startMs;
         if (elapsedMs > budgetMs) {
           Log.warn("IDLE ceiling trip: mode=%d cloud=%d radioOn=%d elapsedMs=%lu connectedStartMs=%lu -> forcing teardown and sleep",
-                   (int)sysStatus.get_connectionMode(),
+                   (int)SystemConfig::get_connectionMode(),
                    (int)cloudConnected,
                    (int)radioOn,
                    elapsedMs,

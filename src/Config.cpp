@@ -1,6 +1,7 @@
 #include "Config.h"
 
-#include "MyPersistentData.h"
+#include "Particle.h"
+#include "persist/SystemConfig.h"
 
 namespace Config {
 
@@ -28,7 +29,7 @@ const char *sourceToString(Source source) {
 }
 
 Source getSource() {
-    uint8_t raw = sysStatus.get_configSource();
+    uint8_t raw = SystemConfig::get_configSource();
     if (raw > (uint8_t)CONFIG_SOURCE_LEDGER) {
         return CONFIG_SOURCE_DEFAULT;
     }
@@ -38,7 +39,7 @@ Source getSource() {
 void setSource(Source source, const char *reason, bool persist) {
     Source prior = getSource();
     if (persist) {
-        sysStatus.set_configSource((uint8_t)source);
+        SystemConfig::set_configSource((uint8_t)source);
     }
 
     if (prior != source || reason != nullptr) {
@@ -56,7 +57,7 @@ bool validateConfigFields(bool logFailures, const char **failureReason) {
     bool valid = true;
     setFailureReason(failureReason, "none");
 
-    const char *tz = sysStatus.get_timeZoneStrCStr();
+    const char *tz = SystemConfig::get_timeZoneStrCStr();
     if (!tz || tz[0] == '\0') {
         if (logFailures) {
             Log.warn("ConfigInvalid: timing.timezone missing");
@@ -65,7 +66,7 @@ bool validateConfigFields(bool logFailures, const char **failureReason) {
         valid = false;
     }
 
-    uint8_t openHour = sysStatus.get_openTime();
+    uint8_t openHour = SystemConfig::get_openTime();
     if (openHour > 23) {
         if (logFailures) {
             Log.warn("ConfigInvalid: timing.openHour=%u out of range", (unsigned)openHour);
@@ -76,7 +77,7 @@ bool validateConfigFields(bool logFailures, const char **failureReason) {
         valid = false;
     }
 
-    uint8_t closeHour = sysStatus.get_closeTime();
+    uint8_t closeHour = SystemConfig::get_closeTime();
     if (closeHour > 23) {
         if (logFailures) {
             Log.warn("ConfigInvalid: timing.closeHour=%u out of range", (unsigned)closeHour);
@@ -87,7 +88,7 @@ bool validateConfigFields(bool logFailures, const char **failureReason) {
         valid = false;
     }
 
-    uint16_t reportingIntervalSec = sysStatus.get_reportingInterval();
+    uint16_t reportingIntervalSec = SystemConfig::get_reportingInterval();
     if (reportingIntervalSec == 0) {
         if (logFailures) {
             Log.warn("ConfigInvalid: timing.reportingIntervalSec missing/zero");
@@ -98,7 +99,7 @@ bool validateConfigFields(bool logFailures, const char **failureReason) {
         valid = false;
     }
 
-    uint32_t occupancyDebounceMs = sensorConfig.get_sensorSetting1();
+    uint32_t occupancyDebounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
     if (occupancyDebounceMs == 0) {
         if (logFailures) {
             Log.warn("ConfigInvalid: sensor.setting1 (occupancy debounce) missing/zero");
@@ -116,7 +117,7 @@ bool isValid(bool logFailures, const char **failureReason) {
     bool valid = validateConfigFields(logFailures, failureReason);
 
     const Source source = getSource();
-    const bool ledgerValid = sysStatus.get_hasValidLedgerConfig();
+    const bool ledgerValid = SystemConfig::get_hasValidLedgerConfig();
     const bool sourceValid =
         (source == CONFIG_SOURCE_LEDGER) ||
         ((source == CONFIG_SOURCE_STORAGE) && ledgerValid);
@@ -145,7 +146,7 @@ uint16_t reportingIntervalSecForRuntime() {
         return DEFAULT_REPORT_INTERVAL_SEC;
     }
 
-    uint16_t interval = sysStatus.get_reportingInterval();
+    uint16_t interval = SystemConfig::get_reportingInterval();
     return interval == 0 ? DEFAULT_REPORT_INTERVAL_SEC : interval;
 }
 
@@ -154,16 +155,16 @@ uint32_t occupancyDebounceMsForRuntime() {
         return DEFAULT_OCCUPANCY_DEBOUNCE_MS;
     }
 
-    uint32_t debounceMs = sensorConfig.get_sensorSetting1();
+    uint32_t debounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
     return debounceMs == 0 ? DEFAULT_OCCUPANCY_DEBOUNCE_MS : debounceMs;
 }
 
 void markLedgerConfigurationValid() {
-    if (!sysStatus.get_hasValidLedgerConfig()) {
-        sysStatus.set_hasValidLedgerConfig(true);
+    if (!SystemConfig::get_hasValidLedgerConfig()) {
+        SystemConfig::set_hasValidLedgerConfig(true);
     }
     setSource(CONFIG_SOURCE_LEDGER, "ledger-apply");
-    sysStatus.flush(true);
+    SystemConfig::flushNow();
 }
 
 void markStorageConfigurationLoaded() {
@@ -171,14 +172,14 @@ void markStorageConfigurationLoaded() {
 }
 
 void markFactoryDefaultsActive() {
-    sysStatus.set_hasValidLedgerConfig(false);
+    SystemConfig::set_hasValidLedgerConfig(false);
     setSource(CONFIG_SOURCE_DEFAULT, "factory-defaults");
 }
 
 void logDiagnostics(const char *tag) {
 #if ENABLE_CONFIG_TRACE
     const bool valid = isValid(false);
-    const char *tz = sysStatus.get_timeZoneStrCStr();
+    const char *tz = SystemConfig::get_timeZoneStrCStr();
     if (!tz) {
         tz = "";
     }
@@ -188,9 +189,9 @@ void logDiagnostics(const char *tag) {
              sourceToString(getSource()),
              valid ? 1 : 0,
              tz,
-             (unsigned)sysStatus.get_openTime(),
-             (unsigned)sysStatus.get_closeTime(),
-             (unsigned)sysStatus.get_reportingInterval());
+             (unsigned)SystemConfig::get_openTime(),
+             (unsigned)SystemConfig::get_closeTime(),
+             (unsigned)SystemConfig::get_reportingInterval());
 #else
     (void)tag;
 #endif
