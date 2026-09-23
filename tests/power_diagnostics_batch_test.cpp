@@ -23,7 +23,9 @@
 #include "power/PowerDiagnostics.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <string>
+#include <vector>
 
 #include "MyPersistentData.h"
 #include "PublishQueuePosixRK.h"
@@ -68,9 +70,73 @@ bool endsWith(const std::string &s, const std::string &suffix) {
   return s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
+// WO-2026-09-22: proves each pdiag batch entry carries its OWN
+// diagnostic-generation-time timestamp (captured via millis() inside
+// appendDiagBatchEntry()), recoverable independent of
+// PublishQueuePosixRK's fixed ~1000ms drain pacing - the exact gap this
+// dispatch exists to close (see the log-scoped, no-fix-applied
+// pdiag-rapid-cycling re-investigation this dispatch's cover note
+// references). All three entries below are captured at different
+// simulated millis() values but flushed in a SINGLE publish() call, so a
+// payload that showed identical or publish-cadence-spaced timestamps
+// here would mean the mechanism isn't actually capturing per-entry, at
+// generation time.
+bool testPerEntryTimestampsReflectRealElapsedTime() {
+  testMillis = 1000;
+  addMaxWidthChargeDiagEntry(); // entry 0: real gap to next = 4000ms
+  testMillis = 5000;
+  addMaxWidthChargeDiagEntry(); // entry 1: real gap to next = 100ms
+  testMillis = 5100;
+  addMaxWidthChargeDiagEntry(); // entry 2
+
+  PublishQueuePosix::instance().lastData.clear();
+  PublishQueuePosix::instance().publishCount = 0;
+  PowerDiagnostics::flushDiagBatch();
+  const std::string payload = PublishQueuePosix::instance().lastData;
+
+  std::vector<unsigned long> timestamps;
+  size_t pos = 0;
+  while ((pos = payload.find("\"ms\":", pos)) != std::string::npos) {
+    pos += 5;
+    timestamps.push_back(std::strtoul(payload.c_str() + pos, nullptr, 10));
+  }
+
+  if (timestamps.size() != 3) {
+    fprintf(stderr,
+            "FAIL: expected 3 per-entry \"ms\" timestamps, found %zu: %s\n",
+            timestamps.size(), payload.c_str());
+    return false;
+  }
+  if (timestamps[0] != 1000 || timestamps[1] != 5000 || timestamps[2] != 5100) {
+    fprintf(stderr,
+            "FAIL: per-entry timestamps did not match capture-time values "
+            "(got %lu,%lu,%lu, expected 1000,5000,5100): %s\n",
+            timestamps[0], timestamps[1], timestamps[2], payload.c_str());
+    return false;
+  }
+  // The real signal this dispatch cares about: genuinely different
+  // elapsed-time gaps between entries, recoverable from the payload alone -
+  // a 4000ms gap is distinguishable from a 100ms gap, neither of which is
+  // ~1000ms (what a publish-cadence artifact would produce instead).
+  if (timestamps[1] - timestamps[0] != 4000 || timestamps[2] - timestamps[1] != 100) {
+    fprintf(stderr, "FAIL: per-entry elapsed gaps do not reflect real capture-time deltas: %s\n",
+            payload.c_str());
+    return false;
+  }
+
+  printf("%s\n", payload.c_str());
+  fprintf(stderr,
+          "OK: per-entry timestamps 1000,5000,5100 (gaps 4000ms,100ms) recovered from a single flush\n");
+  return true;
+}
+
 } // namespace
 
 int main() {
+  if (!testPerEntryTimestampsReflectRealElapsedTime()) {
+    return 1;
+  }
+
   // kDiagBatchCapacity is 12 (accumulator slots) but the local serialization
   // buffer is only 700 bytes; a dozen max-width ChargeDiag entries (~63
   // bytes each) total well over 700 bytes, so sweeping 1..12 entries crosses
