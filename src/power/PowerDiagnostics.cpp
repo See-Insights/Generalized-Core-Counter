@@ -75,6 +75,13 @@ struct DiagBatchEntry {
   uint8_t charging;
   float soc;
   float vcell;
+  // WO-2026-09-22: captured here, not by the caller, so every entry gets one
+  // regardless of call site - see appendDiagBatchEntry(). This is the
+  // diagnostic-generation-time clock (millis()), independent of
+  // PublishQueuePosixRK's fixed 1000ms drain pacing, which otherwise makes
+  // the ~1/sec cadence observed between publishes look like real elapsed
+  // time between cycles when it may just be queue-drain artifact.
+  uint32_t capturedAtMs;
 };
 
 DiagBatchEntry diagBatch[kDiagBatchCapacity];
@@ -88,7 +95,9 @@ void appendDiagBatchEntry(const DiagBatchEntry &entry) {
     }
     return;
   }
-  diagBatch[diagBatchCount++] = entry;
+  diagBatch[diagBatchCount] = entry;
+  diagBatch[diagBatchCount].capturedAtMs = millis();
+  diagBatchCount++;
 }
 
 // Appends a formatted string to `buf` (capacity bufSize) at *offset, advancing
@@ -405,15 +414,16 @@ void flushDiagBatch() {
     bool wrote;
     if (e.reasonCode == kReasonChargeDiag) {
       wrote = appendFormatted(payload, entryBufSize, &offset,
-              "%s{\"r\":%u,\"c\":%u,\"i\":%u,\"f\":%u,\"vc\":%.3f,\"soc\":%.1f,\"s\":%d,\"p\":%u}",
+              "%s{\"r\":%u,\"c\":%u,\"i\":%u,\"f\":%u,\"vc\":%.3f,\"soc\":%.1f,\"s\":%d,\"p\":%u,\"ms\":%lu}",
               sep, (unsigned)e.reasonCode, (unsigned)e.chargeStatus, (unsigned)e.charging,
               (unsigned)e.faultReg, (double)e.vcell, (double)e.soc,
-              (int)e.powerSource, (unsigned)e.profile);
+              (int)e.powerSource, (unsigned)e.profile, (unsigned long)e.capturedAtMs);
     } else {
       wrote = appendFormatted(payload, entryBufSize, &offset,
-              "%s{\"r\":%u,\"s\":%d,\"p\":%u,\"vb\":%u,\"pg\":%u,\"soc\":%.1f}",
+              "%s{\"r\":%u,\"s\":%d,\"p\":%u,\"vb\":%u,\"pg\":%u,\"soc\":%.1f,\"ms\":%lu}",
               sep, (unsigned)e.reasonCode, (int)e.powerSource, (unsigned)e.profile,
-              (unsigned)e.vbusStatus, (unsigned)e.powerGood, (double)e.soc);
+              (unsigned)e.vbusStatus, (unsigned)e.powerGood, (double)e.soc,
+              (unsigned long)e.capturedAtMs);
     }
     if (!wrote) {
       // This entry (comma separator included) didn't fully fit - stop here

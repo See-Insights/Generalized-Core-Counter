@@ -27,3 +27,10 @@ struct TestLog {
 };
 
 inline TestLog Log;
+
+// WO-2026-09-22: PowerDiagnostics.cpp now stamps each pdiag batch entry with
+// millis() at append time (see appendDiagBatchEntry()). Tests set this
+// directly to control what gets stamped, rather than depending on real
+// wall-clock time.
+inline unsigned long testMillis = 0;
+inline unsigned long millis() { return testMillis; }
