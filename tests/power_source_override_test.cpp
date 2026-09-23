@@ -294,6 +294,77 @@ void testPublisherFirmwareObjectReportsCompiledBuildFlags() {
   assert(capturedFlags == 0x6008);
 }
 
+// --- WO-2026-09-15-001 Amendment C: LedgerPayloadStatus log-guard --------
+//
+// This harness's Cloud::noteLedgerSyncRequest() stub always returns 0 (see
+// CloudTestShim.cpp), so writeDeviceStatusToCloud() always takes its
+// early-return path immediately after the log line under test and never
+// reaches the successful-write branch that updates lastPublishedStatus.
+// That leaves lastPublishedStatus permanently empty in this harness, which
+// means the OUTER dedup (strcmp against lastPublishedStatus,
+// DeviceStatusPublisher.cpp:353) can never suppress anything here - every
+// call reaches the log line, isolating the guard under test (the narrower,
+// byte-count-based one added alongside it) as the only thing that can
+// suppress a repeat. This mirrors the real production shape this WO's
+// spam came from: Cloud::loop() retrying an already-in-flight sync with
+// lastPublishedStatus stuck stale.
+void testLedgerPayloadStatusLogSuppressesRepeatedByteCount() {
+  resetHarness();
+  PowerPlatform::testPowerPlatformState.snapshot.source = kPowerSourceVin;
+  PowerPlatform::testPowerPlatformState.snapshot.status = PowerAvailability::Valid;
+  const bool refreshed = PowerManager::instance().refreshInputProfile();
+  assert(refreshed);
+
+  // The guard's "last logged" state is a function-static inside
+  // writeDeviceStatusToCloud() and therefore persists across every test in
+  // this binary, including the ones above that already called it - so this
+  // priming call is not assumed to log; it only establishes a known byte
+  // count to compare the next two calls against.
+  Cloud::instance().writeDeviceStatusToCloud("log-guard-prime-call");
+  const int afterPrime = Log.infoCallCount;
+
+  // Repeat call, nothing in global state changed since the prime call -
+  // same byte count. Must not add a line.
+  Cloud::instance().writeDeviceStatusToCloud("log-guard-repeat-call");
+  assert(Log.infoCallCount == afterPrime);
+
+  // A second repeat, for good measure - this is the actual documented
+  // shape (many repeats, not just two).
+  Cloud::instance().writeDeviceStatusToCloud("log-guard-repeat-call-2");
+  assert(Log.infoCallCount == afterPrime);
+}
+
+// A genuine change that shifts the payload's byte count (resetCount's digit
+// width) must still surface - no diagnostic value lost.
+void testLedgerPayloadStatusLogSurfacesByteCountChange() {
+  resetHarness();
+  PowerPlatform::testPowerPlatformState.snapshot.source = kPowerSourceVin;
+  PowerPlatform::testPowerPlatformState.snapshot.status = PowerAvailability::Valid;
+  const bool refreshed = PowerManager::instance().refreshInputProfile();
+  assert(refreshed);
+
+  // Prime call - establishes a known "last logged" byte count for this test,
+  // regardless of whatever earlier tests in this binary left the guard's
+  // static state at. Not asserted on.
+  testSysStatus.resetCount = 1;
+  Cloud::instance().writeDeviceStatusToCloud("log-guard-prime-call");
+
+  // Repeating the same payload must not log again.
+  Log.infoCallCount = 0;
+  Cloud::instance().writeDeviceStatusToCloud("log-guard-before-change");
+  assert(Log.infoCallCount == 0);
+
+  // Shifts "resetCount":1 -> "resetCount":100, two extra bytes - a genuine
+  // byte-count change must surface.
+  testSysStatus.resetCount = 100;
+  Cloud::instance().writeDeviceStatusToCloud("log-guard-after-change");
+  assert(Log.infoCallCount == 1);
+
+  // Back to the new (changed) byte count repeated: suppressed again.
+  Cloud::instance().writeDeviceStatusToCloud("log-guard-after-change-repeat");
+  assert(Log.infoCallCount == 1);
+}
+
 } // namespace
 
 int main() {
@@ -304,6 +375,8 @@ int main() {
   testPublisherReportsOverrideActiveWhenOverrideFires();
   testPublisherReportsOverrideInactiveWhenOverrideDoesNotFire();
   testPublisherFirmwareObjectReportsCompiledBuildFlags();
+  testLedgerPayloadStatusLogSuppressesRepeatedByteCount();
+  testLedgerPayloadStatusLogSurfacesByteCountChange();
   std::cout << "Power source override reporting/telemetry tests passed\n";
   return 0;
 }

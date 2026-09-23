@@ -113,6 +113,7 @@ static void awakeWatchdogExpiredHandler();
 #else
 static void appWatchdogHandler(); // Application watchdog handler
 #endif
+static void waitForDebugSerialIfConnected(); // Brief settle delay if a debug terminal is already attached at boot
 void publishData();           // Publish the data to the cloud
 void userSwitchISR();         // Interrupt for the user switch
 void sensorISR();             // Interrupt for legacy tire-counting sensor
@@ -753,6 +754,20 @@ void setLoopStage(LoopStage stage) {
 
 const unsigned long resetWait = 30000;      // Error state dwell before reset
 
+// Always-on "brief wait if already connected" serial settle, independent of
+// the bench-only ALLOW_BLOCKING_SERIAL_WAITS flag (unchanged, handled
+// further below in setup()). The global SerialLogHandler's constructor
+// already calls Serial.begin() before setup() runs, so Serial.isConnected()
+// is valid here without an additional Serial.begin() call. On deployed
+// devices nothing is ever attached to serial, so this check is near-zero
+// cost (Serial.isConnected() returns false immediately and no delay
+// occurs).
+static void waitForDebugSerialIfConnected() {
+  if (Serial.isConnected()) {
+    delay(ConnectivityPolicy::DEBUG_SERIAL_POST_CONNECT_DELAY_MS);
+  }
+}
+
 /**
  * @brief Initializes all system components and prepares device for operational state.
  *
@@ -766,16 +781,7 @@ const unsigned long resetWait = 30000;      // Error state dwell before reset
  * @see docs/architecture/startup-sequence.md for detailed initialization phases
  */
 void setup() {
-  // Always-on "brief wait if already connected" serial settle, independent of
-  // the bench-only ALLOW_BLOCKING_SERIAL_WAITS flag (unchanged, handled
-  // further below). The global SerialLogHandler's constructor already calls
-  // Serial.begin() before setup() runs, so Serial.isConnected() is valid
-  // here without an additional Serial.begin() call. On deployed devices
-  // nothing is ever attached to serial, so this check is near-zero cost
-  // (Serial.isConnected() returns false immediately and no delay occurs).
-  if (Serial.isConnected()) {
-    delay(ConnectivityPolicy::DEBUG_SERIAL_POST_CONNECT_DELAY_MS);
-  }
+  waitForDebugSerialIfConnected();
 
   ensureRetainedLoopForensicsInitialized();
 
@@ -1152,6 +1158,14 @@ void setup() {
   Log.info("OscState: usingRC=%d oscStatus=0x%02x oscCtrl=0x%02x aos=%d fos=%d",
            startupOscUsingRC ? 1 : 0, startupOscStatusReg, startupOscCtrlReg,
            startupOscAos ? 1 : 0, startupOscFos ? 1 : 0);
+
+  // WO-2026-09-22-001: currentStatusData::validate()'s occupancyStartTime
+  // future-date clamp runs earlier in setup(), before ab1805.setup() (just
+  // above) has seeded Time, so it can never fire there. Re-run it once,
+  // right here, now that a time source exists this boot - a no-op if
+  // occupied is false, Time is still not valid, or the stored value is
+  // already plausible.
+  current.revalidateOccupancyStartTimeIfTimeAvailable();
 
 #if PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST
   // ===== BENCH-ONLY: DELIBERATE RTC SKEW (WO-2026-08-31-003, Amendment A) =====

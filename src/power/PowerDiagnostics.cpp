@@ -1,5 +1,7 @@
 #include "power/PowerDiagnostics.h"
 
+#include <cmath>
+
 #include "BuildProfile.h"
 #include "MyPersistentData.h"
 #include "power/PowerManager.h"
@@ -218,7 +220,6 @@ const char *profileSelectionReasonLabel(PowerProfileSelectionReason reason) {
 void logPowerState(const char *reason, bool forceLog) {
   // Monotonic counter for diagnostic tracking
   static uint32_t logCounter = 0;
-  (void)forceLog; // Suppression disabled for diagnostic purposes
 
   // Read current power state
   const PowerReport &report = PowerManager::instance().latestReport();
@@ -253,44 +254,97 @@ void logPowerState(const char *reason, bool forceLog) {
   nordicUsbAvailable = true;
 #endif
 
-  // Build compact log message with counter
-  logCounter++;
-  if (pmicAvailable && nordicUsbAvailable) {
-    Log.info("PowerDiag[%lu]: %s source=%s profile=%s vbus=%u pg=%d soc=%.1f%% usbAddr=0x%lx usbReg=0x%lx",
-             (unsigned long)logCounter,
-             reason,
-             powerSourceLabel(powerSource),
-             inputProfileLabel(profile),
-             (unsigned)vbusStatus,
-             powerGood ? 1 : 0,
-             soc,
-             (unsigned long)usbAddr,
-             (unsigned long)usbRegStatus);
-  } else if (pmicAvailable) {
-    Log.info("PowerDiag[%lu]: %s source=%s profile=%s vbus=%u pg=%d soc=%.1f%%",
-             (unsigned long)logCounter,
-             reason,
-             powerSourceLabel(powerSource),
-             inputProfileLabel(profile),
-             (unsigned)vbusStatus,
-             powerGood ? 1 : 0,
-             soc);
-  } else if (nordicUsbAvailable) {
-    Log.info("PowerDiag[%lu]: %s source=%s profile=%s soc=%.1f%% usbAddr=0x%lx usbReg=0x%lx",
-             (unsigned long)logCounter,
-             reason,
-             powerSourceLabel(powerSource),
-             inputProfileLabel(profile),
-             soc,
-             (unsigned long)usbAddr,
-             (unsigned long)usbRegStatus);
-  } else {
-    Log.info("PowerDiag[%lu]: %s source=%s profile=%s soc=%.1f%%",
-             (unsigned long)logCounter,
-             reason,
-             powerSourceLabel(powerSource),
-             inputProfileLabel(profile),
-             soc);
+  // WO-2026-09-15-001 Amendment C: log-on-every-check-not-every-change fix.
+  // Compares the same fields the log line itself displays (soc rounded to
+  // the printed precision, so sub-0.05% float noise between reads does not
+  // count as a change), PLUS `reason`, against what was logged last call.
+  // `reason` is included deliberately, not just the numeric fields: the
+  // documented repeat pattern (WO-2026-09-15-001's original evidence, and
+  // WO-2026-09-21-003's later capture) is the SAME reason - most often
+  // "post-refreshInputProfile" - fired several times in a row with
+  // unchanged values, not different lifecycle checkpoints coincidentally
+  // agreeing. A genuinely different reason (post-wake, connect-success,
+  // ...) is its own checkpoint and must always surface once, even if the
+  // values it reports happen to match the previous checkpoint's.
+  // forceLog - wired through all 7 call sites since this function was
+  // added, previously dead - now does what its name always implied: bypass
+  // suppression for call sites that are always worth a line (setup
+  // baseline, an actual profile-change event) regardless of whether the
+  // values happen to repeat. The diagnostics batch append below is
+  // unconditional either way - this guard is scoped to serial log volume
+  // only, not to what the cloud pdiag payload captures.
+  static bool hasLoggedBefore = false;
+  static char lastLoggedReason[32] = "";
+  static int lastLoggedPowerSource = 0;
+  static PowerInputProfile lastLoggedProfile = PowerInputProfile::NotApplicable;
+  static uint8_t lastLoggedVbusStatus = 0;
+  static bool lastLoggedPowerGood = false;
+  static float lastLoggedSocRounded = 0.0f;
+  static uint32_t lastLoggedUsbAddr = 0;
+  static uint32_t lastLoggedUsbRegStatus = 0;
+
+  const float socRounded = roundf(soc * 10.0f) / 10.0f;
+  const bool valuesUnchanged = hasLoggedBefore &&
+      strcmp(lastLoggedReason, reason ? reason : "") == 0 &&
+      lastLoggedPowerSource == powerSource &&
+      lastLoggedProfile == profile &&
+      lastLoggedVbusStatus == vbusStatus &&
+      lastLoggedPowerGood == powerGood &&
+      lastLoggedSocRounded == socRounded &&
+      lastLoggedUsbAddr == usbAddr &&
+      lastLoggedUsbRegStatus == usbRegStatus;
+
+  if (forceLog || !valuesUnchanged) {
+    hasLoggedBefore = true;
+    strncpy(lastLoggedReason, reason ? reason : "", sizeof(lastLoggedReason) - 1);
+    lastLoggedReason[sizeof(lastLoggedReason) - 1] = '\0';
+    lastLoggedPowerSource = powerSource;
+    lastLoggedProfile = profile;
+    lastLoggedVbusStatus = vbusStatus;
+    lastLoggedPowerGood = powerGood;
+    lastLoggedSocRounded = socRounded;
+    lastLoggedUsbAddr = usbAddr;
+    lastLoggedUsbRegStatus = usbRegStatus;
+
+    // Build compact log message with counter
+    logCounter++;
+    if (pmicAvailable && nordicUsbAvailable) {
+      Log.info("PowerDiag[%lu]: %s source=%s profile=%s vbus=%u pg=%d soc=%.1f%% usbAddr=0x%lx usbReg=0x%lx",
+               (unsigned long)logCounter,
+               reason,
+               powerSourceLabel(powerSource),
+               inputProfileLabel(profile),
+               (unsigned)vbusStatus,
+               powerGood ? 1 : 0,
+               soc,
+               (unsigned long)usbAddr,
+               (unsigned long)usbRegStatus);
+    } else if (pmicAvailable) {
+      Log.info("PowerDiag[%lu]: %s source=%s profile=%s vbus=%u pg=%d soc=%.1f%%",
+               (unsigned long)logCounter,
+               reason,
+               powerSourceLabel(powerSource),
+               inputProfileLabel(profile),
+               (unsigned)vbusStatus,
+               powerGood ? 1 : 0,
+               soc);
+    } else if (nordicUsbAvailable) {
+      Log.info("PowerDiag[%lu]: %s source=%s profile=%s soc=%.1f%% usbAddr=0x%lx usbReg=0x%lx",
+               (unsigned long)logCounter,
+               reason,
+               powerSourceLabel(powerSource),
+               inputProfileLabel(profile),
+               soc,
+               (unsigned long)usbAddr,
+               (unsigned long)usbRegStatus);
+    } else {
+      Log.info("PowerDiag[%lu]: %s source=%s profile=%s soc=%.1f%%",
+               (unsigned long)logCounter,
+               reason,
+               powerSourceLabel(powerSource),
+               inputProfileLabel(profile),
+               soc);
+    }
   }
 
 #if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
