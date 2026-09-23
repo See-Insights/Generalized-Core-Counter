@@ -327,6 +327,7 @@ public:
 	time_t get_lastHookResponse() const;
 	void set_lastHookResponse(time_t value);
 
+	// WO-2026-09-23-001: these four are confirmed dead (no definition, no caller) - candidate for a future cleanup WO, not this one.
 	uint8_t get_alertCodeNode() const;
 	void set_alertCodeNode(uint8_t value);
 
@@ -548,6 +549,7 @@ public:
 	 * @brief Load the appropriate system defaults - good ot initialize a system to "factory settings"
 	 * 
 	 */
+	// WO-2026-09-23-001: confirmed dead (no definition, no caller) - candidate for a future cleanup WO, not this one.
 	void loadCurrentDefaults();                          // Initilize the object values for new deployments
 
 
@@ -692,6 +694,7 @@ public:
 	 * @brief Load the appropriate system defaults - good ot initialize a system to "factory settings"
 	 * 
 	 */
+	// WO-2026-09-23-001: confirmed dead (no definition, no caller) - candidate for a future cleanup WO, not this one.
 	void loadCurrentDefaults();                          // Initilize the object values for new deployments
 
 	/**
