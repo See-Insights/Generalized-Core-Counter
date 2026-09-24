@@ -871,12 +871,29 @@ public:
     static const uint8_t   REG_OSC_CTRL_OFIE        = 0x02;      //!< Oscillator control, oscillator fail interrupt enable
     static const uint8_t   REG_OSC_CTRL_ACIE        = 0x01;      //!< Oscillator control, auto-calibration fail interrupt enable
     static const uint8_t   REG_OSC_CTRL_DEFAULT     = 0x00;      //!< Oscillator control, default value
+    // UPSTREAM BUG FIX (local patch): XTCAL, LKO2 and OMODE were wrong here.
+    // Corrected against Table 19 (Register Definitions 0x10-0xFF) of the
+    // Abracon AB18X5 Real-Time Clock with Power Management Family application
+    // manual, Abracon drawing #453570 rev C, 2014-09-16, page 62. Register
+    // 0x1D Osc. Status bit layout is:
+    //
+    //   bit 7 6 | 5    | 4     | 3 2 | 1  | 0
+    //     XTCAL | LKO2 | OMODE |  -  | OF | ACF
+    //
+    // The old values were also internally contradictory - OMODE and ACF both
+    // claimed bit 0, and XTCAL (0x0c) overlapped LKO2 (0x04) - which is what
+    // first exposed them. OF and ACF were already correct and are unchanged.
+    //
+    // Consequence of the OMODE error: usingRCOscillator() tests
+    // `value & REG_OSC_STATUS_OMODE`, so with the old 0x01 it was reading ACF
+    // (auto-calibration failure) and reporting it as "using RC oscillator."
+    // Fixing the constant fixes that function too.
     static const uint8_t REG_OSC_STATUS             = 0x1d;      //!< Oscillator status register
-    static const uint8_t   REG_OSC_STATUS_XTCAL     = 0x0c;      //!< Oscillator status register, extended crystal calibration
-    static const uint8_t   REG_OSC_STATUS_LKO2      = 0x04;      //!< Oscillator status register, lock OUT2
-    static const uint8_t   REG_OSC_STATUS_OMODE     = 0x01;      //!< Oscillator status register, oscillator mode (read-only)
-    static const uint8_t   REG_OSC_STATUS_OF        = 0x02;      //!< Oscillator status register, oscillator failure
-    static const uint8_t   REG_OSC_STATUS_ACF       = 0x01;      //!< Oscillator status register, auto-calibration failure
+    static const uint8_t   REG_OSC_STATUS_XTCAL     = 0xc0;      //!< Oscillator status register, extended crystal calibration (bits 7:6)
+    static const uint8_t   REG_OSC_STATUS_LKO2      = 0x20;      //!< Oscillator status register, lock OUT2 (bit 5)
+    static const uint8_t   REG_OSC_STATUS_OMODE     = 0x10;      //!< Oscillator status register, oscillator mode (bit 4, read-only)
+    static const uint8_t   REG_OSC_STATUS_OF        = 0x02;      //!< Oscillator status register, oscillator failure (bit 1)
+    static const uint8_t   REG_OSC_STATUS_ACF       = 0x01;      //!< Oscillator status register, auto-calibration failure (bit 0)
     static const uint8_t REG_CONFIG_KEY             = 0x1f;      //!< Register to set to modify certain other keys
     static const uint8_t   REG_CONFIG_KEY_OSC_CTRL  = 0xa1;      //!< Configuration key, enable setting REG_OSC_CTRL
     static const uint8_t   REG_CONFIG_KEY_SW_RESET  = 0x3c;      //!< Configuration key, software reset
