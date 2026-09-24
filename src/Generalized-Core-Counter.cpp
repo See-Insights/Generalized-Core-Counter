@@ -2035,6 +2035,14 @@ void publishData() {
              SystemConfig::get_lastConnectionDuration(),
              timeStampValue);
 
+    // WO-2026-09-23-003: diagnostic only - a serial-side record of what the
+    // device believed and reported at the moment of publish, to
+    // cross-reference against the cloud-received event and physical LED
+    // state. current.get_occupied() -> CurrentReadings::get_occupied(),
+    // confirmed the correct post-Step-5 facade path.
+    Log.info("OccupancyWebhook: occupied=%d timestamp=%lu",
+             CurrentReadings::get_occupied() ? 1 : 0, timeStampValue);
+
   } else {
     const unsigned long timeStampValue = endOfPrevHourStampSec;
 

@@ -531,7 +531,12 @@ void handleConnectingState() {
       thrashGuard.markProgress("CLOUD_CONNECTED");
       setAppBreadcrumb(7);
       connectedStartMs = millis();
+      // WO-2026-09-23-003: diagnostic only - confirms a write through
+      // Step 5's SystemConfig facade actually lands and is readable. Both
+      // values are read back through the facade, not assumed from Time.now().
+      const time_t lastConnectionBefore = SystemConfig::get_lastConnection();
       SystemConfig::set_lastConnection(Time.now());
+      Log.info("lastConnection: %ld -> %ld", (long)lastConnectionBefore, (long)SystemConfig::get_lastConnection());
       clearConnectivityFailsafeRecovery("cloud-ok");
 
       // Observability: connect succeeded + begin service window.
