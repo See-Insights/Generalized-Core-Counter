@@ -10,6 +10,7 @@
 You are the Implementer under `AI_DEVELOPMENT_WORKFLOW.md`. Read its "GitHub Copilot — Implementer" section and its "Temporary build and test artifacts" section first. In summary:
 
 - Work only from this approved WO. Do not expand scope or change the architecture. If the WO cannot be implemented as written, **stop and report back**. Do not improvise.
+- Any correction to the spec, even an obviously right one, is reported as a deviation.
 - **Do not commit, push, merge, or release.** Leave a complete, uncommitted working-tree diff.
 - Temporary artifacts must use visible, descriptive names, sit under a gitignored path, and be removed when you finish, including on failure paths. No dot-prefixed files.
 

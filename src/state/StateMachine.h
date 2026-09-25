@@ -131,4 +131,4 @@ void dailyCleanup();
 /**
  * @brief Publishes the current sensor payload using the configured reporting path.
  */
-void publishData();
+void publishData(time_t stampOverride);

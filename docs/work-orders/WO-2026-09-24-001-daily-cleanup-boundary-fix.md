@@ -74,25 +74,55 @@ to `Clock::isTrusted()`.
 Replace the existing day-boundary check with the following. Names below are
 placeholders; see "Name mapping" for the real functions and config fields.
 
+Revised by Stage 5 decision 8 (2026-09-25). There is one publish per report,
+and the report that triggers the cleanup is the day's closing record.
+
 ```cpp
-if (Clock::isTrusted()) {                       // untrusted: skip entirely, stamp nothing
-    time_t now = Time.now();
+time_t now = Time.now();
 
+// Boundary test: evaluated first, with no writes, so the report knows
+// whether it is the closing record. Untrusted: not due, nothing stamped.
+bool due = false;
+time_t boundary = 0;
+int close = 0;
+if (Clock::isTrusted()) {
     // Normalize once - no separate always-open branch.
-    int close = (openHour == closeHour) ? 24 : closeHour;  // legacy always-open → midnight
-    time_t boundary = localTodayAt(close);
+    close = (openHour == closeHour) ? 24 : closeHour;  // legacy always-open → midnight
+    boundary = localTodayAt(close);
     if (now < boundary) boundary -= 86400;      // before today's close → use yesterday's
-
     time_t last = lastDailyCleanup();
-    if (last < boundary || last > now) {        // due, or stamp is in the future (clock jumped back)
-        if (isOccupied()) closeSessionAt(boundary);  // credit up to close, not beyond
-        publishData();                               // final snapshot into PublishQueue
-        resetDailyCounts();
-        if (close == 24 && isOccupied()) startSessionAt(boundary); // remainder counts toward new day
-        setLastDailyCleanup(now);
-    }
+    due = (last < boundary || last > now);      // due, or stamp is in the future (clock jumped back)
+}
+
+// Closing-record preparation (only when due): credit an open session up to
+// the boundary so the closing report includes it.
+bool wasOccupied = false;
+time_t sessionStart = 0;
+if (due) {
+    wasOccupied = isOccupied();                  // capture BEFORE close: resetDailyCounts() clears occupancy
+    sessionStart = occupancyStartTime();         // capture BEFORE close: closeSessionAt() zeroes it
+    if (wasOccupied) closeSessionAt(boundary);   // credit up to close, not beyond
+}
+
+// (1) The normal report publish - the only publish. When due, it is the
+//     day's closing record, stamped at boundary - 1.
+publishData(due ? boundary - 1 : 0);             // 0 = no override (existing timestamp)
+
+// (2)-(4) Writes, in order, only when due.
+if (due) {
+    resetDailyCounts();                                                          // (3) reset
+    if (close == 24 && wasOccupied) startSessionAt(max(boundary, sessionStart)); // remainder counts toward new day
+    setLastDailyCleanup(now);                                                    // (4) stamp
 }
 ```
+
+Order of effects: (1) the normal report publish, (2) the boundary decision
+it carries, (3) reset, (4) stamp `lastDailyCleanup`. The boundary test itself
+is evaluated before the publish because the publish must know whether it is
+the closing record (for the stamp), and because an open session must be
+credited up to the boundary before it is reported; otherwise the reset would
+zero the credited time without it ever being reported. The test writes
+nothing.
 
 ### Requirements
 
@@ -107,6 +137,14 @@ if (Clock::isTrusted()) {                       // untrusted: skip entirely, sta
 - `lastDailyCleanup` is the only boundary state. Its zero value (never
   cleaned) counts as due.
 - `lastReport` and the hourly `hourlyCount` reset are not touched.
+- There is exactly one `publishData()` call per report. The separate in-block
+  snapshot publish is removed (decision 8).
+- `publishData()` takes an optional stamp override
+  (`publishData(time_t stampOverride = 0)`). A nonzero override replaces the
+  occupancy-mode payload's `timestamp`; zero keeps today's behavior. Only the
+  report that triggers the cleanup passes `boundary - 1`, in both the on-time
+  and catch-up cases. The counting-mode payload (which stamps
+  `endOfPrevHourStampSec`) is unchanged.
 - The always-open case is handled by the `close = 24` normalization above,
   not by a separate branch. Note this does **not** retire the
   `openHour == closeHour` convention itself - that remains in
@@ -131,8 +169,9 @@ split - the mappings below name the pre-Step-5 symbols for traceability.
 | `close == 24` (always-open) | normalized from `openTime == closeTime` | Existing convention: `Clock.cpp:21-23` treats `openHour == closeHour` as always-open. Normalized inline per Stage 5 decision 3 - no separate branch |
 | `lastDailyCleanup()` / `setLastDailyCleanup()` | `sysStatus.get_lastDailyCleanup()` / `set_lastDailyCleanup()` | Already exists; currently write-only, no reader makes a decision from it |
 | `isOccupied()` | `current.get_occupied()` | |
+| `occupancyStartTime()` | `current.get_occupancyStartTime()` | Added with Stage 5 decision 7 |
 | `startSessionAt(t)` | `current.set_occupied(true)` + `current.set_occupancyStartTime(t)` | Mirrors `State_Modes.cpp:65` / `State_Sleep.cpp:1669`, but with an explicit time instead of `Time.now()` |
-| `publishData()` | `publishData()` | Unchanged, `void`, called as today |
+| `publishData()` | `publishData(time_t stampOverride = 0)` | Still `void`. Decision 8 adds the optional stamp override (occupancy payload only); the report path's single call passes `boundary - 1` when due, `0` otherwise |
 
 **One placeholder needs a small new helper:**
 
@@ -274,8 +313,10 @@ Not part of this WO:
 - Handling `PublishQueue` overflow (pre-existing)
 - Deferring cleanup while occupied
 - The `LocalTimeCache` midnight-straddle race (has its own WO)
-- Backfilling backend `dailyoccupancy` data since 2026-09-21 (a separate
-  decision)
+- Backfilling backend `dailyoccupancy` data since 2026-09-21. **Decided
+  2026-09-25: no backfill.** History before the update stays marked as
+  corrupted; counts are correct from the update onward (see "Deployment
+  effect").
 - DST edge cases
 
 ## Acceptance criteria
@@ -292,6 +333,12 @@ Not part of this WO:
 6. Month-end rollover (31 → 1) works, because nothing compares day-of-month
    values.
 7. The hourly reporting and `hourlyCount` behavior is unchanged.
+8. The report that triggers the cleanup is published before the reset, and
+   there is no second publish at cleanup (decision 8).
+9. Only the report that triggers the cleanup has its occupancy payload
+   timestamp set to `boundary - 1`, in both the on-time and catch-up cases.
+   Every other report, and the counting-mode payload, is stamped as before
+   (decision 8).
 
 ## Bench validation
 
@@ -303,10 +350,48 @@ Not part of this WO:
   occurs.
 - **24-hour sensor:** the reset happens at midnight.
 
+### Bench results, 2026-09-25 (Dev-14, pre-decision-8 build)
+
+Build: the Stage 7-verified WO build (decisions 1–7), which still had the
+in-block snapshot publish that decision 8 removes. Times UTC, with SGT in
+parentheses.
+
+- **Morning catch-up (the one-time post-flash correction).** Flashed at
+  06:13Z (14:13 SGT). The cleanup ran at the **06:13:28Z** report: the
+  serial `last=1790316808` is 06:13:28Z. The 06:13:44Z webhook (payload
+  06:13:28Z, `dailyoccupancy=493`) was that report's in-block snapshot. The
+  post-reset 0 report from the same report was lost when a reset at
+  06:15:32Z cleared the RAM queue before it was sent. The next boot's first
+  report (payload 06:15:35Z, 0, `resets=1`) was delivered at 06:18:24Z.
+  (This corrects Claude Code's earlier account, which placed the cleanup on
+  the 06:18 boot.)
+- **On-time close.** `closeHour` set to 15 at 06:15:30Z. At 07:00:03Z
+  (15:00:03 SGT) the report ran at close: USB serial shows
+  `Daily boundary reached (boundary=1790319600 last=1790316808 now=1790319603 close=15)`,
+  then `Report: … totalMin=9` (snapshot) and `Report: … totalMin=0`, and the
+  DATA ledger was stamped 15:00:03. `lastDailyCleanup` is now 15:00:03 SGT,
+  so the next morning's first report does not run a cleanup. The cleanup
+  logic behaved as specified.
+- **Both 15:00 webhooks were lost in transit** (accepted into the queue,
+  queue drained, never received by Particle's integrations or AWS). That
+  loss is not caused by this WO; it is tracked as **WO-2026-09-25-001**.
+
+## Deployment effect (accepted 2026-09-25)
+
+On devices affected by the 2026-09-21 bug, `lastDailyCleanup` has not been
+stamped since the bug began, so the first trusted report after the flash is
+due and the daily counts reset once, mid-day. This is accepted: holding off
+until the next boundary would keep the corrupted accumulated counts for the
+rest of that day. The day's counts are published before the reset, so
+nothing is lost.
+
+**Release notes line:** "On the day of the update, affected devices will
+show a mid-day dailyoccupancy reset (a one-time correction of the 9/21 bug)."
+
 ## Stage 7 instructions (Codex)
 
 Review the diff against this spec only and confirm acceptance criteria 1
-through 7. Anything outside scope gets filed as a separate item and does not
+through 9. Anything outside scope gets filed as a separate item and does not
 block this WO.
 
 ## Approval record
@@ -330,6 +415,50 @@ block this WO.
       Requirements); (6) `close = 24` is an internal normalization only -
       `closeHour = 24` is not a valid stored or config value in this WO, and
       adopting 0/24 as a config value is a follow-up WO (see Requirements).
-- [ ] Copilot implementation (Stage 6) — standard tier, post-Step-5 merge.
-- [ ] Codex diff review (Stage 7) — standard high-reasoning tier.
+      One further decision added 2026-09-25, after Stage 6 and before
+      Stage 7: (7) Occupancy is captured before the session close. The
+      always-open restart uses that captured value, because
+      `resetEverything()` clears occupancy. The restarted session starts at
+      `max(boundary, originalSessionStart)`, so it never credits time before
+      the person actually arrived. (Stage 6 implemented the capture without
+      reporting it as a spec correction; the `max()` rule was applied by
+      Claude Code as a pre-authorized one-liner, with test coverage, before
+      Stage 7. The Fix pseudocode above is corrected to match.)
+      Decision 8 (2026-09-25): restore the user's specified order: (1) the
+      normal report publish, (2) then the boundary test, (3) then reset,
+      (4) then stamp lastDailyCleanup. Remove the separate in-block snapshot
+      publishData() (it came from the architect's sketch, not the user's
+      spec). The report that triggers the cleanup is the day's closing
+      record: stamp its payload at boundary − 1 via an optional stamp
+      override on publishData(), so Ubidots, which plots the payload
+      timestamp, attributes it to the day it closes, in both the on-time and
+      catch-up cases. The counting-mode payload is unchanged.
+      (Implementation note, Claude Code: the boundary *test* is evaluated
+      before the publish, with no writes, because the publish needs its
+      result for the stamp and an open session must be credited up to the
+      boundary before it is reported. All writes follow the order above. See
+      the Fix section.)
+- [x] Copilot implementation (Stage 6) — 2026-09-25, `copilot` CLI 1.0.88,
+      model `gpt-5.5` (reasoning effort not set; CLI default), dispatched
+      from `WO-2026-09-24-001-stage6-copilot-dispatch.md` on `8e7a72f`.
+      Implemented the WO with the `wasOccupied` capture (recorded as
+      decision 7). Local ARM build not run by Copilot (toolchain outside its
+      path allowance); run by Claude Code instead.
+- [x] Codex diff review (Stage 7) — 2026-09-25, **VERIFIED** after one
+      test-only fix. Review `gpt-6-astra` at reasoning high: NOT VERIFIED,
+      mutation (f) survived. Test fix authorized by Chip and applied by
+      Claude Code. Narrow re-verification `gpt-6-astra` at reasoning xhigh:
+      VERIFIED. Both verdicts, word for word, are in
+      `WO-2026-09-24-001-stage7-verdict.md`. Final: suite 43/43 (sh via zsh,
+      py via python3); local ARM 150520 / 1090 / 2444; cloud 151698 / 3530.
+- [x] Copilot implementation of decision 8 (Stage 6, round 2) — 2026-09-25,
+      `copilot` CLI 1.0.88, `gpt-5.5` at reasoning medium, dispatched from
+      `WO-2026-09-24-001-stage6-round2-copilot-dispatch.md`. No deviations
+      reported. The default argument lives in `State_Common.h` only.
+- [x] Codex narrow review of decision 8 (Stage 7, round 2) — 2026-09-25,
+      **VERIFIED, no findings**. `gpt-6-astra` at reasoning ultra. All 12
+      mutations caught: round-1 (a)–(h) and decision-8 (i)–(iv). Suite 43/43
+      (sh via zsh, py via python3); local ARM 150576 / 1090 / 2444; cloud
+      151754 / 3530. Verdict appended, word for word, to
+      `WO-2026-09-24-001-stage7-verdict.md`.
 - [ ] Chip final gate / commit (Stage 8)
