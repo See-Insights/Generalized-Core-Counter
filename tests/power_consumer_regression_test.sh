@@ -25,6 +25,9 @@ extract_braced_block() {
   cat <<'CPP'
 #include "power/PowerManager.h"
 #include "MyPersistentData.h"
+#include "persist/SystemConfig.h"
+#include "persist/PowerConfig.h"
+#include "persist/CurrentReadings.h"
 #include "cloud/BatteryBackoffPolicy.h"
 
 #include <cassert>

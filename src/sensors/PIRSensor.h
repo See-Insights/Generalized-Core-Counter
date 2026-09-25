@@ -5,7 +5,6 @@
 #include "sensors/ISensor.h"
 #include "Particle.h"
 #include "device_pinout.h"
-#include "MyPersistentData.h"  // for sysStatus (verboseMode)
 
 /**
  * @brief PIR (Passive Infrared) Motion Sensor Implementation

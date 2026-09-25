@@ -49,8 +49,8 @@ SRC_ROOT = REPO_ROOT / "src"
 BATTERY_AUTHORITY_CPP = SRC_ROOT / "power" / "BatteryAuthorityCommand.cpp"
 MY_PERSISTENT_DATA_CPP = SRC_ROOT / "MyPersistentData.cpp"
 
-SET_TIER_PATTERN = re.compile(r"sysStatus\.set_currentBatteryTier\s*\(")
-SET_LOW_BATTERY_PATTERN = re.compile(r"sysStatus\.set_lowBatteryMode\s*\(")
+SET_TIER_PATTERN = re.compile(r"PowerConfig::set_currentBatteryTier\s*\(")
+SET_LOW_BATTERY_PATTERN = re.compile(r"PowerConfig::set_lowBatteryMode\s*\(")
 CALCULATE_BATTERY_TIER_DEF_PATTERN = re.compile(
     r"\bcalculateBatteryTier\s*\([^;]*\)\s*\{"
 )
@@ -77,28 +77,33 @@ def main() -> None:
     ]
     texts = {p: strip_comments(p.read_text()) for p in all_source_files}
 
-    # --- Invariant 1: sysStatus.set_currentBatteryTier( appears exactly ---
-    # --- once, inside power/BatteryAuthority.cpp.                       ---
+    # --- Invariant 1: PowerConfig::set_currentBatteryTier( appears exactly ---
+    # --- once outside MyPersistentData.cpp, inside BatteryAuthorityCommand. ---
+    # WO-2026-09-23-001: MyPersistentData.cpp is excluded because it now also
+    # holds the facade forwarder definition; the single-writer invariant is
+    # about production callers, which is what the facade spelling identifies.
     tier_sites = []
     for path, text in texts.items():
+        if path == MY_PERSISTENT_DATA_CPP:
+            continue
         count = len(SET_TIER_PATTERN.findall(text))
         if count:
             tier_sites.append((path, count))
     total_tier_writes = sum(c for _, c in tier_sites)
     if total_tier_writes != 1:
         fail(
-            f"sysStatus.set_currentBatteryTier( appears {total_tier_writes} "
+            f"PowerConfig::set_currentBatteryTier( appears {total_tier_writes} "
             f"time(s) in src/, expected exactly 1: "
             + ", ".join(f"{p.relative_to(REPO_ROOT)}={c}" for p, c in tier_sites)
         )
     if tier_sites[0][0] != BATTERY_AUTHORITY_CPP:
         fail(
-            f"the one sysStatus.set_currentBatteryTier( call site is in "
+            f"the one PowerConfig::set_currentBatteryTier( call site is in "
             f"{tier_sites[0][0].relative_to(REPO_ROOT)}, expected "
             f"{BATTERY_AUTHORITY_CPP.relative_to(REPO_ROOT)}"
         )
 
-    # --- Invariant 2: sysStatus.set_lowBatteryMode( appears exactly once ---
+    # --- Invariant 2: PowerConfig::set_lowBatteryMode( appears exactly once ---
     # --- outside MyPersistentData.cpp, inside power/BatteryAuthority.cpp.---
     low_battery_sites = []
     for path, text in texts.items():
@@ -110,14 +115,14 @@ def main() -> None:
     total_low_battery_writes = sum(c for _, c in low_battery_sites)
     if total_low_battery_writes != 1:
         fail(
-            f"sysStatus.set_lowBatteryMode( appears {total_low_battery_writes} "
+            f"PowerConfig::set_lowBatteryMode( appears {total_low_battery_writes} "
             f"time(s) outside {MY_PERSISTENT_DATA_CPP.relative_to(REPO_ROOT)}, "
             "expected exactly 1: "
             + ", ".join(f"{p.relative_to(REPO_ROOT)}={c}" for p, c in low_battery_sites)
         )
     if low_battery_sites[0][0] != BATTERY_AUTHORITY_CPP:
         fail(
-            f"the one sysStatus.set_lowBatteryMode( call site outside "
+            f"the one PowerConfig::set_lowBatteryMode( call site outside "
             f"MyPersistentData.cpp is in {low_battery_sites[0][0].relative_to(REPO_ROOT)}, "
             f"expected {BATTERY_AUTHORITY_CPP.relative_to(REPO_ROOT)}"
         )
@@ -151,8 +156,8 @@ def main() -> None:
             + ", ".join(offenders)
         )
 
-    print(f"OK: sysStatus.set_currentBatteryTier( appears exactly once, in {BATTERY_AUTHORITY_CPP.relative_to(REPO_ROOT)}")
-    print(f"OK: sysStatus.set_lowBatteryMode( appears exactly once outside MyPersistentData.cpp, in {BATTERY_AUTHORITY_CPP.relative_to(REPO_ROOT)}")
+    print(f"OK: PowerConfig::set_currentBatteryTier( appears exactly once, in {BATTERY_AUTHORITY_CPP.relative_to(REPO_ROOT)}")
+    print(f"OK: PowerConfig::set_lowBatteryMode( appears exactly once outside MyPersistentData.cpp, in {BATTERY_AUTHORITY_CPP.relative_to(REPO_ROOT)}")
     print("OK: calculateBatteryTier has zero definitions anywhere in src/")
     print("OK: applyBatteryAwareConnectionModePolicy has zero declarations/definitions/callers anywhere in src/")
     print("battery_authority_structural_test: all invariants hold")

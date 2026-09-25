@@ -2,6 +2,8 @@
 
 #include "power/BatteryAuthority.h"
 #include "power/ChargeInhibitPolicy.h"
+#include "persist/PowerConfig.h"
+#include "persist/SystemConfig.h"
 
 namespace {
 
@@ -140,10 +142,10 @@ bool Cloud::applyConfigurationFromLedger(const LedgerData &defaults, const Ledge
         const bool anyChanged = sensorChanged || timingChanged || messagingChanged || modesChanged || reportingChanged || powerChanged;
 
         // Do not force synchronous storage flushes here; they can exceed the
-        // 100 ms loop budget. Persistence is handled by sysStatus.loop() and
-        // sensorConfig.loop() (called from the main loop).
-        sysStatus.validate(sizeof(sysStatus));
-        sensorConfig.validate(sizeof(sensorConfig));
+        // 100 ms loop budget. Persistence is handled by SystemConfig::loop() and
+        // SystemConfig::SensorSettings::loop() (called from the main loop).
+        SystemConfig::validateStoredData();
+        SystemConfig::SensorSettings::validateStoredData();
 
         // Defer device-status publishing to Cloud::loop() so it doesn't
         // execute inside CONNECTING_STATE or async callbacks.
@@ -193,16 +195,16 @@ bool Cloud::applyMessagingConfig(const LedgerData &defaults, const LedgerData &d
     int verboseTimeoutMin = 0;
 
     if (getMergedBoolValue(defaultMessaging, deviceMessaging, "serial", serialEnabled)) {
-        if (sysStatus.get_serialConnected() != serialEnabled) {
-            sysStatus.set_serialConnected(serialEnabled);
+        if (SystemConfig::get_serialConnected() != serialEnabled) {
+            SystemConfig::set_serialConnected(serialEnabled);
             Log.info("Config: Serial → %s", serialEnabled ? "ON" : "OFF");
             changed = true;
         }
     }
 
     if (getMergedBoolValue(defaultMessaging, deviceMessaging, "verboseMode", verboseMode)) {
-        if (sysStatus.get_verboseMode() != verboseMode) {
-            sysStatus.set_verboseMode(verboseMode);
+        if (SystemConfig::get_verboseMode() != verboseMode) {
+            SystemConfig::set_verboseMode(verboseMode);
             Log.info("Config: Verbose -> %s", verboseMode ? "ON" : "OFF");
             changed = true;
         }
@@ -210,8 +212,8 @@ bool Cloud::applyMessagingConfig(const LedgerData &defaults, const LedgerData &d
 
     if (getMergedIntValue(defaultMessaging, deviceMessaging, "verboseTimeoutMin", verboseTimeoutMin)) {
         if (validateRange(verboseTimeoutMin, 0, 1440, "verboseTimeoutMin")) {
-            if (sysStatus.get_verboseTimeoutMin() != (uint16_t)verboseTimeoutMin) {
-                sysStatus.set_verboseTimeoutMin((uint16_t)verboseTimeoutMin);
+            if (SystemConfig::get_verboseTimeoutMin() != (uint16_t)verboseTimeoutMin) {
+                SystemConfig::set_verboseTimeoutMin((uint16_t)verboseTimeoutMin);
                 Log.info("Config: Verbose timeout -> %d min", verboseTimeoutMin);
                 changed = true;
             }
@@ -242,14 +244,14 @@ bool Cloud::applyTimingConfig(const LedgerData &defaults, const LedgerData &devi
     int openHour = 0;
     int closeHour = 0;
     int connectAttemptBudgetSec = 0;
-    char timezone[sizeof(sysStatusData::SysData::timeZoneStr)] = {0};
+    char timezone[SystemConfig::kTimeZoneCapacity] = {0};
 
     if (getMergedStringValue(defaultTiming, deviceTiming, "timezone", timezone, sizeof(timezone))) {
         normalizeTimezoneInPlace(timezone, sizeof(timezone));
         size_t timezoneLen = strlen(timezone);
         if (timezoneLen > 0 && timezoneLen < sizeof(timezone)) {
-            if (strcmp(sysStatus.get_timeZoneStrCStr(), timezone) != 0) {
-                sysStatus.set_timeZoneStr(timezone);
+            if (strcmp(SystemConfig::get_timeZoneStrCStr(), timezone) != 0) {
+                SystemConfig::set_timeZoneStr(timezone);
                 Log.info("Config: Timezone -> %s", timezone);
                 changed = true;
             }
@@ -261,8 +263,8 @@ bool Cloud::applyTimingConfig(const LedgerData &defaults, const LedgerData &devi
 
     if (getMergedIntValue(defaultTiming, deviceTiming, "reportingIntervalSec", reportingInterval)) {
         if (validateRange(reportingInterval, 300, 86400, "timing.reportingIntervalSec")) {
-            if (sysStatus.get_reportingInterval() != reportingInterval) {
-                sysStatus.set_reportingInterval(reportingInterval);
+            if (SystemConfig::get_reportingInterval() != reportingInterval) {
+                SystemConfig::set_reportingInterval(reportingInterval);
                 Log.info("Config: Reporting interval -> %ds", reportingInterval);
                 changed = true;
             }
@@ -276,8 +278,8 @@ bool Cloud::applyTimingConfig(const LedgerData &defaults, const LedgerData &devi
 
     if (getMergedIntValue(defaultTiming, deviceTiming, "openHour", openHour)) {
         if (validateRange(openHour, 0, 23, "timing.openHour")) {
-            if (sysStatus.get_openTime() != openHour) {
-                sysStatus.set_openTime(openHour);
+            if (SystemConfig::get_openTime() != openHour) {
+                SystemConfig::set_openTime(openHour);
                 Log.info("Config: Open hour -> %d", openHour);
                 changed = true;
             }
@@ -288,8 +290,8 @@ bool Cloud::applyTimingConfig(const LedgerData &defaults, const LedgerData &devi
 
     if (getMergedIntValue(defaultTiming, deviceTiming, "closeHour", closeHour)) {
         if (validateRange(closeHour, 0, 23, "timing.closeHour")) {
-            if (sysStatus.get_closeTime() != closeHour) {
-                sysStatus.set_closeTime(closeHour);
+            if (SystemConfig::get_closeTime() != closeHour) {
+                SystemConfig::set_closeTime(closeHour);
                 Log.info("Config: Close hour -> %d", closeHour);
                 changed = true;
             }
@@ -301,8 +303,8 @@ bool Cloud::applyTimingConfig(const LedgerData &defaults, const LedgerData &devi
     // Maximum connection-attempt budget per wake (seconds)
     if (getMergedIntValue(defaultTiming, deviceTiming, "connectAttemptBudgetSec", connectAttemptBudgetSec)) {
         if (validateRange(connectAttemptBudgetSec, 30, 900, "connectAttemptBudgetSec")) {
-            if (sysStatus.get_connectAttemptBudgetSec() != connectAttemptBudgetSec) {
-                sysStatus.set_connectAttemptBudgetSec((uint16_t)connectAttemptBudgetSec);
+            if (SystemConfig::get_connectAttemptBudgetSec() != connectAttemptBudgetSec) {
+                SystemConfig::set_connectAttemptBudgetSec((uint16_t)connectAttemptBudgetSec);
                 Log.info("Config: Connect budget -> %ds", connectAttemptBudgetSec);
                 changed = true;
             }
@@ -347,8 +349,8 @@ bool Cloud::applySensorConfig(const LedgerData &defaults, const LedgerData &devi
     // sensor.type
     if (getMergedIntValue(defaultSensor, deviceSensor, "type", sensorType)) {
         if (validateRange(sensorType, 0, 255, "sensor.type")) {
-            if (sensorConfig.get_sensorType() != (uint8_t)sensorType) {
-                sensorConfig.set_sensorType((uint8_t)sensorType);
+            if (SystemConfig::SensorSettings::get_sensorType() != (uint8_t)sensorType) {
+                SystemConfig::SensorSettings::set_sensorType((uint8_t)sensorType);
                 Log.info("Config: Sensor type -> %d", sensorType);
                 changed = true;
             }
@@ -359,15 +361,15 @@ bool Cloud::applySensorConfig(const LedgerData &defaults, const LedgerData &devi
     
     // sensor.setting1-4 (generic settings)
     if (getMergedIntValue(defaultSensor, deviceSensor, "setting1", setting1)) {
-        uint32_t currentValue = sensorConfig.get_sensorSetting1();
-        if (sysStatus.get_verboseMode()) {
+        uint32_t currentValue = SystemConfig::SensorSettings::get_sensorSetting1();
+        if (SystemConfig::get_verboseMode()) {
             Log.info("Cloud config: setting1=%d (current EEPROM=%lu)", setting1, (unsigned long)currentValue);
         }
         if (currentValue != (uint32_t)setting1) {
-            sensorConfig.set_sensorSetting1((uint32_t)setting1);
+            SystemConfig::SensorSettings::set_sensorSetting1((uint32_t)setting1);
             Log.info("Config: Sensor setting1 updated: %lu -> %d", (unsigned long)currentValue, setting1);
             changed = true;
-        } else if (sysStatus.get_verboseMode()) {
+        } else if (SystemConfig::get_verboseMode()) {
             Log.info("Config: Sensor setting1 unchanged at %d", setting1);
         }
     } else {
@@ -375,24 +377,24 @@ bool Cloud::applySensorConfig(const LedgerData &defaults, const LedgerData &devi
     }
     
     if (getMergedIntValue(defaultSensor, deviceSensor, "setting2", setting2)) {
-        if (sensorConfig.get_sensorSetting2() != (uint32_t)setting2) {
-            sensorConfig.set_sensorSetting2((uint32_t)setting2);
+        if (SystemConfig::SensorSettings::get_sensorSetting2() != (uint32_t)setting2) {
+            SystemConfig::SensorSettings::set_sensorSetting2((uint32_t)setting2);
             Log.info("Config: Sensor setting2 -> %d", setting2);
             changed = true;
         }
     }
     
     if (getMergedIntValue(defaultSensor, deviceSensor, "setting3", setting3)) {
-        if (sensorConfig.get_sensorSetting3() != (uint32_t)setting3) {
-            sensorConfig.set_sensorSetting3((uint32_t)setting3);
+        if (SystemConfig::SensorSettings::get_sensorSetting3() != (uint32_t)setting3) {
+            SystemConfig::SensorSettings::set_sensorSetting3((uint32_t)setting3);
             Log.info("Config: Sensor setting3 -> %d", setting3);
             changed = true;
         }
     }
     
     if (getMergedIntValue(defaultSensor, deviceSensor, "setting4", setting4)) {
-        if (sensorConfig.get_sensorSetting4() != (uint32_t)setting4) {
-            sensorConfig.set_sensorSetting4((uint32_t)setting4);
+        if (SystemConfig::SensorSettings::get_sensorSetting4() != (uint32_t)setting4) {
+            SystemConfig::SensorSettings::set_sensorSetting4((uint32_t)setting4);
             Log.info("Config: Sensor setting4 -> %d", setting4);
             changed = true;
         }
@@ -427,10 +429,10 @@ bool Cloud::applyModesConfig(const LedgerData &defaults, const LedgerData &devic
     // Sensor mode: 0=COUNTING, 1=OCCUPANCY, 2=MEASUREMENT
     if (getMergedIntValue(defaultModes, deviceModes, "sensorMode", sensorMode)) {
         if (validateRange(sensorMode, 0, 2, "sensorMode")) {
-            if (sysStatus.get_sensorMode() != static_cast<SensorMode>(sensorMode)) {
-                sysStatus.set_sensorMode(static_cast<SensorMode>(sensorMode));
-                const char *modeStr = sensorMode == COUNTING ? "COUNTING" :
-                                     sensorMode == OCCUPANCY ? "OCCUPANCY" : "MEASUREMENT";
+            if (SystemConfig::get_sensorMode() != static_cast<SystemConfig::SensorMode>(sensorMode)) {
+                SystemConfig::set_sensorMode(static_cast<SystemConfig::SensorMode>(sensorMode));
+                const char *modeStr = sensorMode == SystemConfig::COUNTING ? "COUNTING" :
+                                     sensorMode == SystemConfig::OCCUPANCY ? "OCCUPANCY" : "MEASUREMENT";
                 Log.info("Config: Sensor mode -> %s", modeStr);
                 changed = true;
             }
@@ -442,17 +444,17 @@ bool Cloud::applyModesConfig(const LedgerData &defaults, const LedgerData &devic
     // Connection mode: 0=CONNECTED, 1=INTERMITTENT, 2=DISCONNECTED, 3=INTERMITTENT_KEEP_ALIVE
     if (getMergedIntValue(defaultModes, deviceModes, "connectionMode", connectionMode)) {
         if (validateRange(connectionMode, 0, 3, "connectionMode")) {
-            if (sysStatus.get_connectionMode() != static_cast<ConnectionMode>(connectionMode) ||
-                sysStatus.get_lowBatteryMode()) {
-                sysStatus.set_connectionMode(static_cast<ConnectionMode>(connectionMode));
+            if (SystemConfig::get_connectionMode() != static_cast<SystemConfig::ConnectionMode>(connectionMode) ||
+                PowerConfig::get_lowBatteryMode()) {
+                SystemConfig::set_connectionMode(static_cast<SystemConfig::ConnectionMode>(connectionMode));
                 // WO-2026-09-21 Step 4: routes through BatteryAuthority, the
                 // single owner of the persisted low-battery-mode field -
                 // this operator override should clear any sticky downgrade
                 // rather than have it silently reassert itself.
                 BatteryAuthority::clearLowBatteryMode();
-                const char *modeStr = connectionMode == CONNECTED ? "CONNECTED" :
-                                     connectionMode == INTERMITTENT ? "INTERMITTENT" :
-                                     connectionMode == DISCONNECTED ? "DISCONNECTED" : "INTERMITTENT_KEEP_ALIVE";
+                const char *modeStr = connectionMode == SystemConfig::CONNECTED ? "CONNECTED" :
+                                     connectionMode == SystemConfig::INTERMITTENT ? "INTERMITTENT" :
+                                     connectionMode == SystemConfig::DISCONNECTED ? "DISCONNECTED" : "INTERMITTENT_KEEP_ALIVE";
                 Log.info("Config: Connection mode -> %s", modeStr);
                 changed = true;
             }
@@ -464,11 +466,11 @@ bool Cloud::applyModesConfig(const LedgerData &defaults, const LedgerData &devic
     // Reporting mode: 0=SCHEDULED, 1=ON_CHANGE, 2=THRESHOLD, 3=SCHEDULED_OR_THRESHOLD
     if (getMergedIntValue(defaultModes, deviceModes, "reportingMode", reportingMode)) {
         if (validateRange(reportingMode, 0, 3, "reportingMode")) {
-            if (sysStatus.get_reportingMode() != static_cast<ReportingMode>(reportingMode)) {
-                sysStatus.set_reportingMode(static_cast<ReportingMode>(reportingMode));
-                const char *modeStr = reportingMode == SCHEDULED ? "SCHEDULED" :
-                                     reportingMode == ON_CHANGE ? "ON_CHANGE" :
-                                     reportingMode == THRESHOLD ? "THRESHOLD" : "SCHEDULED_OR_THRESHOLD";
+            if (SystemConfig::get_reportingMode() != static_cast<SystemConfig::ReportingMode>(reportingMode)) {
+                SystemConfig::set_reportingMode(static_cast<SystemConfig::ReportingMode>(reportingMode));
+                const char *modeStr = reportingMode == SystemConfig::SCHEDULED ? "SCHEDULED" :
+                                     reportingMode == SystemConfig::ON_CHANGE ? "ON_CHANGE" :
+                                     reportingMode == SystemConfig::THRESHOLD ? "THRESHOLD" : "SCHEDULED_OR_THRESHOLD";
                 Log.info("Config: Reporting mode -> %s", modeStr);
                 changed = true;
             }
@@ -480,9 +482,9 @@ bool Cloud::applyModesConfig(const LedgerData &defaults, const LedgerData &devic
     // Sampling mode: 0=INTERRUPT, 1=POLLING
     if (getMergedIntValue(defaultModes, deviceModes, "samplingMode", samplingMode)) {
         if (validateRange(samplingMode, 0, 1, "samplingMode")) {
-            if (sysStatus.get_samplingMode() != static_cast<SamplingMode>(samplingMode)) {
-                sysStatus.set_samplingMode(static_cast<SamplingMode>(samplingMode));
-                const char *modeStr = samplingMode == INTERRUPT ? "INTERRUPT" : "POLLING";
+            if (SystemConfig::get_samplingMode() != static_cast<SystemConfig::SamplingMode>(samplingMode)) {
+                SystemConfig::set_samplingMode(static_cast<SystemConfig::SamplingMode>(samplingMode));
+                const char *modeStr = samplingMode == SystemConfig::INTERRUPT ? "INTERRUPT" : "POLLING";
                 Log.info("Config: Sampling mode -> %s", modeStr);
                 changed = true;
             }
@@ -494,8 +496,8 @@ bool Cloud::applyModesConfig(const LedgerData &defaults, const LedgerData &devic
     // Maximum time to wait for cloud disconnect before treating as an error (seconds)
     if (getMergedIntValue(defaultModes, deviceModes, "cloudDisconnectBudgetSec", cloudDisconnectBudgetSec)) {
         if (validateRange(cloudDisconnectBudgetSec, 5, 120, "cloudDisconnectBudgetSec")) {
-            if (sysStatus.get_cloudDisconnectBudgetSec() != cloudDisconnectBudgetSec) {
-                sysStatus.set_cloudDisconnectBudgetSec((uint16_t)cloudDisconnectBudgetSec);
+            if (SystemConfig::get_cloudDisconnectBudgetSec() != cloudDisconnectBudgetSec) {
+                SystemConfig::set_cloudDisconnectBudgetSec((uint16_t)cloudDisconnectBudgetSec);
                 Log.info("Config: Disconnect budget -> %ds", cloudDisconnectBudgetSec);
                 changed = true;
             }
@@ -507,8 +509,8 @@ bool Cloud::applyModesConfig(const LedgerData &defaults, const LedgerData &devic
     // Maximum time to wait for modem power-down before treating as an error (seconds)
     if (getMergedIntValue(defaultModes, deviceModes, "modemOffBudgetSec", modemOffBudgetSec)) {
         if (validateRange(modemOffBudgetSec, 5, 120, "modemOffBudgetSec")) {
-            if (sysStatus.get_modemOffBudgetSec() != modemOffBudgetSec) {
-                sysStatus.set_modemOffBudgetSec((uint16_t)modemOffBudgetSec);
+            if (SystemConfig::get_modemOffBudgetSec() != modemOffBudgetSec) {
+                SystemConfig::set_modemOffBudgetSec((uint16_t)modemOffBudgetSec);
                 Log.info("Config: Modem off budget -> %ds", modemOffBudgetSec);
                 changed = true;
             }
@@ -518,8 +520,8 @@ bool Cloud::applyModesConfig(const LedgerData &defaults, const LedgerData &devic
     }
 
     if (getMergedBoolValue(defaultModes, deviceModes, "enableHibernateSleep", enableHibernateSleep)) {
-        if (sysStatus.get_enableHibernateSleep() != enableHibernateSleep) {
-            sysStatus.set_enableHibernateSleep(enableHibernateSleep);
+        if (SystemConfig::get_enableHibernateSleep() != enableHibernateSleep) {
+            SystemConfig::set_enableHibernateSleep(enableHibernateSleep);
             Log.info("Config: enable hibernate sleep -> %s", enableHibernateSleep ? "YES" : "NO");
             changed = true;
         }
@@ -545,13 +547,13 @@ bool Cloud::applyReportingConfig(const LedgerData &defaults, const LedgerData &d
     bool changed = false;
     bool webhookEnabled = false;
     int webhookTimeout = 0;
-    char webhookName[sizeof(sysStatusData::SysData::webhookName)] = {0};
+    char webhookName[SystemConfig::kWebhookNameCapacity] = {0};
 
     if (getMergedStringValue(defaultWebhook, deviceWebhook, "name", webhookName, sizeof(webhookName))) {
         size_t webhookNameLen = strlen(webhookName);
         if (webhookNameLen > 0 && webhookNameLen < sizeof(webhookName)) {
-            if (strcmp(sysStatus.get_webhookNameCStr(), webhookName) != 0) {
-                sysStatus.set_webhookName(webhookName);
+            if (strcmp(SystemConfig::get_webhookNameCStr(), webhookName) != 0) {
+                SystemConfig::set_webhookName(webhookName);
                 Log.info("Config: Webhook name -> %s", webhookName);
                 changed = true;
             }
@@ -562,8 +564,8 @@ bool Cloud::applyReportingConfig(const LedgerData &defaults, const LedgerData &d
     }
 
     if (getMergedBoolValue(defaultWebhook, deviceWebhook, "enabled", webhookEnabled)) {
-        if (sysStatus.get_webhookEnabled() != webhookEnabled) {
-            sysStatus.set_webhookEnabled(webhookEnabled);
+        if (SystemConfig::get_webhookEnabled() != webhookEnabled) {
+            SystemConfig::set_webhookEnabled(webhookEnabled);
             Log.info("Config: Webhook enabled -> %s", webhookEnabled ? "YES" : "NO");
             changed = true;
         }
@@ -571,8 +573,8 @@ bool Cloud::applyReportingConfig(const LedgerData &defaults, const LedgerData &d
 
     if (getMergedIntValue(defaultWebhook, deviceWebhook, "timeoutMs", webhookTimeout)) {
         if (validateRange(webhookTimeout, 1000, 60000, "webhookTimeoutMs")) {
-            if (sysStatus.get_webhookTimeoutMs() != (uint32_t)webhookTimeout) {
-                sysStatus.set_webhookTimeoutMs((uint32_t)webhookTimeout);
+            if (SystemConfig::get_webhookTimeoutMs() != (uint32_t)webhookTimeout) {
+                SystemConfig::set_webhookTimeoutMs((uint32_t)webhookTimeout);
                 Log.info("Config: Webhook timeout -> %dms", webhookTimeout);
                 changed = true;
             }
@@ -581,7 +583,7 @@ bool Cloud::applyReportingConfig(const LedgerData &defaults, const LedgerData &d
         }
     }
 
-    if (sysStatus.get_verboseMode() &&
+    if (SystemConfig::get_verboseMode() &&
         (webhookName[0] != '\0' || getMergedBoolValue(defaultWebhook, deviceWebhook, "enabled", webhookEnabled))) {
         Log.info("Merged webhook config: name=%s, enabled=%d",
                  webhookName[0] != '\0' ? webhookName : "none",
@@ -618,10 +620,10 @@ bool Cloud::applyPowerConfig(const LedgerData &defaults, const LedgerData &devic
     // committing any individual field - a partially-applied invalid set
     // would be just as unsafe as a fully-applied one.
     ChargeInhibitPolicy::ThermalThresholds candidate{
-        sysStatus.get_thermalChargeArmHighC(),
-        sysStatus.get_thermalChargeArmLowC(),
-        sysStatus.get_thermalChargeReleaseHighC(),
-        sysStatus.get_thermalChargeReleaseLowC(),
+        PowerConfig::get_thermalChargeArmHighC(),
+        PowerConfig::get_thermalChargeArmLowC(),
+        PowerConfig::get_thermalChargeReleaseHighC(),
+        PowerConfig::get_thermalChargeReleaseLowC(),
     };
 
     bool anyFieldSupplied = false;
@@ -643,26 +645,26 @@ bool Cloud::applyPowerConfig(const LedgerData &defaults, const LedgerData &devic
 
     bool changed = false;
 
-    if (sysStatus.get_thermalChargeArmHighC() != candidate.armHighC) {
-        sysStatus.set_thermalChargeArmHighC(candidate.armHighC);
+    if (PowerConfig::get_thermalChargeArmHighC() != candidate.armHighC) {
+        PowerConfig::set_thermalChargeArmHighC(candidate.armHighC);
         Log.info("Config: Thermal charge-inhibit armHighC -> %.1fC", (double)candidate.armHighC);
         changed = true;
     }
 
-    if (sysStatus.get_thermalChargeArmLowC() != candidate.armLowC) {
-        sysStatus.set_thermalChargeArmLowC(candidate.armLowC);
+    if (PowerConfig::get_thermalChargeArmLowC() != candidate.armLowC) {
+        PowerConfig::set_thermalChargeArmLowC(candidate.armLowC);
         Log.info("Config: Thermal charge-inhibit armLowC -> %.1fC", (double)candidate.armLowC);
         changed = true;
     }
 
-    if (sysStatus.get_thermalChargeReleaseHighC() != candidate.releaseHighC) {
-        sysStatus.set_thermalChargeReleaseHighC(candidate.releaseHighC);
+    if (PowerConfig::get_thermalChargeReleaseHighC() != candidate.releaseHighC) {
+        PowerConfig::set_thermalChargeReleaseHighC(candidate.releaseHighC);
         Log.info("Config: Thermal charge-inhibit releaseHighC -> %.1fC", (double)candidate.releaseHighC);
         changed = true;
     }
 
-    if (sysStatus.get_thermalChargeReleaseLowC() != candidate.releaseLowC) {
-        sysStatus.set_thermalChargeReleaseLowC(candidate.releaseLowC);
+    if (PowerConfig::get_thermalChargeReleaseLowC() != candidate.releaseLowC) {
+        PowerConfig::set_thermalChargeReleaseLowC(candidate.releaseLowC);
         Log.info("Config: Thermal charge-inhibit releaseLowC -> %.1fC", (double)candidate.releaseLowC);
         changed = true;
     }

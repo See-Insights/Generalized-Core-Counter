@@ -35,6 +35,10 @@
 #include "MyPersistentData.h"
 #include "BuildProfile.h"
 #include "Config.h"
+#include "persist/CurrentReadings.h"
+#include "persist/PowerConfig.h"
+#include "persist/RecoveryState.h"
+#include "persist/SystemConfig.h"
 
 // WO-2026-09-18 Step 3a: isClockTrusted() is now declared by time/Clock.h,
 // a small, real header (not state/State_Common.h, which transitively
@@ -141,10 +145,10 @@ void sysStatusData::initialize() {
     sysStatus.set_lastDailyCleanup(0);                                     // No cleanup has run yet
     
     // ********** Operating Mode Defaults **********
-    sysStatus.set_sensorMode(COUNTING);                                    // Default to counting mode
-    sysStatus.set_connectionMode(CONNECTED);                               // Default to connected mode
-    sysStatus.set_reportingMode(SCHEDULED);                                // Default to scheduled reporting
-    sysStatus.set_samplingMode(INTERRUPT);                                 // Default to interrupt-driven
+    sysStatus.set_sensorMode(SystemConfig::COUNTING);                      // Default to counting mode
+    sysStatus.set_connectionMode(SystemConfig::CONNECTED);                 // Default to connected mode
+    sysStatus.set_reportingMode(SystemConfig::SCHEDULED);                  // Default to scheduled reporting
+    sysStatus.set_samplingMode(SystemConfig::INTERRUPT);                   // Default to interrupt-driven
     sysStatus.set_verboseTimeoutMin(60);                                   // Default 60 min verbose timeout
     sysStatus.set_verboseModeStartTime(0);                                 // Verbose mode not active
     sysStatus.set_connectAttemptBudgetSec(Config::DEFAULT_CONNECT_ATTEMPT_BUDGET_SEC);
@@ -160,7 +164,7 @@ void sysStatusData::initialize() {
     sysStatus.set_lastWatchdogResetReasonData(0);
     sysStatus.set_hasValidLedgerConfig(false);
     sysStatus.set_configSource((uint8_t)Config::CONFIG_SOURCE_DEFAULT);
-    sysStatus.set_lastWatchdogSource((uint8_t)WATCHDOG_SOURCE_DEVICE_OS);
+    sysStatus.set_lastWatchdogSource((uint8_t)RecoveryState::WATCHDOG_SOURCE_DEVICE_OS);
 }
 
 uint8_t sysStatusData::get_structuresVersion() const {
@@ -975,3 +979,262 @@ void currentStatusData::set_totalOccupiedSeconds(uint32_t value) {
 }
 
 // End of currentStatusData class
+
+// ***************  Facade implementations (WO-2026-09-23-001, Step 5)  ***************
+//
+// The four persist/*.h facades declare narrow, storage-free interfaces. This is
+// the only translation unit that sees both those declarations and the
+// StorageHelperRK-backed classes above, which is what keeps StorageHelperRK.h
+// out of all 27 consumers.
+//
+// Every function here is a straight forward to the pre-split call. Where a call
+// carried behavior beyond a field access - validate()'s size argument, the
+// cross-store reset in resetEverything(), raiseAlert()'s severity arbitration -
+// that behavior stays in the class method and is not reimplemented here.
+
+// The facades publish these capacities so ConfigApply.cpp can size its staging
+// buffers without seeing SysData. Binding them to the real fields here means a
+// future field-width change breaks the build instead of silently truncating.
+static_assert(SystemConfig::kTimeZoneCapacity == sizeof(sysStatusData::SysData::timeZoneStr),
+              "SystemConfig::kTimeZoneCapacity must match SysData::timeZoneStr");
+static_assert(SystemConfig::kWebhookNameCapacity == sizeof(sysStatusData::SysData::webhookName),
+              "SystemConfig::kWebhookNameCapacity must match SysData::webhookName");
+
+namespace SystemConfig {
+
+void setup() { sysStatus.setup(); }
+void loop() { sysStatus.loop(); }
+void flushNow() { sysStatus.flush(true); }
+
+// sizeof(sysStatusData), matching the pre-split sysStatus.validate(sizeof(sysStatus)).
+bool validateStoredData() { return sysStatus.validate(sizeof(sysStatusData)); }
+
+bool get_verboseMode() { return sysStatus.get_verboseMode(); }
+void set_verboseMode(bool value) { sysStatus.set_verboseMode(value); }
+
+uint16_t get_verboseTimeoutMin() { return sysStatus.get_verboseTimeoutMin(); }
+void set_verboseTimeoutMin(uint16_t value) { sysStatus.set_verboseTimeoutMin(value); }
+
+time_t get_verboseModeStartTime() { return sysStatus.get_verboseModeStartTime(); }
+void set_verboseModeStartTime(time_t value) { sysStatus.set_verboseModeStartTime(value); }
+
+bool get_serialConnected() { return sysStatus.get_serialConnected(); }
+void set_serialConnected(bool value) { sysStatus.set_serialConnected(value); }
+
+const char *get_timeZoneStrCStr() { return sysStatus.get_timeZoneStrCStr(); }
+bool set_timeZoneStr(const char *str) { return sysStatus.set_timeZoneStr(str); }
+
+uint8_t get_openTime() { return sysStatus.get_openTime(); }
+void set_openTime(uint8_t value) { sysStatus.set_openTime(value); }
+
+uint8_t get_closeTime() { return sysStatus.get_closeTime(); }
+void set_closeTime(uint8_t value) { sysStatus.set_closeTime(value); }
+
+uint16_t get_reportingInterval() { return sysStatus.get_reportingInterval(); }
+void set_reportingInterval(uint16_t value) { sysStatus.set_reportingInterval(value); }
+
+time_t get_lastReport() { return sysStatus.get_lastReport(); }
+void set_lastReport(time_t value) { sysStatus.set_lastReport(value); }
+
+time_t get_lastHookResponse() { return sysStatus.get_lastHookResponse(); }
+void set_lastHookResponse(time_t value) { sysStatus.set_lastHookResponse(value); }
+
+time_t get_lastDailyCleanup() { return sysStatus.get_lastDailyCleanup(); }
+void set_lastDailyCleanup(time_t value) { sysStatus.set_lastDailyCleanup(value); }
+
+time_t get_lastTimeSync() { return sysStatus.get_lastTimeSync(); }
+void set_lastTimeSync(time_t value) { sysStatus.set_lastTimeSync(value); }
+
+uint8_t get_sensorType() { return sysStatus.get_sensorType(); }
+void set_sensorType(uint8_t value) { sysStatus.set_sensorType(value); }
+
+uint8_t get_sensorMode() { return sysStatus.get_sensorMode(); }
+void set_sensorMode(uint8_t value) { sysStatus.set_sensorMode(value); }
+
+uint8_t get_connectionMode() { return sysStatus.get_connectionMode(); }
+void set_connectionMode(uint8_t value) { sysStatus.set_connectionMode(value); }
+
+uint8_t get_reportingMode() { return sysStatus.get_reportingMode(); }
+void set_reportingMode(uint8_t value) { sysStatus.set_reportingMode(value); }
+
+uint8_t get_samplingMode() { return sysStatus.get_samplingMode(); }
+void set_samplingMode(uint8_t value) { sysStatus.set_samplingMode(value); }
+
+bool get_disconnectedMode() { return sysStatus.get_disconnectedMode(); }
+void set_disconnectedMode(bool value) { sysStatus.set_disconnectedMode(value); }
+
+bool get_enableHibernateSleep() { return sysStatus.get_enableHibernateSleep(); }
+void set_enableHibernateSleep(bool value) { sysStatus.set_enableHibernateSleep(value); }
+
+uint16_t get_connectAttemptBudgetSec() { return sysStatus.get_connectAttemptBudgetSec(); }
+void set_connectAttemptBudgetSec(uint16_t value) { sysStatus.set_connectAttemptBudgetSec(value); }
+
+uint16_t get_cloudDisconnectBudgetSec() { return sysStatus.get_cloudDisconnectBudgetSec(); }
+void set_cloudDisconnectBudgetSec(uint16_t value) { sysStatus.set_cloudDisconnectBudgetSec(value); }
+
+uint16_t get_modemOffBudgetSec() { return sysStatus.get_modemOffBudgetSec(); }
+void set_modemOffBudgetSec(uint16_t value) { sysStatus.set_modemOffBudgetSec(value); }
+
+uint8_t get_connectionAttemptCounter() { return sysStatus.get_connectionAttemptCounter(); }
+void set_connectionAttemptCounter(uint8_t value) { sysStatus.set_connectionAttemptCounter(value); }
+
+time_t get_lastConnection() { return sysStatus.get_lastConnection(); }
+void set_lastConnection(time_t value) { sysStatus.set_lastConnection(value); }
+
+uint16_t get_lastConnectionDuration() { return sysStatus.get_lastConnectionDuration(); }
+void set_lastConnectionDuration(uint16_t value) { sysStatus.set_lastConnectionDuration(value); }
+
+uint16_t get_testConnectionDurationOverride() { return sysStatus.get_testConnectionDurationOverride(); }
+void set_testConnectionDurationOverride(uint16_t value) { sysStatus.set_testConnectionDurationOverride(value); }
+
+const char *get_webhookNameCStr() { return sysStatus.get_webhookNameCStr(); }
+bool set_webhookName(const char *str) { return sysStatus.set_webhookName(str); }
+
+bool get_webhookEnabled() { return sysStatus.get_webhookEnabled(); }
+void set_webhookEnabled(bool value) { sysStatus.set_webhookEnabled(value); }
+
+uint32_t get_webhookTimeoutMs() { return sysStatus.get_webhookTimeoutMs(); }
+void set_webhookTimeoutMs(uint32_t value) { sysStatus.set_webhookTimeoutMs(value); }
+
+bool get_hasValidLedgerConfig() { return sysStatus.get_hasValidLedgerConfig(); }
+void set_hasValidLedgerConfig(bool value) { sysStatus.set_hasValidLedgerConfig(value); }
+
+uint8_t get_configSource() { return sysStatus.get_configSource(); }
+void set_configSource(uint8_t value) { sysStatus.set_configSource(value); }
+
+namespace SensorSettings {
+
+void setup() { sensorConfig.setup(); }
+void loop() { sensorConfig.loop(); }
+
+// sizeof(sensorConfigData), matching the pre-split sensorConfig.validate(sizeof(sensorConfig)).
+bool validateStoredData() { return sensorConfig.validate(sizeof(sensorConfigData)); }
+
+uint8_t get_sensorType() { return sensorConfig.get_sensorType(); }
+void set_sensorType(uint8_t value) { sensorConfig.set_sensorType(value); }
+
+uint32_t get_sensorSetting1() { return sensorConfig.get_sensorSetting1(); }
+void set_sensorSetting1(uint32_t value) { sensorConfig.set_sensorSetting1(value); }
+
+uint32_t get_sensorSetting2() { return sensorConfig.get_sensorSetting2(); }
+void set_sensorSetting2(uint32_t value) { sensorConfig.set_sensorSetting2(value); }
+
+uint32_t get_sensorSetting3() { return sensorConfig.get_sensorSetting3(); }
+void set_sensorSetting3(uint32_t value) { sensorConfig.set_sensorSetting3(value); }
+
+uint32_t get_sensorSetting4() { return sensorConfig.get_sensorSetting4(); }
+void set_sensorSetting4(uint32_t value) { sensorConfig.set_sensorSetting4(value); }
+
+}  // namespace SensorSettings
+
+}  // namespace SystemConfig
+
+namespace RecoveryState {
+
+uint8_t get_resetCount() { return sysStatus.get_resetCount(); }
+void set_resetCount(uint8_t value) { sysStatus.set_resetCount(value); }
+
+uint8_t get_connectivityRecoveryStage() { return sysStatus.get_connectivityRecoveryStage(); }
+void set_connectivityRecoveryStage(uint8_t value) { sysStatus.set_connectivityRecoveryStage(value); }
+
+time_t get_lastConnectivityRecoveryAction() { return sysStatus.get_lastConnectivityRecoveryAction(); }
+void set_lastConnectivityRecoveryAction(time_t value) { sysStatus.set_lastConnectivityRecoveryAction(value); }
+
+uint8_t get_connectivityRecoveryCount() { return sysStatus.get_connectivityRecoveryCount(); }
+void set_connectivityRecoveryCount(uint8_t value) { sysStatus.set_connectivityRecoveryCount(value); }
+
+uint16_t get_watchdogResetCount() { return sysStatus.get_watchdogResetCount(); }
+void set_watchdogResetCount(uint16_t value) { sysStatus.set_watchdogResetCount(value); }
+
+uint8_t get_lastWatchdogBreadcrumb() { return sysStatus.get_lastWatchdogBreadcrumb(); }
+void set_lastWatchdogBreadcrumb(uint8_t value) { sysStatus.set_lastWatchdogBreadcrumb(value); }
+
+uint32_t get_lastWatchdogUptimeMs() { return sysStatus.get_lastWatchdogUptimeMs(); }
+void set_lastWatchdogUptimeMs(uint32_t value) { sysStatus.set_lastWatchdogUptimeMs(value); }
+
+uint32_t get_lastWatchdogResetReasonData() { return sysStatus.get_lastWatchdogResetReasonData(); }
+void set_lastWatchdogResetReasonData(uint32_t value) { sysStatus.set_lastWatchdogResetReasonData(value); }
+
+uint8_t get_lastWatchdogSource() { return sysStatus.get_lastWatchdogSource(); }
+void set_lastWatchdogSource(uint8_t value) { sysStatus.set_lastWatchdogSource(value); }
+
+// Decision A: alert state is forensics, so it is exposed here - but it is
+// still physically CurrentData, so these forward to `current`, not `sysStatus`.
+int8_t get_alertCode() { return current.get_alertCode(); }
+void set_alertCode(int8_t value) { current.set_alertCode(value); }
+void raiseAlert(int8_t value) { current.raiseAlert(value); }
+
+time_t get_lastAlertTime() { return current.get_lastAlertTime(); }
+void set_lastAlertTime(time_t value) { current.set_lastAlertTime(value); }
+
+}  // namespace RecoveryState
+
+namespace PowerConfig {
+
+bool get_solarPowerMode() { return sysStatus.get_solarPowerMode(); }
+void set_solarPowerMode(bool value) { sysStatus.set_solarPowerMode(value); }
+
+bool get_lowPowerMode() { return sysStatus.get_lowPowerMode(); }
+void set_lowPowerMode(bool value) { sysStatus.set_lowPowerMode(value); }
+
+bool get_lowBatteryMode() { return sysStatus.get_lowBatteryMode(); }
+void set_lowBatteryMode(bool value) { sysStatus.set_lowBatteryMode(value); }
+
+uint8_t get_currentBatteryTier() { return sysStatus.get_currentBatteryTier(); }
+void set_currentBatteryTier(uint8_t value) { sysStatus.set_currentBatteryTier(value); }
+
+float get_thermalChargeArmHighC() { return sysStatus.get_thermalChargeArmHighC(); }
+void set_thermalChargeArmHighC(float value) { sysStatus.set_thermalChargeArmHighC(value); }
+
+float get_thermalChargeArmLowC() { return sysStatus.get_thermalChargeArmLowC(); }
+void set_thermalChargeArmLowC(float value) { sysStatus.set_thermalChargeArmLowC(value); }
+
+float get_thermalChargeReleaseHighC() { return sysStatus.get_thermalChargeReleaseHighC(); }
+void set_thermalChargeReleaseHighC(float value) { sysStatus.set_thermalChargeReleaseHighC(value); }
+
+float get_thermalChargeReleaseLowC() { return sysStatus.get_thermalChargeReleaseLowC(); }
+void set_thermalChargeReleaseLowC(float value) { sysStatus.set_thermalChargeReleaseLowC(value); }
+
+}  // namespace PowerConfig
+
+namespace CurrentReadings {
+
+void setup() { current.setup(); }
+void loop() { current.loop(); }
+void resetEverything() { current.resetEverything(); }
+void revalidateOccupancyStartTimeIfTimeAvailable() { current.revalidateOccupancyStartTimeIfTimeAvailable(); }
+
+uint16_t get_hourlyCount() { return current.get_hourlyCount(); }
+void set_hourlyCount(uint16_t value) { current.set_hourlyCount(value); }
+
+uint16_t get_dailyCount() { return current.get_dailyCount(); }
+void set_dailyCount(uint16_t value) { current.set_dailyCount(value); }
+
+time_t get_lastCountTime() { return current.get_lastCountTime(); }
+void set_lastCountTime(time_t value) { current.set_lastCountTime(value); }
+
+bool get_occupied() { return current.get_occupied(); }
+void set_occupied(bool value) { current.set_occupied(value); }
+
+uint32_t get_lastOccupancyEvent() { return current.get_lastOccupancyEvent(); }
+void set_lastOccupancyEvent(uint32_t value) { current.set_lastOccupancyEvent(value); }
+
+time_t get_occupancyStartTime() { return current.get_occupancyStartTime(); }
+void set_occupancyStartTime(time_t value) { current.set_occupancyStartTime(value); }
+
+uint32_t get_totalOccupiedSeconds() { return current.get_totalOccupiedSeconds(); }
+void set_totalOccupiedSeconds(uint32_t value) { current.set_totalOccupiedSeconds(value); }
+
+float get_stateOfCharge() { return current.get_stateOfCharge(); }
+void set_stateOfCharge(float value) { current.set_stateOfCharge(value); }
+
+uint8_t get_batteryState() { return current.get_batteryState(); }
+void set_batteryState(uint8_t value) { current.set_batteryState(value); }
+
+float get_internalTempC() { return current.get_internalTempC(); }
+void set_internalTempC(float value) { current.set_internalTempC(value); }
+
+float get_externalTempC() { return current.get_externalTempC(); }
+void set_externalTempC(float value) { current.set_externalTempC(value); }
+
+}  // namespace CurrentReadings

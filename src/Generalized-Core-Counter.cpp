@@ -55,7 +55,10 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 
 
 // Persistent data and configuration
-#include "MyPersistentData.h"        // FRAM-backed sysStatus, current, sensorConfig
+#include "persist/CurrentReadings.h"
+#include "persist/PowerConfig.h"
+#include "persist/RecoveryState.h"
+#include "persist/SystemConfig.h"
 
 // Cloud connectivity and data publishing
 #include "cloud/Cloud.h"                   // Particle Ledger integration (config + data)
@@ -349,7 +352,7 @@ const char *batteryTierShortName(BatteryTier tier) {
 }
 
 BatteryTier currentBatteryTierForFailsafe() {
-  const uint8_t tierValue = sysStatus.get_currentBatteryTier();
+  const uint8_t tierValue = PowerConfig::get_currentBatteryTier();
   if (tierValue <= TIER_SURVIVAL) {
     return static_cast<BatteryTier>(tierValue);
   }
@@ -398,15 +401,15 @@ uint32_t connectivityFailsafeJitterSec(uint8_t stage) {
 }
 
 void persistConnectivityFailsafeState(uint8_t stage, time_t actionTime, bool incrementCount) {
-  sysStatus.set_connectivityRecoveryStage(stage);
-  sysStatus.set_lastConnectivityRecoveryAction(actionTime);
+  RecoveryState::set_connectivityRecoveryStage(stage);
+  RecoveryState::set_lastConnectivityRecoveryAction(actionTime);
   if (incrementCount) {
-    uint8_t count = sysStatus.get_connectivityRecoveryCount();
+    uint8_t count = RecoveryState::get_connectivityRecoveryCount();
     if (count < 0xFF) {
-      sysStatus.set_connectivityRecoveryCount(count + 1);
+      RecoveryState::set_connectivityRecoveryCount(count + 1);
     }
   }
-  sysStatus.flush(true);
+  SystemConfig::flushNow();
 }
 
 const char *failsafeDeferReasonNameLocal(FailsafeDeferReason reason) {
@@ -978,9 +981,9 @@ void setup() {
     transitionTo(CONNECTING_STATE, "boot button override");
   }
 
-  sysStatus.setup();    // Initialize persistent storage
-  sensorConfig.setup(); // Initialize the sensor configuration
-  current.setup();      // Initialize the current status data
+  SystemConfig::setup();    // Initialize persistent storage
+  SystemConfig::SensorSettings::setup(); // Initialize the sensor configuration
+  CurrentReadings::setup();      // Initialize the current status data
 
   // WO-2026-08-25-001 Amendment C, Decision C1 boot-ordering corollary
   // (AC-C5): PowerManager::instance().setup() is deliberately NOT called
@@ -1003,7 +1006,7 @@ void setup() {
   // setup(), and no other PowerManager::instance() call site exists in this
   // range).
 
-  if (sysStatus.get_hasValidLedgerConfig()) {
+  if (SystemConfig::get_hasValidLedgerConfig()) {
     Config::markStorageConfigurationLoaded();
   } else {
     Config::markFactoryDefaultsActive();
@@ -1018,20 +1021,20 @@ void setup() {
   // it as an alert now that persistent current status storage is initialized.
   if (bootStormAlertPending) {
     // Force explicit boot-storm alert visibility in startup/report payloads.
-    current.set_alertCode(17);
+    RecoveryState::set_alertCode(17);
     // WO-2026-08-29-002 item 8: deliberately NOT gated on isClockTrusted().
     // Same shared lastAlertTime field/consumer as currentStatusData::
     // raiseAlert() (MyPersistentData.cpp) - see that function's comment for
     // why writing a 0 sentinel here would incorrectly bypass State_Report.cpp's
     // alert-40 escalation cooldown.
-    current.set_lastAlertTime(Time.now());
+    RecoveryState::set_lastAlertTime(Time.now());
     bootStormAlertPending = false;
     Log.warn("Boot storm holdoff detected - raising alert 17");
   }
 
   // Configure serial logging based on serial flag
   // Note: Particle firmware on this platform doesn't support Log.level()
-  if (sysStatus.get_serialConnected() || (ALLOW_BLOCKING_SERIAL_WAITS != 0)) {
+  if (SystemConfig::get_serialConnected() || (ALLOW_BLOCKING_SERIAL_WAITS != 0)) {
     Serial.begin(9600);
 
     // Honor the persisted serialConnected flag with a bounded wait so
@@ -1050,15 +1053,15 @@ void setup() {
     }
   }
 
-  if (sysStatus.get_testConnectionDurationOverride() == 0) {
-    sysStatus.set_testConnectionDurationOverride(0xFFFF);  // Disabled (max uint16_t)
+  if (SystemConfig::get_testConnectionDurationOverride() == 0) {
+    SystemConfig::set_testConnectionDurationOverride(0xFFFF);  // Disabled (max uint16_t)
   }
 
   // Testing: clear sticky sleep-failure alert to avoid reset/deep-power loops.
-  if (current.get_alertCode() == 16) {
+  if (RecoveryState::get_alertCode() == 16) {
     Log.info("Clearing alert 16 on boot");
-    current.set_alertCode(0);
-    current.set_lastAlertTime(0);
+    RecoveryState::set_alertCode(0);
+    RecoveryState::set_lastAlertTime(0);
   }
 
   // Clear sticky OOM alert after a reset-driven recovery attempt so field
@@ -1078,10 +1081,10 @@ void setup() {
   default:
     break;
   }
-  if (current.get_alertCode() == 14 && clearOomAlertOnBoot) {
+  if (RecoveryState::get_alertCode() == 14 && clearOomAlertOnBoot) {
     Log.info("Clearing alert 14 on boot after reset-driven recovery");
-    current.set_alertCode(0);
-    current.set_lastAlertTime(0);
+    RecoveryState::set_alertCode(0);
+    RecoveryState::set_lastAlertTime(0);
   }
 
   // Track how often the device has been resetting so the error supervisor
@@ -1094,7 +1097,7 @@ void setup() {
 #ifdef RESET_REASON_USER_APPLICATION
   case RESET_REASON_USER_APPLICATION:
 #endif
-    sysStatus.set_resetCount(sysStatus.get_resetCount() + 1);
+    RecoveryState::set_resetCount(RecoveryState::get_resetCount() + 1);
     break;
   case RESET_REASON_UPDATE:
     // After OTA firmware update, force connection to reload
@@ -1114,7 +1117,7 @@ void setup() {
   // Ensure sensor-board LED power default matches configured sensor type
   // TODO: Consider moving this sensor-specific logic to device_pinout.cpp or SensorManager
   pinMode(ledPower, OUTPUT);
-  SensorType configuredType = static_cast<SensorType>(sysStatus.get_sensorType());
+  SensorType configuredType = static_cast<SensorType>(SystemConfig::get_sensorType());
   const SensorDefinition* sensorDef = SensorDefinitions::getDefinition(configuredType);
   if (sensorDef && sensorDef->ledDefaultOn) {
     digitalWrite(ledPower, HIGH);
@@ -1165,7 +1168,7 @@ void setup() {
   // right here, now that a time source exists this boot - a no-op if
   // occupied is false, Time is still not valid, or the stored value is
   // already plausible.
-  current.revalidateOccupancyStartTimeIfTimeAvailable();
+  CurrentReadings::revalidateOccupancyStartTimeIfTimeAvailable();
 
 #if PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST
   // ===== BENCH-ONLY: DELIBERATE RTC SKEW (WO-2026-08-31-003, Amendment A) =====
@@ -1278,7 +1281,7 @@ void setup() {
   ab1805.setWDT(AB1805::WATCHDOG_MAX_SECONDS); // Enable watchdog
 
   // ===== WATCHDOG RESET PERSISTENCE / FORENSICS =====
-  // Moved here (from immediately after sysStatus.setup(), before AB1805 init)
+  // Moved here (from immediately after SystemConfig::setup(), before AB1805 init)
   // so it can act on the AB1805 classification above. The publish queue was
   // already initialized above, so this is a reordering, not a new
   // dependency. Covers both the Device-OS-detected case
@@ -1288,21 +1291,21 @@ void setup() {
   // not overwrite a previously persisted watchdog's forensic data.
   const bool watchdogClassified = watchdogResetDetected || ab1805ConfirmedWatchdog;
   if (watchdogClassified) {
-    const uint16_t priorWatchdogResetCount = sysStatus.get_watchdogResetCount();
+    const uint16_t priorWatchdogResetCount = RecoveryState::get_watchdogResetCount();
     if (priorWatchdogResetCount < 0xFFFF) {
-      sysStatus.set_watchdogResetCount((uint16_t)(priorWatchdogResetCount + 1));
+      RecoveryState::set_watchdogResetCount((uint16_t)(priorWatchdogResetCount + 1));
     }
-    sysStatus.set_lastWatchdogBreadcrumb(previousBreadcrumb);
-    sysStatus.set_lastWatchdogUptimeMs(previousBreadcrumbMs);
-    sysStatus.set_lastWatchdogResetReasonData(reasonData);
-    sysStatus.set_lastWatchdogSource(watchdogResetDetected ? WATCHDOG_SOURCE_DEVICE_OS : WATCHDOG_SOURCE_AB1805_PIN);
+    RecoveryState::set_lastWatchdogBreadcrumb(previousBreadcrumb);
+    RecoveryState::set_lastWatchdogUptimeMs(previousBreadcrumbMs);
+    RecoveryState::set_lastWatchdogResetReasonData(reasonData);
+    RecoveryState::set_lastWatchdogSource(watchdogResetDetected ? RecoveryState::WATCHDOG_SOURCE_DEVICE_OS : RecoveryState::WATCHDOG_SOURCE_AB1805_PIN);
 
     // New watchdog-reset alert code (its own tier, strictly above tier-3;
     // see getAlertSeverity() in MyPersistentData.cpp - this must outrank
     // any already-active tier-3 alert like thrash detection or a boot
     // storm). One-time forensic marker - intentionally NOT added to
     // isAutoClearAfterReportAlert() so it stays sticky.
-    current.raiseAlert(19);
+    RecoveryState::raiseAlert(19);
 
     // Queue watchdog forensic event only after PublishQueuePosix setup above
     // initialized its mutex.
@@ -1321,12 +1324,12 @@ void setup() {
   const bool timeValidAfterRtc = Time.isValid();
   if (!timeValidBeforeRtc && timeValidAfterRtc) {
     if (rtcReadOk) {
-      if (sysStatus.get_verboseMode()) {
+      if (SystemConfig::get_verboseMode()) {
         Log.info("RTC restored system time: %s (rtc=%s)",
                  Time.timeStr().c_str(),
                  Time.format(rtcTime, TIME_FORMAT_DEFAULT).c_str());
       }
-    } else if (sysStatus.get_verboseMode()) {
+    } else if (SystemConfig::get_verboseMode()) {
       Log.info("RTC restored system time: %s (rtc read failed)",
                Time.timeStr().c_str());
     }
@@ -1391,19 +1394,19 @@ void setup() {
   // report path has already run. Treat the startup status snapshot as its
   // one-time report, then clear it so it does not linger into later
   // direct-connect service paths before the next scheduled report.
-  if (current.get_alertCode() == 44) {
+  if (RecoveryState::get_alertCode() == 44) {
     Log.info("Clearing alert 44 after startup status snapshot");
-    current.set_alertCode(0);
-    current.set_lastAlertTime(0);
+    RecoveryState::set_alertCode(0);
+    RecoveryState::set_lastAlertTime(0);
   }
 
   // ===== TIME AND TIMEZONE CONFIGURATION =====
   // Setup local time from persisted timezone string (POSIX TZ format).
   // This must be configured before we can make any open/close hour decisions.
-  const char *tz = sysStatus.get_timeZoneStrCStr();
+  const char *tz = SystemConfig::get_timeZoneStrCStr();
   if (!tz || tz[0] == '\0') {
     tz = Config::DEFAULT_TIMEZONE;
-    sysStatus.set_timeZoneStr(tz);
+    SystemConfig::set_timeZoneStr(tz);
   }
   LocalTime::instance().withConfig(LocalTimePosixTimezone(tz));
 
@@ -1419,7 +1422,7 @@ void setup() {
   // be true here with zero confirmed cloud syncs ever - ab1805.setup() seeds
   // system time from the RTC every boot, whether or not the RTC is correct.
   //
-  // sysStatus.get_lastTimeSync() (persisted across reboots, stamped only by
+  // SystemConfig::get_lastTimeSync() (persisted across reboots, stamped only by
   // checkClockResync() at confirmed-sync time - see below) is the correct
   // signal to use here, NOT Particle.timeSyncedLast() (which always reads 0
   // immediately after every boot/HIBERNATE wake and would force this branch
@@ -1456,7 +1459,7 @@ void setup() {
   // (isTimeValid()==false) OR when this device has never, across its whole
   // history, completed a confirmed sync - a different, already-correct
   // question from "is the clock trustworthy right now."
-  const bool neverConfirmedSyncEver = (sysStatus.get_lastTimeSync() == 0);
+  const bool neverConfirmedSyncEver = (SystemConfig::get_lastTimeSync() == 0);
   if (!Clock::isTimeValid() || neverConfirmedSyncEver) {
     transitionTo(CONNECTING_STATE, !Clock::isTimeValid() ? "time invalid" : "no confirmed time sync ever (Finding 3)");
   } else {
@@ -1467,7 +1470,7 @@ void setup() {
     // 8+ hours without webhook during closed hours is expected, not an error.
     if (System.resetReason() == RESET_REASON_POWER_MANAGEMENT) {
       uint8_t localHour = (uint8_t)(conv.getLocalTimeHMS().toSeconds() / 3600);
-      if (localHour == sysStatus.get_openTime()) {
+      if (localHour == SystemConfig::get_openTime()) {
         Log.info("Wake from overnight hibernate at opening hour - suppressing alert 40");
         session.suppressAlert40ThisSession = true;
       }
@@ -1587,7 +1590,7 @@ void setup() {
   // bounded interval to the next thermal re-assertion.
   measure.batteryState(BatterySampleContext::Setup);
   PowerDiagnostics::logPowerState("setup", true);
-  if (sysStatus.get_lowBatteryMode()) {
+  if (PowerConfig::get_lowBatteryMode()) {
     // WO-2026-09-21 Step 4 (corrected same day): evaluate() then commit() -
     // this is one of the four deliberate policy-application sites (the
     // retired applyBatteryAwareConnectionModePolicy(float) 1-arg overload
@@ -1670,9 +1673,9 @@ void loop() {
   checkClockResync(); // WO-2026-08-29-002: recurring app-side RTC write-back, not gated by ab1805.loop()'s per-boot latch
 
   // Housekeeping for each transit of the main loop
-  current.loop();
-  sysStatus.loop();
-  sensorConfig.loop();
+  CurrentReadings::loop();
+  SystemConfig::loop();
+  SystemConfig::SensorSettings::loop();
   noteLoopStageDuration(false);
 
   // Service deferred cloud work (ledger status publishes, etc.)
@@ -1695,7 +1698,7 @@ void loop() {
   // Check for short-term webhook response timeout.
   // Requirement: 20 seconds starting only after a successful cloud connect.
   if (Particle.connected() && session.awaitingWebhookResponse && session.webhookAwaitStartMs != 0) {
-    unsigned long timeoutMs = sysStatus.get_webhookTimeoutMs();
+    unsigned long timeoutMs = SystemConfig::get_webhookTimeoutMs();
     if (timeoutMs < 5000UL || timeoutMs > 120000UL) {
       timeoutMs = 20000UL;
     }
@@ -1705,7 +1708,7 @@ void loop() {
       Log.warn("Webhook response timeout after %lu ms - raising alert 40", elapsedMs);
       session.awaitingWebhookResponse = false;
       session.webhookAwaitStartMs = 0;
-      current.raiseAlert(40);
+      RecoveryState::raiseAlert(40);
     }
   }
 
@@ -1716,7 +1719,7 @@ void loop() {
               (unsigned long)System.freeMemory());
     // Out-of-memory is treated as a critical alert; only overwrite any
     // existing alert if this is more severe.
-    current.raiseAlert(14);
+    RecoveryState::raiseAlert(14);
     transitionTo(ERROR_STATE, "out of memory");
   }
 
@@ -1733,10 +1736,10 @@ void loop() {
   // counts are captured even during long-running operations like cellular
   // connection attempts (which can take minutes) or firmware updates.
   // MEASUREMENT mode is time-based (handled in IDLE only), not interrupt-driven.
-  uint8_t sensorMode = sysStatus.get_sensorMode(); 
-  if (sensorMode == COUNTING) {
+  uint8_t sensorMode = SystemConfig::get_sensorMode(); 
+  if (sensorMode == SystemConfig::COUNTING) {
     handleCountingMode();  // Count each sensor event
-  } else if (sensorMode == OCCUPANCY) {
+  } else if (sensorMode == SystemConfig::OCCUPANCY) {
     handleOccupancyMode(); // Track occupied/unoccupied state
   }
 
@@ -1865,7 +1868,7 @@ static void appWatchdogHandler() {
 // calls BatteryAuthority::evaluate(soc) directly instead.
 
 void logTimeDiag(bool isOpen) {
-  const char *tz = sysStatus.get_timeZoneStrCStr();
+  const char *tz = SystemConfig::get_timeZoneStrCStr();
   if (!tz) {
     tz = "";
   }
@@ -1888,7 +1891,7 @@ void logTimeDiag(bool isOpen) {
   // the same monotonic Particle.timeSyncedLast() signal as the resync gate
   // and trust check above - not Time.isValid() alone (Finding 3).
   // lastTimeSyncEpoch is the persisted, wall-clock completion stamp from
-  // checkClockResync() (item 6's fix to sysStatus.get_lastTimeSync(), which
+  // checkClockResync() (item 6's fix to SystemConfig::get_lastTimeSync(), which
   // previously had zero callers).
   //
   // Round 6 (Stage 7 finding 1): syncAgeMs is now reportedSyncAgeMs(), the
@@ -1903,7 +1906,7 @@ void logTimeDiag(bool isOpen) {
   // instead - a value no genuine sync age can ever reach, so a log reader
   // cannot mistake it for a real duration.
   const bool clockTrusted = isClockTrusted();
-  const time_t lastTimeSyncEpoch = sysStatus.get_lastTimeSync();
+  const time_t lastTimeSyncEpoch = SystemConfig::get_lastTimeSync();
 
   // WO-2026-09-19 Step 3b: openness=0/1/2 (Open/Closed/Unknown) surfaces
   // Clock::openness()'s verdict directly, alongside the pre-existing isOpen=
@@ -1930,8 +1933,8 @@ void logTimeDiag(bool isOpen) {
            localHour,
            localMinute,
            localSecond,
-           (int)sysStatus.get_openTime(),
-           (int)sysStatus.get_closeTime(),
+           (int)SystemConfig::get_openTime(),
+           (int)SystemConfig::get_closeTime(),
            isOpen ? 1 : 0,
            clockTrusted ? 1 : 0,
            opennessCode,
@@ -2003,8 +2006,8 @@ void publishData() {
     battState = 0;
   }
 
-  uint8_t sensorMode = sysStatus.get_sensorMode();
-  const int8_t reportedAlertCode = current.get_alertCode();
+  uint8_t sensorMode = SystemConfig::get_sensorMode();
+  const int8_t reportedAlertCode = RecoveryState::get_alertCode();
 
   // Ensure battery value is always a finite number for webhook ingestion.
   // Ubidots rejects NaN/Inf with a 400 response.
@@ -2015,21 +2018,21 @@ void publishData() {
   }
 
   // Build webhook payload based on sensor mode
-  if (sensorMode == OCCUPANCY) {
+  if (sensorMode == SystemConfig::OCCUPANCY) {
     const unsigned long timeStampValue = nowStampSec;
-    const unsigned long totalOccupiedMinutes = (unsigned long)(current.get_totalOccupiedSeconds() / 60UL);
+    const unsigned long totalOccupiedMinutes = (unsigned long)(CurrentReadings::get_totalOccupiedSeconds() / 60UL);
 
     // Occupancy mode webhook format (occupancy as 0/1 numeric value)
     snprintf(data, sizeof(data),
              "{\"occupancy\":%d,\"dailyoccupancy\":%lu,\"battery\":%4.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"alerts\":%i,\"resets\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
-             current.get_occupied() ? 1 : 0,
+             CurrentReadings::get_occupied() ? 1 : 0,
              totalOccupiedMinutes,
              stateOfCharge,
              batteryContext[battState],
-             current.get_internalTempC(),
+             CurrentReadings::get_internalTempC(),
              reportedAlertCode,
-             sysStatus.get_resetCount(),
-             sysStatus.get_lastConnectionDuration(),
+             RecoveryState::get_resetCount(),
+             SystemConfig::get_lastConnectionDuration(),
              timeStampValue);
 
   } else {
@@ -2038,14 +2041,14 @@ void publishData() {
     // Counting mode webhook format (original format)
     snprintf(data, sizeof(data),
              "{\"hourly\":%i,\"daily\":%i,\"battery\":%4.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"resets\":%i,\"alerts\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
-             current.get_hourlyCount(),
-             current.get_dailyCount(),
+             CurrentReadings::get_hourlyCount(),
+             CurrentReadings::get_dailyCount(),
              stateOfCharge,
              batteryContext[battState],
-             current.get_internalTempC(),
-             sysStatus.get_resetCount(),
+             CurrentReadings::get_internalTempC(),
+             RecoveryState::get_resetCount(),
              reportedAlertCode,
-             sysStatus.get_lastConnectionDuration(),
+             SystemConfig::get_lastConnectionDuration(),
              timeStampValue);
 
   }
@@ -2077,12 +2080,12 @@ void publishData() {
   if (queued &&
       reportedAlertCode > 0 &&
       isAutoClearAfterReportAlert(reportedAlertCode) &&
-      current.get_alertCode() == reportedAlertCode) {
-    if (sysStatus.get_verboseMode()) {
+      RecoveryState::get_alertCode() == reportedAlertCode) {
+    if (SystemConfig::get_verboseMode()) {
       Log.info("Clearing alert %d after queueing report payload", (int)reportedAlertCode);
     }
-    current.set_alertCode(0);
-    current.set_lastAlertTime(0);
+    RecoveryState::set_alertCode(0);
+    RecoveryState::set_lastAlertTime(0);
   }
 
   // Arm short-term webhook supervision only if publish succeeded.
@@ -2110,7 +2113,7 @@ void publishData() {
   if (!ledgerOk) {
     // Data ledger publish failure; escalate via alert so the error
     // supervisor can decide on corrective action.
-    current.raiseAlert(42);
+    RecoveryState::raiseAlert(42);
   }
   if (!ledgerOk || ledgerElapsedMs >= REPORT_FORENSICS_ABNORMAL_WARN_THRESHOLD_MS) {
     Log.warn("ReportPerf: step=ledger ms=%lu ok=%d",
@@ -2122,17 +2125,17 @@ void publishData() {
              ledgerOk ? 1 : 0);
   }
 
-  if (sensorMode == OCCUPANCY) {
+  if (sensorMode == SystemConfig::OCCUPANCY) {
     Log.info("Report: occ=%d totalMin=%lu alert=%d q=%d ledger=%s",
-             current.get_occupied() ? 1 : 0,
-             (unsigned long)(current.get_totalOccupiedSeconds() / 60UL),
+             CurrentReadings::get_occupied() ? 1 : 0,
+             (unsigned long)(CurrentReadings::get_totalOccupiedSeconds() / 60UL),
              (int)reportedAlertCode,
              queued ? 1 : 0,
              ledgerState);
   } else {
     Log.info("Report: hourly=%d daily=%d alert=%d q=%d ledger=%s",
-             (int)current.get_hourlyCount(),
-             (int)current.get_dailyCount(),
+             (int)CurrentReadings::get_hourlyCount(),
+             (int)CurrentReadings::get_dailyCount(),
              (int)reportedAlertCode,
              queued ? 1 : 0,
              ledgerState);
@@ -2166,16 +2169,16 @@ void publishStartupStatus() {
 
   int resetReason = System.resetReason();
   uint32_t resetReasonData = System.resetReasonData();
-  int8_t alertCode = current.get_alertCode();
-  time_t lastAlert = current.get_lastAlertTime();
+  int8_t alertCode = RecoveryState::get_alertCode();
+  time_t lastAlert = RecoveryState::get_lastAlertTime();
   unsigned long freeHeap = System.freeMemory();
-  const uint8_t failsafeStage = sysStatus.get_connectivityRecoveryStage();
-  const uint8_t failsafeCount = sysStatus.get_connectivityRecoveryCount();
-  const time_t failsafeLastAction = sysStatus.get_lastConnectivityRecoveryAction();
-  const uint16_t watchdogResetCount = sysStatus.get_watchdogResetCount();
-  const uint8_t lastWatchdogBreadcrumb = sysStatus.get_lastWatchdogBreadcrumb();
-  const uint32_t lastWatchdogUptimeMs = sysStatus.get_lastWatchdogUptimeMs();
-  const uint32_t lastWatchdogResetReasonData = sysStatus.get_lastWatchdogResetReasonData();
+  const uint8_t failsafeStage = RecoveryState::get_connectivityRecoveryStage();
+  const uint8_t failsafeCount = RecoveryState::get_connectivityRecoveryCount();
+  const time_t failsafeLastAction = RecoveryState::get_lastConnectivityRecoveryAction();
+  const uint16_t watchdogResetCount = RecoveryState::get_watchdogResetCount();
+  const uint8_t lastWatchdogBreadcrumb = RecoveryState::get_lastWatchdogBreadcrumb();
+  const uint32_t lastWatchdogUptimeMs = RecoveryState::get_lastWatchdogUptimeMs();
+  const uint32_t lastWatchdogResetReasonData = RecoveryState::get_lastWatchdogResetReasonData();
 #if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
   const uint16_t startupPmicAnomalyCount = pmicAnomalyCount;
   const float startupLastPmicAnomalySoc = lastPmicAnomalySoc;
@@ -2184,7 +2187,7 @@ void publishStartupStatus() {
   const uint8_t startupLastPmicAnomalyPowerSource = lastPmicAnomalyPowerSource;
   const uint8_t startupLastPmicAnomalyVbusStatus = lastPmicAnomalyVbusStatus;
 #endif
-  const time_t lastConnection = sysStatus.get_lastConnection();
+  const time_t lastConnection = SystemConfig::get_lastConnection();
   // WO-2026-08-29-002 item 8/Finding 3: Time.isValid() alone is NOT a trust
   // signal - it was true throughout the incident this field misreported
   // (a wrong RTC seeded system time, isValid() was true, and this computed
@@ -2401,7 +2404,7 @@ void UbidotsHandler(const char *event, const char *data) {
     // escalation and corrective-reset logic. Writing Time.now() even when
     // untrusted preserves existing behavior; see the Implementation Report
     // for the Chief Engineer's review.
-    sysStatus.set_lastHookResponse(Time.now());
+    SystemConfig::set_lastHookResponse(Time.now());
 
     if (session.awaitingWebhookResponse) {
       session.awaitingWebhookResponse = false;
@@ -2409,9 +2412,9 @@ void UbidotsHandler(const char *event, const char *data) {
     }
 
     // Clear webhook supervision alert (40) on any response.
-    if (current.get_alertCode() == 40) {
-      current.set_alertCode(0);
-      current.set_lastAlertTime(0);
+    if (RecoveryState::get_alertCode() == 40) {
+      RecoveryState::set_alertCode(0);
+      RecoveryState::set_lastAlertTime(0);
     }
 
     // If the response is numeric, treat 200/201 as success.
@@ -2429,10 +2432,10 @@ void UbidotsHandler(const char *event, const char *data) {
       snprintf(responseString, sizeof(responseString), "Response Received");
     }
   }
-  if (sysStatus.get_verboseMode() && Particle.connected() && PublishQueuePosix::instance().getCanSleep()) {
+  if (SystemConfig::get_verboseMode() && Particle.connected() && PublishQueuePosix::instance().getCanSleep()) {
     publishDiagnosticSafe("Ubidots Hook", responseString, PRIVATE);
   }
-  if (sysStatus.get_verboseMode() && responseOk) {
+  if (SystemConfig::get_verboseMode() && responseOk) {
     Log.info("%s", responseString);
   }
 }
@@ -2516,23 +2519,23 @@ void outOfMemoryHandler(system_event_t event, int param) {
 
 void clearConnectivityFailsafeRecovery(const char *reason) {
   const bool hadRecoveryState =
-      sysStatus.get_connectivityRecoveryStage() != 0 ||
-      sysStatus.get_lastConnectivityRecoveryAction() != 0 ||
-      sysStatus.get_connectivityRecoveryCount() != 0;
-  const bool hadAlert = (current.get_alertCode() == ConnectivityPolicy::CONNECTIVITY_FAILSAFE_ALERT);
+      RecoveryState::get_connectivityRecoveryStage() != 0 ||
+      RecoveryState::get_lastConnectivityRecoveryAction() != 0 ||
+      RecoveryState::get_connectivityRecoveryCount() != 0;
+  const bool hadAlert = (RecoveryState::get_alertCode() == ConnectivityPolicy::CONNECTIVITY_FAILSAFE_ALERT);
 
   if (!hadRecoveryState && !hadAlert) {
     return;
   }
 
-  sysStatus.set_connectivityRecoveryStage(0);
-  sysStatus.set_lastConnectivityRecoveryAction(0);
-  sysStatus.set_connectivityRecoveryCount(0);
-  sysStatus.flush(true);
+  RecoveryState::set_connectivityRecoveryStage(0);
+  RecoveryState::set_lastConnectivityRecoveryAction(0);
+  RecoveryState::set_connectivityRecoveryCount(0);
+  SystemConfig::flushNow();
 
   if (hadAlert) {
-    current.set_alertCode(0);
-    current.set_lastAlertTime(0);
+    RecoveryState::set_alertCode(0);
+    RecoveryState::set_lastAlertTime(0);
   }
 
   Log.info("Failsafe: cleared reason=%s", reason ? reason : "unknown");
@@ -2552,7 +2555,7 @@ void clearConnectivityFailsafeRecovery(const char *reason) {
  * @see docs/architecture/connectivity-failsafe.md for escalation timing and policy details
  */
 void connectivityFailsafeSupervisor() {
-  if (sysStatus.get_connectionMode() == DISCONNECTED) {
+  if (SystemConfig::get_connectionMode() == SystemConfig::DISCONNECTED) {
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
     ConnectivityFailsafeTest::logDeferDisconnectedMode();
 #endif
@@ -2588,7 +2591,7 @@ void connectivityFailsafeSupervisor() {
     return;
   }
 
-  const time_t lastConnection = sysStatus.get_lastConnection();
+  const time_t lastConnection = SystemConfig::get_lastConnection();
   if (lastConnection == 0) {
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
     ConnectivityFailsafeTest::logDeferNoLastConnection();
@@ -2606,7 +2609,7 @@ void connectivityFailsafeSupervisor() {
     return;
   }
 
-  uint8_t currentStage = sysStatus.get_connectivityRecoveryStage();
+  uint8_t currentStage = RecoveryState::get_connectivityRecoveryStage();
   if (currentStage > 3) {
     currentStage = 0;
   }
@@ -2614,7 +2617,7 @@ void connectivityFailsafeSupervisor() {
     return;
   }
 
-  time_t lastAction = sysStatus.get_lastConnectivityRecoveryAction();
+  time_t lastAction = RecoveryState::get_lastConnectivityRecoveryAction();
   if (lastAction > now) {
     lastAction = 0;
   }
@@ -2638,7 +2641,7 @@ void connectivityFailsafeSupervisor() {
   const bool lowBatteryHardActionBlocked =
       nextStage >= 2 &&
       !externalPowerPresent &&
-      (sysStatus.get_lowBatteryMode() || tier == TIER_SURVIVAL);
+      (PowerConfig::get_lowBatteryMode() || tier == TIER_SURVIVAL);
 
   if (lowBatteryHardActionBlocked) {
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
@@ -2653,7 +2656,7 @@ void connectivityFailsafeSupervisor() {
   }
 
   if (nextStage == 1) {
-    current.raiseAlert(ConnectivityPolicy::CONNECTIVITY_FAILSAFE_ALERT);
+    RecoveryState::raiseAlert(ConnectivityPolicy::CONNECTIVITY_FAILSAFE_ALERT);
     setAppBreadcrumb(BREADCRUMB_CONNECTIVITY_FAILSAFE);
     persistConnectivityFailsafeState(1, now, true);
     Log.info("Failsafe: stage=1 action=radio-reset age=%lds",
@@ -2683,7 +2686,7 @@ void userSwitchISR() { userSwitchDetected = true; }
 
 void sensorISR() {
   static bool frontTireFlag = false;
-  if (frontTireFlag || sysStatus.get_sensorType() == 1) { // Counts the rear tire for pressure sensors and once for PIR (sensor type 1)
+  if (frontTireFlag || SystemConfig::get_sensorType() == 1) { // Counts the rear tire for pressure sensors and once for PIR (sensor type 1)
     sensorDetect = true;                                  // sets the sensor flag for the main loop
     frontTireFlag = false;
   } else
@@ -2711,12 +2714,12 @@ void dailyCleanup() {
     // + persisted lastTimeSync stamp) is recorded once, uniformly, by
     // checkClockResync() - never at request time, which would use the very
     // clock under suspicion (Finding 1's first defect; previously this
-    // function called sysStatus.set_lastTimeSync(Time.now()) immediately
+    // function called SystemConfig::set_lastTimeSync(Time.now()) immediately
     // after Particle.syncTime(), before the request had even completed).
     requestClockResync("daily-cleanup");
   }
   
   Log.info("Running Daily Cleanup");
   
-  current.resetEverything(); // Zero the counts for the new day
+  CurrentReadings::resetEverything(); // Zero the counts for the new day
 }

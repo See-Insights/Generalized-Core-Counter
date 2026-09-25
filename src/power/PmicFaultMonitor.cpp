@@ -3,7 +3,9 @@
 
 #include "PowerManager.h"
 #include "PowerDiagnostics.h"
-#include "MyPersistentData.h"
+#include "persist/CurrentReadings.h"
+#include "persist/RecoveryState.h"
+#include "persist/SystemConfig.h"
 #include "observability/WakeCycleStats.h"
 #include "power/BatteryAuthorityPolicy.h"
 
@@ -164,10 +166,10 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
         immediateResetConsumed = false;
         immediateResetFaultReg = 0;
 
-        const int8_t currentAlert = current.get_alertCode();
+        const int8_t currentAlert = RecoveryState::get_alertCode();
         if (currentAlert == 21 || currentAlert == 23) {
-          current.set_alertCode(0);
-          current.set_lastAlertTime(0);
+          RecoveryState::set_alertCode(0);
+          RecoveryState::set_lastAlertTime(0);
         }
       } else {
         persistentAfterImmediateReset = true;
@@ -187,7 +189,7 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
   const uint8_t ntcFaultCode = regs.faultReg & kPmicNtcFaultMask;
   if (ntcFaultCode != 0) {
     Log.warn("PMIC: NTC fault active (code=0x%02x) - charge-path thermistor/TS network fault", ntcFaultCode);
-    current.raiseAlert(20); // Reuse the thermal alert code - this is a thermal-status class fault.
+    RecoveryState::raiseAlert(20); // Reuse the thermal alert code - this is a thermal-status class fault.
   }
 
   // CHRG_FAULT (bits 5:4). BAT_FAULT is separate, handled below, and does not
@@ -201,25 +203,25 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
         Log.info("PMIC: Input fault - VBUS out of range (likely solar variation)");
         if (persistentAfterImmediateReset) {
           Log.error("PMIC: charge fault persists after reset - alert 21");
-          current.raiseAlert(21);
+          RecoveryState::raiseAlert(21);
         }
         break;
       case 0x02: // Thermal shutdown.
         Log.error("PMIC: Thermal shutdown - charging stopped due to temperature");
-        current.raiseAlert(20);
+        RecoveryState::raiseAlert(20);
         break;
       case 0x03: // Charge safety timer expired - common stuck-charging indicator.
         Log.error(persistentAfterImmediateReset ? "PMIC: charge fault persists after reset - alert 21"
                                                  : "PMIC: Charge safety timer expired - charging timeout");
-        current.raiseAlert(21);
+        RecoveryState::raiseAlert(21);
         break;
       default:
         if (persistentAfterImmediateReset) {
           Log.error("PMIC: charge fault persists after reset - alert 21");
-          current.raiseAlert(21);
+          RecoveryState::raiseAlert(21);
         } else {
           Log.warn("PMIC: Charge fault detected (code=0x%02x)", chargeFault);
-          current.raiseAlert(23);
+          RecoveryState::raiseAlert(23);
         }
         break;
     }
@@ -260,7 +262,7 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
       if (thermallyCorrelatedFault) {
         Log.info("PMIC: Fault detected but charging disabled due to temperature (%.1fC) - fault class is "
                  "thermally correlated, skipping remediation (recovers naturally)",
-                 (double)current.get_internalTempC());
+                 (double)CurrentReadings::get_internalTempC());
       } else {
         Log.info("PMIC: Fault detected, thermal disable config is read-back verified - deferring "
                  "remediation for this non-thermal fault class until charging is re-enabled");
@@ -363,20 +365,20 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
       remediationActiveLevel = 0;
       remediationPhase = 0;
 
-      const int8_t currentAlert = current.get_alertCode();
+      const int8_t currentAlert = RecoveryState::get_alertCode();
       if (currentAlert >= 20 && currentAlert <= 23) {
         Log.info("PMIC: Clearing battery/charging alert %d - charging resumed", currentAlert);
-        current.set_alertCode(0);
-        current.set_lastAlertTime(0);
+        RecoveryState::set_alertCode(0);
+        RecoveryState::set_lastAlertTime(0);
       }
     }
 
     // Narrow recovery path for alert 21 (charge timeout/stuck charging).
-    const int8_t currentAlert = current.get_alertCode();
+    const int8_t currentAlert = RecoveryState::get_alertCode();
     if (currentAlert == 21 && regs.chargeStatus != 2) {
       Log.info("PMIC: clearing alert 21 after charge recovery");
-      current.set_alertCode(0);
-      current.set_lastAlertTime(0);
+      RecoveryState::set_alertCode(0);
+      RecoveryState::set_lastAlertTime(0);
     }
   }
 
@@ -385,7 +387,7 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
   // not increment consecutiveFaults or enter remediation.
   if (regs.faultReg & kPmicBatFaultMask) {
     Log.error("PMIC: Battery overvoltage protection active (BAT_FAULT)");
-    current.raiseAlert(23);
+    RecoveryState::raiseAlert(23);
   }
 
   return regs;
@@ -464,7 +466,7 @@ void trackAndReport(const Registers &regs, int powerSource, float soc, float vce
       baselineVcell = vcell;
       baselineSource = powerSource;
       baselineProfile = powerReport.activeInputProfile;
-      if (sysStatus.get_verboseMode()) Log.info("Charge: base soc=%.2f v=%.3f", (double)soc, (double)vcell);
+      if (SystemConfig::get_verboseMode()) Log.info("Charge: base soc=%.2f v=%.3f", (double)soc, (double)vcell);
     } else if ((nowMs - baselineMs) >= kChargeSummaryIntervalMs) {
       const Observability::WakeCycleStats &stats = Observability::cycleStats();
       Log.info("Charge: soc=%.1f d15=%+.2f v=%.3f dv=%+.3f chg=%s src=%s prof=%s a=%lus c=%lus t=%lus",
@@ -518,7 +520,7 @@ void trackAndReport(const Registers &regs, int powerSource, float soc, float vce
           } else {
             Log.error("PMIC: Stuck in Fast Charging for 6+ hours with no material gain soc=%.1f socGain=%.2f vcell=%.3f vcellGain=%.3f",
                        (double)finalAcceptedSoc, (double)socGain, (double)vcell, (double)vcellGain);
-            current.raiseAlert(21);
+            RecoveryState::raiseAlert(21);
           }
         }
       }

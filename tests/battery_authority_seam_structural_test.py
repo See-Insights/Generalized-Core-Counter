@@ -73,7 +73,7 @@ COMMAND_SOURCE = REPO_ROOT / "src" / "power" / "BatteryAuthorityCommand.cpp"
 # Matches "MyPersistentData.h" or "StorageHelperRK.h" by filename stem, not by
 # a specific #include spelling - this must catch a relative include, a
 # non-relative include, or any other form a future edit might reintroduce.
-PERSISTENCE_HEADER_PATTERN = re.compile(r"MyPersistentData\.h")
+PERSISTENCE_HEADER_PATTERN = re.compile(r"MyPersistentData\.h|persist/\w+\.h")
 STORAGE_HELPER_PATTERN = re.compile(r"StorageHelperRK\.h")
 
 
@@ -148,14 +148,17 @@ def main():
             "failure mode as above, one level more direct"
         )
 
-    # --- Invariant 4 (positive control): the command half DOES include the
+    # --- Invariant 4 (positive control): the command half DOES include a
     # persistence header - i.e. currentTier()/commit() are actually
     # implemented against real persisted state, not stubbed out or left
     # disconnected. Without this check, satisfying invariants 2/3 by simply
-    # deleting the implementation would pass silently. ---
+    # deleting the implementation would pass silently.
+    # WO-2026-09-23-001: the backing header is now persist/PowerConfig.h
+    # rather than MyPersistentData.h; the control still proves the same
+    # thing, since the facade is only ever satisfied by the real store. ---
     if not PERSISTENCE_HEADER_PATTERN.search(command_source_code_only):
         fail(
-            f"{COMMAND_SOURCE} does not reference MyPersistentData.h - the "
+            f"{COMMAND_SOURCE} does not reference a persistence header - the "
             "command implementation must be backed by the real persisted "
             "currentBatteryTier/lowBatteryMode/connectionMode/sensorMode, "
             "not stubbed out here"

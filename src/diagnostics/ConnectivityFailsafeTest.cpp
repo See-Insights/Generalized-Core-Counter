@@ -1,7 +1,9 @@
 #include "diagnostics/ConnectivityFailsafeTest.h"
 
 #include "Config.h"
-#include "MyPersistentData.h"
+#include "persist/PowerConfig.h"
+#include "persist/RecoveryState.h"
+#include "persist/SystemConfig.h"
 #include "power/BatteryAuthority.h"
 #include "power/ConnectivityPolicy.h"
 #include "power/PowerManager.h"
@@ -55,7 +57,7 @@ const char *batteryTierShortNameLocal(BatteryTier tier) {
 }
 
 BatteryTier currentBatteryTierForFailsafeLocal() {
-  const uint8_t tierValue = sysStatus.get_currentBatteryTier();
+  const uint8_t tierValue = PowerConfig::get_currentBatteryTier();
   if (tierValue <= TIER_SURVIVAL) {
     return static_cast<BatteryTier>(tierValue);
   }
@@ -132,7 +134,7 @@ int plannedClosedHoursSleepSec() {
 }
 
 FailsafeDeferReason currentFailsafeEligibilityReason() {
-  if (sysStatus.get_connectionMode() == DISCONNECTED) {
+  if (SystemConfig::get_connectionMode() == SystemConfig::DISCONNECTED) {
     return FAILSAFE_DEFER_DISCONNECTED_MODE;
   }
 
@@ -144,7 +146,7 @@ FailsafeDeferReason currentFailsafeEligibilityReason() {
     return FAILSAFE_DEFER_INVALID_TIME;
   }
 
-  const time_t lastConnection = sysStatus.get_lastConnection();
+  const time_t lastConnection = SystemConfig::get_lastConnection();
   if (lastConnection == 0) {
     return FAILSAFE_DEFER_NO_LAST_CONNECTION;
   }
@@ -152,13 +154,13 @@ FailsafeDeferReason currentFailsafeEligibilityReason() {
   const time_t now = Time.now();
   if (now > lastConnection) {
     const time_t connectionAgeSec = now - lastConnection;
-    uint8_t currentStage = sysStatus.get_connectivityRecoveryStage();
+    uint8_t currentStage = RecoveryState::get_connectivityRecoveryStage();
     if (currentStage > 3) {
       currentStage = 0;
     }
 
     if (connectionAgeSec >= ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC && currentStage < 3) {
-      time_t lastAction = sysStatus.get_lastConnectivityRecoveryAction();
+      time_t lastAction = RecoveryState::get_lastConnectivityRecoveryAction();
       if (lastAction > now) {
         lastAction = 0;
       }
@@ -177,7 +179,7 @@ FailsafeDeferReason currentFailsafeEligibilityReason() {
         const bool externalPowerPresent = connectivityFailsafeHasExternalPowerLocal();
         const bool lowBatteryHardActionBlocked =
             nextStage >= 2 && !externalPowerPresent &&
-            (sysStatus.get_lowBatteryMode() || tier == TIER_SURVIVAL);
+            (PowerConfig::get_lowBatteryMode() || tier == TIER_SURVIVAL);
 
         if (lowBatteryHardActionBlocked) {
           return FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED;
@@ -212,9 +214,9 @@ void logBootDiagnostics() {
   char lastActionField[24];
   char connectionAgeField[24];
   formatFailsafeAgeField(lastActionField, sizeof(lastActionField),
-                         sysStatus.get_lastConnectivityRecoveryAction());
+                         RecoveryState::get_lastConnectivityRecoveryAction());
   formatFailsafeConnectionAgeField(connectionAgeField, sizeof(connectionAgeField),
-                                   sysStatus.get_lastConnection());
+                                   SystemConfig::get_lastConnection());
 
   const FailsafeDeferReason reason = currentFailsafeEligibilityReason();
   if (reason == FAILSAFE_DEFER_NONE) {
@@ -222,8 +224,8 @@ void logBootDiagnostics() {
              (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC,
              (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC,
              (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC,
-             (unsigned)sysStatus.get_connectivityRecoveryStage(),
-             (unsigned)sysStatus.get_connectivityRecoveryCount(),
+             (unsigned)RecoveryState::get_connectivityRecoveryStage(),
+             (unsigned)RecoveryState::get_connectivityRecoveryCount(),
              lastActionField,
              connectionAgeField);
   } else {
@@ -231,8 +233,8 @@ void logBootDiagnostics() {
              (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC,
              (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC,
              (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC,
-             (unsigned)sysStatus.get_connectivityRecoveryStage(),
-             (unsigned)sysStatus.get_connectivityRecoveryCount(),
+             (unsigned)RecoveryState::get_connectivityRecoveryStage(),
+             (unsigned)RecoveryState::get_connectivityRecoveryCount(),
              lastActionField,
              connectionAgeField,
              failsafeDeferReasonName(reason));
@@ -245,7 +247,7 @@ void logDeferDisconnectedMode() {
   if (claimFailsafeDeferLog(FAILSAFE_DEFER_DISCONNECTED_MODE)) {
     Log.info("FailsafeDefer: reason=%s mode=%u",
              failsafeDeferReasonName(FAILSAFE_DEFER_DISCONNECTED_MODE),
-             (unsigned)sysStatus.get_connectionMode());
+             (unsigned)SystemConfig::get_connectionMode());
   }
 }
 

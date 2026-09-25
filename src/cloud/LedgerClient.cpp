@@ -1,5 +1,6 @@
 #include "cloud/Cloud.h"
 #include "power/ConnectivityPolicy.h"
+#include "persist/SystemConfig.h"
 
 namespace {
 
@@ -45,7 +46,7 @@ void Cloud::setup() {
 void Cloud::onDefaultSettingsSync(Ledger ledger) {
     Log.info("LedgerCallback: kind=input ledger=default-settings synced=%lu",
              (unsigned long)ledger.lastSynced());
-    if (sysStatus.get_verboseMode()) {
+    if (SystemConfig::get_verboseMode()) {
         Log.info("default-settings synced from cloud");
     }
     // Do not merge/apply inside async callbacks; keep expensive work
@@ -57,7 +58,7 @@ void Cloud::onDefaultSettingsSync(Ledger ledger) {
 void Cloud::onDeviceSettingsSync(Ledger ledger) {
     Log.info("LedgerCallback: kind=input ledger=device-settings synced=%lu",
              (unsigned long)ledger.lastSynced());
-    if (sysStatus.get_verboseMode()) {
+    if (SystemConfig::get_verboseMode()) {
         Log.info("device-settings synced from cloud");
     }
     // Do not merge/apply inside async callbacks; keep expensive work
@@ -110,7 +111,7 @@ bool Cloud::areLedgersSynced() const {
     unsigned long nowMs = millis();
     
     if (Particle.connected()) {
-        time_t currentConnectionEpoch = sysStatus.get_lastConnection();
+        time_t currentConnectionEpoch = SystemConfig::get_lastConnection();
         bool newConnectionObserved = wasDisconnected ||
                                    (currentConnectionEpoch != 0 && currentConnectionEpoch != lastObservedConnectionEpoch);
 
@@ -120,7 +121,7 @@ bool Cloud::areLedgersSynced() const {
             lastObservedConnectionEpoch = currentConnectionEpoch;
             timeoutOutcomeLogged = false;
             readyOutcomeLogged = false;
-            if (sysStatus.get_verboseMode()) {
+            if (SystemConfig::get_verboseMode()) {
                 Log.info("Connected - starting %lu ms ledger sync window", 
                          ConnectivityPolicy::LEDGER_SYNC_TIMEOUT_MS);
             }
@@ -159,7 +160,7 @@ bool Cloud::areLedgersSynced() const {
             bool deviceHasConfig = ledgerHasConfigContent(deviceData);
 
             if (defaultSynced && !deviceSynced && !deviceHasConfig) {
-                if (!timeoutOutcomeLogged && sysStatus.get_verboseMode()) {
+                if (!timeoutOutcomeLogged && SystemConfig::get_verboseMode()) {
                     Log.info("default-settings synced and device-settings is empty after %lu ms - assuming no device overrides",
                              elapsedSinceConnect);
                 }
@@ -176,7 +177,7 @@ bool Cloud::areLedgersSynced() const {
             }
 
             if (!defaultSynced && deviceSynced && !defaultHasConfig) {
-                if (!timeoutOutcomeLogged && sysStatus.get_verboseMode()) {
+                if (!timeoutOutcomeLogged && SystemConfig::get_verboseMode()) {
                     Log.info("device-settings synced and default-settings is empty after %lu ms - assuming no product defaults",
                              elapsedSinceConnect);
                 }
@@ -210,7 +211,7 @@ bool Cloud::areLedgersSynced() const {
                 return bothSynced;
             }
             // If neither has synced after timeout, assume they're empty and that's okay
-            if (!timeoutOutcomeLogged && sysStatus.get_verboseMode()) {
+            if (!timeoutOutcomeLogged && SystemConfig::get_verboseMode()) {
                 Log.info("No ledger data after %lu ms - assuming empty ledgers (OK)", elapsedSinceConnect);
             }
             if (!timeoutOutcomeLogged) {

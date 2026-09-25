@@ -63,7 +63,7 @@ namespace BatteryAuthority {
  *          the tier recovers). A field here that didn't equal the device's
  *          actual low-battery mode would be a trap for the next reader; a
  *          caller that needs the real persisted flag should read
- *          sysStatus.get_lowBatteryMode() directly.
+ *          PowerConfig::get_lowBatteryMode() directly.
  */
 struct Verdict {
   BatteryTier tier;

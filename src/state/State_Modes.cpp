@@ -2,7 +2,8 @@
 #include "../Config.h"
 #include "cloud/Cloud.h"
 #include "LocalTimeRK.h"
-#include "MyPersistentData.h"
+#include "persist/CurrentReadings.h"
+#include "persist/SystemConfig.h"
 #include "PublishQueuePosixRK.h"
 #include "sensors/SensorManager.h"
 #include "device_pinout.h"
@@ -25,19 +26,19 @@ void handleCountingMode() {
   // Check if sensor has new data
   if (SensorManager::instance().loop()) {
     // Increment counters
-    current.set_hourlyCount(current.get_hourlyCount() + 1);
-    current.set_dailyCount(current.get_dailyCount() + 1);
+    CurrentReadings::set_hourlyCount(CurrentReadings::get_hourlyCount() + 1);
+    CurrentReadings::set_dailyCount(CurrentReadings::get_dailyCount() + 1);
     // WO-2026-08-29-002 item 8 (Finding 6, Round 4 review): lastCountTime has
     // no consumers anywhere in the codebase (see MyPersistentData.cpp and
     // State_Sleep.cpp's identical gating for the consumer analysis) - safe
     // to gate on isClockTrusted() so an untrusted clock records the 0
     // sentinel instead of a wrong timestamp, rather than Time.isValid()
     // alone (Finding 3).
-    current.set_lastCountTime(isClockTrusted() ? Time.now() : 0);
+    CurrentReadings::set_lastCountTime(isClockTrusted() ? Time.now() : 0);
 
     // Log the new count once per event
     Log.info("Count detected - Hourly: %d, Daily: %d",
-             current.get_hourlyCount(), current.get_dailyCount());
+             CurrentReadings::get_hourlyCount(), CurrentReadings::get_dailyCount());
 
     // Flash the on-module BLUE LED for ~1 second as a
     // visual count indicator (works across sleep cycles)
@@ -59,13 +60,13 @@ void handleOccupancyMode() {
   // Check if sensor has new data
   if (SensorManager::instance().loop()) {
     // Sensor detected presence
-    if (!current.get_occupied()) {
+    if (!CurrentReadings::get_occupied()) {
       // Transition from unoccupied to occupied
-      current.set_occupied(true);
-      current.set_occupancyStartTime(Time.now());
+      CurrentReadings::set_occupied(true);
+      CurrentReadings::set_occupancyStartTime(Time.now());
       
       // V3.23: Set LED with debounce timeout from sensor.setting1
-      uint32_t setting1Raw = sensorConfig.get_sensorSetting1();
+      uint32_t setting1Raw = SystemConfig::SensorSettings::get_sensorSetting1();
       uint32_t debounceSeconds = setting1Raw / 1000;
       Log.info("OCCUPANCY detection: setting1=%lu ms => debounce=%lu sec",
                (unsigned long)setting1Raw, (unsigned long)debounceSeconds);
@@ -75,7 +76,7 @@ void handleOccupancyMode() {
         debounceSeconds = 60;  // Minimum 60 second debounce for occupancy
       }
       signalLED(true, debounceSeconds * 1000UL);  // Turn on LED until debounce expires
-      const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
+      const bool reportNow = (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
       logOccupiedEvent("pir", debounceSeconds, reportNow);
       
       // In INTERMITTENT_KEEP_ALIVE mode, report immediately on occupancy state changes
@@ -88,21 +89,21 @@ void handleOccupancyMode() {
       }
     } else {
       // Already occupied - reset LED timeout on new motion
-      uint32_t debounceSeconds = sensorConfig.get_sensorSetting1() / 1000;
+      uint32_t debounceSeconds = SystemConfig::SensorSettings::get_sensorSetting1() / 1000;
       if (debounceSeconds == 0) {
         debounceSeconds = 60;  // Minimum 60 second debounce for occupancy
       }
       signalLED(true, debounceSeconds * 1000UL);  // Reset LED timeout
-      if (sysStatus.get_verboseMode()) {
+      if (SystemConfig::get_verboseMode()) {
         logOccupiedEvent("pir", debounceSeconds, false, true);
       }
     }
 
     // Update last event time (resets debounce timer)
-    current.set_lastOccupancyEvent(millis());
+    CurrentReadings::set_lastOccupancyEvent(millis());
 
-    if (sysStatus.get_verboseMode()) {
-      uint32_t occupiedDuration = Time.now() - current.get_occupancyStartTime();
+    if (SystemConfig::get_verboseMode()) {
+      uint32_t occupiedDuration = Time.now() - CurrentReadings::get_occupancyStartTime();
       Log.info("Occupancy event - Duration: %lu seconds", occupiedDuration);
     }
   }
@@ -120,28 +121,28 @@ void handleOccupancyMode() {
  *          Triggers immediate reporting on state change for DISCONNECTED_KEEP_ALIVE mode.
  */
 void updateOccupancyState() {
-  if (!current.get_occupied()) {
+  if (!CurrentReadings::get_occupied()) {
     return; // Nothing to do if not occupied
   }
 
   // V3.23: Occupancy debounce timeout comes from sensor.setting1
-  uint32_t debounceMs = sensorConfig.get_sensorSetting1();
+  uint32_t debounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
   if (debounceMs == 0) {
     debounceMs = Config::occupancyDebounceMsForRuntime();
   }
 
-  uint32_t lastEvent = current.get_lastOccupancyEvent();
+  uint32_t lastEvent = CurrentReadings::get_lastOccupancyEvent();
   if (lastEvent == 0) {
     // If this is 0 (for example, occupancy set from a PIR wake path that
     // didn't update lastOccupancyEvent), we must not immediately expire.
     lastEvent = millis();
-    current.set_lastOccupancyEvent(lastEvent);
+    CurrentReadings::set_lastOccupancyEvent(lastEvent);
   }
   uint32_t timeSinceLastEvent = millis() - lastEvent;
 
   // Check if debounce timeout has expired
   if (timeSinceLastEvent > debounceMs) {
-    const bool reportNow = (sysStatus.get_connectionMode() == INTERMITTENT_KEEP_ALIVE);
+    const bool reportNow = (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
     const OccupancyCloseResult closeResult = closeOccupancySessionSafely("modes");
     if (closeResult.valid) {
       logUnoccupiedEvent("debounce", closeResult.sessionSeconds, closeResult.totalSeconds, reportNow);

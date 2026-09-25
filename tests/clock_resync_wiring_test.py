@@ -27,7 +27,7 @@ instead traces the actual shipped source to prove:
    advanced past the value the RTC was last written for - never gated on
    `Particle.syncTimeDone()`, which only means "no longer pending" and
    races with `timeSyncedLast()` actually advancing (see point 8).
-3. `sysStatus.set_lastTimeSync(Time.now())` (item 6's Finding-1 fix) is
+3. `SystemConfig::set_lastTimeSync(Time.now())` (item 6's Finding-1 fix) is
    stamped at that same observed-advance point, and `dailyCleanup()` no
    longer stamps it at request time (the old defect: stamping with the very
    clock under suspicion, before any sync had completed).
@@ -81,7 +81,7 @@ instead traces the actual shipped source to prove:
 12. Round 4 review, Finding 3 (HIGH): `setup()`'s time-validation gate must
     force `CONNECTING_STATE` not only when `!Time.isValid()`, but also when
     this device has never (across its whole persisted history) completed a
-    confirmed sync (`sysStatus.get_lastTimeSync() == 0`), so a wrong RTC
+    confirmed sync (`SystemConfig::get_lastTimeSync() == 0`), so a wrong RTC
     that reads `Time.isValid()==true` cannot reach a hibernate-capable state
     without ever having been forced to connect.
 13. Round 4 review, Finding 4 (MEDIUM): the request- and write-back-side
@@ -285,7 +285,7 @@ def main() -> None:
     gate_idx = write_back_gate_stripped.start() if write_back_gate_stripped else gate_idx
     rtc_idx = check_fn_stripped.index("ab1805.setRtcFromSystem()")
     tracked_update_idx = check_fn_stripped.index("lastRtcWriteSyncedLastMs = lastSyncMs")
-    stamp_idx = check_fn_stripped.index("sysStatus.set_lastTimeSync(Time.now())")
+    stamp_idx = check_fn_stripped.index("SystemConfig::set_lastTimeSync(Time.now())")
     if not (gate_idx < rtc_idx < tracked_update_idx < stamp_idx):
         fail(
             "checkClockResync() must check the write-back gate, THEN call "
@@ -341,8 +341,8 @@ def main() -> None:
     guarded_body = confirm_guard.group(1)
     if "lastRtcWriteSyncedLastMs = lastSyncMs" not in guarded_body:
         fail("the lastRtcWriteSyncedLastMs update must be inside the `if (rtcUpdated)` guard (Finding 1)")
-    if "sysStatus.set_lastTimeSync(Time.now())" not in guarded_body:
-        fail("the sysStatus.set_lastTimeSync() stamp must be inside the `if (rtcUpdated)` guard (Finding 1)")
+    if "SystemConfig::set_lastTimeSync(Time.now())" not in guarded_body:
+        fail("the SystemConfig::set_lastTimeSync() stamp must be inside the `if (rtcUpdated)` guard (Finding 1)")
 
     # Round 6 (second follow-up), Stage 7 pass 4: the failure-only tracking
     # writes must be OUTSIDE the success guard (i.e. in the paired `else`),
@@ -453,9 +453,9 @@ def main() -> None:
         line for line in daily_fn.splitlines() if not line.strip().startswith("//")
     ]
     daily_code_text = "\n".join(daily_code_lines)
-    if "sysStatus.set_lastTimeSync" in daily_code_text:
+    if "SystemConfig::set_lastTimeSync" in daily_code_text:
         fail(
-            "dailyCleanup() must not stamp sysStatus.set_lastTimeSync() directly "
+            "dailyCleanup() must not stamp SystemConfig::set_lastTimeSync() directly "
             "(Finding 1's request-time-stamp defect) - completion must be "
             "recorded exactly once, by checkClockResync()"
         )
@@ -501,7 +501,7 @@ def main() -> None:
     ) + len(re.findall(r"get_lastTimeSync\(\)", strip_line_comments(status_text))
     ) + len(re.findall(r"get_lastTimeSync\(\)", strip_line_comments(clock_text)))
     if get_last_time_sync_callers < 1:
-        fail("sysStatus.get_lastTimeSync() must have at least one real (non-comment) caller (item 6)")
+        fail("SystemConfig::get_lastTimeSync() must have at least one real (non-comment) caller (item 6)")
 
     # --- item 8: the confirmed regression site must require isClockTrusted(). ---
     lastconn_match = re.search(
@@ -638,7 +638,7 @@ def main() -> None:
             "set_lastCountTime() on isClockTrusted() (Change 2: lastCountTime "
             "has no consumers, so this is a safe, in-scope Finding-4 fix)"
         )
-    if "current.set_lastCountTime(isClockTrusted() ? Time.now() : 0)" not in sleep_text:
+    if "CurrentReadings::set_lastCountTime(isClockTrusted() ? Time.now() : 0)" not in sleep_text:
         fail(
             "State_Sleep.cpp's PIR-wake counting path must gate "
             "set_lastCountTime() on isClockTrusted() (Change 2)"
@@ -649,7 +649,7 @@ def main() -> None:
     # --- also be gated, identically to the other two lastCountTime      ---
     # --- sites above (same field, same "no consumers" analysis).        ---
     modes_text = MODES_SRC.read_text()
-    if "current.set_lastCountTime(isClockTrusted() ? Time.now() : 0)" not in modes_text:
+    if "CurrentReadings::set_lastCountTime(isClockTrusted() ? Time.now() : 0)" not in modes_text:
         fail(
             "State_Modes.cpp's COUNTING-mode handler must gate "
             "set_lastCountTime() on isClockTrusted() (Finding 6, Round 4 "
@@ -675,13 +675,13 @@ def main() -> None:
         (
             app_text,
             APP_SRC.name,
-            "current.set_lastAlertTime(Time.now());",
+            "RecoveryState::set_lastAlertTime(Time.now());",
             "boot-storm alert (bootStormAlertPending)",
         ),
         (
             app_text,
             APP_SRC.name,
-            "sysStatus.set_lastHookResponse(Time.now());",
+            "SystemConfig::set_lastHookResponse(Time.now());",
             "webhook response handler",
         ),
     ]
@@ -703,7 +703,7 @@ def main() -> None:
     # ungated (validate()'s occupied-with-occupancyStartTime==0 forced-
     # unoccupied side effect, and State_Modes.cpp's duration-since-start
     # calculation would produce a garbage span).
-    occ_needle = "current.set_occupancyStartTime(Time.now());"
+    occ_needle = "CurrentReadings::set_occupancyStartTime(Time.now());"
     if occ_needle not in sleep_text:
         fail("State_Sleep.cpp's PIR-wake occupancy-start path must still call set_occupancyStartTime(Time.now()) unconditionally")
     occ_idx = sleep_text.index(occ_needle)
@@ -744,13 +744,13 @@ def main() -> None:
         )
     never_synced_flag = setup_gate_match.group(1)
     flag_def_match = re.search(
-        re.escape(never_synced_flag) + r"\s*=\s*\(sysStatus\.get_lastTimeSync\(\)\s*==\s*0\)",
+        re.escape(never_synced_flag) + r"\s*=\s*\(SystemConfig::get_lastTimeSync\(\)\s*==\s*0\)",
         app_text,
     )
     if not flag_def_match:
         fail(
             f"setup()'s time-validation gate flag ({never_synced_flag}) must be "
-            "defined as (sysStatus.get_lastTimeSync() == 0) (Finding 3) - "
+            "defined as (SystemConfig::get_lastTimeSync() == 0) (Finding 3) - "
             "NOT Particle.timeSyncedLast() == 0, which always reads 0 "
             "immediately after every boot/HIBERNATE wake and would force a "
             "connect on every wake, defeating low-power connection scheduling"

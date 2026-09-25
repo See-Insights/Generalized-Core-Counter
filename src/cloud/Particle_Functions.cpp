@@ -1,7 +1,6 @@
 #include "cloud/Particle_Functions.h"
 #include "Particle.h"
 #include "sensors/SensorManager.h"
-#include "MyPersistentData.h"  // For sysStatus (serialConnected configuration)
 #include "ThrashGuard.h"        // For thrash diagnostics
 
 // Prototypes and System Mode calls

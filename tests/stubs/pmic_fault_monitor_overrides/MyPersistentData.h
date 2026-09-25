@@ -43,5 +43,3 @@ struct TestSystemStatus {
 inline TestCurrentStatus testCurrent;
 inline TestSystemStatus testSysStatus;
 
-#define current testCurrent
-#define sysStatus testSysStatus

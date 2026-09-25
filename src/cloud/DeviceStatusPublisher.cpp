@@ -7,6 +7,10 @@
 #include "state/StateMachine.h"
 #include "reporting/ReportingPolicy.h"
 #include "time/ClockTrust.h"
+#include "persist/CurrentReadings.h"
+#include "persist/PowerConfig.h"
+#include "persist/RecoveryState.h"
+#include "persist/SystemConfig.h"
 
 // WO-2026-08-29-002 item 8: forward-declared rather than pulled in via
 // state/State_Common.h - that header transitively drags in retained-memory
@@ -92,29 +96,29 @@ void updateFnv1aField(uint32_t &hash, const char *name, unsigned long value) {
 void formatConfigGeneration(char *buffer, size_t bufferSize) {
     uint32_t hash = 2166136261UL;
 
-    updateFnv1aField(hash, "messaging.serial", sysStatus.get_serialConnected() ? 1L : 0L);
-    updateFnv1aField(hash, "messaging.verboseMode", sysStatus.get_verboseMode() ? 1L : 0L);
-    updateFnv1aField(hash, "messaging.verboseTimeoutMin", (unsigned long)sysStatus.get_verboseTimeoutMin());
-    updateFnv1aField(hash, "sensor.type", (unsigned long)sensorConfig.get_sensorType());
-    updateFnv1aField(hash, "sensor.setting1", (unsigned long)sensorConfig.get_sensorSetting1());
-    updateFnv1aField(hash, "sensor.setting2", (unsigned long)sensorConfig.get_sensorSetting2());
-    updateFnv1aField(hash, "sensor.setting3", (unsigned long)sensorConfig.get_sensorSetting3());
-    updateFnv1aField(hash, "sensor.setting4", (unsigned long)sensorConfig.get_sensorSetting4());
-    updateFnv1aField(hash, "timing.timezone", sysStatus.get_timeZoneStrCStr());
-    updateFnv1aField(hash, "timing.reportingIntervalSec", (unsigned long)sysStatus.get_reportingInterval());
-    updateFnv1aField(hash, "timing.openHour", (unsigned long)sysStatus.get_openTime());
-    updateFnv1aField(hash, "timing.closeHour", (unsigned long)sysStatus.get_closeTime());
-    updateFnv1aField(hash, "timing.connectAttemptBudgetSec", (unsigned long)sysStatus.get_connectAttemptBudgetSec());
-    updateFnv1aField(hash, "modes.sensorMode", (unsigned long)sysStatus.get_sensorMode());
-    updateFnv1aField(hash, "modes.connectionMode", (unsigned long)sysStatus.get_connectionMode());
-    updateFnv1aField(hash, "modes.reportingMode", (unsigned long)sysStatus.get_reportingMode());
-    updateFnv1aField(hash, "modes.samplingMode", (unsigned long)sysStatus.get_samplingMode());
-    updateFnv1aField(hash, "modes.cloudDisconnectBudgetSec", (unsigned long)sysStatus.get_cloudDisconnectBudgetSec());
-    updateFnv1aField(hash, "modes.modemOffBudgetSec", (unsigned long)sysStatus.get_modemOffBudgetSec());
-    updateFnv1aField(hash, "modes.enableHibernateSleep", sysStatus.get_enableHibernateSleep() ? 1L : 0L);
-    updateFnv1aField(hash, "webhook.name", sysStatus.get_webhookNameCStr());
-    updateFnv1aField(hash, "webhook.enabled", sysStatus.get_webhookEnabled() ? 1L : 0L);
-    updateFnv1aField(hash, "webhook.timeoutMs", (unsigned long)sysStatus.get_webhookTimeoutMs());
+    updateFnv1aField(hash, "messaging.serial", SystemConfig::get_serialConnected() ? 1L : 0L);
+    updateFnv1aField(hash, "messaging.verboseMode", SystemConfig::get_verboseMode() ? 1L : 0L);
+    updateFnv1aField(hash, "messaging.verboseTimeoutMin", (unsigned long)SystemConfig::get_verboseTimeoutMin());
+    updateFnv1aField(hash, "sensor.type", (unsigned long)SystemConfig::SensorSettings::get_sensorType());
+    updateFnv1aField(hash, "sensor.setting1", (unsigned long)SystemConfig::SensorSettings::get_sensorSetting1());
+    updateFnv1aField(hash, "sensor.setting2", (unsigned long)SystemConfig::SensorSettings::get_sensorSetting2());
+    updateFnv1aField(hash, "sensor.setting3", (unsigned long)SystemConfig::SensorSettings::get_sensorSetting3());
+    updateFnv1aField(hash, "sensor.setting4", (unsigned long)SystemConfig::SensorSettings::get_sensorSetting4());
+    updateFnv1aField(hash, "timing.timezone", SystemConfig::get_timeZoneStrCStr());
+    updateFnv1aField(hash, "timing.reportingIntervalSec", (unsigned long)SystemConfig::get_reportingInterval());
+    updateFnv1aField(hash, "timing.openHour", (unsigned long)SystemConfig::get_openTime());
+    updateFnv1aField(hash, "timing.closeHour", (unsigned long)SystemConfig::get_closeTime());
+    updateFnv1aField(hash, "timing.connectAttemptBudgetSec", (unsigned long)SystemConfig::get_connectAttemptBudgetSec());
+    updateFnv1aField(hash, "modes.sensorMode", (unsigned long)SystemConfig::get_sensorMode());
+    updateFnv1aField(hash, "modes.connectionMode", (unsigned long)SystemConfig::get_connectionMode());
+    updateFnv1aField(hash, "modes.reportingMode", (unsigned long)SystemConfig::get_reportingMode());
+    updateFnv1aField(hash, "modes.samplingMode", (unsigned long)SystemConfig::get_samplingMode());
+    updateFnv1aField(hash, "modes.cloudDisconnectBudgetSec", (unsigned long)SystemConfig::get_cloudDisconnectBudgetSec());
+    updateFnv1aField(hash, "modes.modemOffBudgetSec", (unsigned long)SystemConfig::get_modemOffBudgetSec());
+    updateFnv1aField(hash, "modes.enableHibernateSleep", SystemConfig::get_enableHibernateSleep() ? 1L : 0L);
+    updateFnv1aField(hash, "webhook.name", SystemConfig::get_webhookNameCStr());
+    updateFnv1aField(hash, "webhook.enabled", SystemConfig::get_webhookEnabled() ? 1L : 0L);
+    updateFnv1aField(hash, "webhook.timeoutMs", (unsigned long)SystemConfig::get_webhookTimeoutMs());
 
     snprintf(buffer, bufferSize, "%08lX", (unsigned long)hash);
 }
@@ -199,14 +203,14 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     const SensorManager::VcellSampleState vcellState =
         SensorManager::instance().cachedBatteryVoltageState(vcellForState);
     const ReportingPolicy reportingPolicy = ReportingPolicyResolver::resolveRuntime(
-        current.get_stateOfCharge(), Time.now());
+        CurrentReadings::get_stateOfCharge(), Time.now());
     const Observability::StartupSnapshot &startup = Observability::currentStartupSnapshot();
 
     writerBase.beginObject();
     writerBase.name("schemaVersion").value(kLedgerSchemaVersion);
     writerBase.name("firmware").beginObject();
     writerBase.name("version").value(FIRMWARE_VERSION);
-    writerBase.name("resetCount").value((int)sysStatus.get_resetCount());
+    writerBase.name("resetCount").value((int)RecoveryState::get_resetCount());
     // WO-2026-08-24-001: compact bitmask witness of the build flags that were
     // ACTUALLY compiled in, derived from the same #if conditions that gate
     // each feature (see src/BuildProfile.h) so it cannot silently drift from
@@ -246,7 +250,7 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     writerBase.name("generation").value(configGeneration);
     writerBase.endObject();
     writerBase.name("reporting").beginObject();
-    writerBase.name("lastReportEpoch").value((int)sysStatus.get_lastReport());
+    writerBase.name("lastReportEpoch").value((int)SystemConfig::get_lastReport());
     writerBase.name("nextReportEpoch").value((int)reportingPolicy.nextReportEpoch);
     writerBase.name("configuredIntervalSec").value((unsigned long)reportingPolicy.configuredIntervalSec);
     writerBase.name("effectiveIntervalSec").value((unsigned long)reportingPolicy.effectiveIntervalSec);
@@ -276,7 +280,7 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     // distinguish which guard-pipeline path a SURVIVAL/CRITICAL verdict took
     // (unconditional vcell floor vs. SoC-driven) - see BatteryAuthority.cpp.
     writerBase.name("tier").value(ReportingPolicyResolver::batteryTierName(reportingPolicy.batteryTier));
-    writerBase.name("lowBatteryMode").value(sysStatus.get_lowBatteryMode());
+    writerBase.name("lowBatteryMode").value(PowerConfig::get_lowBatteryMode());
     writerBase.name("vcellState").value(vcellSampleStateLabel(vcellState));
     writerBase.name("socTrust").value(socTrustLabel(SensorManager::instance().cachedSocTrust()));
     writerBase.endObject();
@@ -290,7 +294,7 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     // Particle.timeSyncedLast() signal as the resync gate and trust check
     // in Generalized-Core-Counter.cpp (isClockTrusted()) - not
     // Time.isValid() alone (Finding 3). lastSyncEpoch is the persisted
-    // completion stamp (sysStatus.get_lastTimeSync()), which previously had
+    // completion stamp (SystemConfig::get_lastTimeSync()), which previously had
     // zero callers.
     //
     // Round 6 (Stage 7 finding 1): syncAgeSec is derived from
@@ -312,7 +316,7 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
         writerBase.name("clock").beginObject();
         writerBase.name("trusted").value(isClockTrusted());
         writerBase.name("syncAgeSec").value((int)syncAgeSec);
-        writerBase.name("lastSyncEpoch").value((int)sysStatus.get_lastTimeSync());
+        writerBase.name("lastSyncEpoch").value((int)SystemConfig::get_lastTimeSync());
         // WO-2026-08-31-004 Amendment A-2: read-and-publish only, no new
         // sampling beyond Clock.cpp's own one new I2C read at resync time.
         // This value changes on essentially every confirmed resync (unlike
@@ -523,11 +527,11 @@ bool Cloud::publishDataToLedger(const char *source) {
     writer.name("schemaVersion").value(kLedgerSchemaVersion);
     writer.name("timestamp").value((int)Time.now());
     writer.name("occupancy").beginObject();
-    writer.name("occupied").value(current.get_occupied());
-    writer.name("totalOccupiedSec").value((unsigned long)current.get_totalOccupiedSeconds());
+    writer.name("occupied").value(CurrentReadings::get_occupied());
+    writer.name("totalOccupiedSec").value((unsigned long)CurrentReadings::get_totalOccupiedSeconds());
     writer.endObject();
     writer.name("environment").beginObject();
-    writer.name("temperature").value(current.get_internalTempC(), 1);
+    writer.name("temperature").value(CurrentReadings::get_internalTempC(), 1);
     writer.endObject();
     writer.name("battery").beginObject();
     writer.name("soc").value(PowerManager::instance().soc(), 1);
@@ -644,10 +648,10 @@ bool Cloud::publishDataToLedger(const char *source) {
 
 bool Cloud::hasNonDefaultConfig() {
     // Check if any current values differ from centralized factory defaults.
-    return (sensorConfig.get_sensorType() != 1 || 
-            sensorConfig.get_sensorSetting1() != Config::DEFAULT_OCCUPANCY_DEBOUNCE_MS ||
-            strcmp(sysStatus.get_timeZoneStrCStr(), Config::DEFAULT_TIMEZONE) != 0 ||
-            sysStatus.get_openTime() != Config::DEFAULT_OPEN_HOUR ||
-            sysStatus.get_closeTime() != Config::DEFAULT_CLOSE_HOUR ||
-            sysStatus.get_reportingInterval() != Config::DEFAULT_REPORT_INTERVAL_SEC);
+    return (SystemConfig::SensorSettings::get_sensorType() != 1 || 
+            SystemConfig::SensorSettings::get_sensorSetting1() != Config::DEFAULT_OCCUPANCY_DEBOUNCE_MS ||
+            strcmp(SystemConfig::get_timeZoneStrCStr(), Config::DEFAULT_TIMEZONE) != 0 ||
+            SystemConfig::get_openTime() != Config::DEFAULT_OPEN_HOUR ||
+            SystemConfig::get_closeTime() != Config::DEFAULT_CLOSE_HOUR ||
+            SystemConfig::get_reportingInterval() != Config::DEFAULT_REPORT_INTERVAL_SEC);
 }

@@ -1,7 +1,8 @@
 #include "power/PowerManager.h"
 
 #include "Config.h"
-#include "MyPersistentData.h"
+#include "persist/CurrentReadings.h"
+#include "persist/PowerConfig.h"
 #include "power/PowerDiagnostics.h"
 #include "power/PowerPlatform.h"
 
@@ -16,7 +17,7 @@ constexpr int kPowerSourceBattery = 5;
 
 PowerInputProfile configuredFallbackProfile() {
 #if defined(FIELD_BUILD) && FIELD_BUILD
-  return sysStatus.get_solarPowerMode() ? PowerInputProfile::Solar35W
+  return PowerConfig::get_solarPowerMode() ? PowerInputProfile::Solar35W
                                         : PowerInputProfile::UsbBench;
 #else
   return PowerInputProfile::UsbBench;
@@ -227,11 +228,11 @@ bool PowerManager::hasFuelGauge() const {
 }
 
 float PowerManager::soc() const {
-  return current.get_stateOfCharge();
+  return CurrentReadings::get_stateOfCharge();
 }
 
 uint8_t PowerManager::batteryState() const {
-  return current.get_batteryState();
+  return CurrentReadings::get_batteryState();
 }
 
 const char *PowerManager::availabilityLabel(PowerAvailability availability) {

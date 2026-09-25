@@ -1,6 +1,5 @@
 #include "power/PowerPlatform.h"
 
-#include "MyPersistentData.h"
 #include "power/PowerDiagnostics.h"
 #include "BuildProfile.h"
 
@@ -220,8 +219,8 @@ PowerSourceSnapshot readPowerSource() {
 // until the next coupled measurement; that is the safe direction, and the
 // thermal policy already clears it on a genuine cool reading.
 SystemPowerConfiguration applyDisableChargingBit(SystemPowerConfiguration conf) {
-  // NOTE: do not name this local `current` - MyPersistentData.h #defines
-  // `current` to `currentStatusData::instance()`, which this file includes.
+  // WO-2026-09-23-001: the old `current` macro hazard is gone here - this file
+  // no longer includes MyPersistentData.h, which is what #defined it.
   const SystemPowerConfiguration existingConf = System.getPowerConfiguration();
   if (existingConf.isFeatureSet(SystemPowerFeature::DISABLE_CHARGING)) {
     conf.feature(SystemPowerFeature::DISABLE_CHARGING);

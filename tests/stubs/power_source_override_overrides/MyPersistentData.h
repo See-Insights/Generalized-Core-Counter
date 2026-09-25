@@ -120,6 +120,3 @@ extern TestCurrentStatus testCurrent;
 extern TestSystemStatus testSysStatus;
 extern TestSensorConfig testSensorConfig;
 
-#define current testCurrent
-#define sysStatus testSysStatus
-#define sensorConfig testSensorConfig
