@@ -96,9 +96,12 @@ if (Clock::isTrusted()) {                       // untrusted: skip entirely, sta
 
 ### Requirements
 
-- `localTodayAt()` must use local time, via the existing `LocalTimeCache` or
-  its equivalent. **`localTodayAt(24)` must return tomorrow's local
-  midnight.**
+- `localTodayAt(h)` computes the boundary live from `Time.now()` plus the
+  current timezone offset (via `LocalTimeRK` conversion of the current
+  instant). It must never read `LocalTimeCache`. The cache refreshes only
+  once per minute and can return the wrong calendar date right at a boundary
+  (the midnight-straddle race, a separate WO). **`localTodayAt(24)` returns
+  the next day's local midnight.**
 - `closeSessionAt(t)` credits `max(0, t - sessionStart)`. It must never count
   time past `t`.
 - `lastDailyCleanup` is the only boundary state. Its zero value (never
@@ -109,6 +112,12 @@ if (Clock::isTrusted()) {                       // untrusted: skip entirely, sta
   `openHour == closeHour` convention itself - that remains in
   `Clock.cpp:21-23` and is blocked on a config audit (filed separately; see
   "Two pre-implementation checks").
+- Always-open is represented internally by normalizing open == close to
+  close = 24 inside the boundary calculation only. `closeHour = 24` is not a
+  valid stored or config value in this WO. Config validation, `Clock.cpp`'s
+  open-hours check, and stored data are unchanged. Adopting 0/24 as the
+  user-facing always-open convention is a separate follow-up WO (config
+  validation, cloud settings, migration of open == close devices).
 
 ### Name mapping (Stage 3 work, to remove ambiguity before Stage 6)
 
@@ -315,6 +324,12 @@ block this WO.
       recorded - all clear, no change needed; (3) always-open normalized
       inline via `close = 24`, no separate branch; (4) the two config
       follow-ups filed as WO-2026-09-24-003 and WO-2026-09-24-004.
+      Two further decisions added 2026-09-25, before Stage 6 dispatch:
+      (5) `localTodayAt(h)` computes live local time from `Time.now()` plus
+      the current timezone offset, never from `LocalTimeCache` (see
+      Requirements); (6) `close = 24` is an internal normalization only -
+      `closeHour = 24` is not a valid stored or config value in this WO, and
+      adopting 0/24 as a config value is a follow-up WO (see Requirements).
 - [ ] Copilot implementation (Stage 6) — standard tier, post-Step-5 merge.
 - [ ] Codex diff review (Stage 7) — standard high-reasoning tier.
 - [ ] Chip final gate / commit (Stage 8)
