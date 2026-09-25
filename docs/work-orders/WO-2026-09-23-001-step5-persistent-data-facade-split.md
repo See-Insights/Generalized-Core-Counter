@@ -1,6 +1,10 @@
 # WO-2026-09-23-001: Step 5 — split MyPersistentData.h by concern
 
-**Status:** APPROVED (Stage 5, 2026-09-23) — conditional approval satisfied:
+**Status:** **CLOSED — PASS** (2026-09-25). Merged to `main` via PR #42
+(`8163295`). Dev-14 bench validation passed; see "Bench validation result"
+at the end of this document.
+
+**Prior status:** APPROVED (Stage 5, 2026-09-23) — conditional approval satisfied:
 WO-2026-09-23-002 (the unrelated `serial_settle_test.py` regression) merged
 clean to `main` at `3fff587`, full 38-test host suite (21 `.sh` + 17 bare
 `.py`) confirmed green on that commit. Ready for Stage 6 (Copilot
@@ -272,9 +276,11 @@ during evidence-gathering alone.
 - [x] Chip approval (Stage 5) — 2026-09-23. A and B decided (see below).
       Conditional on WO-2026-09-23-002 landing clean first — condition met:
       merged to `main` at `3fff587`, full 38-test suite confirmed green.
-- [ ] Copilot implementation (Stage 6)
-- [ ] Codex verification (Stage 7)
-- [ ] Chip final gate / commit (Stage 8)
+- [x] Copilot implementation (Stage 6) — 2026-09-23, `97748b8`.
+- [x] Codex verification (Stage 7) — 2026-09-23. Two "Not verified" regression
+      guards fixed and re-verified clean (detail in `97748b8`'s message).
+- [x] Chip final gate / commit (Stage 8) — merged 2026-09-25 04:59Z, PR #42
+      (`8163295`), after the Dev-14 bench validation below.
 
 ## Stage 4: Codex findings and reconciliation
 
@@ -468,3 +474,53 @@ if something goes wrong during Step 5, whether the serial-test breakage was
 old or new. **Chip's Stage 5 approval of this WO is conditional on
 WO-2026-09-23-002 landing clean on `main` first** — Step 5 starts from a
 genuinely green baseline, not one with a known, unrelated crack in it.
+
+## Bench validation result (Dev-14) — PASS
+
+**Result: PASS.** 24h of bench time on Dev-14 counted from the flash of
+`v25-Facades-BenchDiag` (2026-09-24 04:34Z), checked 2026-09-25 04:49Z. The
+window included one intentional power-down (05:52Z) and one reset (05:56Z pin
+reset). Both passed: stored data came through each unchanged.
+
+`v25-Facades-BenchDiag` = this WO's commit plus the two diagnostic-only log
+lines from WO-2026-09-23-003 (not part of this WO).
+
+| Criterion | Evidence |
+|---|---|
+| 7 — no re-init, no data loss | `dailyOccupancy` preserved across the reflash (333→333), the power-down (367→367) and the overnight hibernate (426→426). `alertCount`/`lastAlert` unchanged all day. No watchdog or unexpected resets on this build; uptime continuous from 22:00Z to the check. |
+| 12 — unchanged stored configuration | `config.generation` = `FA0C8923` before and after the day, with `connectionMode`=3 and battery tier HEALTHY. `generation` alone cannot rule out a re-init, because `ConfigApply` re-applies cloud settings on every connect. That is closed by `SysData` fields that are never cloud-sourced, all intact across the 22:00Z hibernate reload: `lastConnection` (read back 1790262006, the value written at 15:00Z), `watchdogResetCount`=104, `lastWatchdogUptimeMs`=1075, `resetCount`=18. |
+| Facade write/read-back | The `lastConnection: old -> new` diagnostic chain is continuous across every captured connection, including the hibernate boundary. |
+
+Evidence sources: `./tools/telemetry` (device, timeline, serial) and read-only
+S3 reads of the `status`/`watchdog` event payloads.
+
+### Notes (recorded verbatim from the 2026-09-25 04:49Z assessment)
+
+1. **Clock start.** If you count the day from the 05:56Z power-up after the power-down, instead of from the flash, the day ends at 13:56 SGT, about an hour from now. I'd count from the flash: a power-down is a hardware event, and the stored data came through it unchanged.
+2. **`OccupancyWebhook` is still unconfirmed.** That diagnostic line has never been captured, because the serial forwarder drops lines. It needs one direct USB serial capture at a report, and it's part of the diagnostic-logging change (WO-2026-09-23-003), not a Step 5 criterion.
+3. **Thermal thresholds aren't covered by `generation`.** Close them with a direct read, or explicitly leave them out of criterion 12's scope.
+4. **The daily count didn't reset at midnight.** That's the known bug in WO-2026-09-24-001, not Step 5.
+
+### Decisions (Chip, 2026-09-25)
+
+- **Note 1:** the 24h window is counted from the flash (04:34Z 2026-09-24).
+- **Note 2:** the `OccupancyWebhook` capture over direct USB serial is part of
+  WO-2026-09-23-003's validation, not this WO's.
+- **Note 3:** the thermal-charge thresholds (`thermalChargeArmHighC`,
+  `thermalChargeArmLowC`, `thermalChargeReleaseHighC`,
+  `thermalChargeReleaseLowC`) are **excluded from criterion 12**.
+  `config.generation` does not cover them (it also omits `solarPowerMode`,
+  `lowPowerMode`, `disconnectedMode`, `structuresVersion` and
+  `testConnectionDurationOverride`), so criterion 12's `generation` evidence
+  says nothing about them. Filed separately as #43.
+- The serial forwarder dropping lines (note 2) is filed as
+  chipmc/local-serial-log-forwarder#1.
+- **Note 4:** pre-existing; fixed by WO-2026-09-24-001, next in sequence.
+
+### Also observed (not Step 5)
+
+- Two `bc=28` sleep-stage watchdog resets at 2026-09-24 03:55Z occurred on
+  `v24-Thermal-Inhibit`, before this build was flashed (WO-2026-09-03-004
+  class).
+- SoC jumped from 68% to 99.7% after the power-down; `BatteryHealth` flagged
+  it `Suspect` (resting estimate ~74%). Fuel-gauge re-seed, not persistence.
