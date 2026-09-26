@@ -24,7 +24,80 @@ This document captures source-traced interpretations of logging fields and patte
 
 ---
 
-### `TimeDiag: tz=... valid=... epoch=... utc=... local=... open=... close=... isOpen=...`
+### `CycleDelivery: awake=Xms a=A k=K f=F r=R q=Q`
+
+**Source:** `State_Sleep.cpp` line ~1234, at the sleep-commit point
+**Represents:** Per-cycle awake time and cumulative publish-delivery accounting. Fires **unconditionally** on every cycle that commits to sleep — unlike `CYCLE end awake=...`, which is gated on verbose mode, and unlike `Sleep: td=...`, which only fires on cycles that actually tear down a connection. This is therefore the reliable way to read awake time per cycle from an ordinary field log.
+
+**Components:**
+- `awake=` = milliseconds from wake to the sleep commit for **this** cycle
+- `a=` = `attempted` — cumulative publishes started for a queued event
+- `k=` = `acknowledged` — cumulative cloud acknowledgements (every queued publish uses explicit `WITH_ACK`, so this is a real cloud ACK)
+- `f=` = `failed` — cumulative attempts that failed or timed out waiting for the ACK
+- `r=` = `retried` — cumulative attempts that followed an earlier failed attempt
+- `q=` = events still queued at this sleep commit (a **snapshot**, not a cumulative total)
+
+`a`, `k`, `f`, and `r` are retained-memory counters: they survive hibernate wake and resets, reset to zero on power loss or reflash, and saturate at 65535 rather than wrapping. These five values, plus `sleptWithQueued` and `abandoned`, are published in the `status` **event**'s `d` object — not in the device-status ledger payload (WO-2026-09-25-001 Stage 5 decision 5). See "Publish Delivery Counters in the `status` Event" below.
+
+**Fires on every sleep commit,** including the Boron overnight RTC-alarm HIBERNATE, which resets the MCU without returning (WO-2026-09-25-001 decision 7). Both sleep paths call the same helper immediately before `System.sleep()`.
+
+**Reading it:** `a == k` with `f=0 r=0 q=0` is a healthy device. A rising `f`/`r` means acknowledgements are being lost or delayed. A non-zero `q` means the device slept with unacknowledged events still on disk — those are retried on the next connection, not dropped.
+
+---
+
+### `DeliveryBudget: expired budget=Xms elapsed=Yms qn=N inflight=Z`
+
+**Source:** `PublishDeliveryGate.cpp` (`src/cloud/`), reached from the IDLE sleep gate, the IDLE connectivity ceiling and the SLEEPING_STATE cloud-sync gate
+**Represents:** The bounded delivery wait (WO-2026-09-25-001 Stage 5 decision 6) ran out. Sleep and cloud teardown are now permitted even though events are still queued — but only while nothing is in flight.
+
+**Components:**
+- `budget=` = `ConnectivityPolicy::PUBLISH_DELIVERY_BUDGET_MS` (90000 by default; a compile-time constant, not a device setting)
+- `elapsed=` = milliseconds since the budget started
+- `qn=` = events still queued at expiry
+- `inflight=` = 1 when a publish attempt was still outstanding. While this is 1 the device still does **not** sleep or disconnect; the attempt is never abandoned.
+
+The budget starts at the first evaluation where the device is cloud-connected **and** the publish queue is not sleep-safe, and is cancelled as soon as the queue drains or the connection drops. Offline time never consumes it: sleeping offline with a queue was always allowed. One line is logged per expiry episode. Each expiry that actually reaches a sleep commit with events queued also increments `d.s` (`sleptWithQueued`) in the `status` event.
+
+---
+
+### `GateFail: reason=... timeout=X elapsed=Y q=Z qn=N ledger=... webhook=... update=...`
+
+**Source:** `State_Sleep.cpp` line ~596, cloud-sync gate
+**Represents:** The cloud-sync budget expired before all pre-sleep work completed, so the device is going to sleep anyway.
+
+**Components:**
+- `reason=` = which conjunct of the gate was still unsatisfied
+- `timeout=` = the cloud-sync budget in ms
+- `elapsed=` = how long the gate actually waited before giving up
+- `q=` = whether the publish queue was **blocking** the gate: `queuePending = queueEmpty ? 0 : 1`, so **`q=1` means the queue still held events** (it is the inverse of the queue's `getCanSleep()` verdict, not that verdict)
+- `qn=` = the number of events still in the publish queue
+- `ledger=` / `webhook=` / `update=` = the other gate conjuncts
+
+`q=1` together with `qn>0` is the normal shape when the queue is holding unacknowledged events; those events are durable on disk and are retried after the next connection. This condition also raises alert 43. The `ledger=`, `webhook=` and `update=` fields use the same polarity: 1 means "still pending", 0 means "satisfied".
+
+---
+
+### `PubqAttempt: id=... h=... e=... f=... future=... ack=... err=... cObs=... ck=... dur=...`
+
+**Source:** `BackgroundPublishRK.cpp` line ~143 (`app.pubq` category)
+**Represents:** One line per real `Particle.publish()` attempt made for a queued event. Bench/diagnostic tracing.
+
+**Components:**
+- `id=` = attempt sequence number; `h=` = FNV-1a hash of the event payload, so the same logical event can be followed across retries
+- `e=` = event name; `f=` = the publish flags actually used (expect bit `0x08` = `WITH_ACK` set and bit `0x02` = `NO_ACK` clear)
+- `future=` / `ack=` = whether the publish future completed and whether the cloud acknowledged
+- `err=` = Device OS error code; `cObs=` / `ck=` = cloud-connection observations at the time of the attempt; `dur=` = attempt duration in ms
+
+A repeated `h=` value across several `id=` values is a retry of the same event — expected when an ACK is lost, and the reason `r=` in `CycleDelivery` rises.
+
+---
+
+### `PubqDispatch: e=... f=... accepted=0 future=none ack=not-observed`
+
+**Source:** `PublishQueuePosixRK.cpp` line ~349
+**Represents:** The background publisher **refused** the dispatch, so no publish attempt was made at all. The event stays queued and is retried. This is logged at error level because a rejected dispatch never produces a `PubqAttempt` line and would otherwise be invisible.
+
+---
 
 **Represents:** Time diagnostic check at state transition (not sleep-mode related)  
 **Components:**
@@ -205,6 +278,33 @@ The charge failure is *consistent with* the Solar profile's 5.08V minimum input 
 - DATA: 200-350 bytes used (schema 2)
 - STATUS: 450-600 bytes used (schema 2)
 - Schema version: should be consistent (typically 2 for current builds)
+
+**`LedgerPayloadStatus: overflow bytes=X/896 schema=Y - status not published`** (WO-2026-09-25-001): `JSONBufferWriter::dataSize()` "can be greater than buffer size" (Device OS 6.4.1 `wiring/inc/spark_wiring_json.h:232`) — the writer stops copying but keeps counting. When the count reaches the buffer size the publisher now refuses to publish instead of storing the NUL terminator past the end of its stack buffer. Seeing this line means the device-status payload outgrew its 896-byte cap for that cycle and no status was sent; the payload's deployed worst case is 903 bytes, which is why the guard exists. Raising the cap is WO-2026-09-25-003.
+
+---
+
+## Publish Delivery Counters in the `status` Event
+
+### `"d": {"a": ..., "k": ..., "f": ..., "r": ..., "q": ..., "s": ..., "b": ...}`
+
+**Source:** `publishStartupStatus()` in `src/Generalized-Core-Counter.cpp`, published as `PublishQueuePosix::instance().publish("status", status, PRIVATE)`
+**Represents:** The publish-delivery counters, carried in cloud telemetry so the fleet-wide delivery rate is measurable on devices with no serial capture (WO-2026-09-25-001, Stage 5 decisions 2, 5, 6 and 7). The first five are the same values as the `CycleDelivery:` log line.
+
+| Key | Meaning |
+|---|---|
+| `d.a` | `attempted` — publishes started for a queued event since the counters were last zeroed. |
+| `d.k` | `acknowledged` — attempts the Particle cloud acknowledged. Every queued publish uses explicit `WITH_ACK`, so this is a real cloud acknowledgement, not a local hand-off. |
+| `d.f` | `failed` — attempts that failed or timed out waiting for the acknowledgement. The event stays queued and is retried. |
+| `d.r` | `retried` — attempts that followed an earlier failed attempt. A persistently non-zero and rising `d.r` means acknowledgements are being lost or delayed. |
+| `d.q` | `queuedAtSleep` — events still queued at the most recent sleep commit. A snapshot, not a cumulative total. A non-zero value means the device slept with unacknowledged events still on disk; they are retried on the next connection. |
+| `d.s` | `sleptWithQueued` — cumulative count of sleep commits that carried at least one event over, i.e. how often the delivery budget expired (or a sleep gate timed out) instead of the queue draining. |
+| `d.b` | `abandoned` — cumulative count of attempts that were dispatched but whose outcome never arrived because the device reset while they were outstanding. Counted once, at the next boot, from a retained flag. |
+
+**The accounting identity is `d.a == d.k + d.f + d.b`,** outside an in-flight attempt and below saturation. Before `d.b` existed, a watchdog/pin/software reset during an attempt left `d.a` permanently ahead of `d.k + d.f` (WO-2026-09-25-001 decision 7). Each counter saturates independently at 65535, so once any of them reaches the ceiling all of them are censored values and the identity no longer holds.
+
+**Why the event and not the device-status ledger:** the ledger payload was already observed at 831–856 bytes of its 896-byte cap, so a counter object there would have pushed ordinary cycles over the cap and suppressed the status publish. The `status` event has room: its measured deployed worst case with all seven counters is well inside the 1023 usable bytes of the `char status[1024]` buffer, and Device OS 6.4.1 allows 1024 (`particle::protocol::MAX_EVENT_DATA_LENGTH`, `communication/inc/protocol_defs.h:94`), which is also the ceiling `PublishQueuePosixRK` itself enforces (`PublishQueuePosixRK.cpp:106`). The "622-byte" figure in that library's doc comments is stale prose from Device OS 0.8.0-era and is not enforced anywhere. `tests/status_event_payload_budget_test.py` re-derives the figure from the shipped format strings.
+
+**Reading it:** the counters live in retained memory, so a `status` event published at boot reports the accounting carried over from the cycles *before* this wake. They survive hibernate wake and resets; they reset to zero on power loss, reflash, or a retained-layout version change; and they saturate at 65535 rather than wrapping, so a value of 65535 must be read as "≥ 65535".
 
 ---
 

@@ -2,6 +2,8 @@
 #include "state/State_Common.h"
 #include "../Config.h"
 #include "cloud/Cloud.h"
+#include "cloud/PublishDeliveryCounters.h"
+#include "cloud/PublishDeliveryGate.h"
 #include "power/Connectivity.h"
 #include "power/ConnectivityPolicy.h"
 #include "power/PowerDiagnostics.h"
@@ -167,6 +169,78 @@ unsigned long computeCloudSyncTimeoutMs(uint16_t queueDepth) {
 }
 
 constexpr unsigned long kGateBlockLogThresholdMs = 10000UL;
+
+// WO-2026-09-25-001 decisions 6 and 7: set once the delivery accounting for
+// this sleep has been committed, so a HIBERNATE that fails and falls back to
+// ULTRA_LOW_POWER does not count the same carry-over twice. Cleared on entry to
+// SLEEPING_STATE; a successful HIBERNATE resets the MCU, which clears it too.
+bool sleepDeliveryCommitted = false;
+
+/**
+ * @brief Commit the publish-delivery accounting for this sleep and log it.
+ *
+ * Called from EVERY path that commits to sleep, immediately before
+ * `System.sleep()`. The Boron overnight RTC-alarm HIBERNATE resets the MCU and
+ * never returns, so doing this only in the ULTRA_LOW_POWER block left every
+ * successful hibernate cycle without a queue snapshot and without a
+ * `CycleDelivery` line (Stage 7 finding P2).
+ *
+ * With events still queued it also moves the RAM queue to flash first
+ * (decision 6), so nothing is lost across a hibernate, and counts one
+ * `sleptWithQueued`.
+ *
+ * @param qDepth  queue depth at the sleep commit
+ * @param awakeMs awake time for this cycle, in milliseconds
+ */
+void commitDeliveryAccountingBeforeSleep(uint16_t qDepth, unsigned long awakeMs) {
+  if (qDepth > 0) {
+    // Decision 6: RAM-queue events must be on flash before we sleep. The
+    // disconnect path already triggers this through the library's system-event
+    // handler, but the budget can also expire on a cycle that never
+    // disconnects, and a hibernate never comes back to do it later.
+    // Qualification (Stage 7): writeQueueToFiles() covers the RAM queue, not an
+    // event the queue has already taken into curEvent - the gates above are
+    // what keep an in-flight attempt from reaching this point.
+    PublishQueuePosix::instance().writeQueueToFiles();
+    if (!sleepDeliveryCommitted) {
+      PublishDeliveryCounters::noteSleptWithQueued();
+    }
+  }
+
+  // WO-2026-09-25-001 (Stage 5 decision 2, acceptance criterion 4): the sleep
+  // commit point is the one place that knows how many events are being carried
+  // over to the next connection, so record it here - after the cloud-operations
+  // gate has either drained the queue or timed out.
+  PublishDeliveryCounters::noteQueuedAtSleep(qDepth);
+  sleepDeliveryCommitted = true;
+
+  // WO-2026-09-25-001 acceptance criteria 4 and 6: one INFO line per sleep
+  // commit carrying the awake time and the delivery counters, so both can be
+  // read from a plain USB capture. The existing "CYCLE end awake=..." line
+  // elsewhere also carries awake time but is gated on verboseMode, and
+  // "Sleep: td=..." is only emitted on cycles that actually tore a connection
+  // down - neither is guaranteed to be present on every cycle of a bench run.
+  const PublishDeliveryCounters::Snapshot delivery = PublishDeliveryCounters::snapshot();
+  Log.info("CycleDelivery: awake=%lums a=%u k=%u f=%u r=%u q=%u",
+           awakeMs,
+           (unsigned)delivery.attempted,
+           (unsigned)delivery.acknowledged,
+           (unsigned)delivery.failed,
+           (unsigned)delivery.retried,
+           (unsigned)delivery.queuedAtSleep);
+}
+
+/// Awake time for this cycle, computed the same way
+/// WakeCycleStats::finalizeBeforeSleep() computes it, for sleep paths that
+/// commit before that finalization runs.
+unsigned long awakeMsForSleepCommit() {
+  const uint32_t wakeStartMs = Observability::cycleStats().wake_start_ms;
+  const unsigned long nowMs = millis();
+  if (wakeStartMs == 0 || nowMs < (unsigned long)wakeStartMs) {
+    return 0UL;
+  }
+  return nowMs - (unsigned long)wakeStartMs;
+}
 
 constexpr uint8_t kGateBlockerQueue = 0x01;
 constexpr uint8_t kGateBlockerLedger = 0x02;
@@ -421,6 +495,9 @@ void handleSleepingState() {
   static unsigned long cloudSyncBudgetMs = 0;
   static uint16_t cloudSyncMaxQueueDepth = 0;
   static uint16_t lastQueueDepth = 0xFFFF;
+  // WO-2026-09-25-001 decision 6: millis() at which the gate started holding for
+  // an in-flight publish past its budget; 0 when no hold is running.
+  static unsigned long inFlightHoldStartMs = 0;
 
   // ********** Non-blocking disconnect + modem power-down **********
   // Device OS already manages the asynchronous cloud session teardown once
@@ -450,6 +527,8 @@ void handleSleepingState() {
     cloudSyncBudgetMs = 0;
     cloudSyncMaxQueueDepth = 0;
     lastQueueDepth = 0xFFFF;
+    inFlightHoldStartMs = 0;
+    sleepDeliveryCommitted = false;
     lastDisconnectProgressMs = 0;
     lastGateProgressMs = 0;
 #if Wiring_WiFi
@@ -479,6 +558,12 @@ void handleSleepingState() {
     }
     // Check prerequisite completion
     bool queueEmpty = PublishQueuePosix::instance().getCanSleep();
+    // WO-2026-09-25-001 Stage 5 decision 6: the gate's queue term is the bounded
+    // delivery gate, not the raw queue verdict - queue empty OR (the 90 s
+    // delivery budget expired AND no publish in flight). `queueEmpty` itself is
+    // kept for the q= reporting below, where it still means "the queue is
+    // holding something".
+    const bool queuePermitsSleep = PublishDeliveryGate::queuePermitsSleep();
     bool configLedgersSynced = Cloud::instance().areLedgersSynced();
     bool outputLedgersSynced = !Cloud::instance().hasPendingOutputLedgerSync();
     Cloud::LedgerSyncDiagnostics ledgerDiagnostics = Cloud::instance().ledgerSyncDiagnostics();
@@ -508,7 +593,7 @@ void handleSleepingState() {
       lastQueueDepth = queueDepth;
     }
 
-    bool allComplete = queueEmpty && ledgersSynced && updatesChecked && webhookConfirmed;
+    bool allComplete = queuePermitsSleep && ledgersSynced && updatesChecked && webhookConfirmed;
 
     if (!allComplete) {
       unsigned long elapsedMs = millis() - cloudSyncStartMs;
@@ -589,13 +674,41 @@ void handleSleepingState() {
         return; // Stay in SLEEPING_STATE until complete or timeout
       }
 
+      // WO-2026-09-25-001 Stage 5 decision 6: the gate has run out of budget,
+      // but a publish attempt is still outstanding. A teardown here would reset
+      // the CoAP retransmit store and abandon that attempt - exactly the loss
+      // this work order exists to stop - so hold, bounded, until the queue has
+      // processed the attempt's result. Device OS completes a WITH_ACK future
+      // within its 20 s SEND_EVENT_ACK_TIMEOUT, so the cap below is only a
+      // backstop against a future that never completes at all.
+      if (PublishDeliveryGate::publishInFlight()) {
+        const unsigned long nowMs = millis();
+        if (inFlightHoldStartMs == 0) {
+          inFlightHoldStartMs = nowMs;
+          Log.info("SLEEP: gate budget reached with a publish in flight - holding up to %lu ms before teardown",
+                   ConnectivityPolicy::PUBLISH_IN_FLIGHT_HOLD_MAX_MS);
+        }
+        const unsigned long holdElapsedMs = nowMs - inFlightHoldStartMs;
+        if (holdElapsedMs < ConnectivityPolicy::PUBLISH_IN_FLIGHT_HOLD_MAX_MS) {
+          thrashGuard.markProgress("PUBLISH_ACK_HOLD");
+          serviceAwakeWatchdog();
+          Particle.process();
+          return; // Never tear down while an attempt is outstanding
+        }
+        Log.warn("SLEEP: publish still in flight after %lu ms hold - proceeding to teardown",
+                 holdElapsedMs);
+      }
+      inFlightHoldStartMs = 0;
+
       // Budget exceeded - log incomplete operations and raise ONE alert (priority order)
        const char *gateFailReason = !queueEmpty ? "queue" :
         (!ledgersSynced ? "ledger" : (!webhookConfirmed ? "webhook" : "update"));
-       Log.warn("GateFail: reason=%s timeout=%lu q=%d ledger=%d webhook=%d update=%d",
+       Log.warn("GateFail: reason=%s timeout=%lu elapsed=%lu q=%d qn=%u ledger=%d webhook=%d update=%d",
           gateFailReason,
           cloudSyncBudgetMs,
+          elapsedMs,
           queuePending,
+          (unsigned)queueDepth,
           ledgerPending,
           webhookPending,
           updatePending);
@@ -607,7 +720,15 @@ void handleSleepingState() {
 
       // Only raise one alert - check in priority order (queue > ledger > updates > webhook)
       if (!queueEmpty) {
-        Log.warn("SLEEP: Publish queue not empty - raising alert 43");
+        // WO-2026-09-25-001 acceptance criterion 3: this is the ONE path that
+        // lets the device tear the connection down and sleep with
+        // unacknowledged events still queued. It must say how many and for how
+        // long it waited, so a capture can tell a gate timeout apart from a
+        // silent drop.
+        Log.warn("SLEEP: Publish queue not empty - %u event(s) unacknowledged after %lu ms (budget=%lu ms) - raising alert 43",
+                 (unsigned)queueDepth,
+                 elapsedMs,
+                 cloudSyncBudgetMs);
         RecoveryState::raiseAlert(43); // Queue drainage failure (highest priority)
       } else if (!ledgersSynced) {
         Log.warn("SLEEP: ledger sync incomplete after %lu ms (budget=%lu ms) - raising alert 44",
@@ -1109,6 +1230,14 @@ void handleSleepingState() {
 
             Log.info("ModemTeardown: radioOn=%d point=hibernate", (int)Connectivity::isRadioPoweredOn());
             Log.info("Sleep: HIBERNATE reason=closed dur=%ds wakePin=%d", wakeInSeconds, (int)WAKEUP_PIN);
+            // WO-2026-09-25-001 decisions 6 and 7 (Stage 7 finding P2): a
+            // successful HIBERNATE resets the MCU and never returns, so the
+            // RAM->flash flush, the queue snapshot and the CycleDelivery line
+            // have to happen here rather than in the ULTRA_LOW_POWER block
+            // further down, which this path never reaches.
+            commitDeliveryAccountingBeforeSleep(
+                (uint16_t)PublishQueuePosix::instance().getNumEvents(),
+                awakeMsForSleepCommit());
             PowerDiagnostics::logPowerState("pre-hibernate");
             thrashGuard.markProgress("SLEEP_ATTEMPT");
             Cloud::instance().logLedgerSleepState();
@@ -1205,6 +1334,11 @@ void handleSleepingState() {
         socTenths,
         isCharging,
         SystemConfig::get_lastConnection());
+
+    // WO-2026-09-25-001 (Stage 5 decisions 2, 6 and 7): record the carry-over,
+    // flush the RAM queue to flash, and log the counters. Shared with the
+    // HIBERNATE path above so every sleep commit emits the same line.
+    commitDeliveryAccountingBeforeSleep(qDepth, (unsigned long)Observability::cycleStats().total_awake_ms);
 
     // Invariants (log-only): detect regressions without affecting behavior.
     // Ceiling is derived from existing budgets and includes firmware update time.

@@ -133,6 +133,42 @@ constexpr int8_t CONNECTIVITY_FAILSAFE_ALERT = 45;
 constexpr unsigned long CLOUD_OPS_GATE_TIMEOUT_MS = 30000UL;
 constexpr unsigned long CLOUD_OPS_STATUS_LOG_INTERVAL_MS = 5000UL;
 
+// ===== Publish delivery budget (WO-2026-09-25-001, Stage 5 decision 6) =====
+// Purpose:
+// - Bound how long the device will stay connected trying to deliver queued
+//   events before it is allowed to sleep with them still queued.
+//
+// Rationale / tradeoffs:
+// - Fix B only removes a queued event once the cloud acknowledged it. A queue
+//   that never drains (repeated ACK failures) would otherwise hold the radio on
+//   forever: IDLE refuses to enter SLEEPING_STATE while the queue is non-empty,
+//   so the SLEEPING_STATE gate's own timeout is never even reached (Stage 7 P1).
+// - The budget starts when the device is cloud-connected with a non-empty
+//   publish queue, and is cancelled as soon as the queue drains or the cloud
+//   connection drops. Once it expires, sleep and cloud teardown are permitted -
+//   but only while no publish is in flight, so an outstanding attempt is never
+//   abandoned.
+// - Queued events are durable: they are moved from RAM to flash before sleep and
+//   retried on the next connection, so expiry delays delivery, it does not drop
+//   events.
+// - 90 s is longer than the Device OS 20 s ACK timeout plus the queue's 30 s
+//   retry backoff, so a single lost ACK still gets a full retry inside the
+//   budget, and it is short enough to bound modem-on battery drain.
+//
+// Configurability (Stage 6 round 3): this is a compile-time named constant, not
+// a runtime setting. Every runtime-configurable value on this device is carried
+// in a persisted struct (SysData/SystemConfig), and this WO is explicitly
+// forbidden from changing a persisted layout, so a runtime knob is out of scope
+// here.
+constexpr unsigned long PUBLISH_DELIVERY_BUDGET_MS = 90000UL;
+
+// Bounded extra hold, after any sleep/teardown gate has already expired, while a
+// publish attempt is still outstanding. Device OS completes a WITH_ACK publish
+// future within SEND_EVENT_ACK_TIMEOUT (20 s,
+// communication/inc/protocol_defs.h:99), so this cap is only a backstop against
+// a future that never completes at all - it must stay above that timeout.
+constexpr unsigned long PUBLISH_IN_FLIGHT_HOLD_MAX_MS = 25000UL;
+
 // ===== Device-to-cloud ledger egress gate =====
 // Purpose:
 // - Allow device-data/device-status ledger writes extra time to finish syncing

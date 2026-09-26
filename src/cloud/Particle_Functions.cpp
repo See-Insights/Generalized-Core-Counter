@@ -21,12 +21,15 @@ SerialLogHandler logHandler(LOG_LEVEL_WARN);
 #elif SERIAL_LOG_LEVEL == 3
 SerialLogHandler logHandler(LOG_LEVEL_INFO,
                             {// Logging level for non-application messages
+                             {"app.pubq", LOG_LEVEL_TRACE},
+                             {"app.seqfile", LOG_LEVEL_TRACE},
+                             {"comm.coap", LOG_LEVEL_TRACE},
                              {"mux", LOG_LEVEL_WARN},
                              {"system.nm", LOG_LEVEL_WARN},
                              {"system", LOG_LEVEL_WARN},
-                             {"comm.dtls", LOG_LEVEL_WARN},
+                             {"comm.dtls", LOG_LEVEL_INFO},
                              {"comm.protocol", LOG_LEVEL_WARN},
-                             {"comm.protocol.handshake", LOG_LEVEL_WARN},
+                             {"comm.protocol.handshake", LOG_LEVEL_INFO},
                              {"net.pppncp", LOG_LEVEL_WARN},
                              {"app.ab1805", LOG_LEVEL_WARN}});
 #elif SERIAL_LOG_LEVEL == 4

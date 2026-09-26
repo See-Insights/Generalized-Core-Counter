@@ -288,6 +288,14 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     writerBase.name("lastResult").value(Observability::toString(cycleStats.connect_result));
     writerBase.name("elapsedMs").value((int)cycleStats.connect_duration_ms);
     writerBase.endObject();
+    // WO-2026-09-25-001 Stage 5 decision 5: the publish delivery counters are
+    // NOT emitted here. They go in the `status` event only
+    // (publishStartupStatus() in src/Generalized-Core-Counter.cpp), because
+    // this payload was already measured at 831-856 of its 896-byte cap in the
+    // field, so a counter object here would push ordinary cycles over the cap
+    // and the guard below would then skip the status publish entirely. This
+    // ledger payload's format is therefore unchanged by this WO. The headroom
+    // question itself is WO-2026-09-25-003.
     // Item 9 (WO-2026-08-29-002): clock trust verdict and sync recency, so
     // "was this cycle's timestamp trustworthy" is readable from telemetry
     // instead of reconstructed. trusted uses the same monotonic
@@ -348,6 +356,22 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
 
     if (!writerBase.buffer()) {
         Log.warn("Failed to create status JSON");
+        return false;
+    }
+
+    // WO-2026-09-25-001: JSONBufferWriter::dataSize() "can be greater than
+    // buffer size" (Device OS 6.4.1 wiring/inc/spark_wiring_json.h:232) - the
+    // writer silently stops copying but keeps counting. The NUL store below
+    // indexes bufferBase with that count, so an over-capacity payload would
+    // write past this stack buffer AND publish truncated, invalid JSON. This
+    // payload's existing fields already have a deployed worst case above the
+    // 896-byte cap (see tests/device_status_payload_budget_test.py), so refuse
+    // to publish instead, loudly, rather than corrupting the stack.
+    if (writerBase.dataSize() >= sizeof(bufferBase)) {
+        Log.error("LedgerPayloadStatus: overflow bytes=%lu/%lu schema=%d - status not published",
+                  (unsigned long)writerBase.dataSize(),
+                  (unsigned long)DEVICE_STATUS_PAYLOAD_CAPACITY,
+                  kLedgerSchemaVersion);
         return false;
     }
 

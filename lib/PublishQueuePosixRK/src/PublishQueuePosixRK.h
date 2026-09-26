@@ -133,6 +133,46 @@ public:
      */
     PublishQueuePosix &withPublishCompleteUserCallback(std::function<void(bool succeeded, const char *eventName, const char *eventData)> cb) { publishCompleteUserCallback = cb; return *this; };
 
+    /**
+     * @brief Sets a callback to call when a publish attempt is dispatched for a queued event
+     *
+     * @param cb The callback function or C++11 lambda
+     *
+     * The callback has this prototype:
+     *
+     * void callback(const char *eventName, uint32_t flags)
+     *
+     * The parameters are:
+     * - eventName: The event name that is being sent
+     * - flags: The effective publish flags the event is being sent with
+     *
+     * Unlike withPublishCompleteUserCallback(), this callback is invoked from stateWait() on the
+     * application thread (the thread that calls loop()), once per accepted dispatch to the
+     * background publish worker - that is, once per Particle.publish() that is actually started.
+     */
+    PublishQueuePosix &withPublishAttemptUserCallback(std::function<void(const char *eventName, uint32_t flags)> cb) { publishAttemptUserCallback = cb; return *this; };
+
+    /**
+     * @brief Sets a callback to call when a dispatched publish attempt has completed
+     *
+     * @param cb The callback function or C++11 lambda
+     *
+     * The callback has this prototype:
+     *
+     * void callback(const char *eventName, bool acknowledged)
+     *
+     * The parameters are:
+     * - eventName: The event name whose attempt completed
+     * - acknowledged: true if the publish Future succeeded. When the event was sent with an
+     *   explicit WITH_ACK, that means the cloud acknowledged it and the queue is about to remove
+     *   the event; false means the event stays queued for retry.
+     *
+     * Unlike withPublishCompleteUserCallback(), this callback is invoked from statePublishWait()
+     * on the application thread (the thread that calls loop()), at the point the queue decides
+     * between removal and retry.
+     */
+    PublishQueuePosix &withPublishResultUserCallback(std::function<void(const char *eventName, bool acknowledged)> cb) { publishResultUserCallback = cb; return *this; };
+
 
     /**
      * @brief You must call this from setup() to initialize this library
@@ -265,6 +305,24 @@ public:
      * completed, or not cloud connected.
      */
     bool getCanSleep() const { return canSleep; };
+
+    /**
+     * @brief True while a publish attempt is outstanding for a queued event
+     *
+     * Set when `stateWait()` successfully dispatches an event to
+     * BackgroundPublishRK (a real `Particle.publish()` has been started), and
+     * cleared only once `statePublishWait()` has processed that attempt's
+     * result - i.e. after the event has been removed on an acknowledgment, or
+     * put back and persisted on a failure.
+     *
+     * WO-2026-09-25-001 (Stage 5 decision 6): the sleep/teardown gates read this
+     * so they never abandon an outstanding publish. It is deliberately the
+     * queue's own state rather than an inference from `getCanSleep()` or the
+     * queue depth, and it deliberately stays true between the worker thread
+     * completing the future and the application thread acting on it, so a
+     * failed RAM event cannot be lost in that window.
+     */
+    bool getPublishInFlight() const { return publishInFlight; };
 
     /**
      * @brief Gets the total number of events queued
@@ -410,12 +468,16 @@ protected:
     bool publishSuccess = false; //!< true if the publish succeeded
     bool pausePublishing = false; //!< flag to pause publishing (used from automated test)
     bool canSleep = false; //!< returns true if this is a good time to go to sleep
+    bool publishInFlight = false; //!< true from an accepted dispatch until statePublishWait() has processed the result
 
     unsigned long waitAfterConnect = 2000; //!< time to wait after Particle.connected() before publishing
     unsigned long waitBetweenPublish = 1000; //!< how long to wait in milliseconds between publishes
     unsigned long waitAfterFailure = 30000; //!< how long to wait after failing to publish before trying again
 
     std::function<void(bool succeeded, const char *eventName, const char *eventData)> publishCompleteUserCallback = 0; //!< User callback for publish complete
+
+    std::function<void(const char *eventName, uint32_t flags)> publishAttemptUserCallback = 0; //!< User callback for publish attempt dispatch (application thread)
+    std::function<void(const char *eventName, bool acknowledged)> publishResultUserCallback = 0; //!< User callback for publish attempt result (application thread)
 
     std::function<void(PublishQueuePosix&)> stateHandler = 0; //!< state handler (stateConnectWait, stateWait, etc).
 

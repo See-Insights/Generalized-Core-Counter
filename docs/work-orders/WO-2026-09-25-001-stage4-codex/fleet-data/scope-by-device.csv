@@ -1,0 +1,13 @@
+device_id,device_name,current_build,event_fw_version,serial_records,s3_deliveries,observed_report_lines,matched_observed_reports,unmatched_observed_reports,observed_cohort_unmatched_percent,true_fleet_loss_rate
+e00fce683f6063bf254283dd,Boron-Dev-11,v24-Thermal-Inhibit,24,14467,277,27,24,3,11.11,not identifiable
+e00fce688e592afaf23ac4fb,Boron-Dev-14,v24-Thermal-Inhibit,24,6563,574,41,41,0,0.0,not identifiable
+e00fce68399ee6244a963935,Boron-Dev-09,v24-Thermal-Inhibit,24,11839,387,47,40,7,14.89,not identifiable
+e00fce6865fe7770b80a014e,ToM-MCP-PCKL1-JAN14-2025,21.0_Test,21,0,475,0,0,0,,not identifiable
+e00fce6853367e34da7e905c,ToM-MCP-PCKL3,21.0_Test,21,0,667,0,0,0,,not identifiable
+e00fce686548d46c4b45e380,Morrisville-Tennis-MAFC-1-SWAPPED,21.0_Test,21,0,500,0,0,0,,not identifiable
+e00fce6841443bcc0f3178e4,Morrisville-Tennis-MAFC-2,21.0_Test,21,0,466,0,0,0,,not identifiable
+e00fce686c3f94ad871d6479,ToM-MCP-Court2,21.0_Test,21,0,721,0,0,0,,not identifiable
+e00fce68c9f3e64f79ccc884,ToM-MCP-Court1,21.0_Test,21,0,630,0,0,0,,not identifiable
+e00fce686e1a157c27984295,ToM-MCP-Court3-DEC28-2024,21.0_Test,21,0,439,0,0,0,,not identifiable
+e00fce687bbfcdc64e7b5f50,SAMIT-TRAIL02,v24-Thermal-Inhibit,24,0,263,0,0,0,,not identifiable
+e00fce68b015d86f790c924e,ToM-MCP-PCKL2,21.0_Test,21,0,593,0,0,0,,not identifiable

@@ -64,6 +64,7 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 #include "cloud/Cloud.h"                   // Particle Ledger integration (config + data)
 #include "PublishQueuePosixRK.h"     // File-backed persistent event queue
 #include "cloud/Particle_Functions.h"      // Particle.function() and Particle.variable() registration
+#include "cloud/PublishDeliveryCounters.h" // WO-2026-09-25-001: retained publish delivery counters
 #include "reporting/ReportingPolicy.h"    // Shared cloud-report cadence policy
 
 // Sensor abstraction layer
@@ -1129,8 +1130,24 @@ void setup() {
   // across all supported platforms (P2, Boron, Argon). With an
   // hourly reporting interval, 800 file-backed events provide
   // headroom over the 720 events needed for a full 30 days.
+  //
+  // WO-2026-09-25-001 (Stage 5 decision 2): the two delivery hooks below are
+  // both invoked on the application thread from PublishQueuePosix::loop() -
+  // attempt from stateWait(), result from statePublishWait() - which is what
+  // lets PublishDeliveryCounters use plain unlocked increments. begin() runs
+  // first so the retained block is validated before anything can dispatch.
+  PublishDeliveryCounters::begin();
   PublishQueuePosix::instance()
       .withFileQueueSize(800)
+      .withPublishAttemptUserCallback([](const char *eventName, uint32_t flags) {
+        (void)eventName;
+        (void)flags;
+        PublishDeliveryCounters::noteAttempt();
+      })
+      .withPublishResultUserCallback([](const char *eventName, bool acknowledged) {
+        (void)eventName;
+        PublishDeliveryCounters::noteResult(acknowledged);
+      })
       .setup(); // Initialize the publish queue
 
   // ===== TIME, RTC, AND WATCHDOG CONFIGURATION =====
@@ -2162,7 +2179,11 @@ void publishData(time_t stampOverride) {
  * heap usage, and PMIC anomalies. Critical for diagnosing unexpected resets in field
  * deployments without physical device access.
  *
- * @note Large payload (~896 bytes). Called once during setup(); queued for first connection.
+ * @note Large payload. Measured worst case 896 bytes of the 1023 usable in the
+ *       `char status[1024]` buffer, itself under Device OS 6.4.1's 1024-byte
+ *       event-data limit; a typical cycle is around 702 bytes. See
+ *       tests/status_event_payload_budget_test.py. Called once during setup();
+ *       queued for the first connection.
  */
 void publishStartupStatus() {
   char status[1024];
@@ -2226,9 +2247,29 @@ void publishStartupStatus() {
              startupAb1805ConfirmedWatchdog ? "AB1805_PIN" : "NONE");
   }
 
+  // WO-2026-09-25-001 (Stage 5 decisions 2 and 5, acceptance criterion 4):
+  // publish delivery counters. They ride in this `status` event and NOT in the
+  // device-status ledger payload - that payload was already at 831-856 of its
+  // 896-byte cap in the field, whereas this event has roughly 300 bytes of
+  // headroom under both the Device OS 6.4.1 event-data limit
+  // (particle::protocol::MAX_EVENT_DATA_LENGTH = 1024,
+  // communication/inc/protocol_defs.h:94) and PublishQueuePosixRK's own
+  // ceiling, which is that same constant (PublishQueuePosixRK.cpp:106).
+  // See tests/status_event_payload_budget_test.py for the full byte budget.
+  //   d = delivery, a = attempted, k = acKnowledged, f = failed,
+  //   r = retried, q = queued at the last sleep commit,
+  //   s = Sleep commits that carried events over (sleptWithQueued),
+  //   b = aBandoned - attempts whose outcome was lost to a reset.
+  // Each counter saturates at PublishDeliveryCounters::kCounterMax (65535), so
+  // five digits per counter is both the deployed and the structural maximum.
+  // Outside an in-flight attempt and below saturation, a == k + f + b.
+  // The counters live in retained memory, so this boot-time event reports the
+  // accounting carried over from the cycles before this wake.
+  const PublishDeliveryCounters::Snapshot delivery = PublishDeliveryCounters::snapshot();
+
 #if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
   snprintf(status, sizeof(status),
-           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"pmicAnomalyCount\":%u,\"lastPmicAnomalySoc\":%.2f,\"lastPmicAnomalyChargeStatus\":%u,\"lastPmicAnomalyAgeSec\":%lu,\"lastPmicAnomalyPowerSource\":%u,\"lastPmicAnomalyVbusStatus\":%u,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d%s%s}",
+           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"pmicAnomalyCount\":%u,\"lastPmicAnomalySoc\":%.2f,\"lastPmicAnomalyChargeStatus\":%u,\"lastPmicAnomalyAgeSec\":%lu,\"lastPmicAnomalyPowerSource\":%u,\"lastPmicAnomalyVbusStatus\":%u,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d,\"d\":{\"a\":%u,\"k\":%u,\"f\":%u,\"r\":%u,\"q\":%u,\"s\":%u,\"b\":%u}%s%s}",
            FIRMWARE_VERSION,
            resetReason,
            (unsigned long)resetReasonData,
@@ -2253,11 +2294,18 @@ void publishStartupStatus() {
            lastConnectionAgeSec,
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
+           (unsigned)delivery.attempted,
+           (unsigned)delivery.acknowledged,
+           (unsigned)delivery.failed,
+           (unsigned)delivery.retried,
+           (unsigned)delivery.queuedAtSleep,
+           (unsigned)delivery.sleptWithQueued,
+           (unsigned)delivery.abandoned,
            hibernateFields,
            pinResetAb1805Fields);
 #else
   snprintf(status, sizeof(status),
-           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d%s%s}",
+           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d,\"d\":{\"a\":%u,\"k\":%u,\"f\":%u,\"r\":%u,\"q\":%u,\"s\":%u,\"b\":%u}%s%s}",
            FIRMWARE_VERSION,
            resetReason,
            (unsigned long)resetReasonData,
@@ -2276,6 +2324,13 @@ void publishStartupStatus() {
            lastConnectionAgeSec,
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
+           (unsigned)delivery.attempted,
+           (unsigned)delivery.acknowledged,
+           (unsigned)delivery.failed,
+           (unsigned)delivery.retried,
+           (unsigned)delivery.queuedAtSleep,
+           (unsigned)delivery.sleptWithQueued,
+           (unsigned)delivery.abandoned,
            hibernateFields,
            pinResetAb1805Fields);
 #endif

@@ -1,6 +1,7 @@
 #include "state/State_Common.h"
 #include "../Config.h"
 #include "cloud/Cloud.h"
+#include "cloud/PublishDeliveryGate.h"
 #include "LocalTimeRK.h"
 #include "persist/CurrentReadings.h"
 #include "persist/SystemConfig.h"
@@ -226,14 +227,17 @@ void handleIdleState() {
 
     // In low-power mode, once all work for this connection cycle is
     // complete (no updates pending), we can safely enter SLEEPING_STATE
-    // to turn off the radio and save power. We only require the publish
-    // queue to be fully drained when we are actually connected; when
-    // offline, it's expected to have a non-zero queue and we still want
-    // to sleep, flushing the queue on the next connection.
-    bool canSleepGate = true;
-    if (Particle.connected()) {
-      canSleepGate = PublishQueuePosix::instance().getCanSleep();
-    }
+    // to turn off the radio and save power.
+    //
+    // WO-2026-09-25-001 Stage 5 decision 6 (Stage 7 finding P1): the queue term
+    // is now the bounded delivery gate rather than a bare
+    // `PublishQueuePosix::getCanSleep()`. It is true when the queue is empty,
+    // when we are offline (queued events are durable and flush on the next
+    // connection), or when the 90 s delivery budget has expired with no publish
+    // in flight. Without the budget, a queue that never drains - repeated ACK
+    // failures under fix B - kept the device here forever: it never entered
+    // SLEEPING_STATE, so that state's own cloud-sync timeout was unreachable.
+    bool canSleepGate = PublishDeliveryGate::queuePermitsSleep();
 
     if (!updatesPending && canSleepGate) {
       // If a sensor event is still pending or the BLUE LED is still on
@@ -253,6 +257,12 @@ void handleIdleState() {
       size_t pending = PublishQueuePosix::instance().getNumEvents();
       if (!Particle.connected() && pending > 0) {
         Log.info("Low-power idle: offline with %u queued event(s) - sleeping and will flush on next connect",
+                 (unsigned)pending);
+      } else if (pending > 0) {
+        // WO-2026-09-25-001 decision 6: the delivery budget expired while
+        // connected. The events are moved to flash at the sleep commit and
+        // retried on the next connection; `sleptWithQueued` counts this.
+        Log.info("Low-power idle: delivery budget expired with %u queued event(s) - sleeping and will retry on next connect",
                  (unsigned)pending);
       } else {
         Log.info("Low-power idle: queue drained and no updates pending - entering SLEEPING_STATE");
@@ -277,7 +287,12 @@ void handleIdleState() {
 
     bool queueCanSleep = true;
     if (cloudConnected) {
-      queueCanSleep = PublishQueuePosix::instance().getCanSleep();
+      // WO-2026-09-25-001 Stage 5 decision 6: same bounded delivery gate as the
+      // low-power sleep transition above, so the ceiling cannot be held off
+      // indefinitely by a queue that never drains. It still returns false while
+      // a publish is in flight, so this ceiling never tears down a connection
+      // with an outstanding attempt.
+      queueCanSleep = PublishDeliveryGate::queuePermitsSleep();
     }
 
     // WO-2026-09-19 Step 3b: Clock::openness() == Open, not

@@ -129,6 +129,8 @@ Device Status describes runtime reality. It does not generally duplicate configu
 | connection.lastResult | Result of the most recent connection attempt. |
 | connection.elapsedMs | Elapsed time for the most recent successful connection. |
 
+**Not in this payload: publish delivery counters.** WO-2026-09-25-001 Stage 5 decision 5 places the `attempted` / `acknowledged` / `failed` / `retried` / `queued-at-sleep` counters in the `status` **event** (`publishStartupStatus()`), not here. This payload was already observed at 831–856 bytes of its 896-byte cap, so a counter object here would have pushed ordinary cycles over the cap and suppressed the status publish entirely. This payload's format is therefore unchanged by that work order. The counters are documented in `docs/FIELD_MEANINGS_REFERENCE.md`; the headroom question is WO-2026-09-25-003.
+
 ## Reporting Cadence and Hardware Wake Cadence
 
 Cloud/application reporting cadence and hardware wake cadence are separate concepts. Firmware may wake more frequently to sense, count, maintain occupancy state, or re-evaluate policy while intentionally delaying cloud communication.

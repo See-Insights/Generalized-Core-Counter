@@ -328,11 +328,31 @@ void PublishQueuePosix::stateWait() {
         // This message is monitored by the automated test tool. If you edit this, change that too.
         _log.trace("publishing %s event=%s data=%s", (curFileNum ? "file" : "ram"), curEvent->eventName, curEvent->eventData);
 
-        if (BackgroundPublishRK::instance().publish(curEvent->eventName, curEvent->eventData, curEvent->flags, 
+        // BENCH B: require an API-level ACK before the queue removes an event.
+        // Normalize at dispatch to cover existing persisted PRIVATE-only events.
+        // NO_ACK takes precedence in Device OS, so clear it before setting WITH_ACK.
+        const PublishFlags sendFlags = (curEvent->flags & ~PublishFlags(NO_ACK)) | WITH_ACK;
+        if (BackgroundPublishRK::instance().publish(curEvent->eventName, curEvent->eventData, sendFlags,
             [this](bool succeeded, const char *eventName, const char *eventData, const void *context) {
                 publishCompleteCallback(succeeded, eventName, eventData);
             })) {
             // Successfully started publish
+            // WO-2026-09-25-001: one Particle.publish() has now been started for this
+            // event. Reported from the application thread, not the publish worker.
+            //
+            // Stage 5 decision 6: an attempt is "in flight" from here until
+            // statePublishWait() has acted on its result, so a sleep/teardown
+            // gate can never abandon it.
+            publishInFlight = true;
+            if (publishAttemptUserCallback) {
+                publishAttemptUserCallback(curEvent->eventName, (uint32_t)sendFlags.value());
+            }
+        }
+        else {
+            // Diagnostic only: preserve the existing state machine on rejection.
+            // No Particle.publish() was started, so no Future or ACK exists.
+            _log.error("PubqDispatch: e=%s f=%02x accepted=0 future=none ack=not-observed",
+                curEvent->eventName, (unsigned)sendFlags.value());
         }
     }
     else {
@@ -343,6 +363,14 @@ void PublishQueuePosix::stateWait() {
 void PublishQueuePosix::statePublishWait() {
     if (!publishComplete) {
         return;
+    }
+
+    // WO-2026-09-25-001: report the attempt's outcome before acting on it.
+    // Under fix B every queued send carries explicit WITH_ACK, so publishSuccess
+    // here means the cloud acknowledged the event; the removal below is therefore
+    // an acknowledged removal, and the retry branch leaves the event queued.
+    if (publishResultUserCallback && curEvent) {
+        publishResultUserCallback(curEvent->eventName, publishSuccess);
     }
 
     if (publishSuccess) {
@@ -388,6 +416,10 @@ void PublishQueuePosix::statePublishWait() {
 
     stateHandler = &PublishQueuePosix::stateWait;
     stateTime = millis();
+    // WO-2026-09-25-001 (Stage 5 decision 6): the attempt's outcome has now been
+    // acted on - the event was either removed on an acknowledgment or put back
+    // and persisted - so nothing is in flight any more.
+    publishInFlight = false;
 }
 
 
