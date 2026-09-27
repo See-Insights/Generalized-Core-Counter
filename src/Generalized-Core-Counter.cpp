@@ -117,7 +117,7 @@ static void awakeWatchdogExpiredHandler();
 static void appWatchdogHandler(); // Application watchdog handler
 #endif
 static void waitForDebugSerialIfConnected(); // Brief settle delay if a debug terminal is already attached at boot
-void publishData();           // Publish the data to the cloud
+void publishData(time_t stampOverride); // Publish the data to the cloud
 void userSwitchISR();         // Interrupt for the user switch
 void sensorISR();             // Interrupt for legacy tire-counting sensor
 void dailyCleanup();          // Reset daily counters and housekeeping
@@ -1982,7 +1982,7 @@ static bool isAutoClearAfterReportAlert(int alertCode) {
  *
  * @note Does not perform immediate publish - queued for delivery during CONNECTING_STATE.
  */
-void publishData() {
+void publishData(time_t stampOverride) {
   // Legacy Ubidots context strings describing battery state
   static const char *batteryContext[7] = {
     "Unknown", "Not Charging", "Charging",
@@ -2019,7 +2019,7 @@ void publishData() {
 
   // Build webhook payload based on sensor mode
   if (sensorMode == SystemConfig::OCCUPANCY) {
-    const unsigned long timeStampValue = nowStampSec;
+    const unsigned long timeStampValue = stampOverride != 0 ? (unsigned long)stampOverride : nowStampSec;
     const unsigned long totalOccupiedMinutes = (unsigned long)(CurrentReadings::get_totalOccupiedSeconds() / 60UL);
 
     // Occupancy mode webhook format (occupancy as 0/1 numeric value)

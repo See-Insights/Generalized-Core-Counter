@@ -1,10 +1,10 @@
 #include "state/State_Common.h"
+#include <algorithm>
 #include "../Config.h"
 #include "cloud/Cloud.h"
 #include "power/BatteryAuthority.h"
 #include "power/ConnectivityPolicy.h"
 #include "power/PowerManager.h"
-#include "time/LocalTimeCache.h"
 #include "LocalTimeRK.h"
 #include "persist/CurrentReadings.h"
 #include "persist/RecoveryState.h"
@@ -24,6 +24,23 @@ namespace {
 
 constexpr unsigned long MODEM_UNSTABLE_RECONNECT_DEFER_MS = 30000UL;
 
+time_t localTodayAt(uint8_t hour) {
+  LocalTimeConvert converter;
+  converter.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
+
+  if (hour == 24) {
+    converter.nextDay(LocalTimeHMS("00:00:00"));
+  } else {
+    LocalTimeHMS hms;
+    hms.hour = (int8_t)hour;
+    hms.minute = 0;
+    hms.second = 0;
+    converter.atLocalTime(hms);
+  }
+
+  return converter.time;
+}
+
 } // namespace
 
 // REPORTING_STATE: Build and send periodic report
@@ -33,30 +50,40 @@ void handleReportingState() {
   }
 
   time_t now = Time.now();
-  // If this is the first report after a calendar *local* day boundary,
-  // run the daily cleanup once to reset daily counters and housekeeping.
+  bool due = false;
+  time_t boundary = 0;
+  uint8_t close = 0;
+
   // WO-2026-09-19 Step 3b: Clock::isTrusted(), not isTimeValid() - the day-
-  // boundary comparison below must not run on an untrusted clock, which
-  // could spuriously trigger (or miss) dailyCleanup() on the wrong day.
+  // boundary logic must not run or stamp state on an untrusted clock, which
+  // could permanently consume a missed boundary.
   if (Clock::isTrusted()) {
-    time_t lastReport = SystemConfig::get_lastReport();
-    if (lastReport != 0) {
-      const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
-      LocalTimeConvert convLast;
-      convLast.withConfig(LocalTime::instance().getConfig()).withTime(lastReport).convert();
+    const uint8_t openHour = SystemConfig::get_openTime();
+    const uint8_t closeHour = SystemConfig::get_closeTime();
+    close = (openHour == closeHour) ? 24 : closeHour;
+    boundary = localTodayAt(close);
+    if (now < boundary) {
+      boundary -= 86400;
+    }
 
-      LocalTimeYMD ymdNow = snapshot.localYmd;
-      LocalTimeYMD ymdLast = convLast.getLocalTimeYMD();
+    const time_t lastDailyCleanup = SystemConfig::get_lastDailyCleanup();
+    due = (lastDailyCleanup < boundary || lastDailyCleanup > now);
+    if (due) {
+      Log.info("Daily boundary reached (boundary=%lu last=%lu now=%lu close=%u) - preparing dailyCleanup",
+               (unsigned long)boundary,
+               (unsigned long)lastDailyCleanup,
+               (unsigned long)now,
+               (unsigned)close);
+    }
+  }
 
-      if (ymdNow.getYear() != ymdLast.getYear() ||
-          ymdNow.getMonth() != ymdLast.getMonth() ||
-          ymdNow.getDay() != ymdLast.getDay()) {
-        Log.info("New local day detected (last=%04d-%02d-%02d, current=%04d-%02d-%02d) - running dailyCleanup",
-                 ymdLast.getYear(), ymdLast.getMonth(), ymdLast.getDay(),
-                 ymdNow.getYear(), ymdNow.getMonth(), ymdNow.getDay());
-        dailyCleanup();
-        SystemConfig::set_lastDailyCleanup(now);
-      }
+  bool wasOccupied = false;
+  time_t originalSessionStart = 0;
+  if (due) {
+    wasOccupied = CurrentReadings::get_occupied();
+    originalSessionStart = CurrentReadings::get_occupancyStartTime();
+    if (wasOccupied) {
+      closeOccupancySessionSafely("daily-cleanup", boundary);
     }
   }
 
@@ -66,7 +93,16 @@ void handleReportingState() {
   measure.loop();         // Take sensor measurements for reporting
   measure.batteryState(); // Update battery SoC/state and enclosure temperature
 
-  publishData(); // Queue hourly report; actual send depends on connectivity policy
+  publishData(due ? boundary - 1 : 0); // Queue report; actual send depends on connectivity policy
+
+  if (due) {
+    dailyCleanup();
+    if (close == 24 && wasOccupied) {
+      CurrentReadings::set_occupied(true);
+      CurrentReadings::set_occupancyStartTime(std::max(boundary, originalSessionStart));
+    }
+    SystemConfig::set_lastDailyCleanup(now);
+  }
 
   // This timestamp is the authoritative application-report generation time.
   // Transport acceptance and successful delivery have separate diagnostics.

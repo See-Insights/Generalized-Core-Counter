@@ -107,8 +107,10 @@ void dailyCleanup();
 
 /**
  * @brief Publishes the current report payload.
+ *
+ * @param stampOverride Optional occupancy payload timestamp override; 0 uses current behavior
  */
-void publishData();
+void publishData(time_t stampOverride = 0);
 
 // WO-2026-09-21 Step 4: applyBatteryAwareConnectionModePolicy() is retired -
 // see power/BatteryAuthority.h's evaluate(), the single owner its entire
@@ -263,13 +265,14 @@ struct OccupancyCloseResult {
 /**
  * @brief Safely closes the current occupancy session and guards wrapped time math.
  *
- * Unsigned subtraction of Time.now() - occupancyStartTime can wrap into a huge
+ * Unsigned subtraction of closeAt - occupancyStartTime can wrap into a huge
  * bogus duration if the stored start time is zero or in the future.
  *
  * @param path Short caller label for anomaly logs
+ * @param closeAt Epoch to credit the current occupancy session through
  * @return Close result including the session duration and new total on valid close
  */
-inline OccupancyCloseResult closeOccupancySessionSafely(const char *path) {
+inline OccupancyCloseResult closeOccupancySessionSafely(const char *path, time_t closeAt = Time.now()) {
 	OccupancyCloseResult result;
 	const bool occupied = CurrentReadings::get_occupied();
 	const int8_t alertCode = RecoveryState::get_alertCode();
@@ -292,7 +295,10 @@ inline OccupancyCloseResult closeOccupancySessionSafely(const char *path) {
 		if (start > now && start <= now + 5) {
 			effectiveStart = now;
 		}
-		rawSessionSeconds = (long long)now - (long long)effectiveStart;
+		if (effectiveStart > closeAt) {
+			effectiveStart = closeAt;
+		}
+		rawSessionSeconds = (long long)closeAt - (long long)effectiveStart;
 		durationComputable = true;
 	}
 
@@ -325,7 +331,7 @@ inline OccupancyCloseResult closeOccupancySessionSafely(const char *path) {
 		}
 		Log.warn("OccAnom: path=%s now=%lu start=%lu prev=%lu dur=%s occ=%d alert=%d",
 					 path ? path : "?",
-					 (unsigned long)now,
+					 (unsigned long)closeAt,
 					 (unsigned long)start,
 					 (unsigned long)previousTotal,
 					 sessionBuf,
