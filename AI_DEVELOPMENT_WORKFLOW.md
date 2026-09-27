@@ -15,9 +15,41 @@
 
 ## 2. Roles and responsibilities
 
-### Claude Code — Architect and Workflow Controller
+This table is the authority for who does what. The sections below expand on it;
+nothing elsewhere in this document or the repository overrides it.
 
-**Primary purpose:** Coordinate the engineering workflow and convert operational evidence into an actionable architecture.
+| Role | Who | Does | Never |
+|---|---|---|---|
+| Architect | Claude, in the Claude app chat | Authors and revises Work Orders; makes design decisions together with Chip; recommends model tiers | Approves its own architecture; commits, pushes, or operates devices |
+| Workflow controller | Claude Code | Dispatches Copilot and Codex through their CLIs; runs read-only investigation (repository, Fleet Ops, telemetry); runs builds and tests; performs workflow completeness checks; makes narrow edits only when pre-authorized case by case | Commits, pushes, merges, releases, or operates devices |
+| Pre-approval investigator (Stage 4) | Codex | Independent investigation of the evidence and the proposed architecture, before approval | Rewrites the Architect's proposal; edits source |
+| Implementer (Stage 6) | GitHub Copilot | Implements the approved Work Order as an uncommitted working-tree diff | Changes the approved architecture; commits or pushes |
+| Verifier (Stage 7) | Codex | Adversarial verification of the diff against the Work Order, including mutation checks | Makes lasting source edits (mutations are restored byte-identically); commits or pushes |
+| Chief Engineer | Chip (the user) | Sole authority for Stage 5 approval, commits, pushes, merges, releases, and device operations; also performs the "AWS agent" role personally | — |
+
+### Architect — Claude (app chat)
+
+**Primary purpose:** Convert operational evidence into an actionable architecture, and own the Engineering Work Order.
+
+**Responsibilities:**
+
+- Establish an initial problem statement and root-cause hypotheses.
+- Produce architectural options with risks and tradeoffs.
+- Request an independent investigation from Codex (dispatched by Claude Code).
+- Reconcile Codex findings with its original analysis.
+- Produce the final Engineering Work Order for Chip’s approval, and revise it as decisions are made.
+- Make design decisions together with Chip.
+- Recommend the model tier for each dispatch (see §5).
+
+**Restrictions:**
+
+- Must not approve its own architecture.
+- Must not commit, push, merge, or release code.
+- Must not operate, configure, restart, or update Fleet devices.
+
+### Claude Code — Workflow Controller
+
+**Primary purpose:** Coordinate the engineering workflow: gather evidence, dispatch the other agents, and check that each stage is complete.
 
 **Responsibilities:**
 
@@ -25,20 +57,16 @@
 - Read the complete GitHub repository, history, issues, CI results, and relevant documentation.
 - Query the Fleet Ops API for telemetry and serial logs.
 - Correlate firmware versions, device identifiers, timestamps, events, and failures.
-- Establish an initial problem statement and root-cause hypotheses.
 - Identify missing evidence and conduct additional read-only investigation.
-- Produce architectural options with risks and tradeoffs.
-- Request an independent investigation from Codex.
-- Reconcile Codex findings with its original analysis.
-- Produce the final Engineering Work Order for Chip’s approval.
+- Dispatch Copilot (Stage 6) and Codex (Stages 4 and 7) through their CLIs, in the format in §4.
+- Run builds and tests to confirm what the other agents report.
 - Track the task through investigation, implementation, validation, and closure.
 - Compare post-change telemetry with the original failure evidence.
 
 **Restrictions:**
 
-- Must not modify production source code.
+- Must not modify production source code, except narrow edits Chip pre-authorizes case by case, with the scope stated.
 - Must not commit, push, merge, or release code.
-- Must not approve its own architecture.
 - Must not operate, configure, restart, or update Fleet devices.
 - Fleet Ops access must be read-only.
 - May write planning artifacts or draft GitHub issues only where specifically authorized.
@@ -142,20 +170,20 @@ made the artifact invisible to a routine `ls` and easy to miss in
 
 ### Codex — Independent Investigator and Verifier
 
-**Model:** GPT-5.6 Sol, initially using High or Extra High reasoning.
+**Model:** set per dispatch; see §5.
 
-**Primary purpose:** Provide an independent technical challenge to Claude’s diagnosis and verify the completed implementation.
+**Primary purpose:** Provide an independent technical challenge to the Architect’s diagnosis and verify the completed implementation.
 
 **Pre-approval responsibilities:**
 
 - Independently inspect the relevant repository areas.
 - Review telemetry and serial-log evidence supplied in the Engineering Work Order.
-- Test whether the evidence supports Claude’s proposed root cause.
+- Test whether the evidence supports the Architect’s proposed root cause.
 - Identify alternative explanations and missing evidence.
 - State what observations would falsify each hypothesis.
 - Examine cross-component effects, concurrency, timing, state transitions, recovery behavior, and edge cases.
 - Review architectural options for correctness and unintended consequences.
-- Return an Investigation Report without rewriting Claude’s proposal.
+- Return an Investigation Report without rewriting the Architect’s proposal.
 
 **Post-implementation responsibilities:**
 
@@ -163,6 +191,7 @@ made the artifact invisible to a routine `ls` and easy to miss in
 - Confirm that the implementation matches the approved architecture.
 - Check that it addresses the observed failure rather than only its symptoms.
 - Review tests, error handling, compatibility, and regression risks.
+- Run the mutation checks the Stage 7 dispatch lists. Each mutation must make at least one test fail; a surviving mutation is a finding.
 - Compare validation results with the original telemetry.
 - Issue one of three findings:
 
@@ -172,17 +201,17 @@ made the artifact invisible to a routine `ls` and easy to miss in
 
 **Restrictions:**
 
-- Read-only access to the repository and Fleet Ops data.
-- Must not edit source code.
+- Read-only access to the repository and Fleet Ops data, except the temporary edits that mutation checks require.
+- Must not make lasting edits to source code. Every mutated file is restored byte-identically before the verdict is issued, and temporary artifacts are removed.
 - Must not commit or push.
 - Must remain independent of the implementation process.
 - Must clearly distinguish observed evidence from inference.
 
 ### GitHub Copilot — Implementer
 
-**Initial model:** GPT-5.5, subject to evaluation against agentic coding alternatives.
+**Model:** set per dispatch; see §5.
 
-**Primary purpose:** Implement the approved Engineering Work Order via the local GitHub Copilot CLI (`gh copilot`), invoked headlessly against the local working tree. Not the GitHub issue-assignment cloud coding agent (loses visibility into local uncommitted work, adds an issue/PR round-trip) and not the VS Code-integrated chat experience (interactive, not scriptable).
+**Primary purpose:** Implement the approved Engineering Work Order via the local GitHub Copilot CLI (`copilot`, also reachable as `gh copilot`), dispatched headlessly by Claude Code against the local working tree (see §4). Not the GitHub issue-assignment cloud coding agent (loses visibility into local uncommitted work, adds an issue/PR round-trip) and not the VS Code-integrated chat experience (interactive, not scriptable).
 
 **Responsibilities:**
 
@@ -192,6 +221,7 @@ made the artifact invisible to a routine `ls` and easy to miss in
 - Add or update unit, integration, regression, and fault-injection tests as required.
 - Run approved build, static-analysis, formatting, and test commands.
 - Document deviations from the approved plan.
+- Any correction to the spec, even an obviously right one, is reported as a deviation.
 - Stop and request clarification if implementation requires an architectural change.
 - Leave a complete, uncommitted working-tree diff for review.
 - Provide an Implementation Report summarizing:
@@ -217,8 +247,8 @@ made the artifact invisible to a routine `ls` and easy to miss in
 
 **Responsibilities:**
 
-- Review Claude’s proposed architecture and Codex’s independent findings.
-- Approve, reject, or revise the Engineering Work Order.
+- Review the Architect’s proposed architecture and Codex’s independent findings.
+- Approve, reject, or revise the Engineering Work Order. Stage 5 approval is Chip’s alone.
 - Decide whether identified risks are acceptable.
 - Authorize implementation.
 - Review the completed diff, test results, Codex verification, and telemetry evidence.
@@ -226,13 +256,15 @@ made the artifact invisible to a routine `ls` and easy to miss in
 - Perform or authorize any required hardware validation.
 - Make the only Git commit.
 - Push, merge, release, deploy, or authorize Fleet changes.
+- Perform all device operations (flashing, bench tests, Fleet changes).
+- Perform the "AWS agent" role personally: AWS resource review, deployment impact, and any AWS change.
 - Decide whether the task is complete.
 
 ## 3. Standard workflow
 
 ### Stage 1 — Intake
 
-Claude creates an Engineering Work Order ID and records:
+The Architect creates an Engineering Work Order ID and records:
 
 - Requested outcome or observed failure
 - Affected devices, builds, branches, and environments
@@ -242,7 +274,7 @@ Claude creates an Engineering Work Order ID and records:
 
 ### Stage 2 — Evidence collection
 
-Claude retrieves and correlates:
+Claude Code retrieves and correlates (read-only):
 
 - Relevant source code and Git history
 - CI and test results
@@ -252,11 +284,11 @@ Claude retrieves and correlates:
 - Event timelines and correlation identifiers
 - Similar historical incidents
 
-Claude records the evidence without prematurely treating a hypothesis as fact.
+Claude Code records the evidence without prematurely treating a hypothesis as fact.
 
 ### Stage 3 — Preliminary architecture
 
-Claude produces:
+The Architect produces, with Chip:
 
 - A precise problem statement
 - One or more root-cause hypotheses
@@ -268,7 +300,7 @@ Claude produces:
 
 ### Stage 4 — Independent investigation
 
-Codex reviews the evidence and proposal independently.
+Codex, dispatched by Claude Code, reviews the evidence and proposal independently.
 
 Codex returns:
 
@@ -279,11 +311,11 @@ Codex returns:
 - Required tests
 - Recommendation to proceed, revise, or investigate further
 
-Claude incorporates the findings but preserves disagreements for Chip to review.
+The Architect incorporates the findings but preserves disagreements for Chip to review.
 
 ### Stage 5 — Architecture approval gate
 
-Claude issues the final Engineering Work Order.
+The Architect issues the final Engineering Work Order.
 
 Chip may:
 
@@ -297,15 +329,15 @@ No source implementation begins before approval.
 
 ### Stage 6 — Implementation
 
-Copilot implements the approved Work Order locally.
+Copilot, dispatched by Claude Code once Chip authorizes implementation, implements the approved Work Order locally.
 
-If Copilot discovers that the plan cannot be implemented as approved, it stops and returns the issue to Claude and Chip. It does not improvise a new architecture.
+If Copilot discovers that the plan cannot be implemented as approved, it stops and returns the issue to the Architect and Chip. It does not improvise a new architecture.
 
 Copilot runs the approved verification commands and leaves all changes uncommitted.
 
 ### Stage 7 — Independent verification
 
-Codex reviews:
+Codex, dispatched by Claude Code, reviews:
 
 - The complete diff
 - Implementation Report
@@ -314,7 +346,9 @@ Codex reviews:
 - Acceptance criteria
 - Available staging or Fleet telemetry
 
-Claude performs workflow completeness checks and compares the resulting behavior with the original incident evidence.
+Claude Code performs workflow completeness checks and compares the resulting behavior with the original incident evidence.
+
+Dispatch Codex with codex exec <dispatch>; codex review --uncommitted rejects custom instructions (CLI 0.154.0).
 
 #### Mandatory: linkage verification
 
@@ -392,7 +426,7 @@ Boron `stateOfCharge` commit. Every test passed.
 Chip reviews:
 
 - Approved Engineering Work Order
-- Claude’s evidence and architecture
+- Claude Code’s evidence and the Architect’s architecture
 - Codex investigation and verification
 - Copilot’s implementation and test report
 - Complete uncommitted diff
@@ -402,7 +436,7 @@ Only Chip may commit and push the change.
 
 ### Stage 9 — Release and feedback
 
-After an authorized release, Claude monitors the defined telemetry window and compares:
+After an authorized release, Claude Code monitors the defined telemetry window (read-only) and compares:
 
 - Failure rate before and after the change
 - Expected state transitions
@@ -410,9 +444,89 @@ After an authorized release, Claude monitors the defined telemetry window and co
 - Performance or resource changes
 - Unexpected secondary effects
 
-Claude prepares a closure report. Chip decides whether the result is accepted, rolled back, or returned for further work.
+Claude Code prepares a closure report. Chip decides whether the result is accepted, rolled back, or returned for further work.
 
-## 4. Engineering Work Order contents
+## 4. Dispatch format
+
+Claude Code dispatches Copilot and Codex. Every dispatch begins with these two lines:
+
+```
+AGENT: <Copilot|Codex> · MODEL: <id> · REASONING: <level>
+AUTHORIZATION SCOPE: <pre-authorized actions> / <explicitly not authorized>
+```
+
+The body follows: the Work Order it serves (the binding spec), the branch and base commit, what to do, what to verify, and the report expected back.
+
+### Commands
+
+**Codex** (Stages 4 and 7) is dispatched with `codex exec <dispatch>`:
+
+```
+codex exec -m <model> -c model_reasoning_effort="<level>" -s workspace-write \
+  -o docs/work-orders/<WO>-stage7-verdict.md - < docs/work-orders/<WO>-stage7-codex-dispatch.md
+```
+
+`codex review --uncommitted` is not used: it rejects custom instructions (CLI 0.154.0). Codex's sandbox has no network, so Claude Code runs the Particle cloud compile separately and records the result.
+
+**Copilot** (Stage 6) is dispatched with its CLI, `copilot -p`:
+
+```
+copilot --model <model> --reasoning-effort <level> \
+  -p "Implement per the dispatch in docs/work-orders/<WO>-stage6-copilot-dispatch.md. The WO is the binding spec wherever the dispatch refers to it. Do not commit, push, merge, or release." \
+  --allow-all-tools --add-dir ~/.particle/toolchains \
+  --allow-url=api.particle.io --allow-url=binaries.particle.io \
+  --deny-tool='shell(git commit)' --deny-tool='shell(git push)' --deny-tool='shell(git merge)' \
+  --deny-tool='shell(git rebase)' --deny-tool='shell(git reset)' --deny-tool='shell(git checkout)' \
+  --deny-tool='shell(git switch)' --deny-tool='shell(git stash)' --deny-tool='shell(gh pr:*)' \
+  --deny-tool='shell(particle flash)' \
+  --share <transcript path>
+```
+
+The deny rules enforce the Implementer's restrictions at the CLI, not only in the prompt. `--add-dir ~/.particle/toolchains` gives Copilot the local Device OS toolchain, which the local build in Stage 7's mandatory checks needs.
+
+### Reports
+
+Every report from Copilot, Codex, or Claude Code states:
+
+- The model and reasoning level actually used. If Auto was used, what Auto picked.
+- The interpreter used for tests, e.g. `43/43 (sh via zsh, py via python3)`. See §10.
+
+### Records
+
+Dispatches and verdicts are saved under `docs/work-orders/`, never only in a scratchpad. The verdict file is the record that a Work Order passed review.
+
+## 5. Model routing
+
+Model routing (reviewed 2026-09-25; re-check monthly)
+
+Claude Code sets the model and reasoning level for Copilot and Codex directly via their CLIs. Every dispatch states both.
+
+| Role | Default | Escalate to |
+|---|---|---|
+| Copilot, Stage 6 implementation | standard model, medium reasoning | top model, high: large or multi-file changes, or after a failed round |
+| Codex, Stage 7 verification | standard model, high reasoning | top model, highest reasoning: safety-relevant logic (power, persistence, reset survival, time and boundaries) |
+| Claude Code, read-only investigation | Auto acceptable | explicit top model for anything that gates a decision |
+
+Escalation is always explicit. "Auto" is never used to get more power.
+
+Resolve model IDs and reasoning levels at dispatch time from the CLI's list of what's available. Don't hardcode them in this document, since pinned IDs go stale.
+
+Historical vendor notes (model availability and deprecations as of 2026-09-14) are kept in `docs/notes/vendor-model-notes-2026-09.md`. They are not a rule.
+
+### Evaluating a change to the defaults
+
+Model assignments should be based on results rather than assumed from model names. Evaluate a candidate default on representative tasks for this project, using:
+
+- First-pass build and test success
+- Correct adherence to approved scope
+- Number of human corrections
+- Unnecessary code churn
+- Regression rate
+- Time to verified result
+- Cost or usage
+- Ability to stop when architectural clarification is required
+
+## 6. Engineering Work Order contents
 
 Every Work Order should include:
 
@@ -435,12 +549,13 @@ Every Work Order should include:
 - Approval record
 - Investigation, implementation, and verification results
 
-## 5. Access and security controls
+## 7. Access and security controls
 
 ### Repository controls
 
-- Claude: read access; optional issue-drafting permission.
-- Codex: read-only access.
+- Architect: read access; no write access to the working tree.
+- Claude Code: read access; runs builds and tests; working-tree edits only when Chip pre-authorizes them case by case; issue drafting only where specifically authorized; no commit or push.
+- Codex: read-only access, except the temporary mutation edits Stage 7 requires, restored byte-identically.
 - Copilot: local working-tree write access but no push credentials.
 - Chip: commit, push, merge, and release authority.
 - Main branches should be protected.
@@ -461,7 +576,7 @@ It should not expose generic database queries, arbitrary command execution, devi
 
 Secrets, customer information, authentication material, and unnecessary device identifiers must be removed or redacted before data reaches an AI.
 
-## 6. Instruction management
+## 8. Instruction management
 
 Use one neutral shared engineering contract for standards common to every agent. It should define:
 
@@ -474,14 +589,15 @@ Use one neutral shared engineering contract for standards common to every agent.
 
 Role-specific behavior should remain separate:
 
-- Claude instructions: architecture and orchestration
-- Codex instructions: independent read-only investigation
+- Architect instructions: Work Order authoring and architecture
+- Claude Code instructions: orchestration, dispatch, and read-only investigation
+- Codex instructions: independent investigation and adversarial verification
 - Copilot instructions: scoped implementation
 - Chip: approval and authorization policy
 
 Shared instructions must not accidentally tell every agent to behave as the Architect or Implementer.
 
-## 7. Automation boundary
+## 9. Automation boundary
 
 The first version should automate:
 
@@ -497,32 +613,25 @@ The first version should automate:
 The following should initially remain explicit human actions:
 
 - Architecture approval
-- Starting implementation
+- Authorizing the start of implementation (Claude Code dispatches only after Chip authorizes)
 - Accepting material scope changes
 - Hardware or Fleet operations
 - Committing and pushing
 - Release authorization
 
-Programmatic invocation of Codex can be considered later through a read-only API integration. The interactive ChatGPT application should not be treated as a dependable machine-to-machine workflow endpoint.
+Claude Code invokes Codex and Copilot programmatically through their local CLIs (see §4). The interactive ChatGPT application should not be treated as a dependable machine-to-machine workflow endpoint.
 
-## 8. Model evaluation
+## 10. Standing rule: host shell tests run under zsh.
 
-GPT-5.5 should be used as the initial Copilot implementation model, but it should be evaluated against GPT-5.3-Codex or GPT-5.6 Terra using representative Fleet Ops tasks.
+The tests in `tests/*.sh` are zsh scripts (`#!/bin/zsh`, `set -euo pipefail`, zsh-only `${0:A:h:h}`). Run them via their shebang (`./tests/<name>.sh`) or `zsh <script>`. Never use `bash` or `sh`.
 
-Evaluation criteria should include:
+Signature of doing it wrong: `line N: A: unbound variable`, and/or every `.sh` test failing while every `.py` test passes. That result says nothing about the code under test. Re-run under zsh before investigating.
 
-- First-pass build and test success
-- Correct adherence to approved scope
-- Number of human corrections
-- Unnecessary code churn
-- Regression rate
-- Time to verified result
-- Cost or usage
-- Ability to stop when architectural clarification is required
+Why this is a rule: agents running the tests under bash have produced false failures and rework several times. This applies to every agent: implementer, reviewer, and verifier.
 
-Model assignments should be based on these results rather than assumed from model names.
+Reporting: any report of test results states the interpreter used, e.g. `43/43 (sh via zsh, py via python3)`.
 
-## 9. Success criteria for the workflow
+## 11. Success criteria for the workflow
 
 The workflow is successful if it produces:
 
