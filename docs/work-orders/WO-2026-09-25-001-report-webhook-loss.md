@@ -173,6 +173,74 @@ Model used: `gpt-6-astra`, reasoning `ultra` (its delegated sub-investigators in
 - No duplicate records in fleet-ops ingestion or Ubidots.
 - The awake-time increase per cycle, compared with the pre-B build, is recorded.
 
+## Bench result (Dev-14, 2026-09-27/28): PASS
+
+**Build:** `v25-WithAck-DiagD` (local build of `bench/2026-09-25-001-diagD` at `05c754f` = `c413e1e` plus diagnostic D), flashed to Dev-14 (`e00fce688e592afaf23ac4fb`) about 14:01 SGT on 27 Sep. The run covers 14:02 SGT on 27 Sep to 07:23 SGT on 28 Sep, with one 22:00 close and an overnight hibernate. Dev-14 was on USB power throughout (`profile=UsbBench`), so the connection mode stayed intermittent keep-alive.
+**Inputs:** serial log `2026-09-27 19-17-58 Boron CDC Mode.log` (the capture begins at uptime 1459 s, 14:26 SGT, despite its 19:17 header, and ends at 07:23 SGT), and the AWS raw archive `particle-events/<UTC day>/{Ubidots-Sensor-Hook-v1,status,hibernate_wake,watchdog}/<deviceId>/` from 06:02Z on 27 Sep to 23:27Z (read-only). The AWS record is Particle's webhook delivery to AWS for the same event. Ubidots itself and Particle's integration history were not checked (no read-only access).
+
+### 1. Delivery, one row per report
+
+(a) `PubqEnqueue … ok=1`; (b) `publish success N` then `removed file N` for the report's queue file; (c) an AWS record with the same payload `timestamp` (published time in UTC).
+
+| Report time (SGT, payload stamp) | dailyoccupancy | occupancy | Queue file | (a) | (b) | (c) |
+|---|---|---|---|---|---|---|
+| 09-27 14:02:39 | 0 | 1 | 3 | ok=1 (pasted log) | yes (pasted log) | yes (06:03:05Z) |
+| 09-27 14:08:07 | 5 | 0 | 4 or 5 | before log | before log | yes (06:08:16Z) |
+| 09-27 14:26:09 | 5 | 1 | 7 | ok=1 | yes | yes (06:26:18Z) |
+| 09-27 14:35:05 | 14 | 0 | 10 | ok=1 | yes | yes (06:35:14Z) |
+| 09-27 14:44:29 | 14 | 1 | 12 | ok=1 | yes | yes (06:44:38Z) |
+| 09-27 14:49:41 | 19 | 0 | 14 | ok=1 | yes | yes (06:49:49Z) |
+| 09-27 15:00:03 | 19 | 0 | 16 | ok=1 | yes | yes (07:00:11Z) |
+| 09-27 15:30:02 | 19 | 0 | 18 | not captured* | yes | yes (07:30:10Z) |
+| 09-27 16:00:02 | 19 | 0 | 20 | not captured* | yes | yes (08:00:10Z) |
+| 09-27 16:30:03 | 19 | 0 | 22 | ok=1 | yes | yes (08:30:11Z) |
+| 09-27 17:00:02 | 19 | 0 | 24 | not captured* | yes | yes (09:00:11Z) |
+| 09-27 17:30:02 | 19 | 0 | 26 | not captured* | yes | yes (09:30:11Z) |
+| 09-27 17:58:21 | 19 | 1 | 28 | ok=1 | yes | yes (09:58:43Z) |
+| 09-27 18:05:04 | 26 | 0 | 31 | ok=1 | yes | yes (10:05:15Z) |
+| 09-27 18:30:03 | 26 | 0 | 33 | ok=1 | yes | yes (10:30:11Z) |
+| 09-27 19:00:03 | 26 | 0 | 35 | ok=1 | yes | yes (11:00:11Z) |
+| 09-27 19:14:22 | 26 | 1 | 37 | ok=1 | yes | yes (11:14:36Z) |
+| 09-27 19:19:35 | 31 | 0 | 39 | not captured* | yes | yes (11:19:44Z) |
+| 09-27 19:19:46 | 31 | 1 | 41 | ok=1 | yes | yes (11:19:54Z) |
+| 09-27 19:24:54 | 36 | 0 | 43 | ok=1 | yes | yes (11:25:02Z) |
+| 09-27 19:30:02 | 36 | 0 | 45 | ok=1 | yes | yes (11:30:12Z) |
+| 09-27 19:36:19 | 36 | 1 | 47 | ok=1 | yes | yes (11:36:27Z) |
+| 09-27 19:41:27 | 41 | 0 | 49 | ok=1 | yes | yes (11:41:36Z) |
+| 09-27 20:00:03 | 41 | 0 | 51 | ok=1 | yes | yes (12:00:12Z) |
+| 09-27 20:30:03 | 41 | 0 | 53 | ok=1 | yes | yes (12:30:12Z) |
+| 09-27 21:00:02 | 41 | 0 | 55 | not captured* | yes | yes (13:00:12Z) |
+| 09-27 21:30:03 | 41 | 0 | 57 | not captured* | yes | yes (13:30:11Z) |
+| 09-27 21:31:53 | 41 | 1 | 59 | ok=1 | yes | yes (13:32:02Z) |
+| 09-27 21:39:43 | 49 | 0 | 62 | not captured* | yes | yes (13:39:53Z) |
+| 09-27 21:59:59 | 49 | 0 | 64 | ok=1 | yes | yes (14:00:12Z) |
+| 09-28 06:00:22 | 0 | 0 | 68 | not captured* | yes | yes (22:00:32Z) |
+| 09-28 06:30:03 | 0 | 0 | 70 | ok=1 | yes | yes (22:30:10Z) |
+| 09-28 07:00:03 | 0 | 0 | 72 | ok=1 | yes | yes (23:00:10Z) |
+| 09-28 07:22:53 | 0 | 1 | 74 | not captured* | yes | yes (23:23:00Z) |
+
+\* The capture dropped this report's `PubqEnqueue` lines. The report is still accounted for: its queue file is in the log (`readQueueFile N event=Ubidots-Sensor-Hook-v1`), followed by `publish success N` and `removed file N`, and its payload prefix in the log is identical to the AWS record's.
+
+**Totals:** 34 reports made since the flash, 34 delivered to AWS, **0 missing**. 32 of the 34 are in the serial log, and every one of them (queue files 7–74) has (b). Queue files 6–74 form a contiguous sequence, and every file logged `publish success` then `removed file` (32 reports, plus `pdiag`, `status`, `hibernate_wake`), with no publish failures. **No AWS report lacks a matching log line**, except the two that came before the capture began: 14:02:39 (checked earlier against the pasted serial output) and 14:08:07. No payload timestamp is duplicated in AWS.
+
+### 2. Sleep, every cycle
+
+36 sleep entries (35 `Sleep: ULP`, 1 `Sleep: HIBERNATE`); every wake in the log ended in one of them. Longest time awake: 20.7 s (a report plus a 16 s connect at 17:58). `GateFail`: 0. `GateBlock`: 0. `Gate: ok` × 33, with waits of 2.7–9.0 s; none near 120 s.
+
+### 3. The 22:00 close
+
+`Daily boundary reached (boundary=1790517600 last=1790480251 now=1790517603 close=22) - preparing dailyCleanup` at 22:00:03 SGT; one closing report stamped **21:59:59 SGT** with `dailyoccupancy=49` (the day's count; the last daytime report at 21:39:43 also had 49), delivered at 14:00:12Z. Then `Sleep: HIBERNATE reason=closed dur=28798s`. `hibernate_wake`: `result=ok wakeReason=ALARM req=28798 actual=28799`. The device woke at 06:00:22 SGT, and its first report was stamped 06:00:22 with `dailyoccupancy=0`; every report after it also had 0.
+
+### 4. Stability
+
+Two `status` events in the run: 06:03:02Z `resetReason=20` (the reboot after the local flash) and 22:00:31Z `resetReason=30` (the hibernate wake). `watchdogResetCount` stayed at 106 (a lifetime counter, unchanged), with no `watchdog` events. No brownouts (`resetReason` 50), no panics, no watchdog resets. `resets` stayed at 1 in every report.
+
+### 5. Unusual, filed as backlog (not investigated)
+
+- The hibernate teardown logged `[net.pppncp] ERROR: PPP error event data=5`, and the modem teardown took 7482 ms, against 2–9 ms on every other cycle. It happened once; the hibernate and the wake were both correct.
+- The serial capture dropped lines: 9 of the 32 reports in the log have no `PubqEnqueue` lines, and the file header's start time (19:17) doesn't match its content (from 14:26). This is capture tooling, not firmware; noted for future benches.
+- One `PowerDiag` line reported `source=USB_ADAPTER` among `USB_HOST` lines on the same USB bench supply.
+
 ## Approval record
 
 - [x] Codex investigation (Stage 4) — 2026-09-25, `gpt-6-astra` at reasoning `ultra`. Mechanism proven (queue removes PRIVATE-only publishes without a cloud ACK); incident cause unproven. Report and evidence in `WO-2026-09-25-001-stage4-codex/`. Repository verified unchanged by both Codex and Claude Code.
@@ -193,5 +261,5 @@ Model used: `gpt-6-astra`, reasoning `ultra` (its delegated sub-investigators in
 - [x] Two pre-authorized lines applied by Claude Code (Chip, 2026-09-27): `FIRMWARE_PRODUCT_VERSION` 24 → 25 (`src/FirmwareVersion.h:28`), and the release-side `GateBlock` logs `getNumEvents()` in place of a fixed `q=0` (`src/state/State_Sleep.cpp:633–634`, one statement inside `#if ENABLE_GATE_TRACE`). Diff delta: those two changes only. Suite 44/44 (sh via zsh, py via python3); `tests/publish_with_ack_structural_test.py` passes; local ARM build (boron) 150640 / 1090 / 2444.
 - [x] Stage 7 closed for decision 11 (Chip, 2026-09-27): **VERIFIED.** **Known limit, no library change:** `q=` (`getNumEvents()`) is off by one in two transient cases: −1 while a RAM event is in flight and another is still in RAM, and +1 right after a failed RAM send, until the queue picks its next event. Otherwise it is the total waiting. No further rounds on decision 11.
 - [x] Build type for v25 (Chip, 2026-09-27): **bench and release builds for v25 are local builds** (the vendored `lib/`, including PR #41, on Device OS 6.4.1) until WO-2026-09-26-001 aligns the build types. Guardrail 5 is satisfied: the bench build type matches the release build type. The vendored `PublishQueuePosixRK.{cpp,h}` and `BackgroundPublishRK.{cpp,h}` were confirmed byte-identical to registry 0.0.7 and 0.0.2 in fix-B Stage 6 round 1 (`WO-2026-09-25-001-stage6-copilot-report.md`, Deviations item 1, on `archive/wo-2026-09-25-001-round3`). Neither directory has changed since the initial import (`8f889ae`), so that check still holds for `c413e1e`.
-- [ ] Dev-14 bench — started 2026-09-27: local build of `bench/2026-09-25-001-diagD` (`c413e1e` plus diagnostic D, `FIRMWARE_VERSION` `v25-WithAck-DiagD`; 150808 / 1090 / 2444), flashed to `e00fce688e592afaf23ac4fb`. Cycles count from this flash. No reflash.
+- [x] Dev-14 bench — started 2026-09-27: local build of `bench/2026-09-25-001-diagD` (`c413e1e` plus diagnostic D, `FIRMWARE_VERSION` `v25-WithAck-DiagD`; 150808 / 1090 / 2444), flashed to `e00fce688e592afaf23ac4fb`. Cycles count from this flash. No reflash. **Result (Claude Code, 2026-09-28): PASS.** 34 reports made, 34 delivered to AWS, 0 missing; every cycle slept (36 sleep entries, 0 `GateFail`, longest gate wait 9.0 s); the 22:00 close was correct (closing report stamped 21:59:59 SGT with `dailyoccupancy=49`, then hibernate, wake 06:00:22, reports at 0); no unexplained resets. See "Bench result" above. Ubidots receipt itself was not checked directly.
 - [ ] Chip final gate / commit (Stage 8)
