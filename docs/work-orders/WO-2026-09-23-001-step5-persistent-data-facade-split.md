@@ -516,6 +516,13 @@ S3 reads of the `status`/`watchdog` event payloads.
 - The serial forwarder dropping lines (note 2) is filed as
   chipmc/local-serial-log-forwarder#1.
 - **Note 4:** pre-existing; fixed by WO-2026-09-24-001, next in sequence.
+- **WO-2026-09-23-003 closed as superseded (Chip, 2026-09-28).** Its two
+  diagnostic log lines (`lastConnection` write and `OccupancyWebhook`) were
+  never merged, and its branch `wo/2026-09-23-003-diagnostic-logging-step5`
+  is deleted, locally and on the remote. The `OccupancyWebhook` capture in
+  note 2 is not pursued. For reference, the WO-2026-09-25-001 bench
+  (2026-09-27/28, diagnostic D) logged every report's full payload over USB
+  serial and matched each one to its cloud record.
 
 ### Also observed (not Step 5)
 
