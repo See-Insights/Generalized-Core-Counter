@@ -1,0 +1,361 @@
+Compiling code for boron
+Targeting version: 6.4.1
+
+Including:
+    lib/AB1805_RK/src/AB1805_RK.cpp
+    lib/AB1805_RK/src/AB1805_RK.h
+    lib/BackgroundPublishRK/src/BackgroundPublishRK.cpp
+    lib/BackgroundPublishRK/src/BackgroundPublishRK.h
+    lib/DeviceInfoLedger/automated-test/ConfigTest.cpp
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/Particle.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/check.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/config.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/debug.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/endian_util.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/helpers.cpp
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/jsmn.c
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/jsmn.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/logging.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/panic.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/preprocessor.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/rng_hal.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/service_debug.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_error.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_fixed_point.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_flags.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_json.cpp
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_json.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_ledger.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_logging.cpp
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_logging.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_map.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_print.cpp
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_print.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_printable.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_stream.cpp
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_stream.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_string.cpp
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_string.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_time.cpp
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_time.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_variant.cpp
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_variant.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/spark_wiring_vector.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/string_convert.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/system_error.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/system_tick_hal.h
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/test1.cpp
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/time_compat.cpp
+    lib/DeviceInfoLedger/automated-test/UnitTestLib/time_compat.h
+    lib/DeviceInfoLedger/src/DeviceInfoLedger.cpp
+    lib/DeviceInfoLedger/src/DeviceInfoLedger.h
+    lib/LocalTimeRK/automated-test/TimeTest.cpp
+    lib/LocalTimeRK/automated-test/UnitTestLib/Particle.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/check.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/config.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/debug.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/endian_util.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/helpers.cpp
+    lib/LocalTimeRK/automated-test/UnitTestLib/jsmn.c
+    lib/LocalTimeRK/automated-test/UnitTestLib/jsmn.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/logging.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/panic.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/preprocessor.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/rng_hal.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/service_debug.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_error.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_fixed_point.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_flags.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_json.cpp
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_json.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_logging.cpp
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_logging.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_map.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_print.cpp
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_print.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_printable.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_stream.cpp
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_stream.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_string.cpp
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_string.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_time.cpp
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_time.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_variant.cpp
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_variant.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/spark_wiring_vector.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/string_convert.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/system_error.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/system_tick_hal.h
+    lib/LocalTimeRK/automated-test/UnitTestLib/test1.cpp
+    lib/LocalTimeRK/automated-test/UnitTestLib/time_compat.cpp
+    lib/LocalTimeRK/automated-test/UnitTestLib/time_compat.h
+    lib/LocalTimeRK/more-examples/Clock/src/Clock.cpp
+    lib/LocalTimeRK/src/LocalTimeRK.cpp
+    lib/LocalTimeRK/src/LocalTimeRK.h
+    lib/PublishQueuePosixRK/more-tests/automated-test/src/automated-test.cpp
+    lib/PublishQueuePosixRK/src/PublishQueuePosixRK.cpp
+    lib/PublishQueuePosixRK/src/PublishQueuePosixRK.h
+    lib/SequentialFileRK/src/SequentialFileRK.cpp
+    lib/SequentialFileRK/src/SequentialFileRK.h
+    lib/StorageHelperRK/automated-test/AutomatedTest.cpp
+    lib/StorageHelperRK/automated-test/UnitTestLib/Particle.h
+    lib/StorageHelperRK/automated-test/UnitTestLib/helpers.cpp
+    lib/StorageHelperRK/automated-test/UnitTestLib/jsmn.c
+    lib/StorageHelperRK/automated-test/UnitTestLib/jsmn.h
+    lib/StorageHelperRK/automated-test/UnitTestLib/rng_hal.h
+    lib/StorageHelperRK/automated-test/UnitTestLib/spark_wiring_flags.h
+    lib/StorageHelperRK/automated-test/UnitTestLib/spark_wiring_json.cpp
+    lib/StorageHelperRK/automated-test/UnitTestLib/spark_wiring_json.h
+    lib/StorageHelperRK/automated-test/UnitTestLib/spark_wiring_print.cpp
+    lib/StorageHelperRK/automated-test/UnitTestLib/spark_wiring_print.h
+    lib/StorageHelperRK/automated-test/UnitTestLib/spark_wiring_printable.h
+    lib/StorageHelperRK/automated-test/UnitTestLib/spark_wiring_stream.h
+    lib/StorageHelperRK/automated-test/UnitTestLib/spark_wiring_string.cpp
+    lib/StorageHelperRK/automated-test/UnitTestLib/spark_wiring_string.h
+    lib/StorageHelperRK/automated-test/UnitTestLib/spark_wiring_time.cpp
+    lib/StorageHelperRK/automated-test/UnitTestLib/spark_wiring_time.h
+    lib/StorageHelperRK/automated-test/UnitTestLib/string_convert.h
+    lib/StorageHelperRK/automated-test/UnitTestLib/system_tick_hal.h
+    lib/StorageHelperRK/automated-test/UnitTestLib/test1.cpp
+    lib/StorageHelperRK/automated-test/UnitTestLib/time_compat.cpp
+    lib/StorageHelperRK/automated-test/UnitTestLib/time_compat.h
+    lib/StorageHelperRK/more-examples/51-spiffs/src/51-spiffs.cpp
+    lib/StorageHelperRK/more-examples/52-sdfat/src/52-sdfat.cpp
+    lib/StorageHelperRK/more-examples/53-fram/src/53-fram.cpp
+    lib/StorageHelperRK/src/StorageHelperRK.cpp
+    lib/StorageHelperRK/src/StorageHelperRK.h
+    project.properties
+    src/BuildProfile.h
+    src/Config.cpp
+    src/Config.h
+    src/FirmwareVersion.h
+    src/Generalized-Core-Counter.cpp
+    src/MyPersistentData.cpp
+    src/MyPersistentData.h
+    src/ProjectConfig.h
+    src/Settings.h
+    src/ThrashGuard.cpp
+    src/ThrashGuard.h
+    src/Version.cpp
+    src/Version.h
+    src/cloud/BatteryBackoff.cpp
+    src/cloud/BatteryBackoffPolicy.h
+    src/cloud/Cloud.cpp
+    src/cloud/Cloud.h
+    src/cloud/ConfigApply.cpp
+    src/cloud/ConfigMerge.cpp
+    src/cloud/DeviceStatusPublisher.cpp
+    src/cloud/LedgerClient.cpp
+    src/cloud/Particle_Functions.cpp
+    src/cloud/Particle_Functions.h
+    src/device_pinout.cpp
+    src/device_pinout.h
+    src/diagnostics/ConnectivityFailsafeTest.cpp
+    src/diagnostics/ConnectivityFailsafeTest.h
+    src/observability/StartupSnapshot.cpp
+    src/observability/StartupSnapshot.h
+    src/observability/StartupSnapshotRuntime.cpp
+    src/observability/StartupSnapshotRuntime.h
+    src/observability/WakeCycleStats.cpp
+    src/observability/WakeCycleStats.h
+    src/persist/CurrentReadings.h
+    src/persist/PowerConfig.h
+    src/persist/RecoveryState.h
+    src/persist/SystemConfig.h
+    src/power/BatteryAuthority.cpp
+    src/power/BatteryAuthority.h
+    src/power/BatteryAuthorityCommand.cpp
+    src/power/BatteryAuthorityPolicy.cpp
+    src/power/BatteryAuthorityPolicy.h
+    src/power/BatteryHealth.cpp
+    src/power/BatteryHealth.h
+    src/power/ChargeInhibit.cpp
+    src/power/ChargeInhibit.h
+    src/power/ChargeInhibitPolicy.h
+    src/power/Connectivity.h
+    src/power/ConnectivityPolicy.h
+    src/power/PmicFaultMonitor.cpp
+    src/power/PmicFaultMonitor.h
+    src/power/PowerDiagnostics.cpp
+    src/power/PowerDiagnostics.h
+    src/power/PowerManager.cpp
+    src/power/PowerManager.h
+    src/power/PowerPlatform.cpp
+    src/power/PowerPlatform.h
+    src/power/PowerTier.cpp
+    src/power/PowerTier.h
+    src/provenance_probe.cpp
+    src/reporting/BatteryTierGuard.cpp
+    src/reporting/BatteryTierGuard.h
+    src/reporting/ReportingIntervalStore.cpp
+    src/reporting/ReportingIntervalStore.h
+    src/reporting/ReportingPolicy.cpp
+    src/reporting/ReportingPolicy.h
+    src/reporting/RuntimeReportingPolicy.cpp
+    src/sensors/ISensor.h
+    src/sensors/PIRSensor.cpp
+    src/sensors/PIRSensor.h
+    src/sensors/SensorData.h
+    src/sensors/SensorDefinitions.h
+    src/sensors/SensorFactory.h
+    src/sensors/SensorManager.cpp
+    src/sensors/SensorManager.h
+    src/state/SleepPrepSpanTiming.h
+    src/state/StateHandlers.cpp
+    src/state/StateHandlers.h
+    src/state/StateMachine.h
+    src/state/StateManager.h
+    src/state/State_Common.h
+    src/state/State_Connect.cpp
+    src/state/State_Error.cpp
+    src/state/State_Idle.cpp
+    src/state/State_Modes.cpp
+    src/state/State_Report.cpp
+    src/state/State_Sleep.cpp
+    src/time/Clock.cpp
+    src/time/Clock.h
+    src/time/ClockTrust.h
+    src/time/HibernateCycle.cpp
+    src/time/HibernateCycle.h
+    src/time/HibernateWakeDiagnostics.h
+    src/time/LocalTimeCache.cpp
+    src/time/LocalTimeCache.h
+    src/time/RtcSkewTest.h
+    tests/SensorManagerBatteryAuthorityTests.cpp
+    tests/battery_health_test.cpp
+    tests/battery_tier_guard_test.cpp
+    tests/charge_inhibit_thermal_test.cpp
+    tests/clock_openness_test.cpp
+    tests/clock_rtc_writeback_test.cpp
+    tests/clock_status_republish_test.cpp
+    tests/clock_trust_test.cpp
+    tests/hibernate_wake_diagnostics_test.cpp
+    tests/occupancy_start_time_clamp_test.cpp
+    tests/persistence_facade_behavior_test.cpp
+    tests/pmic_fault_monitor_test.cpp
+    tests/power_composition_test.cpp
+    tests/power_diagnostics_batch_test.cpp
+    tests/power_diagnostics_log_guard_test.cpp
+    tests/power_manager_accessors_test.cpp
+    tests/power_source_override_test.cpp
+    tests/power_tier_test.cpp
+    tests/reporting_policy_adapter_test.cpp
+    tests/reporting_policy_test.cpp
+    tests/rtc_skew_test.cpp
+    tests/sleep_prep_span_timing_test.cpp
+    tests/startup_snapshot_test.cpp
+    tests/stubs/Config.h
+    tests/stubs/MyPersistentData.h
+    tests/stubs/Particle.h
+    tests/stubs/clock_status_republish_overrides/CloudLinkStubs.cpp
+    tests/stubs/clock_status_republish_overrides/MyPersistentData.h
+    tests/stubs/clock_status_republish_overrides/Particle.h
+    tests/stubs/diag_overrides/Config.h
+    tests/stubs/diag_overrides/MyPersistentData.h
+    tests/stubs/diag_overrides/Particle.h
+    tests/stubs/diag_overrides/PublishQueuePosixRK.h
+    tests/stubs/diag_overrides/persist/CurrentReadings.h
+    tests/stubs/diag_overrides/persist/PowerConfig.h
+    tests/stubs/diag_overrides/persist/SystemConfig.h
+    tests/stubs/diag_overrides/power/PowerPlatform.h
+    tests/stubs/persist/CurrentReadings.h
+    tests/stubs/persist/PowerConfig.h
+    tests/stubs/persist/SystemConfig.h
+    tests/stubs/persistence_backend/Particle.h
+    tests/stubs/persistence_backend/StorageHelperRK.h
+    tests/stubs/pmic_fault_monitor_overrides/Config.h
+    tests/stubs/pmic_fault_monitor_overrides/MyPersistentData.h
+    tests/stubs/pmic_fault_monitor_overrides/Particle.h
+    tests/stubs/pmic_fault_monitor_overrides/device_pinout.h
+    tests/stubs/pmic_fault_monitor_overrides/observability/WakeCycleStats.h
+    tests/stubs/pmic_fault_monitor_overrides/persist/CurrentReadings.h
+    tests/stubs/pmic_fault_monitor_overrides/persist/PowerConfig.h
+    tests/stubs/pmic_fault_monitor_overrides/persist/RecoveryState.h
+    tests/stubs/pmic_fault_monitor_overrides/persist/SystemConfig.h
+    tests/stubs/pmic_fault_monitor_overrides/power/PowerDiagnostics.h
+    tests/stubs/pmic_fault_monitor_overrides/power/PowerPlatform.h
+    tests/stubs/power/PowerDiagnostics.h
+    tests/stubs/power/PowerPlatform.h
+    tests/stubs/power_composition_overrides/MyPersistentData.h
+    tests/stubs/power_composition_overrides/Particle.h
+    tests/stubs/power_composition_overrides/power/PowerDiagnostics.h
+    tests/stubs/power_source_override_overrides/Config.h
+    tests/stubs/power_source_override_overrides/MyPersistentData.h
+    tests/stubs/power_source_override_overrides/Particle.h
+    tests/stubs/power_source_override_overrides/cloud/CloudTestShim.cpp
+    tests/stubs/power_source_override_overrides/device_pinout.h
+    tests/stubs/power_source_override_overrides/observability/StartupSnapshotRuntime.h
+    tests/stubs/power_source_override_overrides/observability/WakeCycleStats.h
+    tests/stubs/power_source_override_overrides/persist/CurrentReadings.h
+    tests/stubs/power_source_override_overrides/persist/PowerConfig.h
+    tests/stubs/power_source_override_overrides/persist/RecoveryState.h
+    tests/stubs/power_source_override_overrides/persist/SystemConfig.h
+    tests/stubs/power_source_override_overrides/power/PowerDiagnostics.h
+    tests/stubs/power_source_override_overrides/power/PowerPlatform.h
+    tests/stubs/power_source_override_overrides/reporting/ReportingPolicy.h
+    tests/stubs/power_source_override_overrides/sensors/SensorManager.h
+    tests/stubs/power_source_override_overrides/state/StateMachine.h
+    tests/stubs/reporting_policy_adapter_overrides/Config.h
+    tests/stubs/reporting_policy_adapter_overrides/Particle.h
+    tests/stubs/reporting_policy_adapter_overrides/power/BatteryAuthority.h
+    tests/stubs/reporting_policy_adapter_overrides/reporting/ReportingIntervalStore.h
+    tests/stubs/reporting_policy_adapter_overrides/sensors/SensorManager.h
+    tests/stubs/reporting_policy_adapter_overrides/state/State_Common.h
+    tests/stubs/reporting_policy_adapter_overrides/time/Clock.h
+    tests/thermal_threshold_migration_test.cpp
+    tests/watchdog_ab1805_classification_test.cpp
+    tests/watchdog_alert_code_test.cpp
+
+
+Checking library StorageHelperRK...
+Checking library AB1805_RK...
+Checking library LocalTimeRK...
+Checking library PublishQueuePosixRK...
+Installing library PublishQueuePosixRK 0.0.7 to lib/PublishQueuePosixRK ...
+Installing library StorageHelperRK 0.0.5 to lib/StorageHelperRK ...
+Installing library LocalTimeRK 0.1.3 to lib/LocalTimeRK ...
+Installing library AB1805_RK 0.0.4 to lib/AB1805_RK ...
+Library PublishQueuePosixRK 0.0.7 installed.
+Checking library SequentialFileRK...
+Checking library BackgroundPublishRK...
+Library AB1805_RK 0.0.4 installed.
+Installing library SequentialFileRK 0.0.2 to lib/SequentialFileRK ...
+Installing library BackgroundPublishRK 0.0.2 to lib/BackgroundPublishRK ...
+Library StorageHelperRK 0.0.5 installed.
+Library BackgroundPublishRK 0.0.2 installed.
+Library LocalTimeRK 0.1.3 installed.
+Library SequentialFileRK 0.0.2 installed.
+make -C ../modules/boron/user-part all
+make[1]: Entering directory `/firmware/modules/boron/user-part'
+
+mkdir -p target/
+make -f ../../../modules/shared/nRF52840/build_linker_script.mk PREBUILD=1
+make[2]: Entering directory `/firmware/modules/boron/user-part'
+Creating target/platform_user_ram.ld ...
+make[2]: Leaving directory `/firmware/modules/boron/user-part'
+
+make -C ../../../user 
+make[2]: Entering directory `/firmware/user'
+Building cpp file: src/Generalized-Core-Counter.cpp
+Invoking: ARM GCC CPP Compiler
+mkdir -p ../build/target/user/platform-13-msrc/
+arm-none-eabi-gcc -DMCU_DEVICE -DnRF52840 -DNRF52840_XXAA -DPLATFORM_THREADING=1 -DPLATFORM_ID=13 -DPLATFORM_NAME=boron -DPLATFORM_GEN=3 -DUSBD_VID_PARTICLE=0x2B04 -DUSBD_PID_DFU=0xD00D -DUSBD_PID_CDC=0xC00D -DSPARK_PLATFORM -fno-builtin-puts -fno-builtin-printf -Wl,--wrap=puts -Wl,--wrap=printf -Wl,--wrap=_printf_i -Wl,--wrap=_svfprintf_r -Wl,--wrap=_scanf_i -Wl,--wrap=__ssvfscanf_r -g3 -gdwarf-2 -Os -mcpu=cortex-m4 -mthumb -mabi=aapcs -mfloat-abi=hard -mfpu=fpv4-sp-d16 -DARM_CPU_CORTEX_M4 --specs=nano.specs -DINCLUDE_PLATFORM=1 -DSOFTDEVICE_PRESENT=1 -DS140 -DPRODUCT_ID=13 -DPRODUCT_FIRMWARE_VERSION=65535 -D_WIZCHIP_=W5500 -DUSE_STDPERIPH_DRIVER -DDFU_BUILD_ENABLE -DLFS_CONFIG=lfs_config.h -DSYSTEM_VERSION_STRING=6.4.1 -DRELEASE_BUILD -I./inc -I../wiring/inc -I../system/inc -I../services/inc -I../third_party/nanopb/nanopb -I../communication/inc -I../hal/inc -I../hal/src/boron -I../hal/network/lwip/cellular -I../hal/src/nRF52840 -I../hal/src/armv7 -I../hal/src/portable/FreeRTOS -I../hal/src/nRF52840 -I../hal/src/nRF52840/lwip -I../hal/src/nRF52840/freertos -I../hal/src/nRF52840/mbedtls -I../hal/src/nRF52840/littlefs -I../hal -I../hal/src/nRF52840/posix -I../hal/network -I../hal/network/api -I../hal/network/lwip -I../hal/network/lwip/posix -I../hal/network/lwip/wiznet -I../hal/network/ncp -I../hal/network/ncp/at_parser -I../hal/network/util -I../third_party/lwip/lwip/src/include -I../third_party/freertos/freertos/FreeRTOS/Source/include -I../third_party/nrf5_sdk/nrf5_sdk/external/freertos/portable/GCC/nrf52 -I../third_party/nrf5_sdk/nrf5_sdk/external/freertos/portable/CMSIS/nrf52 -I../third_party/wiznet_driver/wiznet_driver/Ethernet -I../gsm0710muxer/gsm0710muxer/include -I../hal/shared -I../platform/shared/inc -I../third_party/nrf5_sdk -I../third_party/nrf5_sdk/nrf5_sdk/components/toolchain/cmsis/include -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/drivers -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/drivers/include -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/hal -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/mdk -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/hal -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/drivers/src/prs -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/util -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/s140/headers -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/s140/headers/nrf52 -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/common -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/mbr/nrf52840/headers -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/fstorage -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/experimental_section_vars -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/atomic -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/crc32 -I../third_party/nrf5_sdk/nrf5_sdk/integration/nrfx/legacy -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/delay -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/log -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/log -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/log/src -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/experimental_section_vars -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/atomic -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/delay -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/queue -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/common -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/s140 -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/s140/headers -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/s140/headers/nrf52 -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/fifo -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/atomic_fifo -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/strerror -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/fstorage -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/atomic_flags -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/usbd -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/usbd/class/cdc -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/usbd/class/cdc/acm -I../third_party/nrf5_sdk/nrf5_sdk/components/ble/common -I../third_party/nrf5_sdk/nrf5_sdk/components/ble/nrf_ble_gatt -I../third_party/nrf5_sdk/nrf5_sdk/components/ble/ble_advertising -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/t2t_lib -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/platform -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/ndef/generic/message -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/ndef/generic/record -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/ndef/lauchapp -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/ndef/text -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/ndef/uri -I../third_party/nrf5_sdk/nrf5_sdk/external/nrf_cc310/include -I../third_party/nrf5_sdk/nrf5_sdk/external/utf_converter -I../third_party/littlefs/littlefs -I../third_party/miniz/miniz -I../platform/MCU/nRF52840/inc -I../dynalib/inc -I../hal/shared -Isrc -I./libraries -Ilib/LocalTimeRK/src -Ilib/SequentialFileRK/src -Ilib/PublishQueuePosixRK/src -Ilib/BackgroundPublishRK/src -Ilib/StorageHelperRK/src -Ilib/DeviceInfoLedger/src -Ilib/AB1805_RK/src -I. -MD -MP -MF ../build/target/user/platform-13-msrc/Generalized-Core-Counter.o.d -ffunction-sections -fdata-sections -Wall -Wno-switch -fmessage-length=0 -Wno-error=deprecated-declarations -Wno-error=unused-parameter -Wdeprecated-declarations -Wimplicit-fallthrough=2 -Wno-expansion-to-defined -Wno-cast-function-type -Wno-unused-parameter -Wno-error=type-limits -fno-strict-aliasing -DSPARK=1 -DPARTICLE=1 -Werror=return-type -Wundef -DSTART_DFU_FLASHER_SERIAL_SPEED=14400 -DSPARK_PLATFORM_NET=UBLOXSARA -fno-builtin-malloc -fno-builtin-free -fno-builtin-realloc  -DLOG_INCLUDE_SOURCE_INFO=1 -DPARTICLE_USER_MODULE -DUSER_FIRMWARE_IMAGE_SIZE=0x40000 -DUSER_FIRMWARE_IMAGE_LOCATION=0xB4000 -DMODULAR_FIRMWARE=1 -DMODULE_VERSION=10 -DMODULE_FUNCTION=5 -DMODULE_INDEX=2 -DMODULE_DEPENDENCY=4,1,6401 -DMODULE_DEPENDENCY2=0,0,0 -D_GNU_SOURCE -DLOG_MODULE_CATEGORY="\"app\""  -fno-exceptions -fno-rtti -fcheck-new -flto -ffat-lto-objects -DPARTICLE_COMPILE_LTO_FAT -fno-use-cxa-atexit -std=gnu++17 -D__FILE_NAME__=\"Generalized-Core-Counter.cpp\" -c -o ../build/target/user/platform-13-msrc/Generalized-Core-Counter.o src/Generalized-Core-Counter.cpp
+
+Building cpp file: src/MyPersistentData.cpp
+Invoking: ARM GCC CPP Compiler
+mkdir -p ../build/target/user/platform-13-msrc/
+arm-none-eabi-gcc -DMCU_DEVICE -DnRF52840 -DNRF52840_XXAA -DPLATFORM_THREADING=1 -DPLATFORM_ID=13 -DPLATFORM_NAME=boron -DPLATFORM_GEN=3 -DUSBD_VID_PARTICLE=0x2B04 -DUSBD_PID_DFU=0xD00D -DUSBD_PID_CDC=0xC00D -DSPARK_PLATFORM -fno-builtin-puts -fno-builtin-printf -Wl,--wrap=puts -Wl,--wrap=printf -Wl,--wrap=_printf_i -Wl,--wrap=_svfprintf_r -Wl,--wrap=_scanf_i -Wl,--wrap=__ssvfscanf_r -g3 -gdwarf-2 -Os -mcpu=cortex-m4 -mthumb -mabi=aapcs -mfloat-abi=hard -mfpu=fpv4-sp-d16 -DARM_CPU_CORTEX_M4 --specs=nano.specs -DINCLUDE_PLATFORM=1 -DSOFTDEVICE_PRESENT=1 -DS140 -DPRODUCT_ID=13 -DPRODUCT_FIRMWARE_VERSION=65535 -D_WIZCHIP_=W5500 -DUSE_STDPERIPH_DRIVER -DDFU_BUILD_ENABLE -DLFS_CONFIG=lfs_config.h -DSYSTEM_VERSION_STRING=6.4.1 -DRELEASE_BUILD -I./inc -I../wiring/inc -I../system/inc -I../services/inc -I../third_party/nanopb/nanopb -I../communication/inc -I../hal/inc -I../hal/src/boron -I../hal/network/lwip/cellular -I../hal/src/nRF52840 -I../hal/src/armv7 -I../hal/src/portable/FreeRTOS -I../hal/src/nRF52840 -I../hal/src/nRF52840/lwip -I../hal/src/nRF52840/freertos -I../hal/src/nRF52840/mbedtls -I../hal/src/nRF52840/littlefs -I../hal -I../hal/src/nRF52840/posix -I../hal/network -I../hal/network/api -I../hal/network/lwip -I../hal/network/lwip/posix -I../hal/network/lwip/wiznet -I../hal/network/ncp -I../hal/network/ncp/at_parser -I../hal/network/util -I../third_party/lwip/lwip/src/include -I../third_party/freertos/freertos/FreeRTOS/Source/include -I../third_party/nrf5_sdk/nrf5_sdk/external/freertos/portable/GCC/nrf52 -I../third_party/nrf5_sdk/nrf5_sdk/external/freertos/portable/CMSIS/nrf52 -I../third_party/wiznet_driver/wiznet_driver/Ethernet -I../gsm0710muxer/gsm0710muxer/include -I../hal/shared -I../platform/shared/inc -I../third_party/nrf5_sdk -I../third_party/nrf5_sdk/nrf5_sdk/components/toolchain/cmsis/include -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/drivers -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/drivers/include -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/hal -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/mdk -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/hal -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/drivers/src/prs -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/util -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/s140/headers -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/s140/headers/nrf52 -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/common -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/mbr/nrf52840/headers -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/fstorage -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/experimental_section_vars -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/atomic -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/crc32 -I../third_party/nrf5_sdk/nrf5_sdk/integration/nrfx/legacy -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/delay -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/log -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/log -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/log/src -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/experimental_section_vars -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/atomic -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/delay -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/queue -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/common -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/s140 -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/s140/headers -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/s140/headers/nrf52 -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/fifo -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/atomic_fifo -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/strerror -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/fstorage -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/atomic_flags -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/usbd -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/usbd/class/cdc -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/usbd/class/cdc/acm -I../third_party/nrf5_sdk/nrf5_sdk/components/ble/common -I../third_party/nrf5_sdk/nrf5_sdk/components/ble/nrf_ble_gatt -I../third_party/nrf5_sdk/nrf5_sdk/components/ble/ble_advertising -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/t2t_lib -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/platform -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/ndef/generic/message -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/ndef/generic/record -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/ndef/lauchapp -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/ndef/text -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/ndef/uri -I../third_party/nrf5_sdk/nrf5_sdk/external/nrf_cc310/include -I../third_party/nrf5_sdk/nrf5_sdk/external/utf_converter -I../third_party/littlefs/littlefs -I../third_party/miniz/miniz -I../platform/MCU/nRF52840/inc -I../dynalib/inc -I../hal/shared -Isrc -I./libraries -Ilib/LocalTimeRK/src -Ilib/SequentialFileRK/src -Ilib/PublishQueuePosixRK/src -Ilib/BackgroundPublishRK/src -Ilib/StorageHelperRK/src -Ilib/DeviceInfoLedger/src -Ilib/AB1805_RK/src -I. -MD -MP -MF ../build/target/user/platform-13-msrc/MyPersistentData.o.d -ffunction-sections -fdata-sections -Wall -Wno-switch -fmessage-length=0 -Wno-error=deprecated-declarations -Wno-error=unused-parameter -Wdeprecated-declarations -Wimplicit-fallthrough=2 -Wno-expansion-to-defined -Wno-cast-function-type -Wno-unused-parameter -Wno-error=type-limits -fno-strict-aliasing -DSPARK=1 -DPARTICLE=1 -Werror=return-type -Wundef -DSTART_DFU_FLASHER_SERIAL_SPEED=14400 -DSPARK_PLATFORM_NET=UBLOXSARA -fno-builtin-malloc -fno-builtin-free -fno-builtin-realloc  -DLOG_INCLUDE_SOURCE_INFO=1 -DPARTICLE_USER_MODULE -DUSER_FIRMWARE_IMAGE_SIZE=0x40000 -DUSER_FIRMWARE_IMAGE_LOCATION=0xB4000 -DMODULAR_FIRMWARE=1 -DMODULE_VERSION=10 -DMODULE_FUNCTION=5 -DMODULE_INDEX=2 -DMODULE_DEPENDENCY=4,1,6401 -DMODULE_DEPENDENCY2=0,0,0 -D_GNU_SOURCE -DLOG_MODULE_CATEGORY="\"app\""  -fno-exceptions -fno-rtti -fcheck-new -flto -ffat-lto-objects -DPARTICLE_COMPILE_LTO_FAT -fno-use-cxa-atexit -std=gnu++17 -D__FILE_NAME__=\"MyPersistentData.cpp\" -c -o ../build/target/user/platform-13-msrc/MyPersistentData.o src/MyPersistentData.cpp
+
+Building cpp file: src/provenance_probe.cpp
+Invoking: ARM GCC CPP Compiler
+mkdir -p ../build/target/user/platform-13-msrc/
+arm-none-eabi-gcc -DMCU_DEVICE -DnRF52840 -DNRF52840_XXAA -DPLATFORM_THREADING=1 -DPLATFORM_ID=13 -DPLATFORM_NAME=boron -DPLATFORM_GEN=3 -DUSBD_VID_PARTICLE=0x2B04 -DUSBD_PID_DFU=0xD00D -DUSBD_PID_CDC=0xC00D -DSPARK_PLATFORM -fno-builtin-puts -fno-builtin-printf -Wl,--wrap=puts -Wl,--wrap=printf -Wl,--wrap=_printf_i -Wl,--wrap=_svfprintf_r -Wl,--wrap=_scanf_i -Wl,--wrap=__ssvfscanf_r -g3 -gdwarf-2 -Os -mcpu=cortex-m4 -mthumb -mabi=aapcs -mfloat-abi=hard -mfpu=fpv4-sp-d16 -DARM_CPU_CORTEX_M4 --specs=nano.specs -DINCLUDE_PLATFORM=1 -DSOFTDEVICE_PRESENT=1 -DS140 -DPRODUCT_ID=13 -DPRODUCT_FIRMWARE_VERSION=65535 -D_WIZCHIP_=W5500 -DUSE_STDPERIPH_DRIVER -DDFU_BUILD_ENABLE -DLFS_CONFIG=lfs_config.h -DSYSTEM_VERSION_STRING=6.4.1 -DRELEASE_BUILD -I./inc -I../wiring/inc -I../system/inc -I../services/inc -I../third_party/nanopb/nanopb -I../communication/inc -I../hal/inc -I../hal/src/boron -I../hal/network/lwip/cellular -I../hal/src/nRF52840 -I../hal/src/armv7 -I../hal/src/portable/FreeRTOS -I../hal/src/nRF52840 -I../hal/src/nRF52840/lwip -I../hal/src/nRF52840/freertos -I../hal/src/nRF52840/mbedtls -I../hal/src/nRF52840/littlefs -I../hal -I../hal/src/nRF52840/posix -I../hal/network -I../hal/network/api -I../hal/network/lwip -I../hal/network/lwip/posix -I../hal/network/lwip/wiznet -I../hal/network/ncp -I../hal/network/ncp/at_parser -I../hal/network/util -I../third_party/lwip/lwip/src/include -I../third_party/freertos/freertos/FreeRTOS/Source/include -I../third_party/nrf5_sdk/nrf5_sdk/external/freertos/portable/GCC/nrf52 -I../third_party/nrf5_sdk/nrf5_sdk/external/freertos/portable/CMSIS/nrf52 -I../third_party/wiznet_driver/wiznet_driver/Ethernet -I../gsm0710muxer/gsm0710muxer/include -I../hal/shared -I../platform/shared/inc -I../third_party/nrf5_sdk -I../third_party/nrf5_sdk/nrf5_sdk/components/toolchain/cmsis/include -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/drivers -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/drivers/include -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/hal -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/mdk -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/hal -I../third_party/nrf5_sdk/nrf5_sdk/modules/nrfx/drivers/src/prs -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/util -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/s140/headers -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/s140/headers/nrf52 -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/common -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/mbr/nrf52840/headers -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/fstorage -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/experimental_section_vars -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/atomic -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/crc32 -I../third_party/nrf5_sdk/nrf5_sdk/integration/nrfx/legacy -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/delay -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/log -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/log -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/log/src -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/experimental_section_vars -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/atomic -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/delay -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/queue -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/common -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/s140 -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/s140/headers -I../third_party/nrf5_sdk/nrf5_sdk/components/softdevice/s140/headers/nrf52 -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/fifo -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/atomic_fifo -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/strerror -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/fstorage -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/atomic_flags -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/usbd -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/usbd/class/cdc -I../third_party/nrf5_sdk/nrf5_sdk/components/libraries/usbd/class/cdc/acm -I../third_party/nrf5_sdk/nrf5_sdk/components/ble/common -I../third_party/nrf5_sdk/nrf5_sdk/components/ble/nrf_ble_gatt -I../third_party/nrf5_sdk/nrf5_sdk/components/ble/ble_advertising -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/t2t_lib -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/platform -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/ndef/generic/message -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/ndef/generic/record -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/ndef/lauchapp -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/ndef/text -I../third_party/nrf5_sdk/nrf5_sdk/components/nfc/ndef/uri -I../third_party/nrf5_sdk/nrf5_sdk/external/nrf_cc310/include -I../third_party/nrf5_sdk/nrf5_sdk/external/utf_converter -I../third_party/littlefs/littlefs -I../third_party/miniz/miniz -I../platform/MCU/nRF52840/inc -I../dynalib/inc -I../hal/shared -Isrc -I./libraries -Ilib/LocalTimeRK/src -Ilib/SequentialFileRK/src -Ilib/PublishQueuePosixRK/src -Ilib/BackgroundPublishRK/src -Ilib/StorageHelperRK/src -Ilib/DeviceInfoLedger/src -Ilib/AB1805_RK/src -I. -MD -MP -MF ../build/target/user/platform-13-msrc/provenance_probe.o.d -ffunction-sections -fdata-sections -Wall -Wno-switch -fmessage-length=0 -Wno-error=deprecated-declarations -Wno-error=unused-parameter -Wdeprecated-declarations -Wimplicit-fallthrough=2 -Wno-expansion-to-defined -Wno-cast-function-type -Wno-unused-parameter -Wno-error=type-limits -fno-strict-aliasing -DSPARK=1 -DPARTICLE=1 -Werror=return-type -Wundef -DSTART_DFU_FLASHER_SERIAL_SPEED=14400 -DSPARK_PLATFORM_NET=UBLOXSARA -fno-builtin-malloc -fno-builtin-free -fno-builtin-realloc  -DLOG_INCLUDE_SOURCE_INFO=1 -DPARTICLE_USER_MODULE -DUSER_FIRMWARE_IMAGE_SIZE=0x40000 -DUSER_FIRMWARE_IMAGE_LOCATION=0xB4000 -DMODULAR_FIRMWARE=1 -DMODULE_VERSION=10 -DMODULE_FUNCTION=5 -DMODULE_INDEX=2 -DMODULE_DEPENDENCY=4,1,6401 -DMODULE_DEPENDENCY2=0,0,0 -D_GNU_SOURCE -DLOG_MODULE_CATEGORY="\"app\""  -fno-exceptions -fno-rtti -fcheck-new -flto -ffat-lto-objects -DPARTICLE_COMPILE_LTO_FAT -fno-use-cxa-atexit -std=gnu++17 -D__FILE_NAME__=\"provenance_probe.cpp\" -c -o ../build/target/user/platform-13-msrc/provenance_probe.o src/provenance_probe.cpp
+src/provenance_probe.cpp:4:44: error: static assertion failed: PROVENANCE: AB1805 OMODE=0x01 (registry AB1805_RK 0.0.4 - PR #41 ABSENT)
+    4 | static_assert(AB1805::REG_OSC_STATUS_OMODE != 0x01, "PROVENANCE: AB1805 OMODE=0x01 (registry AB1805_RK 0.0.4 - PR #41 ABSENT)");
+      |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~
+make[2]: *** [../build/target/user/platform-13-msrc/provenance_probe.o] Error 1
+make[2]: Leaving directory `/firmware/user'
+make[1]: *** [user] Error 2
+make[1]: Leaving directory `/firmware/modules/boron/user-part'
+make: *** [modules/boron/user-part] Error 2
+Compile failed: Compiler encountered an error

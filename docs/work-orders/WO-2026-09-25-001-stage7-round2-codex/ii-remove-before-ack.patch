@@ -1,0 +1,13 @@
+--- lib/PublishQueuePosixRK/src/PublishQueuePosixRK.cpp
++++ lib/PublishQueuePosixRK/src/PublishQueuePosixRK.cpp
+@@ -336,6 +336,10 @@
+             [this](bool succeeded, const char *eventName, const char *eventData, const void *context) {
+                 publishCompleteCallback(succeeded, eventName, eventData);
+             })) {
++            if (curFileNum) {
++                fileQueue.getFileFromQueue(true);
++                fileQueue.removeFileNum(curFileNum, false);
++            }
+             // Successfully started publish
+             // WO-2026-09-25-001: one Particle.publish() has now been started for this
+             // event. Reported from the application thread, not the publish worker.

@@ -2058,7 +2058,7 @@ void publishData(time_t stampOverride) {
 
   setAppBreadcrumb(BREADCRUMB_REPORT_QUEUE_START);
   const unsigned long queueStartMs = millis();
-  bool queued = PublishQueuePosix::instance().publish(webhookName, data, PRIVATE);
+  bool queued = PublishQueuePosix::instance().publish(webhookName, data, PRIVATE | WITH_ACK);
   const unsigned long queueElapsedMs = millis() - queueStartMs;
   setAppBreadcrumb(BREADCRUMB_REPORT_QUEUE_DONE);
   if (!queued) {
@@ -2126,14 +2126,14 @@ void publishData(time_t stampOverride) {
   }
 
   if (sensorMode == SystemConfig::OCCUPANCY) {
-    Log.info("Report: occ=%d totalMin=%lu alert=%d q=%d ledger=%s",
+    Log.info("Report: occ=%d totalMin=%lu alert=%d ok=%d ledger=%s",
              CurrentReadings::get_occupied() ? 1 : 0,
              (unsigned long)(CurrentReadings::get_totalOccupiedSeconds() / 60UL),
              (int)reportedAlertCode,
              queued ? 1 : 0,
              ledgerState);
   } else {
-    Log.info("Report: hourly=%d daily=%d alert=%d q=%d ledger=%s",
+    Log.info("Report: hourly=%d daily=%d alert=%d ok=%d ledger=%s",
              (int)CurrentReadings::get_hourlyCount(),
              (int)CurrentReadings::get_dailyCount(),
              (int)reportedAlertCode,
@@ -2280,7 +2280,7 @@ void publishStartupStatus() {
            pinResetAb1805Fields);
 #endif
 
-  PublishQueuePosix::instance().publish("status", status, PRIVATE);
+  PublishQueuePosix::instance().publish("status", status, PRIVATE | WITH_ACK);
 }
 
 /**
@@ -2320,7 +2320,7 @@ void publishWatchdogForensics(bool ab1805Confirmed) {
            (unsigned)startupPreviousState,
            (unsigned long)startupPreviousMillisSinceLastCloudConnect);
 
-  PublishQueuePosix::instance().publish("watchdog", payload, PRIVATE);
+  PublishQueuePosix::instance().publish("watchdog", payload, PRIVATE | WITH_ACK);
 }
 
 /**
@@ -2355,7 +2355,7 @@ void publishHibernateWakeForensics(const HibernateWakeDiagnostics::EventFields &
     return;
   }
 
-  if (!PublishQueuePosix::instance().publish("hibernate_wake", payload, PRIVATE)) {
+  if (!PublishQueuePosix::instance().publish("hibernate_wake", payload, PRIVATE | WITH_ACK)) {
     Log.warn("HibernateWake forensic event publish() returned false (queue full or not ready)");
   }
 }
@@ -2468,7 +2468,7 @@ bool publishDiagnosticSafe(const char* eventName, const char* data, PublishFlags
   }
   
   // Queue has capacity; safe to add diagnostic message
-  PublishQueuePosix::instance().publish(eventName, data, flags);
+  PublishQueuePosix::instance().publish(eventName, data, flags | WITH_ACK);
   return true;
 }
 

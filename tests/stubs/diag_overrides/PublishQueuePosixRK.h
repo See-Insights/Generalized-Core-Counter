@@ -9,6 +9,7 @@
 
 constexpr int PRIVATE = 0;
 constexpr int PUBLIC = 1;
+constexpr int WITH_ACK = 8;
 
 class PublishQueuePosix {
 public:

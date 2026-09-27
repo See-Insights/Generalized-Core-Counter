@@ -1,0 +1,3 @@
+event_fw_version,s3_deliveries,observed_report_lines,matched_observed_reports,unmatched_observed_reports,observed_cohort_unmatched_percent,true_fleet_loss_rate
+21,4491,0,0,0,,not identifiable
+24,1501,115,105,10,8.7,not identifiable

@@ -559,7 +559,7 @@ void handleSleepingState() {
         Log.info("GateBlock: wait=%lu reason=%s q=%d ledger=%d webhook=%d update=%d",
                  elapsedMs,
                  gateBlockerReasonLabel(blockerMask),
-                 queuePending,
+                 (int)queueDepth,
                  ledgerPending,
                  webhookPending,
                  updatePending);
@@ -572,7 +572,7 @@ void handleSleepingState() {
             (millis() - lastGateStatusLogMs) >= ConnectivityPolicy::CLOUD_OPS_STATUS_LOG_INTERVAL_MS) {
 #if ENABLE_GATE_TRACE
           Log.info("Gate: q=%d ledger=%d webhook=%d update=%d wait=%lu/%lu",
-                   queuePending,
+                   (int)queueDepth,
                    ledgerPending,
                    webhookPending,
                    updatePending,
@@ -595,7 +595,7 @@ void handleSleepingState() {
        Log.warn("GateFail: reason=%s timeout=%lu q=%d ledger=%d webhook=%d update=%d",
           gateFailReason,
           cloudSyncBudgetMs,
-          queuePending,
+          (int)queueDepth,
           ledgerPending,
           webhookPending,
           updatePending);
@@ -631,8 +631,8 @@ void handleSleepingState() {
       unsigned long gateWaitMs = millis() - cloudSyncStartMs;
       if (gateWaitMs > kGateBlockLogThresholdMs && lastGateBlockerMask != 0) {
 #if ENABLE_GATE_TRACE
-        Log.info("GateBlock: wait=%lu reason=none q=0 ledger=0 webhook=0 update=0",
-                 gateWaitMs);
+        Log.info("GateBlock: wait=%lu reason=none q=%u ledger=0 webhook=0 update=0",
+                 gateWaitMs, (unsigned)PublishQueuePosix::instance().getNumEvents());
 #endif
         lastGateBlockerMask = 0;
       }

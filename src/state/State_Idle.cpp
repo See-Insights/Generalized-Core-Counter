@@ -226,16 +226,8 @@ void handleIdleState() {
 
     // In low-power mode, once all work for this connection cycle is
     // complete (no updates pending), we can safely enter SLEEPING_STATE
-    // to turn off the radio and save power. We only require the publish
-    // queue to be fully drained when we are actually connected; when
-    // offline, it's expected to have a non-zero queue and we still want
-    // to sleep, flushing the queue on the next connection.
-    bool canSleepGate = true;
-    if (Particle.connected()) {
-      canSleepGate = PublishQueuePosix::instance().getCanSleep();
-    }
-
-    if (!updatesPending && canSleepGate) {
+    // to turn off the radio and save power.
+    if (!updatesPending) {
       // If a sensor event is still pending or the BLUE LED is still on
       // from a recent count, defer transitioning into the SLEEPING_STATE.
       // This avoids rapid Idle<->Sleeping ping-pong and the associated
@@ -255,7 +247,8 @@ void handleIdleState() {
         Log.info("Low-power idle: offline with %u queued event(s) - sleeping and will flush on next connect",
                  (unsigned)pending);
       } else {
-        Log.info("Low-power idle: queue drained and no updates pending - entering SLEEPING_STATE");
+        Log.info("Low-power idle: no updates pending - handing queue (q=%u) to sleep gate",
+                 (unsigned)pending);
       }
       transitionTo(SLEEPING_STATE, "low power idle");
       return; // Go back to sleep when there's no work this hour

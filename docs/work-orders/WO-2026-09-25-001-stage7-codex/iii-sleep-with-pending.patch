@@ -1,0 +1,11 @@
+--- src/state/State_Sleep.cpp
++++ src/state/State_Sleep.cpp
+@@ -509,7 +509,7 @@
+       lastQueueDepth = queueDepth;
+     }
+ 
+-    bool allComplete = queueEmpty && ledgersSynced && updatesChecked && webhookConfirmed;
++    bool allComplete = ledgersSynced && updatesChecked && webhookConfirmed;
+ 
+     if (!allComplete) {
+       unsigned long elapsedMs = millis() - cloudSyncStartMs;
