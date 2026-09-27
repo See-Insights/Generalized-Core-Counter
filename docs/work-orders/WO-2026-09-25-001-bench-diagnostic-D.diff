@@ -1,0 +1,29 @@
+diff --git a/src/Generalized-Core-Counter.cpp b/src/Generalized-Core-Counter.cpp
+index 1977736..562ff26 100644
+--- a/src/Generalized-Core-Counter.cpp
++++ b/src/Generalized-Core-Counter.cpp
+@@ -2059,6 +2059,12 @@ void publishData(time_t stampOverride) {
+   setAppBreadcrumb(BREADCRUMB_REPORT_QUEUE_START);
+   const unsigned long queueStartMs = millis();
+   bool queued = PublishQueuePosix::instance().publish(webhookName, data, PRIVATE | WITH_ACK);
++  // BENCH-ONLY (WO-2026-09-25-001): log exactly what was handed to the queue, in chunks under the 160-char log limit.
++  const size_t pubqLen = strlen(data);
++  Log.info("PubqEnqueue: name=%s len=%u ok=%d", webhookName, (unsigned)pubqLen, queued ? 1 : 0);
++  for (size_t off = 0, i = 1, n = (pubqLen + 99) / 100; off < pubqLen; off += 100, i++) {
++    Log.info("PubqEnqueue: data[%u/%u]=%.*s", (unsigned)i, (unsigned)n, 100, data + off);
++  }
+   const unsigned long queueElapsedMs = millis() - queueStartMs;
+   setAppBreadcrumb(BREADCRUMB_REPORT_QUEUE_DONE);
+   if (!queued) {
+diff --git a/src/cloud/Particle_Functions.cpp b/src/cloud/Particle_Functions.cpp
+index ce4b735..69dec54 100644
+--- a/src/cloud/Particle_Functions.cpp
++++ b/src/cloud/Particle_Functions.cpp
+@@ -21,6 +21,7 @@ SerialLogHandler logHandler(LOG_LEVEL_WARN);
+ #elif SERIAL_LOG_LEVEL == 3
+ SerialLogHandler logHandler(LOG_LEVEL_INFO,
+                             {// Logging level for non-application messages
++                             {"app.pubq", LOG_LEVEL_TRACE}, // BENCH-ONLY
+                              {"mux", LOG_LEVEL_WARN},
+                              {"system.nm", LOG_LEVEL_WARN},
+                              {"system", LOG_LEVEL_WARN},

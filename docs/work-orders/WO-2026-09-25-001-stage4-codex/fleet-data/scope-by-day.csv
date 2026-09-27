@@ -1,0 +1,16 @@
+utc_date,partial_day,s3_deliveries,observed_report_lines,matched_observed_reports,unmatched_observed_reports,observed_cohort_unmatched_percent,true_fleet_loss_rate
+2026-09-11,True,288,2,2,0,0.0,not identifiable
+2026-09-12,False,402,3,3,0,0.0,not identifiable
+2026-09-13,False,505,5,5,0,0.0,not identifiable
+2026-09-14,False,435,15,15,0,0.0,not identifiable
+2026-09-15,False,413,3,3,0,0.0,not identifiable
+2026-09-16,False,427,8,8,0,0.0,not identifiable
+2026-09-17,False,426,8,8,0,0.0,not identifiable
+2026-09-18,False,448,15,13,2,13.33,not identifiable
+2026-09-19,False,504,10,10,0,0.0,not identifiable
+2026-09-20,False,441,6,3,3,50.0,not identifiable
+2026-09-21,False,438,10,9,1,10.0,not identifiable
+2026-09-22,False,346,8,7,1,12.5,not identifiable
+2026-09-23,False,354,6,4,2,33.33,not identifiable
+2026-09-24,False,457,10,9,1,10.0,not identifiable
+2026-09-25,True,108,6,6,0,0.0,not identifiable

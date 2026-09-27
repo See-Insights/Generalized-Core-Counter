@@ -1,0 +1,16 @@
+--- lib/PublishQueuePosixRK/src/PublishQueuePosixRK.cpp
++++ lib/PublishQueuePosixRK/src/PublishQueuePosixRK.cpp
+@@ -407,6 +407,13 @@
+             _log.trace("writing to files after publish failure");
+             writeQueueToFiles();
+         }
++        // Mutation: incorrectly discard an event on Future failure/ACK timeout.
++        int failedFileNum = fileQueue.getFileFromQueue(true);
++        if (failedFileNum) {
++            fileQueue.removeFileNum(failedFileNum, false);
++        }
++        curEvent = NULL;
++        curFileNum = 0;
+     }
+ 
+     stateHandler = &PublishQueuePosix::stateWait;

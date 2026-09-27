@@ -1,0 +1,36 @@
+[
+  {
+    "mutation": "i-drop-with-ack",
+    "tests": 48,
+    "failed": [
+      "publish_with_ack_queue_test.sh"
+    ],
+    "restored_byte_identically": true,
+    "sha256": "66e6ffbbf3a91274d8baac9420e5407d89ee6cb6cef4c88eea979dd9d615d17c"
+  },
+  {
+    "mutation": "ii-remove-before-ack",
+    "tests": 48,
+    "failed": [
+      "publish_with_ack_queue_test.sh"
+    ],
+    "restored_byte_identically": true,
+    "sha256": "66e6ffbbf3a91274d8baac9420e5407d89ee6cb6cef4c88eea979dd9d615d17c"
+  },
+  {
+    "mutation": "iii-sleep-with-pending",
+    "tests": 48,
+    "failed": [
+      "publish_ack_sleep_gate_structural_test.py"
+    ],
+    "restored_byte_identically": true,
+    "sha256": "aa6e297ad1868b8f104bb1a68ba1c2391f1dc7794b0a5fd36e6a1b4cf7534f0a"
+  },
+  {
+    "mutation": "iv-remove-on-failure",
+    "tests": 48,
+    "failed": [],
+    "restored_byte_identically": true,
+    "sha256": "66e6ffbbf3a91274d8baac9420e5407d89ee6cb6cef4c88eea979dd9d615d17c"
+  }
+]

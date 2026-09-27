@@ -87,7 +87,7 @@ check "publishHibernateWakeForensics() forwards its fields parameter into buildE
   "const int written = HibernateWakeDiagnostics::buildEventPayload(payload, sizeof(payload), fields);" \
   "$gcc_src"
 check "new forensic event is queued via PublishQueuePosix, mirroring publishWatchdogForensics" \
-  "PublishQueuePosix::instance().publish(\"hibernate_wake\", payload, PRIVATE))" \
+  "PublishQueuePosix::instance().publish(\"hibernate_wake\", payload, PRIVATE | WITH_ACK))" \
   "$gcc_src"
 
 # Requirement: no preceding hibernate -> no event. The publish call must be

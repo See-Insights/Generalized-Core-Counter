@@ -1,0 +1,11 @@
+--- lib/PublishQueuePosixRK/src/PublishQueuePosixRK.cpp
++++ lib/PublishQueuePosixRK/src/PublishQueuePosixRK.cpp
+@@ -331,7 +331,7 @@
+         // BENCH B: require an API-level ACK before the queue removes an event.
+         // Normalize at dispatch to cover existing persisted PRIVATE-only events.
+         // NO_ACK takes precedence in Device OS, so clear it before setting WITH_ACK.
+-        const PublishFlags sendFlags = (curEvent->flags & ~PublishFlags(NO_ACK)) | WITH_ACK;
++        const PublishFlags sendFlags = curEvent->flags;
+         if (BackgroundPublishRK::instance().publish(curEvent->eventName, curEvent->eventData, sendFlags,
+             [this](bool succeeded, const char *eventName, const char *eventData, const void *context) {
+                 publishCompleteCallback(succeeded, eventName, eventData);

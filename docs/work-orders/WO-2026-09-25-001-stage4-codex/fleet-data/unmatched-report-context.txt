@@ -1,0 +1,194 @@
+
+
+### Boron-Dev-11 2026-09-18T05:21:59.041952+00:00
+2026-09-18T05:21:57.341563+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce683f6063bf254283dd-if00
+2026-09-18T05:21:58.235535+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce683f6063bf254283dd-if00
+2026-09-18T05:21:59.041952+00:00 0010116881 [app] INFO: Report: occ=1 totalMin=75 alert=19 q=1 ledger=req
+2026-09-18T05:21:59.919293+00:00 0010116884 [app] INFO: StateReq: Report->Connect reason=occupancy change
+2026-09-18T05:22:00.798252+00:00 0010117090 [app] INFO: State: Report->Connect
+2026-09-18T05:22:01.708429+00:00 0010117588 [app] INFO: Connect: start budget=660s heap=67112
+2026-09-18T05:22:02.659106+00:00 0010119313 [app] INFO: ConnSummary: ok elapsed=2206 last=CONNECTED cellMs=0 netMs=0 cloudMs=2206 cloudRecoverStage=0 cloudRecoverCount=0 sig=72/25 heap=66320 q=2
+2026-09-18T05:22:03.085Z pdiag
+2026-09-18T05:22:03.482904+00:00 0010119320 [app] INFO: PowerApply: profile=USB source=USB_HOST reason=usb_power_source
+2026-09-18T05:22:04.340201+00:00 SerialException('device reports readiness to read but returned no data (device disconnected or multiple access on port?)')
+2026-09-18T05:22:07.251266+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce683f6063bf254283dd-if00
+
+
+### Boron-Dev-11 2026-09-18T10:00:20.106194+00:00
+2026-09-18T10:00:18.277811+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce683f6063bf254283dd-if00
+2026-09-18T10:00:19.228878+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce683f6063bf254283dd-if00
+2026-09-18T10:00:20.106194+00:00 0026808360 [app] INFO: Report: occ=0 totalMin=274 alert=19 q=1 ledger=req
+2026-09-18T10:00:21.123557+00:00 0026808363 [app] INFO: StateReq: Report->Connect reason=keep alive mode
+2026-09-18T10:00:21.979180+00:00 0026808567 [app] INFO: State: Report->Connect
+2026-09-18T10:00:22.907966+00:00 0026809066 [app] INFO: Connect: start budget=660s heap=48448
+2026-09-18T10:00:23.826441+00:00 0026810533 [app] INFO: ConnSummary: ok elapsed=1937 last=CONNECTED cellMs=0 netMs=0 cloudMs=1936 cloudRecoverStage=0 cloudRecoverCount=0 sig=72/12 heap=47504 q=2
+2026-09-18T10:00:23.934Z pdiag
+2026-09-18T10:00:24.736502+00:00 0026810542 [app] INFO: PowerApply: profile=USB source=USB_HOST reason=usb_power_source
+2026-09-18T10:00:25.783788+00:00 SerialException('device reports readiness to read but returned no data (device disconnected or multiple access on port?)')
+2026-09-18T10:00:28.749507+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce683f6063bf254283dd-if00
+
+
+### Boron-Dev-09 2026-09-20T07:35:14.568083+00:00
+2026-09-20T07:35:12.441935+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-20T07:35:13.551061+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-20T07:35:14.568083+00:00 0034499474 [app] INFO: Report: occ=1 totalMin=18 alert=19 q=1 ledger=req
+2026-09-20T07:35:16.178048+00:00 0034499476 [app] INFO: StateReq: Report->Connect reason=occupancy change
+2026-09-20T07:35:17.155884+00:00 0034499674 [app] INFO: State: Report->Connect
+2026-09-20T07:35:18.088088+00:00 0034500173 [app] INFO: Connect: start budget=660s heap=73816
+2026-09-20T07:35:18.415Z pdiag
+2026-09-20T07:35:18.961441+00:00 0034501898 [app] INFO: ConnSummary: ok elapsed=2207 last=CONNECTED cellMs=0 netMs=0 cloudMs=2206 cloudRecoverStage=0 cloudRecoverCount=0 sig=70/25 heap=72936 q=2
+2026-09-20T07:35:19.828636+00:00 SerialException('device reports readiness to read but returned no data (device disconnected or multiple access on port?)')
+2026-09-20T07:35:22.718219+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+
+
+### Boron-Dev-11 2026-09-20T08:17:39.306281+00:00
+2026-09-20T08:17:21.852861+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce683f6063bf254283dd-if00
+2026-09-20T08:17:23.013160+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce683f6063bf254283dd-if00
+2026-09-20T08:17:26.527473+00:00 0013325855 [app] INFO: WakeReturn: elapsed=305249 reason=TIMER
+2026-09-20T08:17:27.407023+00:00 0013326124 [app] INFO: PowerDiag[286]: post-wake source=USB_HOST profile=UsbBench vbus=1 pg=1 soc=80.1% usbAddr=0x4 usbReg=0x3
+2026-09-20T08:17:28.305263+00:00 0013326133 [app] INFO: PowerDiag[287]: post-refreshInputProfile source=USB_HOST profile=UsbBench vbus=1 pg=1 soc=80.1% usbAddr=0x4 usbReg=0x3
+2026-09-20T08:17:30.186209+00:00 0013326163 [app] INFO: ChargeDiag: chg=DONE(3) fault=0x00 vbus=USB pg=1 th=OK vsys=0 vcell=4.025 soc=80.1 src=USB_HOST prof=USB
+2026-09-20T08:17:31.084153+00:00 0013326167 [app] INFO: Occ: state=0 reason=debounce session=2037s total=4100s report=1
+2026-09-20T08:17:32.029595+00:00 0013326168 [app] INFO: LoopStage: stage=SLEEP_PREP elapsed=305851 state=3 q=67 connMs=4090771
+2026-09-20T08:17:32.954107+00:00 0013326169 [app] INFO: StateReq: Sleep->Report reason=sleep-occupancy-debounce-report
+2026-09-20T08:17:33.829748+00:00 0013326172 [app] INFO: State: Sleep->Report
+2026-09-20T08:17:34.759209+00:00 0013326178 [app] INFO: PowerDiag[288]: post-refreshInputProfile source=USB_HOST profile=UsbBench vbus=1 pg=1 soc=80.1% usbAddr=0x4 usbReg=0x3
+2026-09-20T08:17:35.624982+00:00 0013326200 [app] INFO: ChargeDiag: chg=DONE(3) fault=0x00 vbus=USB pg=1 th=OK vsys=0 vcell=4.025 soc=80.1 src=USB_HOST prof=USB
+2026-09-20T08:17:36.547489+00:00 0013326396 [app] INFO: LedgerPayloadData: bytes=220/512 schema=2
+2026-09-20T08:17:38.372007+00:00 0013326400 [app] WARN: LedgerDuplicateStillInflight: seq=1 globalSeq=2 kind=DATA orig=ReportState new=ReportState age=13325155 count=2 pendingData=1 pendingStatus=1 upd=3148806643 s~
+2026-09-20T08:17:39.306281+00:00 0013326402 [app] INFO: Report: occ=0 totalMin=68 alert=19 q=1 ledger=req
+2026-09-20T08:17:40.879597+00:00 0013326404 [app] INFO: StateReq: Report->Connect reason=occupancy change
+2026-09-20T08:17:42.730164+00:00 0013326406 [app] INFO: State: Report->Connect
+2026-09-20T08:17:43.597088+00:00 0013326406 [app] INFO: Connect: start budget=660s heap=74656
+2026-09-20T08:17:44.449906+00:00 0013329505 [ncp.client] INFO: Using internal SIM card
+Next connect/reset/status lines:
+2026-09-21T09:17:35.444132+00:00 0000091939 [app] INFO: ConnSummary: ok elapsed=89602 last=CONNECTED cellMs=85051 netMs=0 cloudMs=4551 cloudRecoverStage=1 cloudRecoverCount=1 sig=82/29 heap=75624 q=110
+2026-09-21T09:19:31.066Z status
+2026-09-21T09:19:34.344Z status
+2026-09-21T09:19:35.398Z status
+2026-09-21T09:19:38.584Z status
+2026-09-21T09:19:40.744Z status
+
+
+### Boron-Dev-09 2026-09-20T11:00:05.589006+00:00
+2026-09-20T11:00:02.553352+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-20T11:00:03.648037+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-20T11:00:04.648587+00:00 0008568323 [app] INFO: LedgerPayloadData: bytes=220/512 schema=2
+2026-09-20T11:00:05.589006+00:00 0008568620 [app] INFO: Report: occ=0 totalMin=62 alert=19 q=1 ledger=req
+2026-09-20T11:00:07.544331+00:00 0008568622 [app] INFO: StateReq: Report->Connect reason=keep alive mode
+2026-09-20T11:00:08.474973+00:00 0008568721 [app] INFO: State: Report->Connect
+2026-09-20T11:00:09.298Z pdiag
+2026-09-20T11:00:10.910169+00:00 SerialException('device reports readiness to read but returned no data (device disconnected or multiple access on port?)')
+2026-09-20T11:00:13.865081+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+Next connect/reset/status lines:
+2026-09-20T12:00:07.147687+00:00 0012171733 [app] INFO: ConnSummary: ok elapsed=1965 last=CONNECTED cellMs=0 netMs=0 cloudMs=1965 cloudRecoverStage=0 cloudRecoverCount=0 sig=72/25 heap=76040 q=2
+2026-09-20T13:00:09.046418+00:00 0015771596 [app] INFO: ConnSummary: ok elapsed=2069 last=CONNECTED cellMs=0 netMs=0 cloudMs=2069 cloudRecoverStage=0 cloudRecoverCount=0 sig=72/19 heap=75832 q=2
+2026-09-20T14:00:06.649355+00:00 0019371102 [app] INFO: ConnSummary: ok elapsed=2684 last=CONNECTED cellMs=0 netMs=0 cloudMs=2683 cloudRecoverStage=0 cloudRecoverCount=0 sig=72/25 heap=75720 q=2
+2026-09-20T22:00:27.776518+00:00 0000015423 [app] INFO: ConnSummary: ok elapsed=12988 last=CONNECTED cellMs=11798 netMs=0 cloudMs=1190 cloudRecoverStage=0 cloudRecoverCount=0 sig=72/29 heap=76304 q=4
+2026-09-20T22:00:32.965Z status
+2026-09-21T00:00:59.124459+00:00 0003593848 [app] INFO: ConnSummary: ok elapsed=12522 last=CONNECTED cellMs=10763 netMs=0 cloudMs=1759 cloudRecoverStage=0 cloudRecoverCount=0 sig=67/12 heap=76272 q=6
+
+
+### Boron-Dev-09 2026-09-21T05:57:04.055544+00:00
+2026-09-21T05:57:01.557965+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-21T05:57:03.036019+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-21T05:57:04.055544+00:00 0024952584 [app] INFO: Report: occ=1 totalMin=91 alert=19 q=1 ledger=req
+2026-09-21T05:57:04.925928+00:00 0024952587 [app] INFO: StateReq: Report->Connect reason=occupancy change
+2026-09-21T05:57:05.843750+00:00 0024952786 [app] INFO: State: Report->Connect
+2026-09-21T05:57:06.752227+00:00 0024953287 [app] INFO: Connect: start budget=660s heap=66224
+2026-09-21T05:57:07.736208+00:00 0024955192 [app] INFO: ConnSummary: ok elapsed=2382 last=CONNECTED cellMs=0 netMs=0 cloudMs=2383 cloudRecoverStage=0 cloudRecoverCount=0 sig=70/25 heap=65328 q=2
+2026-09-21T05:57:08.577Z pdiag
+2026-09-21T05:57:08.680030+00:00 0024955204 [app] INFO: PowerApply: profile=USB source=USB_HOST reason=usb_power_source
+2026-09-21T05:57:09.596000+00:00 0024955205 [app] INFO: PowerDiag[429]: post-refreshInputProfile source=USB_HOST profile=UsbBench vbus=1 pg=1 soc=81.6% usbAddr=0x4 usbReg=0x3
+2026-09-21T05:57:10.522300+00:00 SerialException('device reports readiness to read but returned no data (device disconnected or multiple access on port?)')
+2026-09-21T05:57:13.499312+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+
+
+### Boron-Dev-09 2026-09-22T12:00:06.473657+00:00
+2026-09-22T12:00:04.549526+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-22T12:00:05.550042+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-22T12:00:06.473657+00:00 0001851847 [app] INFO: Report: occ=0 totalMin=264 alert=19 q=1 ledger=req
+2026-09-22T12:00:07.403305+00:00 0001851849 [app] INFO: StateReq: Report->Connect reason=keep alive mode
+2026-09-22T12:00:08.336561+00:00 0001851943 [app] INFO: State: Report->Connect
+2026-09-22T12:00:09.253971+00:00 0001852441 [app] INFO: Connect: start budget=660s heap=74760
+2026-09-22T12:00:10.247780+00:00 0001854615 [app] INFO: ConnSummary: ok elapsed=2649 last=CONNECTED cellMs=0 netMs=0 cloudMs=2649 cloudRecoverStage=0 cloudRecoverCount=0 sig=72/19 heap=74448 q=2
+2026-09-22T12:00:11.212060+00:00 0001854623 [app] INFO: PowerApply: profile=USB source=USB_ADAPTER reason=usb_power_source
+2026-09-22T12:00:11.636Z pdiag
+2026-09-22T12:00:12.173988+00:00 0001854625 [app] INFO: PowerDiag[76]: post-refreshInputProfile source=USB_ADAPTER profile=UsbBench vbus=2 pg=1 soc=80.3% usbAddr=0x4 usbReg=0x3
+2026-09-22T12:00:13.104228+00:00 SerialException('device reports readiness to read but returned no data (device disconnected or multiple access on port?)')
+2026-09-22T12:00:16.077663+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+
+
+### Boron-Dev-09 2026-09-23T02:35:36.048024+00:00
+2026-09-23T02:35:33.946927+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-23T02:35:35.180061+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-23T02:35:36.048024+00:00 0001631560 [app] INFO: Report: occ=1 totalMin=346 alert=19 q=1 ledger=req
+2026-09-23T02:35:36.978271+00:00 0001631563 [app] INFO: StateReq: Report->Connect reason=occupancy change
+2026-09-23T02:35:37.869055+00:00 0001631767 [app] INFO: State: Report->Connect
+2026-09-23T02:35:38.779853+00:00 0001632267 [app] INFO: Connect: start budget=660s heap=76496
+2026-09-23T02:35:39.835977+00:00 0001634565 [app] INFO: ConnSummary: ok elapsed=2774 last=CONNECTED cellMs=0 netMs=0 cloudMs=2774 cloudRecoverStage=0 cloudRecoverCount=0 sig=72/29 heap=75544 q=2
+2026-09-23T02:35:40.632Z pdiag
+2026-09-23T02:35:40.831195+00:00 0001634573 [app] INFO: PowerApply: profile=USB source=USB_HOST reason=usb_power_source
+2026-09-23T02:35:41.688945+00:00 0001634600 [app] INFO: ChargeDiag: chg=DONE(3) fault=0x00 vbus=USB pg=1 th=OK vsys=0 vcell=4.040 soc=82.2 src=USB_HOST prof=USB
+2026-09-23T02:35:43.609361+00:00 SerialException('device reports readiness to read but returned no data (device disconnected or multiple access on port?)')
+2026-09-23T02:35:46.522243+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-23T02:36:37.512322+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-23T02:36:38.507687+00:00 SerialException(2, "could not open port /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00: [Errno 2] No such file or directory: '/dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00'")
+2026-09-23T02:36:41.456271+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+
+
+### Boron-Dev-09 2026-09-23T02:55:55.387112+00:00
+2026-09-23T02:55:53.456938+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-23T02:55:54.420597+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-23T02:55:55.387112+00:00 0002849967 [app] INFO: Report: occ=1 totalMin=359 alert=19 q=1 ledger=req
+2026-09-23T02:55:56.349522+00:00 0002849970 [app] INFO: StateReq: Report->Connect reason=occupancy change
+2026-09-23T02:55:57.278578+00:00 0002850061 [app] INFO: State: Report->Connect
+2026-09-23T02:55:58.763870+00:00 0002850560 [app] INFO: Connect: start budget=660s heap=75320
+2026-09-23T02:55:59.665542+00:00 0002854024 [app] INFO: ConnSummary: ok elapsed=3939 last=CONNECTED cellMs=0 netMs=0 cloudMs=3938 cloudRecoverStage=0 cloudRecoverCount=0 sig=57/12 heap=74360 q=2
+2026-09-23T02:56:00.582702+00:00 0002854056 [app] INFO: ChargeDiag: chg=DONE(3) fault=0x00 vbus=USB pg=1 th=OK vsys=0 vcell=4.040 soc=82.2 src=USB_HOST prof=USB
+2026-09-23T02:56:01.450674+00:00 0002854058 [app] INFO: PowerDiag[77]: connect-success source=USB_HOST profile=UsbBench vbus=1 pg=1 soc=82.2% usbAddr=0x5 usbReg=0x3
+2026-09-23T02:56:01.623Z pdiag
+2026-09-23T02:56:02.468710+00:00 0002854547 [app] INFO: LedgerPayloadData: bytes=220/512 schema=2
+2026-09-23T02:56:03.359211+00:00 0002854569 [app] INFO: Connect: ok elapsed=3964ms sig=55/12 q=2 heap=74360
+2026-09-23T02:56:04.439287+00:00 0002854570 [app] INFO: StateReq: Connect->Sleep reason=return-to-sleep-after-report
+2026-09-23T02:56:05.379905+00:00 SerialException('device reports readiness to read but returned no data (device disconnected or multiple access on port?)')
+2026-09-23T02:56:09.833017+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-23T02:57:04.682007+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-23T02:57:05.535561+00:00 SerialException(2, "could not open port /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00: [Errno 2] No such file or directory: '/dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00'")
+2026-09-23T02:57:08.385292+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-23T02:57:15.341020+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-23T02:57:16.297325+00:00 SerialException(2, "could not open port /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00: [Errno 2] No such file or directory: '/dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00'")
+2026-09-23T02:57:19.164678+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+
+
+### Boron-Dev-09 2026-09-24T08:17:43.117784+00:00
+2026-09-24T08:17:22.200151+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-24T08:17:23.324246+00:00 /dev/serial/by-id/usb-Particle_Boron_CDC_Mode_e00fce68399ee6244a963935-if00
+2026-09-24T08:17:30.410350+00:00 0037012996 [app] INFO: WakeReturn: elapsed=305244 reason=TIMER
+2026-09-24T08:17:32.809391+00:00 0037017601 [app] INFO: PowerDiag[1657]: post-wake source=USB_HOST profile=UsbBench vbus=2 pg=1 soc=81.6% usbAddr=0x4 usbReg=0x3
+2026-09-24T08:17:33.764014+00:00 0037017611 [app] INFO: PowerApply: profile=USB source=USB_ADAPTER reason=usb_power_source
+2026-09-24T08:17:34.724818+00:00 0037017612 [app] INFO: PowerDiag[1658]: post-refreshInputProfile source=USB_ADAPTER profile=UsbBench vbus=2 pg=1 soc=81.6% usbAddr=0x4 usbReg=0x3
+2026-09-24T08:17:35.612013+00:00 0037017637 [app] INFO: ChargeDiag: chg=DONE(3) fault=0x00 vbus=ADAPT pg=1 th=OK vsys=0 vcell=4.037 soc=81.6 src=USB_ADAPTER prof=USB
+2026-09-24T08:17:36.472120+00:00 0037017640 [app] INFO: Occ: state=0 reason=debounce session=12660s total=53894s report=1
+2026-09-24T08:17:37.357186+00:00 0037017641 [app] INFO: LoopStage: stage=SLEEP_PREP elapsed=310829 state=3 q=494 connMs=24162016
+2026-09-24T08:17:38.213326+00:00 0037017643 [app] INFO: StateReq: Sleep->Report reason=sleep-occupancy-debounce-report
+2026-09-24T08:17:39.171436+00:00 0037017646 [app] INFO: State: Sleep->Report
+2026-09-24T08:17:40.064782+00:00 0037017681 [app] INFO: ChargeDiag: chg=DONE(3) fault=0x00 vbus=ADAPT pg=1 th=OK vsys=0 vcell=4.037 soc=81.6 src=USB_ADAPTER prof=USB
+2026-09-24T08:17:41.013639+00:00 0037018535 [app] INFO: LedgerPayloadData: bytes=221/512 schema=2
+2026-09-24T08:17:41.969041+00:00 0037018540 [app] WARN: LedgerDuplicateStillInflight: seq=22 globalSeq=22 kind=DATA orig=ReportState new=ReportState age=23609018 count=1 pendingData=1 pendingStatus=0 upd=3507816171~
+2026-09-24T08:17:43.117784+00:00 0037018543 [app] INFO: Report: occ=0 totalMin=898 alert=19 q=1 ledger=req
+2026-09-24T08:17:43.973275+00:00 0037018546 [app] INFO: StateReq: Report->Connect reason=occupancy change
+2026-09-24T08:17:45.836255+00:00 0037019200 [app] INFO: State: Report->Connect
+2026-09-24T08:17:46.741881+00:00 0037019202 [app] INFO: Connect: start budget=660s heap=34616
+2026-09-24T08:17:47.646208+00:00 0037022378 [ncp.client] INFO: Using internal SIM card
+2026-09-24T08:19:01.334476+00:00 0037108520 [app] WARN: CloudRecover: stage=1 action=particle-reconnect phaseElapsed=89318 elapsed=89318
+2026-09-24T08:19:02.337840+00:00 0037108586 [system] WARN: Failed to load session data from persistent storage
+2026-09-24T08:19:08.961706+00:00 0037116150 [system] ERROR: Failed to determine server address: 202
+2026-09-24T08:19:09.970755+00:00 0037116151 [system] WARN: Cloud socket connection failed: -230
+Next connect/reset/status lines:
+2026-09-24T09:02:13.356019+00:00 0039699191 [app] INFO: ConnSummary: ok elapsed=94583 last=CONNECTED cellMs=67312 netMs=0 cloudMs=27271 cloudRecoverStage=1 cloudRecoverCount=1 sig=65/19 heap=30208 q=497
+2026-09-24T10:00:32.835473+00:00 0043199948 [app] INFO: ConnSummary: ok elapsed=27214 last=CONNECTED cellMs=25244 netMs=0 cloudMs=1970 cloudRecoverStage=0 cloudRecoverCount=0 sig=67/29 heap=31464 q=399
+2026-09-24T11:00:42.108023+00:00 0046809164 [app] INFO: ConnSummary: ok elapsed=34635 last=CONNECTED cellMs=26390 netMs=0 cloudMs=8245 cloudRecoverStage=0 cloudRecoverCount=0 sig=65/25 heap=32312 q=139
+2026-09-24T12:00:20.849506+00:00 0050387857 [app] INFO: ConnSummary: ok elapsed=13821 last=CONNECTED cellMs=11642 netMs=0 cloudMs=2179 cloudRecoverStage=0 cloudRecoverCount=0 sig=65/29 heap=32616 q=2
+2026-09-24T13:00:42.546729+00:00 0054009503 [app] INFO: ConnSummary: ok elapsed=36348 last=CONNECTED cellMs=26247 netMs=0 cloudMs=10101 cloudRecoverStage=0 cloudRecoverCount=0 sig=65/19 heap=32688 q=2
+2026-09-24T14:00:31.040359+00:00 0057597952 [app] INFO: ConnSummary: ok elapsed=23094 last=CONNECTED cellMs=18047 netMs=0 cloudMs=5046 cloudRecoverStage=0 cloudRecoverCount=0 sig=65/25 heap=32664 q=2

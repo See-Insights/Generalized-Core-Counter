@@ -436,7 +436,7 @@ void flushDiagBatch() {
 
   appendFormatted(payload, sizeof(payload), &offset, truncated ? "],\"trunc\":1}" : "]}");
 
-  PublishQueuePosix::instance().publish("pdiag", payload, PRIVATE);
+  PublishQueuePosix::instance().publish("pdiag", payload, PRIVATE | WITH_ACK);
 
   diagBatchCount = 0;
   diagBatchDroppedCount = 0;
