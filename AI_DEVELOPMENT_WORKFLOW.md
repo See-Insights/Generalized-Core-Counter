@@ -535,3 +535,13 @@ The workflow is successful if it produces:
 - Traceability from Fleet evidence to code change
 - No unauthorized commits, pushes, releases, or device operations
 - A measurable reduction in Chip’s coordination workload without reducing engineering control
+
+## 12. Guardrails (added 2026-09-26)
+
+Added after WO-2026-09-25-001, where three review rounds grew a restoration of an existing design into roughly 1,000 lines of new mechanism. See `docs/RECOVERY_PLAN_2026-09-26.md`.
+
+1. **Check the history first.** Before designing anything new, search the history for the behavior (`git log -S "<symbol>"`, `git log -G`). If the behavior existed before, the default fix is to restore it; a new mechanism needs a stated reason why restoration is not enough. For a restoration, Stage 7 verifies against "at least as good as the version restored", not an expanded fault model.
+2. **A plain-language goal at the top of every WO.** One short paragraph, no jargon, saying what should be true when the work is done. Every dispatch and review is checked against it.
+3. **A size budget in every dispatch.** Each dispatch states the expected size of the change (lines of `src/` and `lib/`, and tests). Going over the budget means stopping and reporting, not continuing.
+4. **The two-round rule.** If two implementation rounds each add new mechanisms, or two rounds pass without VERIFIED, stop. The architect and the user restate the goal in plain language before any third round.
+5. **Verify the binary, not the source, for anything involving vendored libraries.** A library that is both vendored in `lib/` and listed in `project.properties` may be replaced by the registry copy in a cloud build. Confirm the change is present in the binary that will be flashed (disassembly, symbols, or strings), not only in the source tree. Local and cloud builds may use different library copies. Bench-test the build type the fleet will receive.
