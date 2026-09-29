@@ -42,7 +42,6 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 #include "device_pinout.h"           // Platform-specific pin definitions
 #include "AB1805_RK.h"               // RTC and hardware watchdog
 #include "LocalTimeRK.h"             // Timezone conversion (UTC to local)
-#include "time/LocalTimeCache.h"          // Cached LocalTimeRK conversions
 #include "time/ClockTrust.h"         // Sync-recency resync gate and trust signal (WO-2026-08-29-002)
 #include "time/HibernateWakeDiagnostics.h" // Hibernate-wake gate data types/cloud-event rendering (WO-2026-08-29-001)
 #include "time/HibernateCycle.h"           // Hibernate-cycle owner: retained fields, wake classification (WO-2026-09-16 Step 2)
@@ -956,12 +955,6 @@ void setup() {
     String deviceID = System.deviceID();
     deviceID.toCharArray(responseTopic, sizeof(responseTopic));
     Particle.subscribe(responseTopic, UbidotsHandler);
-
-    // Also subscribe to the default Particle webhook response prefix so this
-    // works with whatever webhook name is configured in the ledger.
-    // If the integration uses the default response topic, responses will be
-    // published to: hook-response/<eventName>.
-    Particle.subscribe("hook-response/", UbidotsHandler);
   }
 
   // Configure startup with the radio left off. CONNECTING_STATE owns
@@ -1880,10 +1873,11 @@ void logTimeDiag(bool isOpen) {
     gmtime_r(&epoch, &utcTm);
   }
 
-  const LocalTimeCache::LocalTimeSnapshot &snapshot = LocalTimeCache::getLocalTimeSnapshot();
-  const LocalTimeYMD localDate = snapshot.localYmd;
-  const uint32_t localSecondsOfDay = snapshot.localSecondsOfDay;
-  const uint8_t localHour = snapshot.localHour;
+  LocalTimeConvert localConverter;
+  localConverter.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
+  const LocalTimeYMD localDate = localConverter.getLocalTimeYMD();
+  const uint32_t localSecondsOfDay = (uint32_t)localConverter.getLocalTimeHMS().toSeconds();
+  const uint8_t localHour = (uint8_t)localConverter.getLocalTimeHMS().hour;
   const uint8_t localMinute = (uint8_t)((localSecondsOfDay / 60UL) % 60UL);
   const uint8_t localSecond = (uint8_t)(localSecondsOfDay % 60UL);
 

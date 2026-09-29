@@ -31,6 +31,11 @@ struct TestLog {
 
   template <typename... Args>
   void warn(const char *, Args...) {}
+
+  // WO-2026-09-25-001: DeviceStatusPublisher.cpp's payload overflow guard logs
+  // at error level.
+  template <typename... Args>
+  void error(const char *, Args...) {}
 };
 
 inline TestLog Log;
