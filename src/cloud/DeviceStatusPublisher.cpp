@@ -351,6 +351,14 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
         return false;
     }
 
+    // WO-2026-09-29-001 C: dataSize() can exceed the buffer - guard the NUL store.
+    if (writerBase.dataSize() >= sizeof(bufferBase)) {
+        Log.error("LedgerPayloadStatus: overflow bytes=%lu/%lu schema=%d - status not published",
+                  (unsigned long)writerBase.dataSize(),
+                  (unsigned long)DEVICE_STATUS_PAYLOAD_CAPACITY,
+                  kLedgerSchemaVersion);
+        return false;
+    }
     bufferBase[writerBase.dataSize()] = '\0';
 
     // Only publish if the status payload actually changed.
