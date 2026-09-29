@@ -91,6 +91,12 @@ be verified against a binary that does not correspond to the source.
   Clearing `target/` is *not* a clean build — it holds link output only. The
   compiled objects live at
   `~/.particle/toolchains/deviceOS/<ver>/build/target/user/platform-<id>-m/<app>/`.
+- **When switching `EXTRA_CFLAGS` between release and bench builds, run
+  `make clean-user` first, or stale object files are reused.** A flag passed
+  only on the command line changes no file timestamp, so `make` sees nothing to
+  rebuild and silently links the previous build's objects. Found 2026-09-28 in
+  WO-2026-09-28-001, when the first bench builds with
+  `-DENABLE_DIAGNOSTICS_PUBLISH_MODE=1` reused the release objects.
 - Prove presence/absence with `nm` on the linked ELF **and** on the object
   itself. Never with `strings`.
 - Record the `text`/`data` sizes at both flag values. A size that matches the

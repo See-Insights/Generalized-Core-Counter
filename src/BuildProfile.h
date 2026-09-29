@@ -243,7 +243,7 @@
  * survived real production failure (660s connect timeout). Promoted from
  * bench-only to field soak in v22-Diag-Soak. Not sourced from cloud/ledger.
  */
-#define ENABLE_DIAGNOSTICS_PUBLISH_MODE 1
+#define ENABLE_DIAGNOSTICS_PUBLISH_MODE 0  // bench builds enable with -DENABLE_DIAGNOSTICS_PUBLISH_MODE=1 (WO-2026-09-28-001)
 #endif
 
 #if (ENABLE_DIAGNOSTICS_PUBLISH_MODE != 0) && (ENABLE_DIAGNOSTICS_PUBLISH_MODE != 1)
