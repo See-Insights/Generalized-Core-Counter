@@ -15,3 +15,8 @@ Found by Codex during the WO-2026-09-25-001 Stage 4 investigation (`WO-2026-09-2
 - [ ] Implementation (Stage 6)
 - [ ] Codex verification (Stage 7)
 - [ ] Chip final gate / commit (Stage 8)
+
+## Update 2026-09-29 (WO-2026-09-29-001, item B)
+
+- **The broad subscription is removed in v27** (WO-2026-09-29-001 item B). History: it was added in `eda6b7e` (v3.24), with the reason "works with whatever webhook name is configured in the ledger". Every product integration (product 42131) replies on `{{PARTICLE_DEVICE_ID}}/hook-response/{{PARTICLE_EVENT_NAME}}`, which the device-ID subscription already matches. The only reply the broad `hook-response/` prefix ever caught was `pdiag`'s, whose integration has no response topic. That reply releasing the report wait is this WO's problem, and v26 stopped release builds publishing `pdiag`.
+- **Still open here (Chip, 2026-09-29):** the device-ID subscription also receives the replies for `status`, `watchdog`, `hibernate_wake`, and the AWS-ingest copy of `Ubidots-Sensor-Hook-v1` (the same event name as the Ubidots integration). `UbidotsHandler()` clears `session.awaitingWebhookResponse` on any nonempty response, so any of those can still end the report wait before Ubidots itself replies.

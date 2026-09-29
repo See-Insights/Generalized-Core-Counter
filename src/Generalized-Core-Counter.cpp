@@ -956,12 +956,6 @@ void setup() {
     String deviceID = System.deviceID();
     deviceID.toCharArray(responseTopic, sizeof(responseTopic));
     Particle.subscribe(responseTopic, UbidotsHandler);
-
-    // Also subscribe to the default Particle webhook response prefix so this
-    // works with whatever webhook name is configured in the ledger.
-    // If the integration uses the default response topic, responses will be
-    // published to: hook-response/<eventName>.
-    Particle.subscribe("hook-response/", UbidotsHandler);
   }
 
   // Configure startup with the radio left off. CONNECTING_STATE owns
