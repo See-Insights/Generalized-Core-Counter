@@ -90,3 +90,7 @@ itself would only mask the symptom.
 - `WO-2026-09-03-004-mafc1-sleep-path-watchdog-stalls.md` - a related,
   previously-filed sleep-path finding (a different device, a hang rather
   than a rapid cycle, but the same general area of the state machine).
+
+## Field occurrence on v25-WithAck (filed 2026-09-28, from WO-2026-09-28-001)
+
+- **ToM-MCP-Court3 (`e00fce686e1a157c27984295`), 2026-09-28:** 612 `pdiag` batches in about 9 hours on v25, with wakes every 6–12 s near the end. That flood filled the publish queue to its 800-file cap (watchdog 16:46 EDT, `queue=800`), and reports and `status` events were discarded as a result; WO-2026-09-28-001 stops release builds publishing `pdiag`. **Open here:** an occupied session from 09:33:15 EDT (`occupancy=1`, `dailyoccupancy=36`) to 14:15:01 EDT (`occupancy=0`, `dailyoccupancy=36`) added 0 minutes. The 14:15 report shows `resets=2`, and the resets before it have no `status` event in the archive. Whether a reset ended the session uncredited, or the minutes were never counted, is for this investigation.

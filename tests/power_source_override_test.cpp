@@ -260,11 +260,12 @@ void testPublisherReportsOverrideInactiveWhenOverrideDoesNotFire() {
 // -- would be caught here, the same way the overrideActive tests above catch
 // drift in that field.
 //
-// This test's expected value (0x6008 / 24584) is computed from
-// src/BuildProfile.h's actual DEFAULT flag values as of this WO, plus the
-// Addendum A 0x4000 bit:
+// This test's expected value (0x4008 / 16392) is computed from
+// src/BuildProfile.h's actual DEFAULT flag values, plus the Addendum A
+// 0x4000 bit:
 //   ENABLE_PMIC_FORENSICS=1        -> bit3  (0x0008)
-//   ENABLE_DIAGNOSTICS_PUBLISH_MODE=1 -> bit13 (0x2000)
+//   ENABLE_DIAGNOSTICS_PUBLISH_MODE=0 -> bit13 (0x2000) clear; the default
+//     was 1 (0x6008) until WO-2026-09-28-001 turned it off in release builds
 //   PLATFORM_ID == PLATFORM_BORON (forced by the test stub Particle.h, the
 //     same guard that gates PowerManager.cpp's USB source override) -> bit14
 //     (0x4000)
@@ -291,7 +292,7 @@ void testPublisherFirmwareObjectReportsCompiledBuildFlags() {
   int capturedFlags = -1;
   const bool found = g_statusJsonObserver.findInt("flags", &capturedFlags);
   assert(found);
-  assert(capturedFlags == 0x6008);
+  assert(capturedFlags == 0x4008);
 }
 
 // --- WO-2026-09-15-001 Amendment C: LedgerPayloadStatus log-guard --------

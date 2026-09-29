@@ -111,19 +111,21 @@ default_value=$("$binary_default")
 flipped_value=$("$binary_flipped")
 
 # Hand-computed from BuildProfile.h's actual defaults as of this WO:
-#   default: ENABLE_PMIC_FORENSICS(bit3=0x0008) + ENABLE_DIAGNOSTICS_PUBLISH_MODE(bit13=0x2000) = 0x2008 (8200)
+#   default: ENABLE_PMIC_FORENSICS(bit3=0x0008) = 0x0008 (8)
+#            (ENABLE_DIAGNOSTICS_PUBLISH_MODE now defaults to 0 per
+#             WO-2026-09-28-001, so its bit13=0x2000 is no longer set)
 #   flipped: DEV_BUILD(bit0=0x0001) + ALLOW_BLOCKING_SERIAL_WAITS(bit1=0x0002)
-#            + ENABLE_GATE_TRACE(bit8=0x0100) + ENABLE_DIAGNOSTICS_PUBLISH_MODE(bit13=0x2000) = 0x2103 (8451)
+#            + ENABLE_GATE_TRACE(bit8=0x0100) = 0x0103 (259)
 #            (ENABLE_PMIC_FORENSICS forced to 0 here, so its bit drops out)
-expected_default=8200
-expected_flipped=8451
+expected_default=8
+expected_flipped=259
 
 if [[ "$default_value" != "$expected_default" ]]; then
-  echo "FAILED: default-build compiledBuildFlags=$default_value, expected $expected_default (0x2008)" >&2
+  echo "FAILED: default-build compiledBuildFlags=$default_value, expected $expected_default (0x0008)" >&2
   exit 1
 fi
 if [[ "$flipped_value" != "$expected_flipped" ]]; then
-  echo "FAILED: flipped-build compiledBuildFlags=$flipped_value, expected $expected_flipped (0x2103)" >&2
+  echo "FAILED: flipped-build compiledBuildFlags=$flipped_value, expected $expected_flipped (0x0103)" >&2
   exit 1
 fi
 if [[ "$default_value" == "$flipped_value" ]]; then
