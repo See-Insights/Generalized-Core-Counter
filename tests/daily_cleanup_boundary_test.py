@@ -157,6 +157,19 @@ def verify_source_shape() -> None:
     if any(token in handle_code[:daily_cleanup] for token in ("getYear()", "getMonth()", "getDay()")):
         fail("daily boundary logic must not compare calendar Y/M/D fields")
 
+    # WO-2026-09-29-001 item A: the daily-close report is an immediate-connect
+    # trigger, ahead of the keep-alive and cadence branches.
+    due_connect = re.search(
+        r"\}\s*else\s+if\s*\(\s*due\s*\)\s*\{\s*transitionTo\(CONNECTING_STATE,\s*\"daily close\"\);",
+        handle_code,
+    )
+    keep_alive_branch = handle_code.find("SystemConfig::INTERMITTENT_KEEP_ALIVE")
+    cadence_branch = handle_code.find("reportingPolicy.cadenceDue")
+    if due_connect is None or -1 in (keep_alive_branch, cadence_branch) or not (
+        due_connect.start() < keep_alive_branch < cadence_branch
+    ):
+        fail("connect decision must treat due as an immediate CONNECTING_STATE trigger before the keep-alive and cadence branches")
+
     default_declarations = sum(
         text.count("publishData(time_t stampOverride = 0)")
         for text in (common_text, machine_text, app_text)

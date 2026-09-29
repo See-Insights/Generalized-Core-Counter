@@ -247,6 +247,9 @@ void handleReportingState() {
                tierName);
 #endif
       transitionTo(CONNECTING_STATE, "occupancy change");
+    } else if (due) {
+      // WO-2026-09-29-001 A: the day's closing report goes out at close.
+      transitionTo(CONNECTING_STATE, "daily close");
     } else if (forceConnectForLongTermWebhook) {
 #if ENABLE_CONNECT_DECISION_TRACE
       Log.info("REPORTING: Forcing connection due to long-term webhook health (OPEN hours)");
