@@ -249,8 +249,3 @@
 #if (ENABLE_DIAGNOSTICS_PUBLISH_MODE != 0) && (ENABLE_DIAGNOSTICS_PUBLISH_MODE != 1)
 #error "ENABLE_DIAGNOSTICS_PUBLISH_MODE must be 0 or 1"
 #endif
-
-// Optional convenience: enable DEBUG_SERIAL in DEV builds unless overridden.
-#if DEV_BUILD && !defined(DEBUG_SERIAL)
-#define DEBUG_SERIAL
-#endif

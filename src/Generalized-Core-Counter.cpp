@@ -17,7 +17,7 @@
 // Include Particle Device OS APIs
 #include "Particle.h"
 
-// Global configuration (includes DEBUG_SERIAL define)
+// Global configuration (runtime defaults and connectivity budgets)
 #include "Config.h"
 #include "state/State_Common.h"
 #include "state/SleepPrepSpanTiming.h"
@@ -75,12 +75,7 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 #include "state/StateHandlers.h"           // Handler functions for each state
 
 // Application metadata
-#include "Version.h"                 // FIRMWARE_VERSION and FIRMWARE_RELEASE_NOTES
-#include "ProjectConfig.h"           // Webhook event name and project constants
-
-// Forward declarations for firmware metadata referenced from this translation unit.
-extern const char* FIRMWARE_VERSION;
-extern const char* FIRMWARE_RELEASE_NOTES;
+#include "Version.h"                 // FIRMWARE_VERSION
 
 /*
  * Architectural overview

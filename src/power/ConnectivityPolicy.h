@@ -61,7 +61,6 @@ namespace ConnectivityPolicy {
 //   down or to service stuck cloud operations.
 constexpr unsigned long CONNECT_BUDGET_DEFAULT_MS = 5UL * 60UL * 1000UL; // 5 minutes
 constexpr unsigned long CONNECT_BUDGET_DEEP_MS = 11UL * 60UL * 1000UL;   // 11 minutes
-constexpr unsigned int CONNECT_BUDGET_DEFAULT_SEC = 300U;                // 5 minutes
 constexpr uint16_t CONNECT_BUDGET_CONFIG_MIN_SEC = 120;                  // Particle docs minimum
 constexpr uint16_t CONNECT_BUDGET_CONFIG_MAX_SEC = 900;
 

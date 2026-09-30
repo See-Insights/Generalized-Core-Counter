@@ -1,23 +1,23 @@
 /**
  * @file Config.h
- * @brief Backward-compatible wrapper for shared project settings.
+ * @brief Runtime configuration defaults and validation entry points.
  *
  * @details
- * New code should include Settings.h directly when it needs shared build or
- * project settings. This wrapper remains so existing includes do not need to
- * change all at once.
+ * Build-profile flags live in BuildProfile.h; connectivity budgets live in
+ * power/ConnectivityPolicy.h (which includes BuildProfile.h itself). The
+ * connection defaults below are aliases of the ConnectivityPolicy values, not
+ * second copies of them.
  *
  * Safety note:
  * - CONNECTIVITY_FAILSAFE_TEST_MODE is a compile-time build-profile flag.
- * - It must not be sourced from cloud config and should not be toggled in
- *   this wrapper header.
+ * - It must not be sourced from cloud config and should not be toggled here.
  */
 
 #ifndef GENERALIZED_CORE_COUNTER_CONFIG_H
 #define GENERALIZED_CORE_COUNTER_CONFIG_H
 
 #include <stdint.h>
-#include "Settings.h"
+#include "power/ConnectivityPolicy.h"
 
 namespace Config {
 
@@ -32,9 +32,10 @@ constexpr uint8_t DEFAULT_OPEN_HOUR = 6;
 constexpr uint8_t DEFAULT_CLOSE_HOUR = 22;
 constexpr uint16_t DEFAULT_REPORT_INTERVAL_SEC = 3600;
 constexpr uint32_t DEFAULT_OCCUPANCY_DEBOUNCE_MS = 60000UL;
-constexpr uint16_t DEFAULT_CONNECT_ATTEMPT_BUDGET_SEC = 300;
-constexpr uint16_t DEFAULT_CLOUD_DISCONNECT_BUDGET_SEC = 15;
-constexpr uint16_t DEFAULT_MODEM_OFF_BUDGET_SEC = 30;
+constexpr uint16_t DEFAULT_CONNECT_ATTEMPT_BUDGET_SEC =
+	(uint16_t)(ConnectivityPolicy::CONNECT_BUDGET_DEFAULT_MS / 1000UL);
+constexpr uint16_t DEFAULT_CLOUD_DISCONNECT_BUDGET_SEC = ConnectivityPolicy::DISCONNECT_CLOUD_DEFAULT_SEC;
+constexpr uint16_t DEFAULT_MODEM_OFF_BUDGET_SEC = ConnectivityPolicy::DISCONNECT_MODEM_DEFAULT_SEC;
 
 const char *sourceToString(Source source);
 Source getSource();

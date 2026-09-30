@@ -67,7 +67,8 @@ extern const pin_t TMP36_SENSE_PIN;   // Carrier board temperature sensor (A4)
 extern const pin_t BLUE_LED;          // On-module blue status LED (D7)
 extern const pin_t WAKEUP_PIN;        // AB1805 FOUT/nIRQ wake pin (WKP = D10 on Photon2, was D8 on Argon/Boron)
 
-// Optional hardware override macros are documented in Settings.h.
+// Optional hardware override macros (MUON_*) are documented at their use
+// sites in sensors/SensorManager.cpp.
 
 // ---------------------------------------------------------------------------
 // Sensor-specific logical pins (PIR-on-carrier configuration)
