@@ -1,5 +1,6 @@
 #include "cloud/Particle_Functions.h"
 #include "Particle.h"
+#include "BuildProfile.h"      // SERIAL_LOG_LEVEL and the category filters
 #include "sensors/SensorManager.h"
 #include "ThrashGuard.h"        // For thrash diagnostics
 
@@ -9,9 +10,7 @@ SYSTEM_MODE(SEMI_AUTOMATIC); // This will enable user code to start executing
                              // automatically.
 STARTUP(System.enableFeature(FEATURE_RESET_INFO));
 
-#define SERIAL_LOG_LEVEL 3 // Set the logging level for the serial log handler
-// Temporary - will fix with config file later
-
+// Logging policy (level and category filters) lives in BuildProfile.h.
 #if SERIAL_LOG_LEVEL == 0
 SerialLogHandler logHandler(LOG_LEVEL_NONE); // Easier to see the program flow
 #elif SERIAL_LOG_LEVEL == 1
@@ -19,16 +18,7 @@ SerialLogHandler logHandler(LOG_LEVEL_ERROR);
 #elif SERIAL_LOG_LEVEL == 2
 SerialLogHandler logHandler(LOG_LEVEL_WARN);
 #elif SERIAL_LOG_LEVEL == 3
-SerialLogHandler logHandler(LOG_LEVEL_INFO,
-                            {// Logging level for non-application messages
-                             {"mux", LOG_LEVEL_WARN},
-                             {"system.nm", LOG_LEVEL_WARN},
-                             {"system", LOG_LEVEL_WARN},
-                             {"comm.dtls", LOG_LEVEL_WARN},
-                             {"comm.protocol", LOG_LEVEL_WARN},
-                             {"comm.protocol.handshake", LOG_LEVEL_WARN},
-                             {"net.pppncp", LOG_LEVEL_WARN},
-                             {"app.ab1805", LOG_LEVEL_WARN}});
+SerialLogHandler logHandler(LOG_LEVEL_INFO, {SERIAL_LOG_CATEGORY_FILTERS});
 #elif SERIAL_LOG_LEVEL == 4
 SerialLogHandler logHandler(LOG_LEVEL_ALL);
 #endif

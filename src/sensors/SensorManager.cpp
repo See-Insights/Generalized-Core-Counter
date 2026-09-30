@@ -965,7 +965,7 @@ bool SensorManager::measureTemperatureAndApplyChargeDecision() {
   //  - Otherwise, use TMP36 (if wired) or platform-specific stub.
   //
   // Compile-time controls:
-  //  - Define MUON_HAS_TMP112 to force enable the TMP112A path.
+  //  - Define MUON_HAS_TMP112=1 to force enable the TMP112A path.
   //  - Define DISABLE_TMP112_AUTODETECT to skip probing for TMP112A.
 
   float tempC = CurrentReadings::get_internalTempC(); // seed; every branch below overwrites or falls back explicitly
@@ -993,7 +993,7 @@ bool SensorManager::measureTemperatureAndApplyChargeDecision() {
   }
 #endif
 
-#if defined(MUON_HAS_TMP112)
+#if MUON_HAS_TMP112
   tmp112Present = true;
   tmp112ProbeDone = true;
 #endif
