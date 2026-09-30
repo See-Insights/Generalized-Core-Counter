@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v28-CloseBeforeSleep] - 2026-09-30
+
+### Fixed
+
+- The device never sleeps for the night with the daily close still due: the close test now has one owner and the night-sleep commitment asks it first.
+
 ## [v24-Thermal-Inhibit] - 2026-08-28
 
 ### Added

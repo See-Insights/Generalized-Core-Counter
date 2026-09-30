@@ -74,9 +74,6 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 #include "state/StateMachine.h"            // State enum and global state variables
 #include "state/StateHandlers.h"           // Handler functions for each state
 
-// Application metadata
-#include "Version.h"                 // FIRMWARE_VERSION
-
 /*
  * Architectural overview
  * ----------------------

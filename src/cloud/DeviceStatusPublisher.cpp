@@ -34,8 +34,8 @@ namespace Clock {
 long lastSyncCorrectionSec();
 } // namespace Clock
 
-// External firmware version string (defined in Version.cpp)
-extern const char* FIRMWARE_VERSION;
+// External firmware version string (the one definition lives in FirmwareVersion.h)
+#include "../FirmwareVersion.h"
 
 // WO-2026-08-31-004 Amendment A (cloud follow-up): the AB1805 oscillator
 // state captured once at boot in Generalized-Core-Counter.cpp's setup(),
