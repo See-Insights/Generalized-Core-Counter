@@ -81,12 +81,19 @@ sed -i '' "s/^PROJECT_NUMBER.*/PROJECT_NUMBER         = \"${VERSION_ESCAPED}\"/"
 # Update README version line
 sed -i '' "s/^\*\*Version:\*\*.*/\*\*Version:\*\* ${VERSION_ESCAPED} | \*\*Latest:\*\* ${NOTES_ESCAPED}/" "$README"
 
-# Append to CHANGELOG.md
+# Insert the release into CHANGELOG.md, newest first: directly after the
+# "## Unreleased" section (before the first "## [" release heading), in the
+# file's bracketed format. Falls back to appending if there is no release
+# heading yet. The entry travels via the environment so awk does not
+# reinterpret backslashes in the notes.
 DATE="$(date +%Y-%m-%d)"
-{
-  echo "## ${VERSION} – ${DATE}"
-  echo "- ${NOTES}"
-  echo
-} >> "$CHANGELOG"
+CHANGELOG_ENTRY="$(printf '## [%s] - %s\n\n### Changed\n\n- %s\n' "$VERSION" "$DATE" "$NOTES")"
+CHANGELOG_TMP="$(mktemp)"
+CHANGELOG_ENTRY="$CHANGELOG_ENTRY" awk '
+  !inserted && /^## \[/ { print ENVIRON["CHANGELOG_ENTRY"]; print ""; inserted = 1 }
+  { print }
+  END { if (!inserted) { print ""; print ENVIRON["CHANGELOG_ENTRY"] } }
+' "$CHANGELOG" > "$CHANGELOG_TMP"
+mv "$CHANGELOG_TMP" "$CHANGELOG"
 
 echo "Updated to version ${VERSION}"

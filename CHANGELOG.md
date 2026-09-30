@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v29-ConfigCleanup] - 2026-09-30
+
+### Changed
+
+- Configuration cleanup: build switches and logging policy in BuildProfile.h, version identity in FirmwareVersion.h, release notes moved to CHANGELOG.md, dead settings removed, one webhook-timeout range (5000-120000 ms)
+
 ## [v28-CloseBeforeSleep] - 2026-09-30
 
 ### Fixed
@@ -600,6 +606,3 @@ This release fundamentally restructures device configuration to use four indepen
 
 ## 20.1-PowerMgt – 2026-08-07
 - Testing Power Management
-## v29-ConfigCleanup – 2026-09-30
-- Configuration cleanup: build switches and logging policy in BuildProfile.h, version identity in FirmwareVersion.h, release notes moved to CHANGELOG.md, dead settings removed, one webhook-timeout range (5000-120000 ms)
-
