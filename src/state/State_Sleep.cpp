@@ -22,6 +22,7 @@
 #include "state/SleepPrepSpanTiming.h"
 #include "time/HibernateCycle.h"
 #include "time/Clock.h"
+#include "time/DailyBoundary.h"
 
 namespace {
 
@@ -969,6 +970,12 @@ void handleSleepingState() {
   const Clock::Openness parkOpenness = Clock::openness();
   logTimeDiag(isWithinOpenHours());
   if (parkOpenness == Clock::Openness::Closed) {
+    // WO-2026-09-30-001: never commit to night sleep while the close is due.
+    if (DailyBoundary::check(Time.now()).due) {
+      transitionTo(REPORTING_STATE, "close due before night sleep");
+      return;
+    }
+
     // Notify sensor layer we are entering full night sleep so sensors and
     // indicator LEDs can be powered down. During daytime naps we keep
     // interrupt-driven sensors (like PIR) powered so they can wake the

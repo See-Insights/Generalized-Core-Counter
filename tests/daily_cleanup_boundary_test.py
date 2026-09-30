@@ -7,6 +7,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 STATE_REPORT = REPO_ROOT / "src" / "state" / "State_Report.cpp"
+DAILY_BOUNDARY_H = REPO_ROOT / "src" / "time" / "DailyBoundary.h"
+DAILY_BOUNDARY_CPP = REPO_ROOT / "src" / "time" / "DailyBoundary.cpp"
 STATE_COMMON = REPO_ROOT / "src" / "state" / "State_Common.h"
 STATE_MACHINE = REPO_ROOT / "src" / "state" / "StateMachine.h"
 APP_MAIN = REPO_ROOT / "src" / "Generalized-Core-Counter.cpp"
@@ -76,16 +78,35 @@ def index_after(text: str, needle: str, previous: int, label: str) -> int:
 
 def verify_source_shape() -> None:
     report_text = STATE_REPORT.read_text()
+    boundary_header = DAILY_BOUNDARY_H.read_text()
+    boundary_text = DAILY_BOUNDARY_CPP.read_text()
     common_text = STATE_COMMON.read_text()
     machine_text = STATE_MACHINE.read_text()
     app_text = APP_MAIN.read_text()
     report_code = strip_comment_lines(report_text)
+    boundary_code = strip_comment_lines(boundary_text)
 
-    if "time/LocalTimeCache.h" in report_code or "LocalTimeCache::" in report_code:
-        fail("State_Report.cpp daily boundary logic must not use LocalTimeCache")
+    # WO-2026-09-30-001: the due-test and localTodayAt() moved out of
+    # handleReportingState() into the DailyBoundary owner, so the night-sleep
+    # commitment can ask the same question. The logic is checked there now;
+    # handleReportingState() is checked for the call and the unchanged order.
+    for label, code in (("State_Report.cpp", report_code), ("DailyBoundary.cpp", boundary_code)):
+        if "time/LocalTimeCache.h" in code or "LocalTimeCache::" in code:
+            fail(f"{label} daily boundary logic must not use LocalTimeCache")
+
+    boundary_header_code = strip_comment_lines(boundary_header)
+    for required in (
+        "struct Result",
+        "bool due;",
+        "time_t boundary;",
+        "uint8_t close;",
+        "Result check(time_t now);",
+    ):
+        if required not in boundary_header_code:
+            fail(f"DailyBoundary.h must publish the shared due-test result; missing {required}")
 
     local_today = extract_function(
-        report_text, r"time_t\s+localTodayAt\s*\(\s*uint8_t\s+\w+\s*\)\s*\{", "localTodayAt"
+        boundary_text, r"time_t\s+localTodayAt\s*\(\s*uint8_t\s+\w+\s*\)\s*\{", "localTodayAt"
     )
     for required in (
         "LocalTimeConvert",
@@ -98,6 +119,35 @@ def verify_source_shape() -> None:
             fail(f"localTodayAt() must compute live LocalTimeRK boundaries and handle hour 24; missing {required}")
     if "LocalTimeCache" in local_today:
         fail("localTodayAt() must never read LocalTimeCache")
+    if re.search(r"time_t\s+localTodayAt\s*\(", report_code):
+        fail("localTodayAt() must live in DailyBoundary.cpp, not State_Report.cpp")
+
+    check_fn = extract_function(
+        boundary_text, r"Result\s+check\s*\(\s*time_t\s+\w+\s*\)\s*\{", "DailyBoundary::check"
+    )
+    check_code = strip_comment_lines(check_fn)
+    boundary_tokens = [
+        ("due default", "bool due = false"),
+        ("trusted-clock gate", "if (Clock::isTrusted())"),
+        ("open hour", "SystemConfig::get_openTime()"),
+        ("close hour", "SystemConfig::get_closeTime()"),
+        ("always-open normalization", "close = (openHour == closeHour) ? 24 : closeHour"),
+        ("boundary computation", "localTodayAt(close)"),
+        ("before-boundary condition", "if (now < boundary)"),
+        ("before-boundary adjustment", "boundary -= 86400"),
+        ("lastDailyCleanup read", "SystemConfig::get_lastDailyCleanup()"),
+        ("due comparison", "due = (lastDailyCleanup < boundary || lastDailyCleanup > now)"),
+        ("result return", "return {due, boundary, close}"),
+    ]
+    position = -1
+    for label, token in boundary_tokens:
+        position = index_after(check_code, token, position, label)
+    if "SystemConfig::get_lastReport()" in check_code:
+        fail("daily boundary decision must not use lastReport")
+    if any(token in check_code for token in ("getYear()", "getMonth()", "getDay()")):
+        fail("daily boundary logic must not compare calendar Y/M/D fields")
+    if "set_" in check_code:
+        fail("DailyBoundary::check() must be a pure query - it must not write persisted state")
 
     handle = extract_function(
         report_text, r"void\s+handleReportingState\s*\(\s*\)\s*\{", "handleReportingState"
@@ -115,16 +165,10 @@ def verify_source_shape() -> None:
     publish_pos = report_publish.start()
 
     ordered_tokens = [
-        ("due default", "bool due = false"),
-        ("trusted-clock gate", "if (Clock::isTrusted())"),
-        ("open hour", "SystemConfig::get_openTime()"),
-        ("close hour", "SystemConfig::get_closeTime()"),
-        ("always-open normalization", "close = (openHour == closeHour) ? 24 : closeHour"),
-        ("boundary computation", "localTodayAt(close)"),
-        ("before-boundary condition", "if (now < boundary)"),
-        ("before-boundary adjustment", "boundary -= 86400"),
-        ("lastDailyCleanup read", "SystemConfig::get_lastDailyCleanup()"),
-        ("due comparison", "due = (lastDailyCleanup < boundary || lastDailyCleanup > now)"),
+        ("DailyBoundary call", "DailyBoundary::check(now)"),
+        ("due local", "due = closeCheck.due"),
+        ("boundary local", "boundary = closeCheck.boundary"),
+        ("close local", "close = closeCheck.close"),
         ("occupied snapshot", "wasOccupied = CurrentReadings::get_occupied()"),
         ("original session start capture", "CurrentReadings::get_occupancyStartTime()"),
         ("boundary-aware close", 'closeOccupancySessionSafely("daily-cleanup", boundary)'),
@@ -148,8 +192,8 @@ def verify_source_shape() -> None:
 
     if handle_code.find("SystemConfig::get_lastReport()", 0, daily_cleanup) != -1:
         fail("daily boundary decision must not use lastReport")
-    if not (handle_code.find("due = (lastDailyCleanup < boundary || lastDailyCleanup > now)") < publish_pos < daily_cleanup):
-        fail("boundary due computation must precede the single publish, and publish must precede dailyCleanup()")
+    if not (handle_code.find("DailyBoundary::check(now)") < publish_pos < daily_cleanup):
+        fail("the DailyBoundary due check must precede the single publish, and publish must precede dailyCleanup()")
     if last_report_stamp < daily_cleanup:
         fail("lastReport must not be stamped by the daily boundary block")
     if not (publish_pos < daily_cleanup < last_report_stamp < hourly_reset):

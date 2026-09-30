@@ -46,6 +46,10 @@ STATE_ERROR = SRC_ROOT / "state" / "State_Error.cpp"
 STATE_IDLE = SRC_ROOT / "state" / "State_Idle.cpp"
 STATE_REPORT = SRC_ROOT / "state" / "State_Report.cpp"
 STATE_SLEEP = SRC_ROOT / "state" / "State_Sleep.cpp"
+# WO-2026-09-30-001 moved the daily-cleanup day-boundary gate out of
+# State_Report.cpp into the DailyBoundary owner; the converted
+# Clock::isTrusted() site moved with it, unchanged.
+DAILY_BOUNDARY = SRC_ROOT / "time" / "DailyBoundary.cpp"
 
 # The only two Clock::isTimeValid() call sites this step leaves unconverted,
 # matched as exact (whitespace-trimmed) source lines after comment-stripping.
@@ -62,7 +66,7 @@ CONVERTED_SITES = [
     (APP_SRC, "if (Clock::isTrusted()) {", "setup() boot-storm window (Group A)"),
     (STATE_COMMON, "const bool timeValid = Clock::isTrusted();", "closeOccupancySessionSafely (Group A)"),
     (STATE_ERROR, "if (!Clock::isTrusted()) {", "alert 40 corrective action (Group A)"),
-    (STATE_REPORT, "if (Clock::isTrusted()) {", "daily-cleanup day-boundary gate (Group A)"),
+    (DAILY_BOUNDARY, "if (Clock::isTrusted()) {", "daily-cleanup day-boundary gate (Group A)"),
     (STATE_IDLE, "if (Clock::isTrusted()) {", "MEASUREMENT-mode scheduled sampling (Group A)"),
     (STATE_SLEEP, "if (Clock::isTrusted() && intervalSec > 0) {", "reporting-boundary alignment (Group A)"),
     (STATE_IDLE, "const Clock::Openness parkOpenness = Clock::openness();", "SystemConfig::CONNECTED-mode park-hours policy (Group B)"),
@@ -89,7 +93,7 @@ def strip_comments(code: str) -> str:
 
 def main() -> None:
     texts = {}
-    for path in {APP_SRC, STATE_COMMON, STATE_ERROR, STATE_IDLE, STATE_REPORT, STATE_SLEEP}:
+    for path in {APP_SRC, STATE_COMMON, STATE_ERROR, STATE_IDLE, STATE_REPORT, STATE_SLEEP, DAILY_BOUNDARY}:
         if not path.is_file():
             fail(f"{path} does not exist")
         texts[path] = strip_comments(path.read_text())

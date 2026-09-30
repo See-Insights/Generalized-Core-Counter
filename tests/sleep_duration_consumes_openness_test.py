@@ -113,11 +113,25 @@ def main() -> None:
             "(nightSleepSec = secondsUntilNextOpen();) in handleSleepingState()"
         )
     preceding = sleeping_fn[:commit_match.start()]
-    guard_match = re.search(
-        r"if\s*\(\s*parkOpenness\s*==\s*Clock::Openness::Closed\s*\)\s*\{[^{}]*$",
-        preceding,
-        re.DOTALL,
-    )
+    # The commitment must sit directly inside the
+    # `if (parkOpenness == Clock::Openness::Closed)` block. Checked
+    # structurally (innermost unclosed `{` before the commitment) rather than
+    # with a brace-free text window, because WO-2026-09-30-001 legitimately
+    # adds a braced early-return guard at the top of that same block.
+    open_block_stack = []
+    for index, character in enumerate(preceding):
+        if character == "{":
+            open_block_stack.append(index)
+        elif character == "}":
+            if open_block_stack:
+                open_block_stack.pop()
+    guard_match = None
+    if open_block_stack:
+        guard_match = re.search(
+            r"if\s*\(\s*parkOpenness\s*==\s*Clock::Openness::Closed\s*\)\s*\{\s*$",
+            preceding[:open_block_stack[-1] + 1],
+            re.DOTALL,
+        )
     if not guard_match:
         fail(
             "the night-sleep commitment (nightSleepSec = secondsUntilNextOpen();) "
