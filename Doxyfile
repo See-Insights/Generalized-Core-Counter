@@ -2,7 +2,7 @@
 
 PROJECT_NAME           = "Generalized-Core-Counter"
 PROJECT_BRIEF          = "Particle-based generalized core counter firmware"
-PROJECT_NUMBER         = "v28-CloseBeforeSleep"
+PROJECT_NUMBER         = "v29-ConfigCleanup"
 
 # Where to put generated docs
 OUTPUT_DIRECTORY       = docs
