@@ -610,18 +610,20 @@ def main() -> None:
     print(f"PASS: State_Sleep.cpp contains ZERO occurrences of the shared logging helper "
           f"{helper_name}() and ZERO occurrences of 'exitSleepingState' anywhere in the file")
 
-    # ---- Check: all 13 real exit points inside handleSleepingState() are
+    # ---- Check: all 14 real exit points inside handleSleepingState() are
     # plain transitionTo(...) calls again (reverted from exitSleepingState()),
     # plus the one dead/unreachable transitionTo() line following the second
-    # System.reset() - 14 total transitionTo( occurrences in the function. ----
+    # System.reset() - 15 total transitionTo( occurrences in the function.
+    # (WO-2026-09-30-001 added the 14th real exit point: the close-due
+    # turnaround ahead of the night-sleep commitment.) ----
     transition_calls_in_hs = re.findall(r"\btransitionTo\s*\(", "\n".join(hs_body))
-    EXPECTED_TRANSITION_CALLS = 14  # 13 real exit points + 1 dead line after the second System.reset()
+    EXPECTED_TRANSITION_CALLS = 15  # 14 real exit points + 1 dead line after the second System.reset()
     if len(transition_calls_in_hs) != EXPECTED_TRANSITION_CALLS:
         fail(f"expected exactly {EXPECTED_TRANSITION_CALLS} transitionTo( calls inside "
-             f"handleSleepingState() (13 real exit points reverted from exitSleepingState(), plus "
+             f"handleSleepingState() (14 real exit points reverted from exitSleepingState(), plus "
              f"the 1 dead/unreachable line after the second System.reset()), found "
              f"{len(transition_calls_in_hs)}")
-    print(f"PASS: all 13 real exit points inside handleSleepingState() are plain transitionTo(...) "
+    print(f"PASS: all 14 real exit points inside handleSleepingState() are plain transitionTo(...) "
           "calls again (exitSleepingState() removed), plus the 1 dead/unreachable line, unchanged")
 
     # ---- Check: the two System.reset() paths' purpose-built diagnostics
