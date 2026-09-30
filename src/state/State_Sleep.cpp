@@ -981,6 +981,7 @@ void handleSleepingState() {
     // interrupt-driven sensors (like PIR) powered so they can wake the
     // device from ULTRA_LOW_POWER sleep.
     SensorManager::instance().onEnterSleep();
+    signalLED(false);
 
     // ********** Night sleep (outside opening hours) **********
     nightSleepSec = secondsUntilNextOpen();
