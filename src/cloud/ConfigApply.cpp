@@ -572,7 +572,8 @@ bool Cloud::applyReportingConfig(const LedgerData &defaults, const LedgerData &d
     }
 
     if (getMergedIntValue(defaultWebhook, deviceWebhook, "timeoutMs", webhookTimeout)) {
-        if (validateRange(webhookTimeout, 1000, 60000, "webhookTimeoutMs")) {
+        if (validateRange(webhookTimeout, (int)SystemConfig::kWebhookTimeoutMinMs,
+                          (int)SystemConfig::kWebhookTimeoutMaxMs, "webhookTimeoutMs")) {
             if (SystemConfig::get_webhookTimeoutMs() != (uint32_t)webhookTimeout) {
                 SystemConfig::set_webhookTimeoutMs((uint32_t)webhookTimeout);
                 Log.info("Config: Webhook timeout -> %dms", webhookTimeout);

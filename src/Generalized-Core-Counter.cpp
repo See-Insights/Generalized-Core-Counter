@@ -1656,7 +1656,7 @@ void loop() {
   // Requirement: 20 seconds starting only after a successful cloud connect.
   if (Particle.connected() && session.awaitingWebhookResponse && session.webhookAwaitStartMs != 0) {
     unsigned long timeoutMs = SystemConfig::get_webhookTimeoutMs();
-    if (timeoutMs < 5000UL || timeoutMs > 120000UL) {
+    if (timeoutMs < SystemConfig::kWebhookTimeoutMinMs || timeoutMs > SystemConfig::kWebhookTimeoutMaxMs) {
       timeoutMs = 20000UL;
     }
 
