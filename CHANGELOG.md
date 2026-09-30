@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v30-LedOffAtNight] - 2026-09-30
+
+### Changed
+
+- The blue occupancy LED is turned off whenever the device sleeps for the night
+
 ## [v29-ConfigCleanup] - 2026-09-30
 
 ### Changed

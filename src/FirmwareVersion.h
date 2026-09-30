@@ -15,9 +15,9 @@
 #define FIRMWARE_VERSION_H
 
 /** @brief Particle Product integer version (must be an integer). */
-#define FIRMWARE_PRODUCT_VERSION 29
+#define FIRMWARE_PRODUCT_VERSION 30
 
 /** @brief Current firmware release string. */
-inline const char* FIRMWARE_VERSION = "v29-ConfigCleanup";
+inline const char* FIRMWARE_VERSION = "v30-LedOffAtNight";
 
 #endif /* FIRMWARE_VERSION_H */

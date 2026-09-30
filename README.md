@@ -8,7 +8,7 @@ This repository includes key documentation files that contributors and AI coding
 
 # Generalized-Core-Counter
 
-**Version:** v29-ConfigCleanup | **Latest:** Configuration cleanup: build switches and logging policy in BuildProfile.h, version identity in FirmwareVersion.h, release notes moved to CHANGELOG.md, dead settings removed, one webhook-timeout range (5000-120000 ms)
+**Version:** v30-LedOffAtNight | **Latest:** The blue occupancy LED is turned off whenever the device sleeps for the night
 
 Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v14 release packages cloud recovery tuning and release-safe logging cleanup without changing the existing production power, sleep, connectivity, watchdog, ledger, or PMIC behavior.
 
