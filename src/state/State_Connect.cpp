@@ -66,14 +66,18 @@ void sampleConnectionSignal(int &strengthPct, int &qualityPct, bool &valid) {
   qualityPct = -1;
 #if Wiring_Cellular
   CellularSignal sig = Cellular.RSSI();
-  strengthPct = (int)(sig.getStrength() + 0.5f);
-  qualityPct = (int)(sig.getQuality() + 0.5f);
-  valid = true;
+  if (sig.getStrength() >= 0.0f && sig.getQuality() >= 0.0f) {
+    strengthPct = (int)(sig.getStrength() + 0.5f);
+    qualityPct = (int)(sig.getQuality() + 0.5f);
+    valid = true;
+  }
 #elif Wiring_WiFi
   WiFiSignal sig = WiFi.RSSI();
-  strengthPct = (int)(sig.getStrength() + 0.5f);
-  qualityPct = (int)(sig.getQuality() + 0.5f);
-  valid = true;
+  if (sig.getStrength() >= 0.0f && sig.getQuality() >= 0.0f) {
+    strengthPct = (int)(sig.getStrength() + 0.5f);
+    qualityPct = (int)(sig.getQuality() + 0.5f);
+    valid = true;
+  }
 #endif
 }
 
@@ -715,17 +719,30 @@ void handleConnectingState() {
     RecoveryState::raiseAlert(31);
     Connectivity::requestFullDisconnectAndRadioOff();
     clearActiveConnectAttempt();
+
+    // A failed attempt counts toward the periodic deep attempt as well, so a
+    // device that keeps failing still reaches the 11-minute budget.
+    uint8_t failedAttemptCounter = SystemConfig::get_connectionAttemptCounter();
+    if (failedAttemptCounter < ConnectivityPolicy::DEEP_ATTEMPT_COUNTER_THRESHOLD) {
+      SystemConfig::set_connectionAttemptCounter(failedAttemptCounter + 1);
+    }
+
     transitionTo(SLEEPING_STATE, "connect-timeout");
   }
 }
 
 // FIRMWARE_UPDATE_STATE: Stay connected for firmware/config updates
+// Firmware-update event record owned by Generalized-Core-Counter.cpp (WO-2026-10-01-001 A).
+extern volatile bool firmwareUpdateInProgress;
+extern volatile unsigned long firmwareUpdateLastActivityMs;
+
 void handleFirmwareUpdateState() {
   // Track how long we've been in update mode so we can mirror the
   // Particle Wake-Publish-Sleep example behaviour: bound the time
   // spent waiting for an update before going back to sleep.
   static unsigned long firmwareUpdateStartMs = 0;
   static bool configLoadedInUpdateMode = false;
+  static unsigned long lastProgressSeenMs = 0;
 
   if (state != oldState) {
     publishStateTransition();
@@ -733,11 +750,18 @@ void handleFirmwareUpdateState() {
 
     firmwareUpdateStartMs = millis();
     configLoadedInUpdateMode = false;
+    lastProgressSeenMs = 0;
 
     // Ensure cloud connection is requested
     if (!Particle.connected()) {
       Particle.connect();
     }
+  }
+
+  // Hold the short-term webhook response window open: an OTA transfer is
+  // forward progress, not a stalled webhook (WO-2026-10-01-001 A5).
+  if (session.awaitingWebhookResponse) {
+    session.webhookAwaitStartMs = millis();
   }
 
   // Once connected, ensure configuration is loaded at least once
@@ -747,14 +771,21 @@ void handleFirmwareUpdateState() {
       Cloud::instance().loadConfigurationFromCloud();
       configLoadedInUpdateMode = true;
     }
+  }
 
-    // If no updates are pending anymore and no OTA in progress, exit update mode
-    if (!System.updatesPending()) {
-      Log.info("No updates pending - leaving FIRMWARE_UPDATE_STATE to IDLE_STATE");
-      configLoadedInUpdateMode = false;
-      transitionTo(IDLE_STATE, "firmware-update-complete");
-      return;
-    }
+  // A new begin/progress event since the last pass is forward progress, so
+  // ThrashGuard does not pre-empt the no-progress exit below.
+  if (firmwareUpdateLastActivityMs != lastProgressSeenMs) {
+    lastProgressSeenMs = firmwareUpdateLastActivityMs;
+    thrashGuard.markProgress("OTA_PROGRESS");
+  }
+
+  // No download is running (it completed, failed, or never started): go back to
+  // sleep. Device OS resets the device itself after a completed update.
+  if (!firmwareUpdateInProgress) {
+    Log.info("No firmware update in progress - leaving FIRMWARE_UPDATE_STATE to SLEEPING_STATE");
+    transitionTo(SLEEPING_STATE, "firmware-update-not-in-progress");
+    return;
   }
 
   // Optional escape hatch: user button can also exit update mode
@@ -764,13 +795,13 @@ void handleFirmwareUpdateState() {
     return;
   }
 
-  // Firmware update timeout: if we've spent more than firmwareUpdateMaxMs
-  // in this state, mirror the reference example and go to sleep so we can
-  // try again in a future cycle instead of keeping the modem on
-  // indefinitely.
-  if (firmwareUpdateStartMs != 0 && (millis() - firmwareUpdateStartMs) > firmwareUpdateMaxMs) {
-    Log.info("Firmware update timed out after %lu ms in FIRMWARE_UPDATE_STATE - transitioning to SLEEPING_STATE",
-             (unsigned long)(millis() - firmwareUpdateStartMs));
-    transitionTo(SLEEPING_STATE, "firmware-update-timeout");
+  // No-progress exit: a transfer that is still moving keeps the device awake
+  // for as long as it needs; one that has stalled for firmwareUpdateMaxMs
+  // goes back to sleep to retry in a future cycle.
+  const unsigned long noProgressRefMs = (lastProgressSeenMs > firmwareUpdateStartMs) ? lastProgressSeenMs : firmwareUpdateStartMs;
+  if (millis() - noProgressRefMs > firmwareUpdateMaxMs) {
+    Log.info("Firmware update: no progress for %lu ms in FIRMWARE_UPDATE_STATE - transitioning to SLEEPING_STATE",
+             (unsigned long)(millis() - noProgressRefMs));
+    transitionTo(SLEEPING_STATE, "firmware-update-no-progress");
   }
 }

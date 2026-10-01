@@ -1,4 +1,5 @@
 #include "BuildProfile.h"
+#include "ResetCause.h"
 #include "state/State_Common.h"
 #include "../Config.h"
 #include "cloud/Cloud.h"
@@ -315,6 +316,9 @@ bool shouldUseBoronRtcAlarmHibernate(uint32_t requestedSleepSec, time_t &rtcNow)
  * @brief SLEEPING_STATE: deep sleep between reporting intervals.
  * ...
  */
+// Firmware-update record owned by Generalized-Core-Counter.cpp (WO-2026-10-01-001 A).
+extern volatile bool firmwareUpdateInProgress;
+
 void handleSleepingState() {
   setLoopStage(LOOP_STAGE_SLEEP_PREP);
 
@@ -470,6 +474,17 @@ void handleSleepingState() {
     cloudDisconnectStartMs = 0;
     cloudDisconnectElapsedMs = 0;
     modemOffElapsedMs = 0;
+  }
+
+  // Particle's reference pattern (STATE_SLEEP's first check): a firmware
+  // download in flight outranks sleep. Sit here on every pass until no
+  // teardown has been requested, so a `begin` delivered between loop passes is
+  // caught before the cloud disconnect / radio-off requests below, not after
+  // the transfer has already been lost (WO-2026-10-01-001 item A).
+  if (!disconnectRequested && firmwareUpdateInProgress) {
+    cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
+    transitionTo(FIRMWARE_UPDATE_STATE, "firmware update in progress");
+    return;
   }
 
   // Only wait for cloud operations *before* requesting disconnect.
@@ -1168,7 +1183,7 @@ void handleSleepingState() {
 #if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
       PowerDiagnostics::flushDiagBatch();
 #endif
-      System.reset();
+      System.reset(RESET_CAUSE_SLEEP_HEAP_GUARD);
       return;
     }
 
@@ -1466,7 +1481,7 @@ void handleSleepingState() {
 #if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
         PowerDiagnostics::flushDiagBatch();
 #endif
-        System.reset();
+        System.reset(RESET_CAUSE_SLEEP_ATTEMPTS_EXHAUSTED);
         
         // Should never reach here, but set ERROR_STATE as fallback
         transitionTo(ERROR_STATE, "sleep-all-attempts-failed");

@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v31-ConnectivityFixes] - 2026-10-01
+
+### Changed
+
+- Connectivity and diagnosability fixes: OTA progress-aware update dwell, failed-attempt counting, reset-cause codes, signal validity
+
 ## [v30-LedOffAtNight] - 2026-09-30
 
 ### Changed
