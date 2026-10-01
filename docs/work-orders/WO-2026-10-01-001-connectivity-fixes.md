@@ -187,6 +187,103 @@ In `sampleConnectionSignal()` (`State_Connect.cpp:63–71`), set `valid` only wh
   Verdict: `WO-2026-10-01-001-stage7-r2-verdict.md`.
 - [x] Stage 8 (Chip, 2026-10-01): accepted; commit v31 and the workflow deletion rule as separate commits (by Claude Code on Chip's instruction), push the branch and open the PR. **Don't merge** until the Dev-09 bench (OTA to a version-only v31.1-BenchOTA, product 32, never released; a reset-cause check) passes and v30 (PR #53) has merged.
 
+## Bench evidence (Dev-09, e00fce68399ee6244a963935, 2026-10-01)
+
+Bench run by Chip; status events read by Claude Code from the AWS archive (read-only). Images built locally with Workbench's environment (Device OS 6.4.1): `v31-ConnectivityFixes` (product 31, SHA-256 `1e77d4d6…13b4`), `v31.1-BenchOTA` (product 32, never released, `4b06b931…7f81`), `v31-FailsafeTest` (bench only, `-DCONNECTIVITY_FAILSAFE_TEST_MODE=1`, `31c09ad1…83c1`). The failsafe test image needed a two-line include fix applied only to its scratch copy (`ConnectivityFailsafeTest.cpp`: `"Config.h"` → `"../Config.h"`; `ConnectivityFailsafeTest.h`: add `"cloud/BatteryBackoffPolicy.h"`): the repo's test mode does not currently build.
+
+### Item C: reset cause (PASS)
+
+- **Our own reset:** `v31-FailsafeTest` with the antenna removed. Status 11:27:40.724Z: `resetReason` 140, **`resetReasonData` 2** (`RESET_CAUSE_CONNECTIVITY_FAILSAFE`), `failsafeTest` 1, `failsafeStage` 2, previous boot ended at breadcrumb 10 (`CONNECTIVITY_FAILSAFE_HARD`). A second stage-2 reset (140 / 2, published 12:42:47Z) and stage 3, the AB1805 deep power-down (reason 20, breadcrumbs wiped, published 12:43:05Z), followed while the device stayed offline.
+- **A reset from outside the firmware** (`particle usb reset`): status 12:43:08.765Z: `resetReason` 140, **`resetReasonData` 0**. The previous boot ran 41 s with the main loop running normally (breadcrumb 18), so it was neither one of the six coded sites nor the AB1805 library fallback. So 140 with data 0 identifies a reset from outside our `src/` reset sites.
+
+### Item A: OTA in one session, no sleep mid-download (PASS)
+
+OTA of `v31-ConnectivityFixes` (product 31) onto Dev-09 running `v31.1-BenchOTA` (product 32). Serial log (Workbench serial monitor, device time in ms; `[Connected]`/`[Disconnected]` are monitor markers):
+
+```
+0000642890 [app] INFO: PowerDiag[8]: post-wake source=USB_HOST profile=UsbBench vbus=2 pg=1 soc=81.1% usbAddr=0x2 usbReg=0x3
+0000642902 [app] INFO: PowerApply: profile=USB source=USB_ADAPTER reason=usb_power_source
+0000642904 [app] INFO: PowerDiag[9]: post-refreshInputProfile source=USB_ADAPTER profile=UsbBench vbus=2 pg=1 soc=81.1% usbAddr=0x2 usbReg=0x3
+0000642933 [app] INFO: ChargeDiag: chg=DONE(3) fault=0x00 vbus=ADAPT pg=1 th=OK vsys=0 vcell=4.032 soc=81.1 src=USB_ADAPTER prof=USB
+0000642938 [app] INFO: Occ: state=1 reason=pir-wake led=300s report=1
+0000642940 [app] INFO: LoopStage: stage=SLEEP_PREP elapsed=632586 state=3 q=0 connMs=634052
+0000642943 [app] INFO: StateReq: Sleep->Report reason=sleep-pir-occupancy-report
+0000642945 [app] INFO: State: Sleep->Report
+0000642992 [app] INFO: ChargeDiag: chg=DONE(3) fault=0x00 vbus=ADAPT pg=1 th=OK vsys=0 vcell=4.032 soc=81.1 src=USB_ADAPTER prof=USB
+0000643123 [app] INFO: LedgerPayloadData: bytes=219/512 schema=2
+0000643454 [app] INFO: Report: occ=1 totalMin=79 alert=19 ok=1 ledger=req
+0000643461 [app] INFO: StateReq: Report->Connect reason=occupancy change
+0000643687 [app] INFO: State: Report->Connect
+0000644186 [app] INFO: Connect: start budget=660s heap=77128
+0000645905 [app] INFO: ConnSummary: ok elapsed=2199 last=CONNECTED cellMs=0 netMs=0 cloudMs=2198 cloudRecoverStage=0 cloudRecoverCount=0 sig=77/19 heap=76248 q=1
+0000645954 [app] INFO: ChargeDiag: chg=DONE(3) fault=0x00 vbus=ADAPT pg=1 th=OK vsys=0 vcell=4.032 soc=81.1 src=USB_ADAPTER prof=USB
+0000645964 [app] INFO: PowerDiag[10]: connect-success source=USB_ADAPTER profile=UsbBench vbus=2 pg=1 soc=81.1% usbAddr=0x2 usbReg=0x3
+0000645974 [app] INFO: LedgerPayloadStatus: bytes=827/896 schema=2
+0000646481 [app] INFO: LedgerPayloadData: bytes=219/512 schema=2
+0000646508 [app] INFO: Connect: ok elapsed=2222ms sig=78/19 q=1 heap=76208
+0000646509 [app] INFO: StateReq: Connect->Sleep reason=return-to-sleep-after-report
+0000646632 [app] INFO: State: Connect->Sleep
+0000647497 [app] INFO: LedgerCb: kind=DATA seq=4 globalSeq=5 found=1 age=4370 ms=647497 upd=4154893822 sync=4154897949 countBefore=2 countAfter=1 pendingData=0 pendingStatus=1
+0000647932 [comm.ota] INFO: Received UpdateStart request
+0000647934 [comm.ota] INFO: File size: 99441
+0000647935 [comm.ota] INFO: Chunk size: 512
+0000647935 [comm.ota] INFO: File checksum:
+3cef3626c2e0ec4fed959072455af9c6c65e573ba648b747391f2c1de8ad58f6
+0000647936 [comm.ota] INFO: Starting firmware update
+0000649055 [comm.ota] INFO: Start offset: 0
+0000649056 [comm.ota] INFO: Chunk count: 195
+0000649060 [app] INFO: LoopStage: stage=SLEEP_PREP elapsed=2428 state=3 q=1 connMs=3150
+0000649062 [app] INFO: StateReq: Sleep->FW reason=firmware update in progress
+0000649065 [app] INFO: State: Sleep->FW
+0000649066 [app] INFO: Entering FIRMWARE_UPDATE_STATE - keeping device connected for updates
+0000649068 [app] INFO: Connected in FIRMWARE_UPDATE_STATE - loading configuration from cloud
+0000650061 [app] INFO: LedgerCb: kind=STATUS seq=5 globalSeq=5 found=1 age=4071 ms=650061 upd=4154896681 sync=4154900542 countBefore=1 countAfter=0 pendingData=0 pendingStatus=0
+0000725501 [comm.ota] INFO: Received UpdateFinish request
+0000725502 [comm.ota] INFO: Validating firmware update
+0000726804 [comm.ota] INFO: Update time: 78873
+0000726805 [comm.ota] INFO: Transfer time: 71029
+0000726805 [comm.ota] INFO: Processing time: 2951
+0000726806 [comm.ota] INFO: Chunks received: 207
+0000726806 [comm.ota] INFO: Chunk ACKs sent: 201
+0000726807 [comm.ota] INFO: Duplicate chunks: 12
+0000726808 [comm.ota] INFO: Out-of-order chunks: 11
+0000726808 [comm.ota] INFO: Applying firmware update
+0000728138 [app] INFO: No firmware update in progress - leaving FIRMWARE_UPDATE_STATE to SLEEPING_
+[Disconnected]
+STATE
+0000728139 [app] INFO: StateReq: FW->Sleep reason=firmware-update-not-in-progress
+0000728141 [app] INFO: State: FW->Sleep
+[Connected]
+0000002619 [ncp.client] INFO: Using internal SIM card
+0000016742 [app] INFO: ConnSummary: ok elapsed=15492 last=CONNECTED cellMs=5452 netMs=0 cloudMs=10040 cloudRecoverStage=0 cloudRecoverCount=0 sig=78/25 heap=76432 q=1
+0000016751 [app] INFO: PowerApply: profile=USB source=USB_HOST reason=usb_power_source
+0000016752 [app] INFO: PowerDiag[4]: post-refreshInputProfile source=USB_HOST profile=UsbBench vbus=1 pg=1 soc=80.9% usbAddr=0x2 usbReg=0x3
+0000016778 [app] INFO: ChargeDiag: chg=DONE(3) fault=0x00 vbus=USB pg=1 th=OK vsys=0 vcell=4.032 soc=80.9 src=USB_HOST prof=USB
+0000016781 [app] INFO: PowerDiag[5]: connect-success source=USB_HOST profile=UsbBench vbus=1 pg=1 soc=80.9% usbAddr=0x2 usbReg=0x3
+0000016791 [app] INFO: LedgerPayloadStatus: bytes=838/896 schema=2
+0000017247 [app] INFO: LedgerPayloadData: bytes=220/512 schema=2
+0000017589 [app] INFO: Connect: ok elapsed=15998ms sig=78/19 q=1 heap=75800
+0000017590 [app] INFO: StateReq: Connect->Idle reason=connect-complete
+0000017604 [app] INFO: ClockResync: sync advanced, rtcUpdated=1 epoch=1790861397 correctionSec=0
+0000017945 [app] INFO: LedgerPayloadStatus: bytes=837/896 schema=2
+0000018281 [app] INFO: State: Connect->Idle
+0000018286 [app] INFO: Low-power idle: no updates pending - handing queue (q=1) to sleep gate
+0000018286 [app] INFO: StateReq: Idle->Sleep reason=low power idle
+0000018289 [app] INFO: LedgerCb: kind=STATUS seq=1 globalSeq=3 found=1 age=1484 ms=18289 upd=4155003121 sync=4155002893 countBefore=3 countAfter=2 pendingData=1 pendingStatus=0
+0000018291 [app] INFO: State: Idle->Sleep
+[Disconnected]
+```
+
+What it shows:
+- **One session, from offset 0:** `Start offset: 0`, `Chunk count: 195`; transfer 71.0 s, update 78.9 s, 207 chunks received (12 duplicates, 11 out of order).
+- **The sleep handler catches the download before any teardown:** 1.1 s after `Starting firmware update`, `StateReq: Sleep->FW reason=firmware update in progress`, then `Entering FIRMWARE_UPDATE_STATE`.
+- **No `Sleep:` and no `Low-power idle` line between `Starting firmware update` (647936) and the reboot.** The only `Low-power idle` line is in the next boot (18286), after the update.
+- **After `Applying firmware update`:** the flag cleared and the state left for Sleep (`FW->Sleep` at 728141). Device OS reset 3 ms later, before any teardown (the next status reports the previous boot ended at 728144 ms). This is the Stage 7 round 2 note (2) path, seen benign here.
+- **Next status** (archive, `status/…/2026-10-01T13-30-01-955Z.json`, published 13:30:01.955Z): `version` **v31-ConnectivityFixes**, **`resetReason` 70**, `resetReasonData` 0, `failsafeStage` 0, `failsafeTest` 0, `fw_version` 31. New boot about 13:29:39Z (from `ClockResync epoch=1790861397` at 17.6 s uptime).
+- **Nothing queued lost:** the report made just before the update (`Report: occ=1 totalMin=79`) was delivered at 13:28:15.647Z (stamped 21:28:08 SGT, occ 1, dd 79); the post-update `q=1` is the startup status, published 13:30:01Z.
+
+Not recorded in the archive: Particle's `spark/flash/status` events (the archive keeps only the firmware's own events). An earlier v31.1-BenchOTA OTA around 13:00–13:17Z resumed at the full file size (offset 99442, 0 chunks); its cause was not determined (no serial in the archive after 10:30Z).
+
 ## Budget versus actual (closing record)
 
 Per `AI_DEVELOPMENT_WORKFLOW.md` §12 guardrail 3. Actuals are the figures recorded in the Stage 7 verdicts (`WO-2026-10-01-001-stage7-verdict.md` for B, C, D; `WO-2026-10-01-001-stage7-r2-verdict.md` for A); "not recorded" means the verdict has no figure.
