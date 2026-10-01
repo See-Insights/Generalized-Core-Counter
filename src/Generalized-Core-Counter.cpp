@@ -31,6 +31,7 @@
 #include "observability/StartupSnapshotRuntime.h"
 #include "diagnostics/ConnectivityFailsafeTest.h"
 #include "ThrashGuard.h"
+#include "ResetCause.h"
 
 // Firmware version metadata
 #include "FirmwareVersion.h"
@@ -127,11 +128,21 @@ void connectivityFailsafeSupervisor();
 
 SystemSleepConfiguration config; // Sleep 2.0 configuration
 void outOfMemoryHandler(system_event_t event, int param);
+void firmwareUpdateHandler(system_event_t event, int param);
 LocalTimeConvert conv; // For converting UTC time to local time
 AB1805 ab1805(Wire);   // AB1805 RTC / Watchdog
 
 // System health flag set from the out-of-memory callback.
 int outOfMemory = -1; // Set by outOfMemoryHandler when heap is exhausted
+
+// Firmware-update system-event record (WO-2026-10-01-001 item A), following
+// Particle's wake-publish-sleep reference pattern. The handler only records;
+// the sleep gate and FIRMWARE_UPDATE_STATE act on it. Event codes are Device
+// OS 6.4.1 system/inc/system_event.h:77-80 (begin 0, complete 1, progress 2,
+// failed -1). Deliberate difference 1: begin and progress also record millis()
+// so the dwell can be bounded by inactivity rather than by a fixed cap.
+volatile bool firmwareUpdateInProgress = false;
+volatile unsigned long firmwareUpdateLastActivityMs = 0;
 
 // ********** State Machine **********
 char stateNames[7][16] = {"Initialize", "Error",     "Idle",
@@ -888,6 +899,8 @@ void setup() {
             outOfMemoryHandler); // Enabling an out of memory handler is a good
                                  // safety tip. If we run out of memory a
                                  // System.reset() is done.
+
+  System.on(firmware_update, firmwareUpdateHandler); // Record OTA progress (WO-2026-10-01-001 A)
 
   // Awake watchdog: reset if the firmware stops making forward progress while
   // running normally. Use the Device OS hardware watchdog so intended sleep
@@ -1810,7 +1823,7 @@ static void awakeWatchdogExpiredHandler() {
 // ApplicationWatchdog expects a plain function pointer.
 static void appWatchdogHandler() {
   setAppBreadcrumb(BREADCRUMB_APP_WATCHDOG_RESET);
-  System.reset();
+  System.reset(RESET_CAUSE_APP_WATCHDOG);
 }
 #endif
 
@@ -2475,6 +2488,14 @@ void outOfMemoryHandler(system_event_t event, int param) {
   outOfMemory = param;
 }
 
+// Records firmware-update progress only - no transitions, no other work.
+void firmwareUpdateHandler(system_event_t event, int param) {
+  (void)event;
+  if (param == 0) { firmwareUpdateInProgress = true; }
+  if (param == 1 || param == -1) { firmwareUpdateInProgress = false; }
+  if (param == 0 || param == 2) { firmwareUpdateLastActivityMs = millis(); }
+}
+
 void clearConnectivityFailsafeRecovery(const char *reason) {
   const bool hadRecoveryState =
       RecoveryState::get_connectivityRecoveryStage() != 0 ||
@@ -2629,7 +2650,7 @@ void connectivityFailsafeSupervisor() {
     persistConnectivityFailsafeState(2, now, true);
     Log.info("Failsafe: stage=2 action=system-reset age=%lds",
              (long)connectionAgeSec);
-    System.reset();
+    System.reset(RESET_CAUSE_CONNECTIVITY_FAILSAFE);
     return;
   }
 

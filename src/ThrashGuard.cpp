@@ -1,4 +1,5 @@
 #include "ThrashGuard.h"
+#include "ResetCause.h"
 #include "state/StateMachine.h"
 #include "power/Connectivity.h"
 #include "persist/RecoveryState.h"
@@ -64,7 +65,7 @@ uint32_t ThrashGuard::timeoutForStateSec(int currentState) const {
   case REPORTING_STATE:
     return 120;
   case FIRMWARE_UPDATE_STATE:
-    return 180;
+    return 330;  // Above the 5-minute no-progress exit so ThrashGuard does not pre-empt it
   case INITIALIZATION_STATE:
   case ERROR_STATE:
     return 60;
@@ -148,5 +149,5 @@ void ThrashGuard::loop(int currentState, uint32_t nowMs) {
   logTrip(currentState, noprogSec, lastTag_, 3, "reset");
   RecoveryState::raiseAlert(18);  // Alert 18: Severe thrash detected (tier 3 - reset)
   thrashResetCount++;
-  System.reset();
+  System.reset(RESET_CAUSE_THRASH_TIER3);
 }

@@ -1,4 +1,5 @@
 #include "state/State_Common.h"
+#include "ResetCause.h"
 #include "../Config.h"
 #include "cloud/Cloud.h"
 #include "LocalTimeRK.h"
@@ -158,7 +159,7 @@ void handleErrorState() {
     if (millis() - resetTimer > resetWait) {
       Log.info("ModemTeardown: radioOn=%d point=error-state-soft-reset", (int)Connectivity::isRadioPoweredOn());
       Log.info("Executing soft reset from ERROR_STATE");
-      System.reset();
+      System.reset(RESET_CAUSE_ERROR_STATE_SOFT);
     }
     break;
 

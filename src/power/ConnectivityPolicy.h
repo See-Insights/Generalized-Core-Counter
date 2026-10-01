@@ -80,17 +80,21 @@ constexpr uint16_t CONNECT_BUDGET_CONFIG_MAX_SEC = 900;
 constexpr uint8_t DEEP_ATTEMPT_COUNTER_THRESHOLD = 3; // deep when attemptCounter >= 3
 constexpr float DEEP_ATTEMPT_SOC_THRESHOLD = 50.0f;   // deep when SoC > 50%
 
-// ===== Firmware update (stay-connected) budget =====
+// ===== Firmware update (stay-connected) no-progress window =====
 // Purpose:
-// - Upper-bound how long we remain in a firmware-update dwell state before
-//   abandoning and returning to normal low-power behavior.
+// - Upper-bound how long we remain in a firmware-update dwell state WITHOUT a
+//   `firmware_update` progress event before abandoning and returning to normal
+//   low-power behavior. A transfer that keeps reporting progress restarts this
+//   window, so it is no longer an absolute cap (WO-2026-10-01-001 item A).
 //
 // Rationale / tradeoffs:
-// - Keeps OTA from monopolizing the power budget in poor connectivity.
+// - Keeps a stalled OTA from monopolizing the power budget in poor connectivity
+//   while letting a slow-but-moving download finish in one session.
 //
 // Safety notes:
 // - Generally “medium risk” to tune: making it longer increases energy burn;
-//   making it shorter can cause updates to fail more often.
+//   making it shorter can cause updates to fail more often. ThrashGuard's
+//   FIRMWARE_UPDATE_STATE timeout (ThrashGuard.cpp) must stay above this value.
 constexpr unsigned long FIRMWARE_UPDATE_MAX_MS = 5UL * 60UL * 1000UL;
 
 // ===== Long-duration connectivity failsafe =====

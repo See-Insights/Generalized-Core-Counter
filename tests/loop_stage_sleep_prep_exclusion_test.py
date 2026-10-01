@@ -610,20 +610,22 @@ def main() -> None:
     print(f"PASS: State_Sleep.cpp contains ZERO occurrences of the shared logging helper "
           f"{helper_name}() and ZERO occurrences of 'exitSleepingState' anywhere in the file")
 
-    # ---- Check: all 14 real exit points inside handleSleepingState() are
+    # ---- Check: all 15 real exit points inside handleSleepingState() are
     # plain transitionTo(...) calls again (reverted from exitSleepingState()),
     # plus the one dead/unreachable transitionTo() line following the second
-    # System.reset() - 15 total transitionTo( occurrences in the function.
+    # System.reset() - 16 total transitionTo( occurrences in the function.
     # (WO-2026-09-30-001 added the 14th real exit point: the close-due
-    # turnaround ahead of the night-sleep commitment.) ----
+    # turnaround ahead of the night-sleep commitment. WO-2026-10-01-001 item A
+    # added the 15th: the firmware-update check ahead of the first teardown
+    # request.) ----
     transition_calls_in_hs = re.findall(r"\btransitionTo\s*\(", "\n".join(hs_body))
-    EXPECTED_TRANSITION_CALLS = 15  # 14 real exit points + 1 dead line after the second System.reset()
+    EXPECTED_TRANSITION_CALLS = 16  # 15 real exit points + 1 dead line after the second System.reset()
     if len(transition_calls_in_hs) != EXPECTED_TRANSITION_CALLS:
         fail(f"expected exactly {EXPECTED_TRANSITION_CALLS} transitionTo( calls inside "
-             f"handleSleepingState() (14 real exit points reverted from exitSleepingState(), plus "
+             f"handleSleepingState() (15 real exit points reverted from exitSleepingState(), plus "
              f"the 1 dead/unreachable line after the second System.reset()), found "
              f"{len(transition_calls_in_hs)}")
-    print(f"PASS: all 14 real exit points inside handleSleepingState() are plain transitionTo(...) "
+    print(f"PASS: all 15 real exit points inside handleSleepingState() are plain transitionTo(...) "
           "calls again (exitSleepingState() removed), plus the 1 dead/unreachable line, unchanged")
 
     # ---- Check: the two System.reset() paths' purpose-built diagnostics
@@ -632,7 +634,9 @@ def main() -> None:
     # System.reset() itself doesn't return - so there is no exclusion-window
     # logic needed anymore; just confirm the diagnostics themselves are
     # intact and the reset call count is unchanged. ----
-    reset_line_indices = [i for i, l in enumerate(hs_body) if "System.reset();" in l]
+    # WO-2026-10-01-001 item C made each reset name itself:
+    # `System.reset(RESET_CAUSE_...)`. Match the call, not the bare form.
+    reset_line_indices = [i for i, l in enumerate(hs_body) if "System.reset(" in l]
     if len(reset_line_indices) != 2:
         fail(f"expected exactly 2 System.reset() calls inside handleSleepingState(), "
              f"found {len(reset_line_indices)}")

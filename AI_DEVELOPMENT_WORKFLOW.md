@@ -145,7 +145,7 @@ removed when the work completes.
 - Descriptive names that identify the tool and purpose, e.g.
   `tests/rtc_skew_test_bin`, not `tests/.t`.
 - Placement under a path already covered by `.gitignore`, or added to it.
-- Cleanup on completion, including on failure paths.
+- Cleanup on completion, including on failure paths, of **only the artifacts you created**. Use a uniquely named scratch directory (e.g. `build-tmp/<wo>-stage6/`) and remove that directory, never a shared parent: `build-tmp/` holds other agents' artifacts and evidence.
 
 **Prohibited:**
 
@@ -246,6 +246,7 @@ made the artifact invisible to a routine `ls` and easy to miss in
 - Must not commit, push, merge, release, or operate Fleet devices.
 - Must not silently weaken or remove tests to obtain a passing result.
 - Must not modify protected files unless explicitly included in the Work Order.
+- Must not delete anything it did not create. Cleanup removes only its own uniquely named scratch directory (named in the dispatch), never a shared parent such as `build-tmp/` itself. Every Copilot dispatch's AUTHORIZATION SCOPE states this and names the scratch directory. (Added 2026-10-01: WO-2026-10-01-001's Stage 6 round 1 ran `rm -rf build-tmp`, deleting a 230,000-file archive copy that an investigation report cited, plus another agent's run log.)
 
 ### Chip — Chief Engineer and Final Authority
 
@@ -461,6 +462,8 @@ AGENT: <Copilot|Codex> · MODEL: <id> · REASONING: <level>
 AUTHORIZATION SCOPE: <pre-authorized actions> / <explicitly not authorized>
 ```
 
+For Copilot and Codex, the AUTHORIZATION SCOPE names the agent's own scratch directory (e.g. `build-tmp/<wo>-stage6/`), and its "not authorized" half includes "deleting anything you didn't create, including `build-tmp/` itself".
+
 The body follows: the Work Order it serves (the binding spec), the branch and base commit, what to do, what to verify, and the report expected back.
 
 ### Commands
@@ -554,6 +557,11 @@ Every Work Order should include:
 - Rollback procedure
 - Approval record
 - Investigation, implementation, and verification results
+- Budget versus actual (closing section; §12 guardrail 3), one row per item, figures taken from the Stage 7 verdict, "not recorded" where the verdict has no figure:
+
+  | Item | Budget | Raised to (reason) | Actual net `src/` lines | Tests |
+  |---|---|---|---|---|
+  | A | ≤ N lines | — | +n | … |
 
 ## 7. Access and security controls
 
@@ -658,5 +666,6 @@ Added after WO-2026-09-25-001, where three review rounds grew a restoration of a
 1. **Check the history first.** Before designing anything new, search the history for the behavior (`git log -S "<symbol>"`, `git log -G`). If the behavior existed before, the default fix is to restore it; a new mechanism needs a stated reason why restoration is not enough. For a restoration, Stage 7 verifies against "at least as good as the version restored", not an expanded fault model.
 2. **A plain-language goal at the top of every WO.** One short paragraph, no jargon, saying what should be true when the work is done. Every dispatch and review is checked against it.
 3. **A size budget in every dispatch.** Each dispatch states the expected size of the change (lines of `src/` and `lib/`, and tests). Going over the budget means stopping and reporting, not continuing.
+   **Record budget versus actual.** Every WO's closing record includes a table with one row per item: budget, raised to (if raised, with its recorded reason), and actual net `src/` lines (tests listed separately). Review the tables every few WOs: a kind of change that keeps going over points to a structural problem, not just a budget to raise.
 4. **The two-round rule.** If two implementation rounds each add new mechanisms, or two rounds pass without VERIFIED, stop. The architect and the user restate the goal in plain language before any third round.
 5. **Verify the binary, not the source, for anything involving vendored libraries.** A library that is both vendored in `lib/` and listed in `project.properties` may be replaced by the registry copy in a cloud build. Confirm the change is present in the binary that will be flashed (disassembly, symbols, or strings), not only in the source tree. Local and cloud builds may use different library copies. Bench-test the build type the fleet will receive.

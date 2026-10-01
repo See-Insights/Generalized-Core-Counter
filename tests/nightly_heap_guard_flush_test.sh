@@ -33,6 +33,8 @@ generate() {
 #include <vector>
 
 #include "power/ConnectivityPolicy.h"
+// WO-2026-10-01-001 item C: the extracted block now names its reset cause.
+#include "ResetCause.h"
 
 // Records the exact order System.reset()/System.freeMemory() and
 // PowerDiagnostics::flushDiagBatch() were invoked in, so the test can assert
@@ -45,7 +47,11 @@ struct FakeSystem {
 
   unsigned long freeMemory() const { return freeMemoryValue; }
 
-  void reset() { callOrder.push_back("System.reset"); }
+  void reset(uint32_t cause = 0) {
+    // Item C: the guard must pass its own non-zero cause code.
+    assert(cause == RESET_CAUSE_SLEEP_HEAP_GUARD);
+    callOrder.push_back("System.reset");
+  }
 };
 
 FakeSystem System;
