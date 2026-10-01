@@ -197,6 +197,11 @@ void set_testConnectionDurationOverride(uint16_t value);
 
 // *************** Webhook configuration ***************
 
+// WO-2026-09-29-002 step 4 (Chip, 2026-09-30): the one accepted webhook-response
+// timeout range. Used by cloud/ConfigApply.cpp and Generalized-Core-Counter.cpp.
+constexpr uint32_t kWebhookTimeoutMinMs = 5000UL;
+constexpr uint32_t kWebhookTimeoutMaxMs = 120000UL;
+
 const char *get_webhookNameCStr();
 bool set_webhookName(const char *str);
 

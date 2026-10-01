@@ -51,9 +51,6 @@ TestNrfPowerRegs testNrfPowerRegs;
 // actually wrote for a given JSON field name (see Finding 1 test below).
 JSONFieldObserver g_statusJsonObserver;
 
-// Required by DeviceStatusPublisher.cpp (`extern const char* FIRMWARE_VERSION;`).
-const char *FIRMWARE_VERSION = "test-fw";
-
 // WO-2026-08-31-004 Amendment A (cloud follow-up): required by
 // DeviceStatusPublisher.cpp's `extern` declarations of the boot-time
 // oscillator-state globals normally set once in Generalized-Core-Counter.cpp's

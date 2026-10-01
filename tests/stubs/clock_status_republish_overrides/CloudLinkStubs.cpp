@@ -43,10 +43,6 @@ bool Cloud::applyConfigurationFromLedger(const LedgerData &, const LedgerData &)
     return false;
 }
 
-// FIRMWARE_VERSION: referenced unconditionally by
-// DeviceStatusPublisher.cpp's writeDeviceStatusToCloud().
-const char *FIRMWARE_VERSION = "test-fw";
-
 // WO-2026-08-31-004 Amendment A (cloud follow-up): required by
 // DeviceStatusPublisher.cpp's `extern` declarations of the boot-time
 // oscillator-state globals normally set once in Generalized-Core-Counter.cpp's

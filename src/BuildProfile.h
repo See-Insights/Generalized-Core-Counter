@@ -2,7 +2,8 @@
 
 /**
  * @file BuildProfile.h
- * @brief Build-profile guardrails for serial/debug waits.
+ * @brief Single owner of compile-time build profile, logging policy and the
+ *        compiled build-flags witness.
  *
  * @details
  * - FIELD builds must never block on USB serial.
@@ -11,10 +12,19 @@
  * - Logging remains enabled in all profiles; these flags only affect
  *   whether blocking waits are compiled into the firmware.
  *
+ * Profile selector (the one switch that picks a whole build shape):
+ * - Release (the default): no build flag needed.
+ * - Bench: -DBUILD_PROFILE_BENCH=1 turns on the bench diagnostics
+ *   (ENABLE_DIAGNOSTICS_PUBLISH_MODE). It deliberately does NOT turn on
+ *   ENABLE_RTC_SKEW_TEST, which stays an explicit, separately-requested flag.
+ * - Any individual flag below can still be overridden with its own -D.
+ *
  * Usage examples (build flags):
  * - FIELD (non-blocking): -DDEV_BUILD=0
  * - DEV (non-blocking): -DDEV_BUILD=1
  * - DEV (blocking waits enabled): -DDEV_BUILD=1 -DALLOW_BLOCKING_SERIAL_WAITS=1
+ * - Bench profile: -DBUILD_PROFILE_BENCH=1
+ * - Serial log level (0=none,1=error,2=warn,3=info+filters,4=all): -DSERIAL_LOG_LEVEL=4
  * - Connectivity failsafe bench test: -DCONNECTIVITY_FAILSAFE_TEST_MODE=1
  * - PMIC forensics override: -DENABLE_PMIC_FORENSICS=0
  * - Ledger trace logging: -DENABLE_LEDGER_TRACE=1
@@ -23,10 +33,7 @@
  * - Performance trace logging: -DENABLE_PERF_TRACE=1
  * - Sleep-gate trace logging: -DENABLE_GATE_TRACE=1
  * - Sleep routine trace logging: -DENABLE_SLEEP_TRACE=1
- * - Routine PMIC trace logging: -DENABLE_PMIC_TRACE=1
  * - Routine config trace logging: -DENABLE_CONFIG_TRACE=1
- * - PMIC charge cycle diagnostic test: -DENABLE_PMIC_CHARGE_CYCLE_TEST=1
- * - PMIC register dump diagnostic: -DENABLE_PMIC_REGISTER_DUMP=1
  * - Diagnostics publish mode: -DENABLE_DIAGNOSTICS_PUBLISH_MODE=1
  * - RTC skew bench hook (Boron only): -DENABLE_RTC_SKEW_TEST=1
  *
@@ -47,7 +54,6 @@
  * - ENABLE_PERF_TRACE=1 enables successful report performance timing logs.
  * - ENABLE_GATE_TRACE=1 enables sleep gate polling/detail logs.
  * - ENABLE_SLEEP_TRACE=1 enables routine sleep/watchdog/pre-sleep battery logs.
- * - ENABLE_PMIC_TRACE=1 enables routine PMIC state logs.
  * - ENABLE_CONFIG_TRACE=1 enables routine config apply/validation diagnostics.
  * - Defaults remain 0 for field-safe release logging.
  *
@@ -55,6 +61,21 @@
  * Switch to developer behavior by setting DEV_BUILD=1 (and optionally
  * ALLOW_BLOCKING_SERIAL_WAITS=1) at build time.
  */
+#ifndef BUILD_PROFILE_BENCH
+/**
+ * @brief Build profile selector: 0 = release (default), 1 = bench.
+ *
+ * Bench turns on the bench diagnostics (ENABLE_DIAGNOSTICS_PUBLISH_MODE). It
+ * must NOT turn on ENABLE_RTC_SKEW_TEST, which writes a deliberately wrong
+ * RTC value and stays an explicit, separately-requested flag.
+ */
+#define BUILD_PROFILE_BENCH 0
+#endif
+
+#if (BUILD_PROFILE_BENCH != 0) && (BUILD_PROFILE_BENCH != 1)
+#error "BUILD_PROFILE_BENCH must be 0 or 1"
+#endif
+
 #ifndef DEV_BUILD
 /**
  * @brief Set to 1 for developer builds.
@@ -161,42 +182,12 @@
 #error "ENABLE_SLEEP_TRACE must be 0 or 1"
 #endif
 
-#ifndef ENABLE_PMIC_TRACE
-#define ENABLE_PMIC_TRACE 0
-#endif
-
-#if (ENABLE_PMIC_TRACE != 0) && (ENABLE_PMIC_TRACE != 1)
-#error "ENABLE_PMIC_TRACE must be 0 or 1"
-#endif
-
 #ifndef ENABLE_CONFIG_TRACE
 #define ENABLE_CONFIG_TRACE 0
 #endif
 
 #if (ENABLE_CONFIG_TRACE != 0) && (ENABLE_CONFIG_TRACE != 1)
 #error "ENABLE_CONFIG_TRACE must be 0 or 1"
-#endif
-
-#ifndef ENABLE_PMIC_CHARGE_CYCLE_TEST
-/**
- * @brief TEMPORARY DIAGNOSTIC: Run PMIC charge cycle test once on boot.
- *
- * Set to 1 to enable test, then reflash. Test runs automatically during setup()
- * and takes ~21 seconds. Logs comprehensive PMIC state before/during/after
- * disabling and re-enabling charging to diagnose charge state machine behavior.
- * 
- * One-shot guard prevents multiple executions per boot. After test completes,
- * set back to 0 and reflash to remove test from binary.
- * 
- * Safety: Requires external power, SOC > 50%, safe temperature range.
- * Boron/BQ24195 PMIC only. Test is harmless - device runs from USB when
- * charging is temporarily disabled.
- */
-#define ENABLE_PMIC_CHARGE_CYCLE_TEST 0
-#endif
-
-#if (ENABLE_PMIC_CHARGE_CYCLE_TEST != 0) && (ENABLE_PMIC_CHARGE_CYCLE_TEST != 1)
-#error "ENABLE_PMIC_CHARGE_CYCLE_TEST must be 0 or 1"
 #endif
 
 #ifndef ENABLE_RTC_SKEW_TEST
@@ -207,7 +198,9 @@
  * immediately after ab1805.setup() and before the hibernate-wake
  * classification block: it reads the current AB1805 RTC value, writes back
  * a compile-time-skewed value (see RtcSkewTest::kSkewSeconds in
- * src/time/RtcSkewTest.h), and logs both readings. This reproduces the
+ * src/time/RtcSkewTest.h), and logs both readings. Deliberately NOT tied to
+ * BUILD_PROFILE_BENCH: a bench build must not silently corrupt the RTC.
+ * This reproduces the
  * Dev-11 field defect (RTC holding a plausible-but-wrong time, so
  * Time.isValid() is true but the value is bad) on demand, which a simple
  * LiPo/USB power-cycle cannot: that only clears the RTC to *unset*, a
@@ -242,15 +235,76 @@
  * soak, including nightly heap-guard flush and JSON truncation fixes, and
  * survived real production failure (660s connect timeout). Promoted from
  * bench-only to field soak in v22-Diag-Soak. Not sourced from cloud/ledger.
+ *
+ * Defaults to the build profile: off in release, on in bench.
  */
-#define ENABLE_DIAGNOSTICS_PUBLISH_MODE 0  // bench builds enable with -DENABLE_DIAGNOSTICS_PUBLISH_MODE=1 (WO-2026-09-28-001)
+#define ENABLE_DIAGNOSTICS_PUBLISH_MODE BUILD_PROFILE_BENCH
 #endif
 
 #if (ENABLE_DIAGNOSTICS_PUBLISH_MODE != 0) && (ENABLE_DIAGNOSTICS_PUBLISH_MODE != 1)
 #error "ENABLE_DIAGNOSTICS_PUBLISH_MODE must be 0 or 1"
 #endif
 
-// Optional convenience: enable DEBUG_SERIAL in DEV builds unless overridden.
-#if DEV_BUILD && !defined(DEBUG_SERIAL)
-#define DEBUG_SERIAL
+// ===== Serial logging policy =====
+// Level and per-category filters are build profile, not application logic, so
+// they live here; cloud/Particle_Functions.cpp instantiates the one
+// SerialLogHandler from them.
+#ifndef SERIAL_LOG_LEVEL
+/** @brief Serial log level: 0=none, 1=error, 2=warn, 3=info+filters, 4=all. */
+#define SERIAL_LOG_LEVEL 3
 #endif
+
+#if (SERIAL_LOG_LEVEL < 0) || (SERIAL_LOG_LEVEL > 4)
+#error "SERIAL_LOG_LEVEL must be 0 (none), 1 (error), 2 (warn), 3 (info+filters) or 4 (all)"
+#endif
+
+/**
+ * @brief Per-category log filters applied at SERIAL_LOG_LEVEL 3: holds noisy
+ *        Device OS categories at WARN. Expanded inside the SerialLogHandler
+ *        initializer list, so LOG_LEVEL_* resolves at the use site.
+ */
+#define SERIAL_LOG_CATEGORY_FILTERS                                            \
+    {"mux", LOG_LEVEL_WARN}, {"system.nm", LOG_LEVEL_WARN},                    \
+    {"system", LOG_LEVEL_WARN}, {"comm.dtls", LOG_LEVEL_WARN},                 \
+    {"comm.protocol", LOG_LEVEL_WARN},                                         \
+    {"comm.protocol.handshake", LOG_LEVEL_WARN},                               \
+    {"net.pppncp", LOG_LEVEL_WARN}, {"app.ab1805", LOG_LEVEL_WARN}
+
+// ===== Compiled build-flags witness (WO-2026-08-24-001) =====
+// Compact bitmask of the build flags ACTUALLY compiled in, derived from the
+// same conditions that gate each feature so it cannot silently drift from the
+// shipped binary the way ENABLE_BORON_USB_SOURCE_OVERRIDE did. Defined once
+// here, expanded at both emission sites (the Boot: serial line's "flags=" and
+// the ledger firmware object's "flags").
+//
+// Bit positions are an external contract: fleet tooling reads this word, so a
+// retired flag leaves its bit RESERVED rather than renumbering the rest.
+// Reserved: 0x0400 (retired ENABLE_PMIC_TRACE), 0x1000 (retired
+// ENABLE_PMIC_CHARGE_CYCLE_TEST); both were always 0 in a release build.
+//
+// Bit 0x4000 mirrors the SAME condition that gates the USB source override in
+// PowerManager::refreshInputProfile(); set => override compiled in. A CLEAR
+// bit is EXPECTED and CORRECT on non-Boron platforms; it is a defect signal
+// ONLY on a Boron build. It is resolved where this header is processed, so an
+// emitting translation unit must reach Particle.h (which defines
+// PLATFORM_BORON) first; both do, via Config.h -> power/ConnectivityPolicy.h.
+#if defined(PLATFORM_ID) && defined(PLATFORM_BORON) && (PLATFORM_ID == PLATFORM_BORON)
+#define BUILD_FLAGS_BORON_USB_SOURCE_OVERRIDE_BIT 0x4000
+#else
+#define BUILD_FLAGS_BORON_USB_SOURCE_OVERRIDE_BIT 0
+#endif
+
+#define COMPILED_BUILD_FLAGS                                                   \
+    ((DEV_BUILD ? 0x0001 : 0) |                                                \
+     (ALLOW_BLOCKING_SERIAL_WAITS ? 0x0002 : 0) |                              \
+     (CONNECTIVITY_FAILSAFE_TEST_MODE ? 0x0004 : 0) |                          \
+     (ENABLE_PMIC_FORENSICS ? 0x0008 : 0) |                                    \
+     (ENABLE_LEDGER_TRACE ? 0x0010 : 0) |                                      \
+     (ENABLE_CONNECT_TRACE ? 0x0020 : 0) |                                     \
+     (ENABLE_CONNECT_DECISION_TRACE ? 0x0040 : 0) |                            \
+     (ENABLE_PERF_TRACE ? 0x0080 : 0) |                                        \
+     (ENABLE_GATE_TRACE ? 0x0100 : 0) |                                        \
+     (ENABLE_SLEEP_TRACE ? 0x0200 : 0) |                                       \
+     (ENABLE_CONFIG_TRACE ? 0x0800 : 0) |                                      \
+     (ENABLE_DIAGNOSTICS_PUBLISH_MODE ? 0x2000 : 0) |                          \
+     BUILD_FLAGS_BORON_USB_SOURCE_OVERRIDE_BIT)

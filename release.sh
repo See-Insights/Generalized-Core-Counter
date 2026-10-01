@@ -139,7 +139,7 @@ TAG_NAME="v${VERSION}"
 if [ "$ASSUME_YES" -ne 1 ]; then
   echo "About to:"
   echo "  - bump version to ${VERSION}"
-  echo "  - update src/Version.cpp, Doxyfile, README.md, CHANGELOG.md"
+  echo "  - update src/FirmwareVersion.h, Doxyfile, README.md, CHANGELOG.md"
   echo "  - generate Doxygen docs (docs/html)"
   echo "  - git commit -m '${COMMIT_MSG}'"
   echo "  - git push (${UPSTREAM})"
@@ -164,7 +164,7 @@ run ./bump_version.sh "$VERSION" "$RELEASE_NOTES"
 run doxygen Doxyfile
 
 # Step 3: stage known files
-run git add src/Version.cpp Doxyfile README.md CHANGELOG.md docs/html
+run git add src/FirmwareVersion.h Doxyfile README.md CHANGELOG.md docs/html
 
 # Step 4: commit
 if [ -n "$(git diff --cached --name-only)" ]; then

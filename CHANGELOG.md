@@ -16,6 +16,24 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v30-LedOffAtNight] - 2026-09-30
+
+### Changed
+
+- The blue occupancy LED is turned off whenever the device sleeps for the night
+
+## [v29-ConfigCleanup] - 2026-09-30
+
+### Changed
+
+- Configuration cleanup: build switches and logging policy in BuildProfile.h, version identity in FirmwareVersion.h, release notes moved to CHANGELOG.md, dead settings removed, one webhook-timeout range (5000-120000 ms)
+
+## [v28-CloseBeforeSleep] - 2026-09-30
+
+### Fixed
+
+- The device never sleeps for the night with the daily close still due: the close test now has one owner and the night-sleep commitment asks it first.
+
 ## [v24-Thermal-Inhibit] - 2026-08-28
 
 ### Added
