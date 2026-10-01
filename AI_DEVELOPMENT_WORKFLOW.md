@@ -145,7 +145,7 @@ removed when the work completes.
 - Descriptive names that identify the tool and purpose, e.g.
   `tests/rtc_skew_test_bin`, not `tests/.t`.
 - Placement under a path already covered by `.gitignore`, or added to it.
-- Cleanup on completion, including on failure paths.
+- Cleanup on completion, including on failure paths, of **only the artifacts you created**. Use a uniquely named scratch directory (e.g. `build-tmp/<wo>-stage6/`) and remove that directory, never a shared parent: `build-tmp/` holds other agents' artifacts and evidence.
 
 **Prohibited:**
 
@@ -246,6 +246,7 @@ made the artifact invisible to a routine `ls` and easy to miss in
 - Must not commit, push, merge, release, or operate Fleet devices.
 - Must not silently weaken or remove tests to obtain a passing result.
 - Must not modify protected files unless explicitly included in the Work Order.
+- Must not delete anything it did not create. Cleanup removes only its own uniquely named scratch directory (named in the dispatch), never a shared parent such as `build-tmp/` itself. Every Copilot dispatch's AUTHORIZATION SCOPE states this and names the scratch directory. (Added 2026-10-01: WO-2026-10-01-001's Stage 6 round 1 ran `rm -rf build-tmp`, deleting a 230,000-file archive copy that an investigation report cited, plus another agent's run log.)
 
 ### Chip — Chief Engineer and Final Authority
 
@@ -460,6 +461,8 @@ Claude Code dispatches Copilot and Codex. Every dispatch begins with these two l
 AGENT: <Copilot|Codex> · MODEL: <id> · REASONING: <level>
 AUTHORIZATION SCOPE: <pre-authorized actions> / <explicitly not authorized>
 ```
+
+For Copilot and Codex, the AUTHORIZATION SCOPE names the agent's own scratch directory (e.g. `build-tmp/<wo>-stage6/`), and its "not authorized" half includes "deleting anything you didn't create, including `build-tmp/` itself".
 
 The body follows: the Work Order it serves (the binding spec), the branch and base commit, what to do, what to verify, and the report expected back.
 
