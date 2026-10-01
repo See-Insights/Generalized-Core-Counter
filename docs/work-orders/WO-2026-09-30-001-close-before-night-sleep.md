@@ -83,3 +83,11 @@ On **Dev-09**, whose connectivity is better than Dev-14's:
 - [x] Stage 7 closed (Chip, 2026-09-30): **VERIFIED.** The size finding is accepted and this WO's budget raised to about 35 lines, for the reason recorded under Change. Noted: Codex caught Copilot understating the size (it counted 9 lines as moved whose originals remain), which is the independent check working.
 - [ ] Chip final gate / commit (Stage 8)
 - [x] Bench on Dev-09 — 2026-09-30, v28 (flashed 09:19 SGT), `closeHour` = 10: **close half PASS.** Serial: 10:00:13 `sleep-timer-occupied-suppress-report` (occupied at the close) → 10:00:22 `Sleep->Report reason=close due before night sleep` → 10:00:24 `Daily boundary reached (boundary=1790733600 ... close=10)` → 10:00:28 `Report: occ=0 totalMin=42` → `Running Daily Cleanup` → `Report->Connect reason=daily close` → 10:01 night sleep. The closing report, stamped **09:59:59 SGT** with `dailyoccupancy=42`, arrived at 10:00:37. **Report after the close: PASS in substance.** The next report, stamped 10:19:05 SGT (arrived 10:19:15), shows `occupancy=0`, `dailyoccupancy=11`: the count restarted from 0, not 42. The 11 minutes are one new session that began at 10:07:50 (serial: `Occ: state=1 reason=pir`, just after a restart at about 10:07 with `closeHour` back at 22) and ended by 10:19. It isn't a literal 0 only because occupancy occurred before the next report. Observation, not graded: that session's occupancy-start report (flagged `report=1` at 10:07:50, right after the restart) never arrived; its minutes were counted in the 10:19 report.
+
+## Budget versus actual (closing record)
+
+Per `AI_DEVELOPMENT_WORKFLOW.md` §12 guardrail 3. Actuals are the figures recorded in the Stage 7 verdict (`WO-2026-09-30-001-stage7-verdict.md`); "not recorded" means the verdict has no figure.
+
+| Item | Budget | Raised to (reason) | Actual net `src/` lines | Tests |
+|---|---|---|---|---|
+| Close before night sleep (`DailyBoundary` + the `:971` guard) | about 25 new lines (moved lines counted separately) | about 35 (Chip, 2026-09-30, after Stage 7 round 1: new owner file pair is planned Phase 3 structure; the behavioral change is the 5-line guard; the logic is moved, not new) | +35 (net code lines, excluding blanks, comments and the version lines) | not recorded |

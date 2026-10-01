@@ -112,3 +112,15 @@ Since v28 routes the occupied-at-close case through the report, a device occupie
 - [x] Codex verification, narrow (Stage 7) — 2026-09-30, `gpt-6-astra`, reasoning high: **VERIFIED WITH NOTES**; every step passes. Patches apply to clean exports of `c9c43b0`, and step 4 reproduces the working tree exactly. Loadable-section SHA-256 (fresh builds, the WO's seeded method): step 1 `ad322c5d…bf3d` and step 2 `ad322c5d…bf3d`, both identical to the v28 baseline (the release flags word stays `0x4008`); step 3 `a37a5d07…738b`, where the `nm` names and sizes are identical, all 40,972 instructions match after address normalization, and the reduction is 148 bytes of string minus 4 bytes of padding = 144 bytes; step 4 `1673f72e…e2b6`, with changes only in `Cloud::applyReportingConfig` (symbol 0x1e0 → 0x1e4). Bench build: `pdiag` and `flushDiagBatch` present, RTC skew absent (151272 / 1090 / 2444). `-DSERIAL_LOG_LEVEL=0..4` selects the handler; −1 and 5 hit `#error`. `bump_version.sh` extraction returns 28. Step 4's test catches the old range. Suite 46/46 (sh via zsh, py via python3); `WITH_ACK` and build-flags witness tests unchanged and green; the only existing-test edits remove duplicate `FIRMWARE_VERSION` definitions in two stubs. Release 150164 / 1090 / 2196. Notes: Copilot's report misattributes some changes between steps, though the patches follow the specified order; a parallel build hit a make dependency-order error, so all results are from serial builds. Working tree byte-identical before and after. Verdict: `WO-2026-09-29-002-stage7-verdict.md`. **At USER GATE 2.**
 - [ ] Chip final gate / commits (Stage 8)
 - [x] Addendum, LED off at night (Claude Code, narrow pre-authorized edit, 2026-09-30): the one-line `signalLED(false)` in `State_Sleep.cpp`'s night-sleep commitment, then `v30-LedOffAtNight`, product 30, made with `bump_version.sh`. Suite 46/46 (sh via zsh, py via python3). Two commits: the fix, then the version.
+
+## Budget versus actual (closing record)
+
+Per `AI_DEVELOPMENT_WORKFLOW.md` §12 guardrail 3. Actuals are the figures recorded in the Stage 7 verdict (`WO-2026-09-29-002-stage7-verdict.md`); "not recorded" means the verdict has no figure.
+
+| Item | Budget | Raised to (reason) | Actual net `src/` lines | Tests |
+|---|---|---|---|---|
+| Step 1 | net-negative (any net add is stop-and-report) | — | −96 | not recorded |
+| Step 2 | net-negative | — | −7 | not recorded |
+| Step 3 | net-negative | — | −51 | not recorded |
+| Step 4 | about 5, plus a test | 6 (accepted at Stage 6 as reasonable: the `validateRange` call wraps to two lines; the verdict confirms "the six-line step-4 budget") | +6 | +204 (`tests/webhook_timeout_range_test.py`) |
+| Addendum (v30, LED off at night) | one line (narrow pre-authorized edit) | — | not recorded (no Stage 7 verdict for the addendum) | not recorded |
