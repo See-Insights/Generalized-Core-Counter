@@ -91,6 +91,22 @@ Keep Dev-09 occupied across an hour boundary by waving at the sensor regularly. 
 - the session still counting afterwards;
 - Ubidots' `dailyoccupancy` continuing normally.
 
+### Bench results (Dev-09, e00fce68399ee6244a963935, 2026-10-02; read from the AWS archive by Claude Code): **PASS**
+
+Chip held occupancy across the 13:00 SGT hour boundary. Dev-09's reporting interval is 3600 s.
+
+| Stamp (SGT) | Published | Firmware | occupancy | dailyoccupancy | rs | cyc / slp |
+|---|---|---|---|---|---|---|
+| 12:39:25 | 04:40:42Z | 32 | 1 (session starts) | 193 | 4 | 5 / 4 |
+| — | 04:50:30Z | update to **v33-HourlyWhileOccupied** (status reason 70) | | | | |
+| **13:00:12** | **05:00:22Z** | **33** | **1** (scheduled hourly report while occupied) | 193 | 5 | 20 / 19 |
+| 13:10:48 | 05:11:12Z | 33 | 0 (session ends) | **213** | 5 | 27 / 26 |
+
+- **A report at the hour with `occupancy: 1`:** PASS (13:00:12 SGT, v33).
+- **The session still counting afterwards:** PASS. `dailyoccupancy` rose by **20 minutes** at session end, which covers the session from the v33 boot (about 12:50:30) to about 13:10, straight across the 13:00 report. If the hourly report had ended or restarted the session, only about 10 minutes would have been credited.
+- **`dailyoccupancy` continuing normally:** PASS (193 → 213; it never decreased). `cyc` and `slp` rose together, so the device kept sleeping.
+- **Note (pre-existing, not v33):** the roughly 11 minutes before the update (12:39–12:50) were lost, because the update reset restarted the in-progress session at boot. That's the known restart limitation, the same as MAFC-1 on 30 Sep.
+
 ## Future enhancements (recorded, not now)
 
 - **Occupied courts report more often than hourly.** A mid-session report could then include the minutes of the session in progress, so `dailyoccupancy` isn't stale during long sessions. (Ubidots dashboards use only `dailyoccupancy`, checked by Chip.)
@@ -110,7 +126,8 @@ Keep Dev-09 occupied across an hour boundary by waving at the sensor regularly. 
   - Suite 57/57 (29 sh via zsh, 28 py via python3). Linkage: the helper is called from both Sleep sites and inlined at Idle. Release 150780 / 1090 / 2204. Working tree byte-identical. Verdict: `WO-2026-10-02-002-stage7-verdict.md`.
 - [x] Narrow edit (Claude Code, pre-authorized by Chip, 2026-10-02): `reportDueThisInterval()`'s two declarations, which were joined on one line to fit the budget, split onto two lines (`State_Common.h:36–37`). Budget 8 → 9, reason: readability, no compressed declarations. Re-verified: the `src/` and `tests/` diff differs from Stage 7's only by that split. Suite 57/57 (sh via zsh, py via python3). Release build 150780 / 1090 / 2204 (identical), `v33-HourlyWhileOccupied`, product 33. The "don't compress code to meet a budget" line was added to `AI_DEVELOPMENT_WORKFLOW.md` §12 guardrail 3.
 - [x] Stage 8 (Chip, 2026-10-02): accepted. Commit v33 (with the two-line split) and push, by Claude Code on Chip's instruction; v32's bench result committed separately.
-- [ ] Bench on Dev-09 (occupied across an hour boundary), then a gradual soak and deployment (v33 includes v32).
+- [x] Bench on Dev-09 (occupied across the 13:00 SGT boundary): **PASS** (see Bench results).
+- [ ] Gradual soak and deployment (v33 includes v32).
 
 ## Budget versus actual (closing record)
 
