@@ -20,11 +20,11 @@ nothing elsewhere in this document or the repository overrides it.
 
 | Role | Who | Does | Never |
 |---|---|---|---|
-| Architect | Claude, in the Claude app chat | Authors and revises Work Orders; makes design decisions together with Chip; recommends model tiers | Approves its own architecture; commits, pushes, or operates devices |
+| Architect | Claude, in the Claude app chat | Authors and revises Work Orders; makes design decisions together with Chip; recommends model tiers | Approves its own architecture; commits, pushes, merges, or operates devices |
 | Workflow controller | Claude Code | Dispatches Copilot and Codex through their CLIs; runs read-only investigation (repository, Fleet Ops, telemetry); runs builds and tests; performs workflow completeness checks; makes narrow edits only when pre-authorized case by case | Commits, pushes, merges, releases, or operates devices |
-| Pre-approval investigator (Stage 4) | Codex | Independent investigation of the evidence and the proposed architecture, before approval | Rewrites the Architect's proposal; edits source |
-| Implementer (Stage 6) | GitHub Copilot | Implements the approved Work Order as an uncommitted working-tree diff | Changes the approved architecture; commits or pushes |
-| Verifier (Stage 7) | Codex | Adversarial verification of the diff against the Work Order, including mutation checks | Makes lasting source edits (mutations are restored byte-identically); commits or pushes |
+| Pre-approval investigator (Stage 4) | Codex | Independent investigation of the evidence and the proposed architecture, before approval | Rewrites the Architect's proposal; edits source; merges |
+| Implementer (Stage 6) | GitHub Copilot | Implements the approved Work Order as an uncommitted working-tree diff | Changes the approved architecture; commits, pushes, or merges |
+| Verifier (Stage 7) | Codex | Adversarial verification of the diff against the Work Order, including mutation checks | Makes lasting source edits (mutations are restored byte-identically); commits, pushes, or merges |
 | Chief Engineer | Chip (the user) | Sole authority for Stage 5 approval, commits, pushes, merges, releases, and device operations; also performs the "AWS agent" role personally | — |
 
 ### Architect — Claude (app chat)
@@ -45,6 +45,7 @@ nothing elsewhere in this document or the repository overrides it.
 
 - Must not approve its own architecture.
 - Must not commit, push, merge, or release code.
+- Must not merge pull requests. Agents may open PRs; only the user merges. A request to "open a PR" never includes merging. (Added 2026-10-02: the v33 PR was merged when only opening it was intended.)
 - Must not operate, configure, restart, or update Fleet devices.
 
 ### Claude Code — Workflow Controller
@@ -67,6 +68,7 @@ nothing elsewhere in this document or the repository overrides it.
 
 - Must not modify production source code, except narrow edits Chip pre-authorizes case by case, with the scope stated.
 - Must not commit, push, merge, or release code.
+- Must not merge pull requests. Agents may open PRs; only the user merges. A request to "open a PR" never includes merging. (Added 2026-10-02: the v33 PR was merged when only opening it was intended.)
 - Must not operate, configure, restart, or update Fleet devices.
 - Fleet Ops access must be read-only.
 - May write planning artifacts or draft GitHub issues only where specifically authorized.
@@ -210,6 +212,7 @@ made the artifact invisible to a routine `ls` and easy to miss in
 - Read-only access to the repository and Fleet Ops data, except the temporary edits that mutation checks require.
 - Must not make lasting edits to source code. Every mutated file is restored byte-identically before the verdict is issued, and temporary artifacts are removed.
 - Must not commit or push.
+- Must not merge pull requests. Agents may open PRs; only the user merges. A request to "open a PR" never includes merging. (Added 2026-10-02: the v33 PR was merged when only opening it was intended.)
 - Must remain independent of the implementation process.
 - Must clearly distinguish observed evidence from inference.
 
@@ -244,6 +247,7 @@ made the artifact invisible to a routine `ls` and easy to miss in
 - Must not independently change the approved architecture.
 - Must not expand scope without approval.
 - Must not commit, push, merge, release, or operate Fleet devices.
+- Must not merge pull requests. Agents may open PRs; only the user merges. A request to "open a PR" never includes merging. (Added 2026-10-02: the v33 PR was merged when only opening it was intended.)
 - Must not silently weaken or remove tests to obtain a passing result.
 - Must not modify protected files unless explicitly included in the Work Order.
 - Must not delete anything it did not create. Cleanup removes only its own uniquely named scratch directory (named in the dispatch), never a shared parent such as `build-tmp/` itself. Every Copilot dispatch's AUTHORIZATION SCOPE states this and names the scratch directory. (Added 2026-10-01: WO-2026-10-01-001's Stage 6 round 1 ran `rm -rf build-tmp`, deleting a 230,000-file archive copy that an investigation report cited, plus another agent's run log.)
