@@ -182,12 +182,12 @@ void handleIdleState() {
   // under an untrusted clock helps rather than risks anything (unlike the
   // sleep-duration decision, this block never commits to hours of sleep).
   if (Clock::openness() != Clock::Openness::Closed) {
-    // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, do not generate periodic
-    // reports while occupied. Occupancy=1 should only be reported on the
-    // transition 0->1 (and 1->0 when it clears).
+    // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, report while occupied only
+    // when one is due for this reporting interval (WO-2026-10-02-002: report
+    // every hour, occupied or not).
     if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && CurrentReadings::get_occupied() &&
         SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
-      // Skip periodic reporting while occupied in this mode.
+      if (reportDueThisInterval()) { transitionTo(REPORTING_STATE, "report interval"); return; }
     } else {
     uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
 

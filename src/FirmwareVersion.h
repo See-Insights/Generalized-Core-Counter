@@ -15,9 +15,9 @@
 #define FIRMWARE_VERSION_H
 
 /** @brief Particle Product integer version (must be an integer). */
-#define FIRMWARE_PRODUCT_VERSION 32
+#define FIRMWARE_PRODUCT_VERSION 33
 
 /** @brief Current firmware release string. */
-inline const char* FIRMWARE_VERSION = "v32-RecoveryVisibility";
+inline const char* FIRMWARE_VERSION = "v33-HourlyWhileOccupied";
 
 #endif /* FIRMWARE_VERSION_H */

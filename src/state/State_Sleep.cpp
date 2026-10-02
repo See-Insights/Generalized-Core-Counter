@@ -1744,9 +1744,10 @@ void handleSleepingState() {
     // We trust that the system timer woke us at the correct boundary.
     if (timerWake) {
       // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, suppress periodic reports
-      // while occupied so occupancy=1 is only reported on 0->1 transition.
+      // while occupied UNLESS one is due for this reporting interval
+      // (WO-2026-10-02-002: report every hour, occupied or not).
       if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && CurrentReadings::get_occupied() &&
-          SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
+          SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE && !reportDueThisInterval()) {
         transitionTo(SLEEPING_STATE, "sleep-timer-occupied-suppress-report");
         return;
       }
@@ -1761,11 +1762,12 @@ void handleSleepingState() {
     // reasoning as the scheduled-reporting site in State_Idle.cpp: an
     // opportunistic report is a resync opportunity, not a commitment.
     if (pirWake && Clock::openness() != Clock::Openness::Closed) {
-      // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, do not opportunistically
-      // report while occupied; PIR hits should only reset debounce.
+      // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, a PIR hit while occupied
+      // reports only when one is due for this reporting interval
+      // (WO-2026-10-02-002); otherwise it only resets debounce.
       if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && CurrentReadings::get_occupied() &&
           SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
-        // Skip overdue-report check while occupied.
+        if (reportDueThisInterval()) { transitionTo(REPORTING_STATE, "sleep-pir-overdue-report"); return; }
       } else {
       uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
 
