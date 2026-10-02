@@ -28,12 +28,15 @@ enum class ConnAcquirePhase : uint8_t {
   NETWORK_ACQUIRE,
   CLOUD_ACQUIRE,
   CONNECTED,
+  MODEM_OFF,
 };
 
 const char *connAcquirePhaseLabel(ConnAcquirePhase phase) {
   switch (phase) {
   case ConnAcquirePhase::CELLULAR_ACQUIRE:
     return "CELLULAR_ACQUIRE";
+  case ConnAcquirePhase::MODEM_OFF:
+    return "MODEM_OFF";
   case ConnAcquirePhase::NETWORK_ACQUIRE:
     return "NETWORK_ACQUIRE";
   case ConnAcquirePhase::CLOUD_ACQUIRE:
@@ -45,14 +48,18 @@ const char *connAcquirePhaseLabel(ConnAcquirePhase phase) {
   }
 }
 
+// WO-2026-10-02-001 item C: MODEM_OFF is diagnostics only - it separates
+// "the modem is not powered / not responding" from "searching for a tower".
+// No decision path may branch on it; its time counts as CELLULAR_ACQUIRE.
 ConnAcquirePhase classifyConnAcquirePhase(bool cellularReady,
+                                          bool cellularOn,
                                           bool networkReady,
                                           bool cloudConnected) {
   if (cloudConnected) {
     return ConnAcquirePhase::CONNECTED;
   }
   if (!cellularReady) {
-    return ConnAcquirePhase::CELLULAR_ACQUIRE;
+    return cellularOn ? ConnAcquirePhase::CELLULAR_ACQUIRE : ConnAcquirePhase::MODEM_OFF;
   }
   if (!networkReady) {
     return ConnAcquirePhase::NETWORK_ACQUIRE;
@@ -321,13 +328,15 @@ void handleConnectingState() {
   SystemConfig::set_lastConnectionDuration(int(elapsedMs / 1000));
 
   bool cellularReady = true;
+  bool cellularOn = true;
 #if Wiring_Cellular
   cellularReady = Cellular.ready();
+  cellularOn = Cellular.isOn();
 #endif
   const bool networkReady = Network.ready();
   const bool cloudConnected = Particle.connected();
   const ConnAcquirePhase currentConnPhase =
-      classifyConnAcquirePhase(cellularReady, networkReady, cloudConnected);
+      classifyConnAcquirePhase(cellularReady, cellularOn, networkReady, cloudConnected);
   const unsigned long phaseNowMs = millis();
   const unsigned long phaseElapsedMs = phaseNowMs - phaseStartMs;
   unsigned long cloudAcquireElapsedMs = connPhaseCloudMs;
@@ -338,6 +347,7 @@ void handleConnectingState() {
   auto addPhaseElapsed = [&](ConnAcquirePhase phase, uint32_t deltaMs) {
     switch (phase) {
     case ConnAcquirePhase::CELLULAR_ACQUIRE:
+    case ConnAcquirePhase::MODEM_OFF:
       connPhaseCellMs += deltaMs;
       break;
     case ConnAcquirePhase::NETWORK_ACQUIRE:
@@ -351,11 +361,13 @@ void handleConnectingState() {
     }
   };
 
+  // MODEM_OFF and CELLULAR_ACQUIRE are one timing phase; only the label differs,
+  // so a change between them is not a boundary and never resets phaseStartMs.
+  auto timingPhase = [](ConnAcquirePhase phase) { return phase == ConnAcquirePhase::MODEM_OFF ? ConnAcquirePhase::CELLULAR_ACQUIRE : phase; };
   if (!connPhaseInitialized) {
     connPhaseInitialized = true;
-    lastConnPhase = currentConnPhase;
     phaseStartMs = phaseNowMs;
-  } else if (currentConnPhase != lastConnPhase) {
+  } else if (timingPhase(currentConnPhase) != timingPhase(lastConnPhase)) {
     const uint32_t phaseDeltaMs = (uint32_t)(phaseNowMs - phaseStartMs);
     addPhaseElapsed(lastConnPhase, phaseDeltaMs);
 #if ENABLE_CONNECT_TRACE
@@ -365,9 +377,9 @@ void handleConnectingState() {
              (unsigned long)elapsedMs,
              (unsigned long)phaseDeltaMs);
 #endif
-    lastConnPhase = currentConnPhase;
     phaseStartMs = phaseNowMs;
   }
+  lastConnPhase = currentConnPhase;
 
   if (!connectRequested) {
     // Log signal strength at start of connection attempt for field

@@ -18,6 +18,7 @@
 #include "device_pinout.h"
 #include "sensors/SensorDefinitions.h"
 #include "AB1805_RK.h"
+#include "observability/AwakeCycleCounters.h"
 #include "observability/WakeCycleStats.h"
 #include "ThrashGuard.h"
 #include "state/SleepPrepSpanTiming.h"
@@ -1146,6 +1147,7 @@ void handleSleepingState() {
 #endif
             setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
             const SystemSleepResult hibernateResult = System.sleep(config);
+            AwakeCycles::recordSleepReturn(hibernateResult.error() == SYSTEM_ERROR_NONE);
 
             // HIBERNATE should reset the MCU. If we return here, treat it as failed and fall back.
             HibernateCycle::abandon();
@@ -1398,6 +1400,7 @@ void handleSleepingState() {
   setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
   setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
   SystemSleepResult result = System.sleep(config);
+  AwakeCycles::recordSleepReturn(result.error() == SYSTEM_ERROR_NONE);
   const unsigned long sleepElapsedMs = millis() - sleepCallStartMs;
   pin_t wakePin = result.wakeupPin();
   const char *wakeReturnReason = (result.error() != SYSTEM_ERROR_NONE) ? "ERROR" :
@@ -1449,6 +1452,7 @@ void handleSleepingState() {
     setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
     setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
     result = System.sleep(config);
+    AwakeCycles::recordSleepReturn(result.error() == SYSTEM_ERROR_NONE);
 
     if (result.error() != SYSTEM_ERROR_NONE) {
       Log.error("STOP sleep fallback failed err=%d (wakeIn=%d sec) - using timer-only STOP sleep", (int)result.error(), wakeInSeconds);
@@ -1463,6 +1467,7 @@ void handleSleepingState() {
       setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
       setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
       result = System.sleep(config);
+      AwakeCycles::recordSleepReturn(result.error() == SYSTEM_ERROR_NONE);
 
       if (result.error() != SYSTEM_ERROR_NONE) {
         // All sleep modes failed - this indicates a device state corruption

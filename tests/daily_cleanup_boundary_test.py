@@ -86,7 +86,7 @@ def verify_source_shape() -> None:
     report_code = strip_comment_lines(report_text)
     boundary_code = strip_comment_lines(boundary_text)
 
-    # WO-2026-09-30-001: the due-test and localTodayAt() moved out of
+    # WO-2026-09-30-001: the due-test and today's-boundary helper moved out of
     # handleReportingState() into the DailyBoundary owner, so the night-sleep
     # commitment can ask the same question. The logic is checked there now;
     # handleReportingState() is checked for the call and the unchanged order.
@@ -101,12 +101,14 @@ def verify_source_shape() -> None:
         "time_t boundary;",
         "uint8_t close;",
         "Result check(time_t now);",
+        # WO-2026-10-02-001 item A: exported for the connectivity failsafe.
+        "time_t todayAt(uint8_t hour);",
     ):
         if required not in boundary_header_code:
             fail(f"DailyBoundary.h must publish the shared due-test result; missing {required}")
 
     local_today = extract_function(
-        boundary_text, r"time_t\s+localTodayAt\s*\(\s*uint8_t\s+\w+\s*\)\s*\{", "localTodayAt"
+        boundary_text, r"time_t\s+todayAt\s*\(\s*uint8_t\s+\w+\s*\)\s*\{", "DailyBoundary::todayAt"
     )
     for required in (
         "LocalTimeConvert",
@@ -116,11 +118,11 @@ def verify_source_shape() -> None:
         "atLocalTime",
     ):
         if required not in local_today:
-            fail(f"localTodayAt() must compute live LocalTimeRK boundaries and handle hour 24; missing {required}")
+            fail(f"DailyBoundary::todayAt() must compute live LocalTimeRK boundaries and handle hour 24; missing {required}")
     if "LocalTimeCache" in local_today:
-        fail("localTodayAt() must never read LocalTimeCache")
-    if re.search(r"time_t\s+localTodayAt\s*\(", report_code):
-        fail("localTodayAt() must live in DailyBoundary.cpp, not State_Report.cpp")
+        fail("DailyBoundary::todayAt() must never read LocalTimeCache")
+    if re.search(r"time_t\s+todayAt\s*\(", report_code):
+        fail("DailyBoundary::todayAt() must live in DailyBoundary.cpp, not State_Report.cpp")
 
     check_fn = extract_function(
         boundary_text, r"Result\s+check\s*\(\s*time_t\s+\w+\s*\)\s*\{", "DailyBoundary::check"
@@ -132,7 +134,7 @@ def verify_source_shape() -> None:
         ("open hour", "SystemConfig::get_openTime()"),
         ("close hour", "SystemConfig::get_closeTime()"),
         ("always-open normalization", "close = (openHour == closeHour) ? 24 : closeHour"),
-        ("boundary computation", "localTodayAt(close)"),
+        ("boundary computation", "todayAt(close)"),
         ("before-boundary condition", "if (now < boundary)"),
         ("before-boundary adjustment", "boundary -= 86400"),
         ("lastDailyCleanup read", "SystemConfig::get_lastDailyCleanup()"),

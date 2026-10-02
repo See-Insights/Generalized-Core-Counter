@@ -8,7 +8,7 @@ This repository includes key documentation files that contributors and AI coding
 
 # Generalized-Core-Counter
 
-**Version:** v31-ConnectivityFixes | **Latest:** Connectivity and diagnosability fixes: OTA progress-aware update dwell, failed-attempt counting, reset-cause codes, signal validity
+**Version:** v32-RecoveryVisibility | **Latest:** Failsafe recovers in ~3 open hours (stage 1 retired); reports carry fh, lfb, cyc and slp; ConnSummary distinguishes MODEM_OFF
 
 Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v14 release packages cloud recovery tuning and release-safe logging cleanup without changing the existing production power, sleep, connectivity, watchdog, ledger, or PMIC behavior.
 

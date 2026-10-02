@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v32-RecoveryVisibility] - 2026-10-02
+
+### Changed
+
+- Failsafe recovers in ~3 open hours (stage 1 retired); reports carry fh, lfb, cyc and slp; ConnSummary distinguishes MODEM_OFF
+
 ## [v31-ConnectivityFixes] - 2026-10-01
 
 ### Changed

@@ -30,6 +30,11 @@ struct Result {
 /// Evaluates whether the daily close is due as of `now` (UTC epoch).
 Result check(time_t now);
 
+/// Today's local `hour:00:00` as a UTC epoch (`hour == 24` means tomorrow's
+/// midnight). Exported for the connectivity failsafe's open-hours age base
+/// (WO-2026-10-02-001 item A) so there is still exactly one implementation.
+time_t todayAt(uint8_t hour);
+
 } // namespace DailyBoundary
 
 #endif /* __DAILY_BOUNDARY_H */

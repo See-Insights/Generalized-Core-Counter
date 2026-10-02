@@ -27,6 +27,7 @@
 #include "power/PowerPlatform.h"
 #include "power/PowerDiagnostics.h"
 #include "power/BatteryAuthority.h"        // Battery tier/low-battery-mode owner (WO-2026-09-21 Step 4)
+#include "observability/AwakeCycleCounters.h"
 #include "observability/WakeCycleStats.h"
 #include "observability/StartupSnapshotRuntime.h"
 #include "diagnostics/ConnectivityFailsafeTest.h"
@@ -48,6 +49,7 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 #include "time/HibernateCycle.h"           // Hibernate-cycle owner: retained fields, wake classification (WO-2026-09-16 Step 2)
 #include "time/RtcSkewTest.h"         // Bench-only RTC skew hook arithmetic/guard (WO-2026-08-31-003)
 #include "time/Clock.h"               // Clock owner: open-hours, resync/RTC write-back, trust signal (WO-2026-09-18 Step 3a)
+#include "time/DailyBoundary.h"       // Daily-close owner; exports todayAt() for the failsafe's open-hours age base
 
 #if ENABLE_RTC_SKEW_TEST
 #warning "ENABLE_RTC_SKEW_TEST=1 (bench-only RTC skew hook enabled - must not ship)"
@@ -203,7 +205,7 @@ enum AppBreadcrumb : uint8_t {
   BREADCRUMB_CONNECT_REQUESTED = 6,
   BREADCRUMB_CLOUD_CONNECTED = 7,
   BREADCRUMB_APP_WATCHDOG_RESET = 8,
-  BREADCRUMB_CONNECTIVITY_FAILSAFE = 9,
+  // 9 was BREADCRUMB_CONNECTIVITY_FAILSAFE (stage 1, retired WO-2026-10-02-001 item B)
   BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD = 10,
   BREADCRUMB_REPORT_QUEUE_START = 11,
   BREADCRUMB_REPORT_QUEUE_DONE = 12,
@@ -248,8 +250,6 @@ const char *appBreadcrumbName(uint8_t code) {
     return "CLOUD";
   case BREADCRUMB_APP_WATCHDOG_RESET:
     return "WDT";
-  case BREADCRUMB_CONNECTIVITY_FAILSAFE:
-    return "CONN_FAILSAFE";
   case BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD:
     return "CONN_FAILSAFE_HARD";
   case BREADCRUMB_REPORT_QUEUE_START:
@@ -1988,6 +1988,13 @@ void publishData(time_t stampOverride) {
     battState = 0;
   }
 
+  // WO-2026-10-02-001 items D/E: heap and awake-cycle visibility. Every new
+  // field is an unquoted JSON number (Ubidots auto-creates a variable per new
+  // top-level key, and a quoted value would create a text variable).
+  runtime_info_t rtInfo = {};
+  rtInfo.size = sizeof(rtInfo);
+  HAL_Core_Runtime_Info(&rtInfo, nullptr);
+
   // Build webhook payload based on sensor mode
   if (sensorMode == SystemConfig::OCCUPANCY) {
     const unsigned long timeStampValue = stampOverride != 0 ? (unsigned long)stampOverride : nowStampSec;
@@ -1995,7 +2002,7 @@ void publishData(time_t stampOverride) {
 
     // Occupancy mode webhook format (occupancy as 0/1 numeric value)
     snprintf(data, sizeof(data),
-             "{\"occupancy\":%d,\"dailyoccupancy\":%lu,\"battery\":%4.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"alerts\":%i,\"resets\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
+             "{\"occupancy\":%d,\"dailyoccupancy\":%lu,\"battery\":%4.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"alerts\":%i,\"resets\":%i,\"connecttime\":%i,\"fh\":%lu,\"lfb\":%lu,\"cyc\":%lu,\"slp\":%lu,\"timestamp\":%lu000}",
              CurrentReadings::get_occupied() ? 1 : 0,
              totalOccupiedMinutes,
              stateOfCharge,
@@ -2004,6 +2011,8 @@ void publishData(time_t stampOverride) {
              reportedAlertCode,
              RecoveryState::get_resetCount(),
              SystemConfig::get_lastConnectionDuration(),
+             (unsigned long)System.freeMemory(), (unsigned long)rtInfo.largest_free_block_heap,
+             (unsigned long)AwakeCycles::cycles, (unsigned long)AwakeCycles::sleeps,
              timeStampValue);
 
   } else {
@@ -2011,7 +2020,7 @@ void publishData(time_t stampOverride) {
 
     // Counting mode webhook format (original format)
     snprintf(data, sizeof(data),
-             "{\"hourly\":%i,\"daily\":%i,\"battery\":%4.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"resets\":%i,\"alerts\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
+             "{\"hourly\":%i,\"daily\":%i,\"battery\":%4.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"resets\":%i,\"alerts\":%i,\"connecttime\":%i,\"fh\":%lu,\"lfb\":%lu,\"cyc\":%lu,\"slp\":%lu,\"timestamp\":%lu000}",
              CurrentReadings::get_hourlyCount(),
              CurrentReadings::get_dailyCount(),
              stateOfCharge,
@@ -2020,6 +2029,8 @@ void publishData(time_t stampOverride) {
              RecoveryState::get_resetCount(),
              reportedAlertCode,
              SystemConfig::get_lastConnectionDuration(),
+             (unsigned long)System.freeMemory(), (unsigned long)rtInfo.largest_free_block_heap,
+             (unsigned long)AwakeCycles::cycles, (unsigned long)AwakeCycles::sleeps,
              timeStampValue);
 
   }
@@ -2523,11 +2534,14 @@ void clearConnectivityFailsafeRecovery(const char *reason) {
 /**
  * @brief Monitors connection health and triggers escalating recovery when stale.
  *
- * Implements 3-stage recovery when connection attempts exceed policy thresholds:
- * Stage 1 (radio reset), Stage 2 (system reset), Stage 3 (deep power-down, Boron only).
+ * Implements escalating recovery when connection attempts exceed policy thresholds:
+ * Stage 2 (system reset), then Stage 3 (deep power-down, Boron only). Stage 1
+ * (radio reset) is retired (WO-2026-10-02-001 item B); the first action is stage 2.
  * Prevents indefinite modem-on battery drain and recovers from radio firmware wedges.
  *
- * Defers action if disconnected, firmware updating, time invalid, recently connected,
+ * Acts during open hours only, measuring the age from the later of lastConnection
+ * and today's opening. Defers if disconnected, firmware updating, time invalid,
+ * recently connected,
  * within cooldown period, or jitter delay not elapsed (prevents fleet-wide simultaneous resets).
  *
  * @note Stage 3 deep power-down will not wake for hours/days - last resort only.
@@ -2551,7 +2565,7 @@ void connectivityFailsafeSupervisor() {
   // WO-2026-09-19 Step 3b: deliberately NOT converted to Clock::isTrusted(),
   // even though this function's connectionAgeSec math below is exactly the
   // kind of untrusted-clock arithmetic Step 3b otherwise guards against.
-  // This escalation ladder (radio reset -> system reset -> deep power-down)
+  // This escalation ladder (system reset -> deep power-down)
   // exists to recover a wedged modem/radio - and a device with a wedged
   // radio has, by definition, never completed a sync this boot either, so
   // gating the recovery on Clock::isTrusted() would disable the recovery
@@ -2578,12 +2592,19 @@ void connectivityFailsafeSupervisor() {
     return;
   }
 
+  // WO-2026-10-02-001 item A: act during open hours only, and measure the age
+  // from the later of lastConnection and today's opening. Wall-clock age would
+  // make every device cross the 3 h threshold on its 06:00 wake, because the
+  // overnight gap since the 22:00 close is 7-8 h and this supervisor runs at
+  // the top of loop() before the report has started connecting.
   const time_t now = Time.now();
-  if (now <= lastConnection) {
+  const time_t openedAt = DailyBoundary::todayAt(SystemConfig::get_openTime());
+  const time_t ageBase = (openedAt > lastConnection) ? openedAt : lastConnection;
+  if (Clock::openness() != Clock::Openness::Open || now <= ageBase) {
     return;
   }
 
-  const time_t connectionAgeSec = now - lastConnection;
+  const time_t connectionAgeSec = now - ageBase;
   if (connectionAgeSec < ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC) {
     return;
   }
@@ -2601,7 +2622,11 @@ void connectivityFailsafeSupervisor() {
     lastAction = 0;
   }
 
-  const uint8_t nextStage = currentStage + 1;
+  // WO-2026-10-02-001 item B: stage 1 (radio reset) is retired - it never
+  // restored a wedged connection in the field. Stage numbers keep their
+  // meaning, so the first action is stage 2 and a stage 1 persisted by older
+  // firmware still progresses to 2.
+  const uint8_t nextStage = (currentStage <= 1) ? 2 : (uint8_t)(currentStage + 1);
   time_t requiredDelay = ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC;
   if (nextStage >= 2) {
     requiredDelay += (time_t)connectivityFailsafeJitterSec(nextStage);
@@ -2631,17 +2656,6 @@ void connectivityFailsafeSupervisor() {
              batteryTierShortName(tier));
 #endif
     persistConnectivityFailsafeState(currentStage, now, false);
-    return;
-  }
-
-  if (nextStage == 1) {
-    RecoveryState::raiseAlert(ConnectivityPolicy::CONNECTIVITY_FAILSAFE_ALERT);
-    setAppBreadcrumb(BREADCRUMB_CONNECTIVITY_FAILSAFE);
-    persistConnectivityFailsafeState(1, now, true);
-    Log.info("Failsafe: stage=1 action=radio-reset age=%lds",
-             (long)connectionAgeSec);
-    Connectivity::requestFullDisconnectAndRadioOff();
-    transitionTo(CONNECTING_STATE, "failsafe stage 1");
     return;
   }
 
