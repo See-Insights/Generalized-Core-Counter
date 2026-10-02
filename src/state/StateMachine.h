@@ -26,8 +26,8 @@ extern State state;
 extern State oldState;
 extern char stateNames[7][16];
 
-/// Sleep configuration and AB1805 RTC/watchdog shared across state handlers.
-extern SystemSleepConfiguration config;
+/// AB1805 RTC/watchdog shared across state handlers. Sleep configurations are
+/// built fresh as locals at each sleep site.
 extern AB1805 ab1805;
 
 /// Shared system health and ISR flags.

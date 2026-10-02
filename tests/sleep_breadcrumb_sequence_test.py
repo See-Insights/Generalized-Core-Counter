@@ -85,7 +85,11 @@ def main() -> None:
     call_enter_lines = find_all("setAppBreadcrumb(28)")
     drain_call_lines = find_all("drainSerialBeforeSleep();")
     flush_call_lines = find_all("PowerDiagnostics::flushDiagBatch();")
-    sleep_call_lines = find_all("System.sleep(config)")
+    # WO-2026-10-02-003 (v34): each site now builds and passes its own local
+    # SystemSleepConfiguration rather than the removed shared global `config`,
+    # so match the call by shape, not by the object's name.
+    sleep_call_lines = [i for i, l in enumerate(lines)
+                        if re.search(r"System\.sleep\(\s*\w+\s*\)", l)]
 
     # Expect 4 sleep-entry call sites total (hibernate, ULP primary, STOP
     # fallback 1, STOP fallback 2).
@@ -98,7 +102,7 @@ def main() -> None:
     if len(drain_call_lines) != 4:
         fail(f"expected 4 drainSerialBeforeSleep() call sites, found {len(drain_call_lines)}")
     if len(sleep_call_lines) != 4:
-        fail(f"expected 4 System.sleep(config) call sites, found {len(sleep_call_lines)}")
+        fail(f"expected 4 System.sleep(<config>) call sites, found {len(sleep_call_lines)}")
     print("PASS: found exactly 4 sleep-entry call sites "
           "(hibernate, ULP primary, STOP fallback x2) with matching breadcrumb counts")
 

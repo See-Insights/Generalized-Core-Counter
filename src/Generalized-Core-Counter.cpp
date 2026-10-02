@@ -128,7 +128,6 @@ void connectivityFailsafeSupervisor();
 
 // ===== Global runtime objects =====
 
-SystemSleepConfiguration config; // Sleep 2.0 configuration
 void outOfMemoryHandler(system_event_t event, int param);
 void firmwareUpdateHandler(system_event_t event, int param);
 LocalTimeConvert conv; // For converting UTC time to local time
@@ -1682,15 +1681,12 @@ void loop() {
     }
   }
 
-  // If an out-of-memory event occurred, go to error state
+  // If an out-of-memory event occurred, reset immediately - no ERROR_STATE
+  // route, so no resetWait delay and no suppression at any reset count.
   if (outOfMemory >= 0) {
-    Log.error("Out-of-memory event detected (param=%d freeHeap=%lu) - resetting",
-              outOfMemory,
-              (unsigned long)System.freeMemory());
-    // Out-of-memory is treated as a critical alert; only overwrite any
-    // existing alert if this is more severe.
-    RecoveryState::raiseAlert(14);
-    transitionTo(ERROR_STATE, "out of memory");
+    Log.info("out of memory occurred size=%d", outOfMemory);
+    delay(100);
+    System.reset(RESET_CAUSE_OUT_OF_MEMORY);
   }
 
   // If the user switch is pressed, force an immediate report and connection

@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v34-SleepConfigLeak] - 2026-10-02
+
+### Changed
+
+- Build a fresh local SystemSleepConfiguration at each sleep site and remove the shared global, stopping the per-wake-cycle heap loss.
+
 ## [v33-HourlyWhileOccupied] - 2026-10-02
 
 ### Changed
