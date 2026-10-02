@@ -146,6 +146,41 @@ Ubidots will create a variable for each new top-level key; that's accepted. **Ev
 2. **The payload:** one report in AWS carrying numeric `fh`, `lfb`, `cyc` and `slp`. In the Particle integration log, the webhook still returns success. In Ubidots, the four new variables appear with numeric values.
 3. **ConnSummary:** if a modem-off case occurs, `last=MODEM_OFF` appears.
 
+### Bench results (Dev-09, e00fce68399ee6244a963935, 2026-10-02; read from the AWS archive by Claude Code)
+
+**Overall: PASS** (updated 04:20Z on 2 Oct, Claude Code). Items 1 and 2 hold: the report after a sleep shows `cyc` 2 and `slp` 1. The Ubidots check is deferred, and `MODEM_OFF` wasn't observed (accepted: Stage 7 proved C).
+
+**1. The failsafe (v32-FailsafeTest, antenna removed, open hours): PASS.** Published in one burst at 03:56Z, when Dev-09 reconnected:
+
+| Published | version | Reset / data | failsafeTest / stage | Previous boot's breadcrumb (uptime) |
+|---|---|---|---|---|
+| 03:56:34.810Z | v32-FailsafeTest | 20 / 0 (USB flash) | 1 / 0 | 4 (19,900 s) |
+| 03:56:43.722Z | v32-FailsafeTest | **140 / 2** | 1 / **2** | **10** (377 s) |
+| 03:56:47.231Z | v32-FailsafeTest | **140 / 2** | 1 / 2 | **10** (879 s) |
+
+- **No stage 1:** every action was the full reset with code 2.
+- **The first reset** came about 6.3 min into the boot, inside the expected window of 5 to about 16 min after the last connection (about 03:33Z).
+- **The second reset was again stage 2** (not stage 3), so the failsafe was cleared by a successful connection in that boot. That fits the socket drop at 03:47:45Z, and the reset came about 5.5 min after it.
+- **The three boot reports** carried numeric `fh` 89,784–89,800, `lfb` 89,728–89,784, `cyc` 1 and `slp` 0.
+
+**2. The payload (v32-RecoveryVisibility, USB flash): PASS.**
+- **Status published 04:03:27.391Z:** `version` **v32-RecoveryVisibility**, `resetReason` 20 (USB flash), `resetReasonData` 0, **`failsafeTest` 0**, `fw_version` 32.
+- **Reports since the flash (checked 04:09Z): one,** stamped 12:00:13 SGT and published 04:03:29Z:
+  - `occupancy` 0, `dailyoccupancy` 171, `fh` **89800**, `lfb` **89728**, `cyc` **1**, `slp` **0**;
+  - the raw payload has all four as **unquoted JSON numbers**, and `key1` is still the only string;
+  - `cyc ≥ slp` holds.
+- **The report after a sleep,** stamped 12:08:32 SGT and published 04:19:27Z (an occupancy-change report, delivered when Dev-09 reconnected):
+  - `occupancy` 0, `dailyoccupancy` 178, `fh` **76856**, `lfb` **75648**, `cyc` **2**, `slp` **1**, all unquoted numbers.
+  - **Both counters rose** (1 → 2 and 0 → 1), so one awake period ended in a successful sleep; `cyc ≥ slp`.
+  - No report shows an unchanged `cyc`.
+- **First memory data from a release build:**
+  - `fh` 89,800 → 76,856 (−12,944 B) and `lfb` 89,728 → 75,648 (−14,080 B) between the boot report and the first report after connecting.
+  - **That's a one-time step, not a rate.** The boot report is made before the cloud session exists. The drop matches the about 13 KB the Singapore serial logs showed the cloud session taking early in each boot (about 90 KB at boot, about 77 KB at the first connection).
+  - A change per hour needs reports over the following hours. That's the first job for these fields in the field.
+- **Ubidots:** **deferred until after the v33 fleet rollout** (Chip, 2026-10-02), so the bench doesn't wait on this check. One webhook serves every device, and older firmware doesn't send these fields.
+
+**3. ConnSummary `MODEM_OFF`:** not observed yet. Dev-09's serial isn't forwarded to AWS while it's on the Mac.
+
 ## Approval record
 
 - [x] Stage 5: Chip and the architect, 2026-10-02, in the opening dispatch (goal, items A–E, budgets, Stage 7 checks, bench, routing: one Copilot round `claude-opus-5` medium, one narrow Stage 7 Codex `gpt-6-astra` high; not authorized: commits, flashing, Ubidots or webhook changes, AWS writes).
