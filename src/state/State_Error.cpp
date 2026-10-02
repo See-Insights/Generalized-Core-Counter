@@ -25,7 +25,6 @@
 //  - 3: Hard recovery using AB1805 deep power down
 //
 // The mapping is intentionally conservative to avoid thrashing:
-//  - Out-of-memory (14): up to 3 soft resets, then stop resetting.
 //  - Modem/disconnect failure (15) and connect timeout (31):
 //    a couple of soft resets, then a hard power-cycle, then stop.
 //  - Sleep failures (16): soft reset, then hard power-cycle, then stop.
@@ -38,13 +37,10 @@ static int resolveErrorAction() {
   }
 
   switch (alert) {
-  case 14: // out-of-memory
-    if (resets >= 3) {
-      Log.info("OOM alert but reset count=%u; suppressing further resets", resets);
-      return 0;
-    }
-    return 2; // soft reset
-
+  // Alert 14 (out-of-memory) has no case here: WO-2026-10-02-003 item B made
+  // loop() reset directly with RESET_CAUSE_OUT_OF_MEMORY, so nothing raises 14.
+  // A 14 persisted by pre-v34 firmware falls to `default` and returns to Idle
+  // without resetting - the same outcome the old suppression branch gave.
   case 15: // modem or disconnect failure
   case 31: // failed to connect to cloud
   case 44: // ledger sync timeout before sleep

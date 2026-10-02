@@ -1113,8 +1113,11 @@ void handleSleepingState() {
           const time_t wakeTime = rtcNow + (time_t)wakeInSeconds;
           if (ab1805.interruptAtTime(wakeTime)) {
             setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START (was stale literal 20, colliding with BREADCRUMB_REPORT_EXIT)
-            config = SystemSleepConfiguration();
-            config.mode(SystemSleepMode::HIBERNATE)
+            // Fresh local configuration per sleep: Device OS move-assigns
+            // without freeing the previous wake-source list, so a reused
+            // long-lived object orphans that list on every cycle.
+            SystemSleepConfiguration hibernateConfig;
+            hibernateConfig.mode(SystemSleepMode::HIBERNATE)
               .gpio(WAKEUP_PIN, FALLING)
               .gpio(BUTTON_PIN, FALLING);
 
@@ -1146,7 +1149,7 @@ void handleSleepingState() {
             setAppBreadcrumb(27); // BREADCRUMB_SLEEP_DIAG_FLUSH_DONE
 #endif
             setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
-            const SystemSleepResult hibernateResult = System.sleep(config);
+            const SystemSleepResult hibernateResult = System.sleep(hibernateConfig);
             AwakeCycles::recordSleepReturn(hibernateResult.error() == SYSTEM_ERROR_NONE);
 
             // HIBERNATE should reset the MCU. If we return here, treat it as failed and fall back.
@@ -1196,10 +1199,9 @@ void handleSleepingState() {
     }
   }
 
-  // Reset sleep configuration on each sleep so GPIO selections do not
-  // accumulate across calls.
+  // The sleep configuration is built fresh as a local at each sleep site
+  // (below), so GPIO selections cannot accumulate across calls.
   setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START (was stale literal 20, colliding with BREADCRUMB_REPORT_EXIT)
-  config = SystemSleepConfiguration();
 
   // ********** WORKING SLEEP CONFIGURATION **********
   // Based on Connected-Counter-Next which uses system timer + GPIO wake.
@@ -1341,7 +1343,8 @@ void handleSleepingState() {
   }
 #endif
   
-  config.mode(SystemSleepMode::ULTRA_LOW_POWER)
+  SystemSleepConfiguration ulpConfig;
+  ulpConfig.mode(SystemSleepMode::ULTRA_LOW_POWER)
     .gpio(BUTTON_PIN, FALLING)     // Service button wake (active-low)
     .gpio(intPin, RISING);         // PIR sensor wake
     
@@ -1353,11 +1356,11 @@ void handleSleepingState() {
     // Keep cellular modem in low-power standby so we can quickly reconnect
     // when occupancy changes. This prevents 30-60s reconnection overhead and
     // potential carrier blacklisting from rapid disconnect/reconnect cycles.
-    config.network(NETWORK_INTERFACE_CELLULAR, SystemSleepNetworkFlag::INACTIVE_STANDBY);
+    ulpConfig.network(NETWORK_INTERFACE_CELLULAR, SystemSleepNetworkFlag::INACTIVE_STANDBY);
 #endif
   }
   
-  config.duration((uint32_t)wakeInSeconds * 1000UL);  // Timer-based wake at reporting boundary
+  ulpConfig.duration((uint32_t)wakeInSeconds * 1000UL);  // Timer-based wake at reporting boundary
 
   // Stop watchdog immediately before sleep (after config is fully built)
   // to minimize time between I2C transaction and sleep entry
@@ -1399,7 +1402,7 @@ void handleSleepingState() {
   drainSerialBeforeSleep();
   setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
   setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
-  SystemSleepResult result = System.sleep(config);
+  SystemSleepResult result = System.sleep(ulpConfig);
   AwakeCycles::recordSleepReturn(result.error() == SYSTEM_ERROR_NONE);
   const unsigned long sleepElapsedMs = millis() - sleepCallStartMs;
   pin_t wakePin = result.wakeupPin();
@@ -1440,8 +1443,8 @@ void handleSleepingState() {
 
    // STOP generally supports a wider set of wake pins on some platforms.
     setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START (was stale literal 20, colliding with BREADCRUMB_REPORT_EXIT)
-    config = SystemSleepConfiguration();
-    config.mode(SystemSleepMode::STOP)
+    SystemSleepConfiguration stopConfig;
+    stopConfig.mode(SystemSleepMode::STOP)
       .gpio(BUTTON_PIN, FALLING)
       .gpio(intPin, RISING)
       .duration((uint32_t)wakeInSeconds * 1000UL);
@@ -1451,14 +1454,14 @@ void handleSleepingState() {
     drainSerialBeforeSleep();
     setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
     setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
-    result = System.sleep(config);
+    result = System.sleep(stopConfig);
     AwakeCycles::recordSleepReturn(result.error() == SYSTEM_ERROR_NONE);
 
     if (result.error() != SYSTEM_ERROR_NONE) {
       Log.error("STOP sleep fallback failed err=%d (wakeIn=%d sec) - using timer-only STOP sleep", (int)result.error(), wakeInSeconds);
       setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START
-      config = SystemSleepConfiguration();
-      config.mode(SystemSleepMode::STOP)
+      SystemSleepConfiguration stopTimerConfig;
+      stopTimerConfig.mode(SystemSleepMode::STOP)
         .duration((uint32_t)wakeInSeconds * 1000UL);
       PowerDiagnostics::logPowerState("pre-sleep-stop-timer-only");
       Cloud::instance().logLedgerSleepState();
@@ -1466,7 +1469,7 @@ void handleSleepingState() {
       drainSerialBeforeSleep();
       setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
       setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
-      result = System.sleep(config);
+      result = System.sleep(stopTimerConfig);
       AwakeCycles::recordSleepReturn(result.error() == SYSTEM_ERROR_NONE);
 
       if (result.error() != SYSTEM_ERROR_NONE) {

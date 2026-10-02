@@ -19,7 +19,9 @@ what can be pinned is the shape:
      reserved to mean "the reset came from outside our src/ reset sites".
   3. Every code used is declared in the ResetCause enum, and the enum's own
      values are distinct and non-zero.
-  4. The startup status payload still carries `resetReasonData`.
+  4. The out-of-memory site in `loop()` resets directly with
+     `RESET_CAUSE_OUT_OF_MEMORY` (7) - WO-2026-10-02-003 item B.
+  5. The startup status payload still carries `resetReasonData`.
 
 Comments are stripped before each check so prose mentioning `System.reset()`
 cannot produce a false positive or a false negative.
@@ -33,7 +35,11 @@ SRC = REPO_ROOT / "src"
 RESET_CAUSE_HEADER = SRC / "ResetCause.h"
 MAIN = SRC / "Generalized-Core-Counter.cpp"
 
-EXPECTED_SITE_COUNT = 6
+EXPECTED_SITE_COUNT = 7
+
+# WO-2026-10-02-003 item B: the out-of-memory reset must carry its own code.
+OOM_CAUSE_NAME = "RESET_CAUSE_OUT_OF_MEMORY"
+OOM_CAUSE_VALUE = 7
 
 
 def fail(msg: str) -> None:
@@ -112,6 +118,18 @@ def main() -> None:
                 "codes must be distinct so a reset can be attributed"
             )
         used[argument] = where
+
+    # --- The out-of-memory site carries code 7 -------------------------------
+    if declared.get(OOM_CAUSE_NAME) != OOM_CAUSE_VALUE:
+        fail(
+            f"ResetCause.h must declare {OOM_CAUSE_NAME} = {OOM_CAUSE_VALUE} "
+            f"(found {declared.get(OOM_CAUSE_NAME)!r})"
+        )
+    if OOM_CAUSE_NAME not in used:
+        fail(
+            f"no System.reset() site passes {OOM_CAUSE_NAME}; the out-of-memory "
+            "handler's reset must name itself (WO-2026-10-02-003 item B)"
+        )
 
     # --- The startup status still publishes the code -------------------------
     main_src = strip_comments(MAIN.read_text())

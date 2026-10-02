@@ -19,4 +19,5 @@ enum ResetCause : uint32_t {
   RESET_CAUSE_SLEEP_HEAP_GUARD = 4,        ///< Nightly heap guard before overnight sleep
   RESET_CAUSE_SLEEP_ATTEMPTS_EXHAUSTED = 5,///< All sleep attempts failed
   RESET_CAUSE_ERROR_STATE_SOFT = 6,        ///< ERROR_STATE soft reset
+  RESET_CAUSE_OUT_OF_MEMORY = 7,           ///< out of memory
 };
