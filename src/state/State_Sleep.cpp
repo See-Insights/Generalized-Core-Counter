@@ -18,6 +18,7 @@
 #include "device_pinout.h"
 #include "sensors/SensorDefinitions.h"
 #include "AB1805_RK.h"
+#include "observability/AwakeCycleCounters.h"
 #include "observability/WakeCycleStats.h"
 #include "ThrashGuard.h"
 #include "state/SleepPrepSpanTiming.h"
@@ -1146,6 +1147,7 @@ void handleSleepingState() {
 #endif
             setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
             const SystemSleepResult hibernateResult = System.sleep(config);
+            AwakeCycles::recordSleepReturn(hibernateResult.error() == SYSTEM_ERROR_NONE);
 
             // HIBERNATE should reset the MCU. If we return here, treat it as failed and fall back.
             HibernateCycle::abandon();
@@ -1398,6 +1400,7 @@ void handleSleepingState() {
   setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
   setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
   SystemSleepResult result = System.sleep(config);
+  AwakeCycles::recordSleepReturn(result.error() == SYSTEM_ERROR_NONE);
   const unsigned long sleepElapsedMs = millis() - sleepCallStartMs;
   pin_t wakePin = result.wakeupPin();
   const char *wakeReturnReason = (result.error() != SYSTEM_ERROR_NONE) ? "ERROR" :
@@ -1449,6 +1452,7 @@ void handleSleepingState() {
     setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
     setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
     result = System.sleep(config);
+    AwakeCycles::recordSleepReturn(result.error() == SYSTEM_ERROR_NONE);
 
     if (result.error() != SYSTEM_ERROR_NONE) {
       Log.error("STOP sleep fallback failed err=%d (wakeIn=%d sec) - using timer-only STOP sleep", (int)result.error(), wakeInSeconds);
@@ -1463,6 +1467,7 @@ void handleSleepingState() {
       setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
       setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
       result = System.sleep(config);
+      AwakeCycles::recordSleepReturn(result.error() == SYSTEM_ERROR_NONE);
 
       if (result.error() != SYSTEM_ERROR_NONE) {
         // All sleep modes failed - this indicates a device state corruption
@@ -1739,9 +1744,10 @@ void handleSleepingState() {
     // We trust that the system timer woke us at the correct boundary.
     if (timerWake) {
       // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, suppress periodic reports
-      // while occupied so occupancy=1 is only reported on 0->1 transition.
+      // while occupied UNLESS one is due for this reporting interval
+      // (WO-2026-10-02-002: report every hour, occupied or not).
       if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && CurrentReadings::get_occupied() &&
-          SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
+          SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE && !reportDueThisInterval()) {
         transitionTo(SLEEPING_STATE, "sleep-timer-occupied-suppress-report");
         return;
       }
@@ -1756,11 +1762,12 @@ void handleSleepingState() {
     // reasoning as the scheduled-reporting site in State_Idle.cpp: an
     // opportunistic report is a resync opportunity, not a commitment.
     if (pirWake && Clock::openness() != Clock::Openness::Closed) {
-      // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, do not opportunistically
-      // report while occupied; PIR hits should only reset debounce.
+      // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, a PIR hit while occupied
+      // reports only when one is due for this reporting interval
+      // (WO-2026-10-02-002); otherwise it only resets debounce.
       if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && CurrentReadings::get_occupied() &&
           SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
-        // Skip overdue-report check while occupied.
+        if (reportDueThisInterval()) { transitionTo(REPORTING_STATE, "sleep-pir-overdue-report"); return; }
       } else {
       uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
 

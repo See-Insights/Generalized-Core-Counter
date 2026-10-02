@@ -1,8 +1,10 @@
 #pragma once
 
+#include "../Config.h"
 #include "Particle.h"
 #include "persist/CurrentReadings.h"
 #include "persist/RecoveryState.h"
+#include "persist/SystemConfig.h"
 #include "state/StateHandlers.h"
 #include "state/StateMachine.h"
 #include "time/Clock.h"
@@ -11,6 +13,30 @@
  * @file State_Common.h
  * @brief Shared helper declarations used by multiple state handlers.
  */
+
+/**
+ * @brief WO-2026-10-02-002 (v33): is a scheduled report due in the current
+ *        reporting interval?
+ *
+ * @details The clock-hour rule decided at Stage 5: a report is due when none
+ *          has been made yet in the interval the current time falls in, i.e.
+ *          `lastReport == 0` or `now / interval != lastReport / interval`.
+ *          This is the single due test used by all three sites that formerly
+ *          suppressed the scheduled report while occupied (State_Sleep.cpp's
+ *          timer wake and PIR wake, State_Idle.cpp's scheduled reporting), so
+ *          an occupied site reports once per hour boundary and no more.
+ *          Occupancy-change reports set lastReport too, so they count.
+ *
+ *          Config::reportingIntervalSecForRuntime() never returns 0 (it falls
+ *          back to DEFAULT_REPORT_INTERVAL_SEC), so the division is safe.
+ *
+ * @return true when no report has been made in the current reporting interval.
+ */
+inline bool reportDueThisInterval() {
+	const time_t interval = Config::reportingIntervalSecForRuntime();
+	const time_t lastReport = SystemConfig::get_lastReport();
+	return lastReport == 0 || Time.now() / interval != lastReport / interval;
+}
 
 /**
  * @brief Reasons the long-duration connectivity failsafe intentionally deferred action.

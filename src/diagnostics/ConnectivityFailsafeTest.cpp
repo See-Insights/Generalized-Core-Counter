@@ -1,6 +1,6 @@
 #include "diagnostics/ConnectivityFailsafeTest.h"
 
-#include "Config.h"
+#include "../Config.h"
 #include "persist/PowerConfig.h"
 #include "persist/RecoveryState.h"
 #include "persist/SystemConfig.h"
@@ -9,6 +9,8 @@
 #include "power/PowerManager.h"
 #include "power/PowerPlatform.h"
 #include "state/StateMachine.h"
+#include "time/Clock.h"
+#include "time/DailyBoundary.h"
 
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
 #warning "CONNECTIVITY_FAILSAFE_TEST_MODE=1 (bench timings enabled)"
@@ -152,8 +154,10 @@ FailsafeDeferReason currentFailsafeEligibilityReason() {
   }
 
   const time_t now = Time.now();
-  if (now > lastConnection) {
-    const time_t connectionAgeSec = now - lastConnection;
+  const time_t openedAt = DailyBoundary::todayAt(SystemConfig::get_openTime());
+  const time_t ageBase = (openedAt > lastConnection) ? openedAt : lastConnection;
+  if (Clock::openness() == Clock::Openness::Open && now > ageBase) {
+    const time_t connectionAgeSec = now - ageBase;
     uint8_t currentStage = RecoveryState::get_connectivityRecoveryStage();
     if (currentStage > 3) {
       currentStage = 0;
@@ -165,7 +169,7 @@ FailsafeDeferReason currentFailsafeEligibilityReason() {
         lastAction = 0;
       }
 
-      const uint8_t nextStage = currentStage + 1;
+      const uint8_t nextStage = (currentStage <= 1) ? 2 : (uint8_t)(currentStage + 1);
       time_t requiredDelay = ConnectivityPolicy::CONNECTIVITY_FAILSAFE_COOLDOWN_SEC;
       if (nextStage >= 2) {
         requiredDelay += (time_t)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC;

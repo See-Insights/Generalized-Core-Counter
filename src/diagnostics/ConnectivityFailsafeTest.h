@@ -2,6 +2,7 @@
 
 #include "Particle.h"
 #include "BuildProfile.h"
+#include "cloud/BatteryBackoffPolicy.h"
 #include "state/State_Common.h"
 
 namespace ConnectivityFailsafeTest {

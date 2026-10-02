@@ -4,9 +4,9 @@
 #include "persist/SystemConfig.h"
 #include "time/Clock.h"
 
-namespace {
+namespace DailyBoundary {
 
-time_t localTodayAt(uint8_t hour) {
+time_t todayAt(uint8_t hour) {
   LocalTimeConvert converter;
   converter.withConfig(LocalTime::instance().getConfig()).withCurrentTime().convert();
 
@@ -23,10 +23,6 @@ time_t localTodayAt(uint8_t hour) {
   return converter.time;
 }
 
-} // namespace
-
-namespace DailyBoundary {
-
 Result check(time_t now) {
   bool due = false;
   time_t boundary = 0;
@@ -39,7 +35,7 @@ Result check(time_t now) {
     const uint8_t openHour = SystemConfig::get_openTime();
     const uint8_t closeHour = SystemConfig::get_closeTime();
     close = (openHour == closeHour) ? 24 : closeHour;
-    boundary = localTodayAt(close);
+    boundary = todayAt(close);
     if (now < boundary) {
       boundary -= 86400;
     }
