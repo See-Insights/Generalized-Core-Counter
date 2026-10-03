@@ -2,7 +2,7 @@
 
 **Goal, in plain language:** a ledger write that's already waiting is never retried; the latest content is written once, after the previous write completes.
 
-**Status:** **APPROVED at USER GATE 2** (Chip, 2026-10-03), after Stage 7 (Codex `gpt-6-astra` high) found no production defect. 61/61; 14 net `src/` lines against a budget raised from 10 to 14. Both Stage 7 notes are applied. Committed for Chip's merge; the Dev-09 bench comes after the flash.
+**Status:** **APPROVED at USER GATE 2** (Chip, 2026-10-03), after Stage 7 (Codex `gpt-6-astra` high) found no production defect. 61/61; 14 net `src/` lines against a budget raised from 10 to 14. Both Stage 7 notes are applied. Merged (PR #58). **Dev-09 bench PASS** (2026-10-03); the OTA-download case is to be confirmed at the next OTA to a v35 device.
 
 **Workflow:** Per `AI_DEVELOPMENT_WORKFLOW.md`: Stage 5 decisions (Chip and the architect, in the opening dispatch) → Stage 6 (Copilot) → Stage 7 (Codex); §5 model routing; §12 guardrails (plain goal, size budget with no compressed code, two-round rule, facts checked against their source, budget vs actual in the closing record).
 
@@ -93,6 +93,27 @@ The flood happens at boot, when the first time sync lands while ConnectState's S
 - then exactly one deferred STATUS write.
 
 If an OTA is convenient, do one too, with the same pass criterion.
+
+### Bench result: PASS (Dev-09, 2026-10-03)
+
+**Result: PASS.** The OTA-download case is to be confirmed at the next OTA to a v35 device.
+
+- **Device and source:** Dev-09, status `v35-LedgerNoRetry` at 06:18:47Z (reset reason 20, USB flash).
+- **Who checked what:** Chip captured the serial log of the boot and first connection. Claude Code checked each claim against it.
+
+Times are milliseconds since boot.
+
+| Claim | Log line | Holds |
+|---|---|---|
+| One warning, not a flood; the refused ConnectState DATA write was marked for later | `108047 LedgerDuplicateStillInflight … kind=DATA orig=ReportState new=ConnectState age=106974 … pendingData=1`, the only one in the log | ✓ |
+| The in-flight DATA write completed, then the deferred DATA write went out once | `108411 LedgerCb: kind=DATA seq=1` → `108416 LedgerPayloadData` | ✓ |
+| STATUS completed, then the deferred clock-resync STATUS went out once | `108083 ClockResync` set it while STATUS seq 2 (ConnectState's, issued at 107592) was in flight → `109179 LedgerCb STATUS seq=2` → `109186 LedgerPayloadStatus` | ✓ |
+| One operation per pass | the DATA write (108416) and the STATUS write (109186) went out on separate passes | ✓ |
+| Both follow-ups completed, the gate released in 6.9 s, and the device slept | `109828 LedgerCb DATA seq=3`, `115247 LedgerCb STATUS seq=4`, `115253 GateRelease: wait=6854`, then `Sleep: ULP … dur=300s` | ✓ |
+
+**Notes:**
+- **The 107 s wait was the connection, not the ledger.** ReportState's DATA write was queued about 1 s after boot. The connection then took 106 s: a DNS failure (`-170`), then cloud recovery at stage 1 (`CloudRecover: success stage=1`, `sig=65/25`). That's why ConnectState's DATA write found it in flight.
+- **The ConnectState snapshot that v34 would have dropped was written 5 ms after the first write completed** (108411 → 108416).
 
 ## Out of scope
 

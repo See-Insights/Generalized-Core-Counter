@@ -54,7 +54,9 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 
   **Fix:** separate the configured mode from the battery downgrade. The effective mode is derived, and neither overwrites the other.
 
-**Phase 4: backlog**, in order: build provenance (vendored versus registry libraries; WO-2026-09-26-001), fleet-ops duplicates, ledger headroom, the connect stall, the Dev-11 oscillator test, the PWGT fix, and CI: run the host test suite (sh via zsh, py via python3) plus the WITH_ACK structural test on every PR via GitHub Actions, so a PR with failing tests can't be merged; and battery-tier tuning: CONSERVING starts at 75% charge (`BatteryBackoffPolicy.h:21`), which for solar sites heading into shorter days may cut connections more often than needed, so tune it later from field data on how often devices actually get that low. After Step 6.
+**Phase 4: backlog**, in order: build provenance (vendored versus registry libraries; WO-2026-09-26-001), fleet-ops duplicates, the connect stall, the Dev-11 oscillator test, the PWGT fix, and CI: run the host test suite (sh via zsh, py via python3) plus the WITH_ACK structural test on every PR via GitHub Actions, so a PR with failing tests can't be merged; and battery-tier tuning: CONSERVING starts at 75% charge (`BatteryBackoffPolicy.h:21`), which for solar sites heading into shorter days may cut connections more often than needed, so tune it later from field data on how often devices actually get that low. After Step 6.
+
+**Ledger content review** (backlog, after Step 6): what we send to the status and data ledgers, and why. The STATUS payload is 834 of 896 bytes (62 bytes of headroom), so decide what belongs there, what can be dropped, and what belongs in events instead. Supersedes the separate "ledger headroom" item.
 
 ## Guardrails (`AI_DEVELOPMENT_WORKFLOW.md` §12)
 
