@@ -170,7 +170,7 @@ void testConfirmedSyncPublishesTrustedTrueEndToEnd() {
   // requested and nothing in the composed payload changed, so a second
   // loop() call must not reach deviceStatusLedger.set() again. This proves
   // writeDeviceStatusToCloud()'s success path actually clears
-  // pendingStatusPublish (Cloud.cpp:694), not just that SOME publish
+  // pendingStatusPublish (Cloud.cpp:703), not just that SOME publish
   // happened once.
   g_statusJsonObserver.reset();
   Cloud::instance().loop(); // nothing newly requested

@@ -200,6 +200,7 @@ Cloud::Cloud() : ledgersSynced(false), lastApplySuccess(true) {
     lastPublishedStatus[0] = '\0';
     pendingStatusPublish = false;
     pendingStatusPublishSource = "Unknown";
+    pendingDataPublish = false;
     pendingConfigApply = false;
     pendingDeviceStatusSync = false;
     pendingDeviceDataSync = false;
@@ -690,10 +691,27 @@ void Cloud::loop() {
 
     // Publish device-status updates opportunistically when connected.
     // Do at most one deferred operation per loop() pass.
-    if (pendingStatusPublish && Particle.connected()) {
+    //
+    // WO-2026-10-03-001 (a1): a write that is already waiting is never
+    // retried. The gate below is the same in-flight test
+    // noteLedgerSyncRequest() applies (tracked pointer AND an unsynced
+    // local write), so the drain simply waits rather than rebuilding a
+    // payload every pass only to have the request refused.
+    if (pendingStatusPublish && Particle.connected() &&
+        !(isLedgerPointerTracked(&deviceStatusLedger) && ledgerHasUnsyncedWriteForDiag(deviceStatusLedger))) {
         if (writeDeviceStatusToCloud(pendingStatusPublishSource)) {
             pendingStatusPublish = false;
             pendingStatusPublishSource = "Unknown";
+        }
+        return;
+    }
+
+    // WO-2026-10-03-001 (b): the deferred device-data write, gated the same
+    // way. The payload is rebuilt here, so it carries the latest content.
+    if (pendingDataPublish && Particle.connected() &&
+        !(isLedgerPointerTracked(&deviceDataLedger) && ledgerHasUnsyncedWriteForDiag(deviceDataLedger))) {
+        if (publishDataToLedger("DeferredData")) {
+            pendingDataPublish = false;
         }
     }
 }

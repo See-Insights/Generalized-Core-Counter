@@ -15,9 +15,9 @@
 #define FIRMWARE_VERSION_H
 
 /** @brief Particle Product integer version (must be an integer). */
-#define FIRMWARE_PRODUCT_VERSION 34
+#define FIRMWARE_PRODUCT_VERSION 35
 
 /** @brief Current firmware release string. */
-inline const char* FIRMWARE_VERSION = "v34-SleepConfigLeak";
+inline const char* FIRMWARE_VERSION = "v35-LedgerNoRetry";
 
 #endif /* FIRMWARE_VERSION_H */

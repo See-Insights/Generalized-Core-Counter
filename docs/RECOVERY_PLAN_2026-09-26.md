@@ -44,7 +44,17 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 
 **Phase 3: clarity (Step 5.5).** Pilot: the reporting state in four plain steps (always report → daily cleanup if closing → already connected? → connect now or later), about 20 lines, with the details in named owners (`DailyBoundary`, `Connectivity::shouldConnectNow`) and the response wait restored explicitly. Then `setup()` as named phases, then the other states.
 
-**Phase 4: backlog**, in order: build provenance (vendored versus registry libraries; WO-2026-09-26-001), fleet-ops duplicates, ledger headroom, the connect stall, the Dev-11 oscillator test, the PWGT fix.
+**Step 6: the power-owner split.** Items deferred to it so far:
+- **Duplicated power-source codes and PMIC fault masks** (WO-2026-09-29-002).
+- **Boron versus M-SoM build selection** (WO-2026-09-29-002).
+- **Connection-mode tug-of-war** (2026-10-03, found while explaining Trail02's 2-hour delivery spacing on v34):
+  - `ConfigApply.cpp:445–455` restores keep-alive on every config apply;
+  - `BatteryAuthorityCommand.cpp:80–84` re-applies intermittent in CONSERVING;
+  - the mode flips, and is persisted, on every connection.
+
+  **Fix:** separate the configured mode from the battery downgrade. The effective mode is derived, and neither overwrites the other.
+
+**Phase 4: backlog**, in order: build provenance (vendored versus registry libraries; WO-2026-09-26-001), fleet-ops duplicates, ledger headroom, the connect stall, the Dev-11 oscillator test, the PWGT fix, and CI: run the host test suite (sh via zsh, py via python3) plus the WITH_ACK structural test on every PR via GitHub Actions, so a PR with failing tests can't be merged; and battery-tier tuning: CONSERVING starts at 75% charge (`BatteryBackoffPolicy.h:21`), which for solar sites heading into shorter days may cut connections more often than needed, so tune it later from field data on how often devices actually get that low. After Step 6.
 
 ## Guardrails (`AI_DEVELOPMENT_WORKFLOW.md` §12)
 

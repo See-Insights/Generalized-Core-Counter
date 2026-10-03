@@ -303,9 +303,8 @@ void testPublisherFirmwareObjectReportsCompiledBuildFlags() {
 // DeviceStatusPublisher.cpp:353) can never suppress anything here - every
 // call reaches the log line, isolating the guard under test (the narrower,
 // byte-count-based one added alongside it) as the only thing that can
-// suppress a repeat. This mirrors the real production shape this WO's
-// spam came from: Cloud::loop() retrying an already-in-flight sync with
-// lastPublishedStatus stuck stale.
+// suppress a repeat. This mirrors the historical production retry pattern
+// fixed by WO-2026-10-03-001.
 void testLedgerPayloadStatusLogSuppressesRepeatedByteCount() {
   resetHarness();
   PowerPlatform::testPowerPlatformState.snapshot.source = kPowerSourceVin;

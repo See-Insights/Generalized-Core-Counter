@@ -414,8 +414,12 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
 #else
         (void)resultDiagnostics;
 #endif
-        // Keep pendingStatusPublish set so the deferred status update can retry
-        // once the in-flight ledger write has completed.
+        // WO-2026-10-03-001 (a2): defer instead of dropping. Callers that
+        // write directly (ConnectState, State_Connect.cpp) previously lost
+        // the write entirely; now loop() issues it once the in-flight write
+        // completes, with a freshly built payload.
+        pendingStatusPublish = true;
+        pendingStatusPublishSource = issueSource;
         return false;
     }
 
@@ -578,6 +582,11 @@ bool Cloud::publishDataToLedger(const char *source) {
 #else
         (void)resultDiagnostics;
 #endif
+        // WO-2026-10-03-001 (a3): defer instead of dropping this write
+        // silently. The caller still sees success, so ReportState and
+        // alert 42 are unchanged; loop() reissues it, with a freshly built
+        // payload, once the in-flight data write completes.
+        pendingDataPublish = true;
         return true;
     }
 
@@ -603,6 +612,7 @@ bool Cloud::publishDataToLedger(const char *source) {
     
     if (result == SYSTEM_ERROR_NONE) {
         pendingDeviceDataSync = true;
+        pendingDataPublish = false; // WO-2026-10-03-001: this write supersedes any deferred one
 #if ENABLE_LEDGER_TRACE
         Log.info("LedgerDiag: success elapsed=%lu pending=%u heap=%lu",
                  elapsedMs,

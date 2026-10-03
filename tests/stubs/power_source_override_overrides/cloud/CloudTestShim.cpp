@@ -31,6 +31,11 @@ Cloud::Cloud()
       lastApplySuccess(false),
       pendingStatusPublish(false),
       pendingStatusPublishSource(nullptr),
+      // WO-2026-10-03-001 (a3): the real Cloud gained a deferred-DATA flag;
+      // this harness only needs it initialized, since publishDataToLedger()
+      // sets it on the refusal path that noteLedgerSyncRequest() below
+      // always forces here.
+      pendingDataPublish(false),
       pendingConfigApply(false),
       pendingDeviceStatusSync(false),
       pendingDeviceDataSync(false) {
