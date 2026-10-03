@@ -12,52 +12,28 @@
 extern AB1805 ab1805; // WO-2026-08-24: defined once, in Generalized-Core-Counter.cpp
 
 static bool isWithinOpenHoursForHour(uint8_t hour, uint8_t openHour, uint8_t closeHour) {
-  if (openHour < closeHour) {
-    // Simple daytime window, e.g. 6 -> 22
-    return (hour >= openHour) && (hour < closeHour);
-  } else if (openHour > closeHour) {
-    // Overnight window, e.g. 20 -> 6
-    return (hour >= openHour) || (hour < closeHour);
-  } else {
-    // openHour == closeHour: treat as always open
-    return true;
-  }
+  // Daytime window only: the hour rules guarantee closeHour > openHour, and
+  // always-open is 0/24 (WO-2026-09-24-004).
+  return (hour >= openHour) && (hour < closeHour);
 }
 
 static int secondsUntilNextOpenForSeconds(uint32_t secondsOfDay,
                                           uint8_t openHour,
-                                          uint8_t closeHour,
+                                          uint8_t /*closeHour*/,
                                           bool openNow) {
   uint32_t openSec = (uint8_t)openHour * 3600;
-  uint32_t closeSec = (uint8_t)closeHour * 3600;
 
   // Normalize: if we're currently within opening hours, next open is tomorrow
   if (openNow) {
     return (int)((24 * 3600UL - secondsOfDay) + openSec);
   }
 
-  if (openHour < closeHour) {
-    // Simple daytime window, closed before open or after close
-    if (secondsOfDay < openSec) {
-      // Before opening today
-      return (int)(openSec - secondsOfDay);
-    } else {
-      // After closing, next open is tomorrow
-      return (int)((24 * 3600UL - secondsOfDay) + openSec);
-    }
-  } else if (openHour > closeHour) {
-    // Overnight window; closed between closeHour and openHour
-    if (secondsOfDay < openSec && secondsOfDay >= closeSec) {
-      // During the closed gap today
-      return (int)(openSec - secondsOfDay);
-    } else {
-      // Otherwise next open is later today or tomorrow, but openNow
-      // was already false so this path will generally be rare; fall back to 1 hour
-      return 3600;
-    }
+  if (secondsOfDay < openSec) {
+    // Before opening today
+    return (int)(openSec - secondsOfDay);
   } else {
-    // openHour == closeHour: always open; should not normally reach here
-    return 3600;
+    // After closing, next open is tomorrow
+    return (int)((24 * 3600UL - secondsOfDay) + openSec);
   }
 }
 

@@ -67,23 +67,15 @@ bool validateConfigFields(bool logFailures, const char **failureReason) {
     }
 
     uint8_t openHour = SystemConfig::get_openTime();
-    if (openHour > 23) {
-        if (logFailures) {
-            Log.warn("ConfigInvalid: timing.openHour=%u out of range", (unsigned)openHour);
-        }
-        if (valid) {
-            setFailureReason(failureReason, "timing.openHour out of range");
-        }
-        valid = false;
-    }
-
     uint8_t closeHour = SystemConfig::get_closeTime();
-    if (closeHour > 23) {
+    const char *hoursRule = hoursRuleFailure(openHour, closeHour);
+    if (hoursRule) {
         if (logFailures) {
-            Log.warn("ConfigInvalid: timing.closeHour=%u out of range", (unsigned)closeHour);
+            Log.warn("ConfigInvalid: timing.openHour=%u timing.closeHour=%u (%s)",
+                     (unsigned)openHour, (unsigned)closeHour, hoursRule);
         }
         if (valid) {
-            setFailureReason(failureReason, "timing.closeHour out of range");
+            setFailureReason(failureReason, "timing.openHour/closeHour break the hour rules");
         }
         valid = false;
     }
