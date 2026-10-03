@@ -412,6 +412,11 @@ private:
     // Deferred work flags
     bool pendingStatusPublish;
     const char *pendingStatusPublishSource;
+    // WO-2026-10-03-001 (a3): a device-data write refused because an earlier
+    // one is still in flight is deferred here instead of being dropped, and
+    // drained by loop() once that write completes. Deliberately NOT part of
+    // hasPendingOutputLedgerSync() (Stage 5 decision 2).
+    bool pendingDataPublish;
     bool pendingConfigApply;
     bool pendingDeviceStatusSync;
     bool pendingDeviceDataSync;

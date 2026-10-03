@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v35-LedgerNoRetry] - 2026-10-02
+
+### Changed
+
+- A waiting ledger write is never retried; refused STATUS/DATA writes are deferred, not dropped
+
 ## [v34-SleepConfigLeak] - 2026-10-02
 
 ### Changed
