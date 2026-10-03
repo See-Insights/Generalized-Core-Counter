@@ -32,9 +32,7 @@ Result check(time_t now) {
   // boundary logic must not run or stamp state on an untrusted clock, which
   // could permanently consume a missed boundary.
   if (Clock::isTrusted()) {
-    const uint8_t openHour = SystemConfig::get_openTime();
-    const uint8_t closeHour = SystemConfig::get_closeTime();
-    close = (openHour == closeHour) ? 24 : closeHour;
+    close = SystemConfig::get_closeTime();
     boundary = todayAt(close);
     if (now < boundary) {
       boundary -= 86400;

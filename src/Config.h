@@ -37,6 +37,28 @@ constexpr uint16_t DEFAULT_CONNECT_ATTEMPT_BUDGET_SEC =
 constexpr uint16_t DEFAULT_CLOUD_DISCONNECT_BUDGET_SEC = ConnectivityPolicy::DISCONNECT_CLOUD_DEFAULT_SEC;
 constexpr uint16_t DEFAULT_MODEM_OFF_BUDGET_SEC = ConnectivityPolicy::DISCONNECT_MODEM_DEFAULT_SEC;
 
+// WO-2026-09-24-004: the three open/close hour rules, written once.
+//   1. Always-open is exactly openHour = 0, closeHour = 24.
+//   2. closeHour > openHour (no overnight windows).
+//   3. 0 <= openHour <= 12.
+// Returns the rule broken, for logging, or nullptr when the pair is valid.
+inline const char *hoursRuleFailure(int openHour, int closeHour) {
+	if (openHour < 0 || openHour > 12) {
+		return "rule 3: openHour must be 0-12";
+	}
+	if (closeHour > 24) {
+		return "combined hour bounds: closeHour must be at most 24";
+	}
+	if (closeHour <= openHour) {
+		return "rule 2: closeHour must be greater than openHour";
+	}
+	return nullptr;
+}
+
+inline bool hoursFollowRules(int openHour, int closeHour) {
+	return hoursRuleFailure(openHour, closeHour) == nullptr;
+}
+
 const char *sourceToString(Source source);
 Source getSource();
 void setSource(Source source, const char *reason = nullptr, bool persist = true);

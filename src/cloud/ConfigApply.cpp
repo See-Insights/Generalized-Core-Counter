@@ -1,5 +1,6 @@
 #include "cloud/Cloud.h"
 
+#include "../Config.h"
 #include "power/BatteryAuthority.h"
 #include "power/ChargeInhibitPolicy.h"
 #include "persist/PowerConfig.h"
@@ -276,26 +277,26 @@ bool Cloud::applyTimingConfig(const LedgerData &defaults, const LedgerData &devi
     // Note: pollingRate is no longer used in v3.23 - sensor-specific timing
     // is now configured via sensor.setting1-4 fields in the sensor section
 
-    if (getMergedIntValue(defaultTiming, deviceTiming, "openHour", openHour)) {
-        if (validateRange(openHour, 0, 23, "timing.openHour")) {
-            if (SystemConfig::get_openTime() != openHour) {
-                SystemConfig::set_openTime(openHour);
-                Log.info("Config: Open hour -> %d", openHour);
+    // WO-2026-09-24-004: the hours are checked and applied as a pair. An absent
+    // value falls back to the current one; a pair that breaks the rules is
+    // rejected whole, so the device keeps its last valid hours.
+    const bool haveOpenHour = getMergedIntValue(defaultTiming, deviceTiming, "openHour", openHour);
+    const bool haveCloseHour = getMergedIntValue(defaultTiming, deviceTiming, "closeHour", closeHour);
+    if (haveOpenHour || haveCloseHour) {
+        const int mergedOpen = haveOpenHour ? openHour : (int)SystemConfig::get_openTime();
+        const int mergedClose = haveCloseHour ? closeHour : (int)SystemConfig::get_closeTime();
+        const char *hoursRule = Config::hoursRuleFailure(mergedOpen, mergedClose);
+        if (hoursRule == nullptr) {
+            if (SystemConfig::get_openTime() != mergedOpen || SystemConfig::get_closeTime() != mergedClose) {
+                SystemConfig::set_openTime(mergedOpen);
+                SystemConfig::set_closeTime(mergedClose);
+                Log.info("Config: Open/close hours -> %d/%d", mergedOpen, mergedClose);
                 changed = true;
             }
         } else {
-            success = false;
-        }
-    }
-
-    if (getMergedIntValue(defaultTiming, deviceTiming, "closeHour", closeHour)) {
-        if (validateRange(closeHour, 0, 23, "timing.closeHour")) {
-            if (SystemConfig::get_closeTime() != closeHour) {
-                SystemConfig::set_closeTime(closeHour);
-                Log.info("Config: Close hour -> %d", closeHour);
-                changed = true;
-            }
-        } else {
+            Log.warn("Invalid hours openHour=%d closeHour=%d (%s); keeping %u/%u",
+                     mergedOpen, mergedClose, hoursRule,
+                     (unsigned)SystemConfig::get_openTime(), (unsigned)SystemConfig::get_closeTime());
             success = false;
         }
     }

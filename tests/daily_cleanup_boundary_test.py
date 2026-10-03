@@ -45,7 +45,7 @@ def strip_comment_lines(text: str) -> str:
 
 
 def local_boundary_utc(now: int, open_hour: int, close_hour: int) -> int:
-    close = 24 if open_hour == close_hour else close_hour
+    close = close_hour
     day_start = (now // SECONDS_PER_DAY) * SECONDS_PER_DAY
     boundary = day_start + (SECONDS_PER_DAY if close == 24 else close * 3600)
     if now < boundary:
@@ -131,9 +131,10 @@ def verify_source_shape() -> None:
     boundary_tokens = [
         ("due default", "bool due = false"),
         ("trusted-clock gate", "if (Clock::isTrusted())"),
-        ("open hour", "SystemConfig::get_openTime()"),
-        ("close hour", "SystemConfig::get_closeTime()"),
-        ("always-open normalization", "close = (openHour == closeHour) ? 24 : closeHour"),
+        # WO-2026-09-24-004: the hour rules retired the open == close sentinel,
+        # so the close boundary is the configured close hour, and the open hour
+        # is no longer read here.
+        ("close hour", "close = SystemConfig::get_closeTime()"),
         ("boundary computation", "todayAt(close)"),
         ("before-boundary condition", "if (now < boundary)"),
         ("before-boundary adjustment", "boundary -= 86400"),
@@ -280,7 +281,7 @@ def verify_acceptance_model() -> None:
     assert due_exact and exact_boundary == exactly_at_close
 
     midnight_sensor_now = 5 * SECONDS_PER_DAY + 3600
-    due_midnight, _, midnight_boundary = cleanup_due(True, midnight_sensor_now, 0, 7, 7)
+    due_midnight, _, midnight_boundary = cleanup_due(True, midnight_sensor_now, 0, 0, 24)
     assert due_midnight and midnight_boundary == 5 * SECONDS_PER_DAY
 
     untrusted_due, untrusted_stamp, _ = cleanup_due(False, just_after_close, 0, 6, 22)

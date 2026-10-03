@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v36-HourRules] - 2026-10-03
+
+### Changed
+
+- WO-2026-09-24-004: open/close hours follow the three rules
+
 ## [v35-LedgerNoRetry] - 2026-10-02
 
 ### Changed
