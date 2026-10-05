@@ -40,7 +40,7 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 - Bench on Dev-14 (stacked with WO-2026-09-24-001, plus diagnostic D, with USB serial): 20 cycles of "report offline, then connect", one close, and one occupancy start and end. Pass: every report is delivered and the device sleeps every cycle.
 - Then the fleet. Merge order: WO-2026-09-24-001, then 25-001, then 25-002.
 
-**Phase 2: the alert ladder.** Only the `deepPowerDown()` bench check (the AB1805 configuration-key issue). The ladder itself needs no code change.
+**Phase 2: the alert ladder.** Only the `deepPowerDown()` bench check (the AB1805 configuration-key issue). The ladder itself needs no code change. Field evidence so far: failsafe stage 3 did power down successfully on 1 Oct (status at 12:43:05Z: reset reason 20, breadcrumbs wiped; WO-2026-10-01-001; the 4 Oct Codex report, `2026-10-04-pre-step6-known-issues-codex-report.md`, §C). The PWGT key fix is still open (see "Upstream reports").
 
 **Phase 3: clarity (Step 5.5).** Pilot: the reporting state in four plain steps (always report → daily cleanup if closing → already connected? → connect now or later), about 20 lines, with the details in named owners (`DailyBoundary`, `Connectivity::shouldConnectNow`) and the response wait restored explicitly. Then `setup()` as named phases, then the other states.
 
@@ -49,14 +49,51 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 - **Boron versus M-SoM build selection** (WO-2026-09-29-002).
 - **Connection-mode tug-of-war** (2026-10-03, found while explaining Trail02's 2-hour delivery spacing on v34):
   - `ConfigApply.cpp:445–455` restores keep-alive on every config apply;
-  - `BatteryAuthorityCommand.cpp:80–84` re-applies intermittent in CONSERVING;
+  - `BatteryAuthorityCommand.cpp:80–84` re-applies intermittent in CONSERVING or worse;
   - the mode flips, and is persisted, on every connection.
 
   **Fix:** separate the configured mode from the battery downgrade. The effective mode is derived, and neither overwrites the other.
+- **The failsafe's allowance for deliberate spacing.** Its only allowance today is the low-battery block (`Generalized-Core-Counter.cpp:2641–2656`), which works only because the tug-of-war above sets the low-battery flag. **Goal:** the failsafe counts only the time when the device was expected to connect.
+- **Battery trust and tier.** The gauge is compared with a resting-voltage table (`kOcvKnots`, `BatteryHealth.cpp:19–32`) using a voltage sampled while awake, so healthy devices were marked untrusted and dropped to CRITICAL: Court3 at 82%, PCKL1 at 77% (the 4 Oct Codex report's ledger snapshot: 79.8% and 76.5%, both Untrusted/CRITICAL), and Dev-14 showing CRITICAL at 65%. Decide only after a week of v37's `vc` data (WO-2026-10-04-001 item D). If that isn't enough, add the fuller battery-decision snapshot proposed in the 4 Oct Codex report §D (raw and accepted SOC, vcell, charge state, radio state, sample age, source, resulting tier).
+- **CONSERVING threshold.** CONSERVING starts at 75% charge (`BatteryBackoffPolicy.h:21`), which may be too high for solar sites going into shorter days. Tune it from field data on how often devices actually get that low. (Moved here from the Phase 4 list.)
+- **Power-source misreads:** USB_ADAPTER and USB_HOST swapping on the same supply, as seen in Dev-09's and Dev-14's PowerDiag lines.
 
-**Phase 4: backlog**, in order: build provenance (vendored versus registry libraries; WO-2026-09-26-001), fleet-ops duplicates, the connect stall, the Dev-11 oscillator test, the PWGT fix, and CI: run the host test suite (sh via zsh, py via python3) plus the WITH_ACK structural test on every PR via GitHub Actions, so a PR with failing tests can't be merged; and battery-tier tuning: CONSERVING starts at 75% charge (`BatteryBackoffPolicy.h:21`), which for solar sites heading into shorter days may cut connections more often than needed, so tune it later from field data on how often devices actually get that low. After Step 6.
+**Phase 4: backlog**, in order: build provenance (vendored versus registry libraries; WO-2026-09-26-001), then the connect stall (WO-2026-09-25-005). The rest is grouped below.
 
-**Ledger content review** (backlog, after Step 6): what we send to the status and data ledgers, and why. The STATUS payload is 834 of 896 bytes (62 bytes of headroom), so decide what belongs there, what can be dropped, and what belongs in events instead. Supersedes the separate "ledger headroom" item.
+**Clock owner (Step 5.5/6).**
+- **Trust the AB1805 at boot** when `isRTCSet()` is true, the oscillator-fail flag is clear, and the time isn't earlier than the last persisted time. That removes the boot-time reconnect for clock sync and lets a missed close or session credit run in `setup()`. **Bench:** power-cycle with and without the RTC losing power.
+- **AB1805 flags:** fix the sticky oscillator-fail flag, and clear SLST after reading it (`AB1805_RK.cpp:186` never clears it, so every wake after one deep power-down is labeled `DEEP_POWER_DOWN`; 4 Oct Codex report §C). This replaces the Dev-11 oscillator test from the old Phase 4 list; Dev-11 was retired on 29 Sep, so it needs another bench unit.
+- **A late ALARM wake reports success:** apply the same on-time window as v37's item C (WO-2026-10-04-001).
+- **`deepPowerDown()` and the PWGT configuration key:** see Phase 2.
+
+**Upstream reports.**
+- **AB1805_RK library.** Five defects, not yet written down elsewhere: the three wrong Osc. Status constants XTCAL, LKO2 and OMODE (fixed in the vendored copy by PR #41, `ab2e0fe`, "to be filed upstream"); `deepPowerDown()` sets PWGT in `REG_OSC_CTRL` without writing the configuration key first, so it never takes effect (`AB1805_RK.cpp:562`); and `resetConfig()` does the same for `REG_OSC_CTRL` and `REG_TRICKLE` (`:156–157`). Add a sixth: SLST is never cleared (`:186`).
+- **Particle Device OS:** the `SystemSleepConfiguration` move-assignment leak (draft: `WO-2026-10-02-003-particle-bug-report-draft.md`). Issue link: not yet filed.
+
+**Connectivity** (deferred from the 1 Oct investigation: `2026-10-01-connectivity-investigation-codex-report.md`, recorded in WO-2026-10-01-001's non-goals).
+- **Connection attempts** (report #2): every Nth retry a full 11-minute attempt (Particle's guidance), and drop the "above 50% means always long" rule.
+- **A cap on total awake time across retries** (report #4).
+- **Slow modem teardown** (report #6): measure first, change nothing yet.
+
+**After Step 6.**
+- **Ledger content review:** what we send to the status and data ledgers, and why. The STATUS payload is 834 of 896 bytes (62 bytes of headroom), so decide what belongs there, what can be dropped, and what belongs in events instead. Supersedes the separate "ledger headroom" item.
+- **CI:** run the host test suite (sh via zsh, py via python3) plus the WITH_ACK structural test on every PR via GitHub Actions, so a PR with failing tests can't be merged.
+- **Renaming the webhook event:** its own WO, with a cut-over that never leaves a gap. No name may be a prefix of another.
+- **Occupied courts reporting more often than hourly,** with mid-session reports carrying the session's minutes so far.
+- **The reporting-state pilot (Phase 3),** starting with a voice walkthrough of `handleReportingState()`.
+- **Muon M524 bring-up,** then the M635e and M404.
+
+**Rollout and follow-ups** (not WOs).
+- **Hibernate fleet-wide:** after v37's item A has a few days in the field. Trail02 woke on time on all three trial nights (4 Oct Codex report §C).
+- **The Ubidots template:** add `"vc": "{{vc}}"` once every device runs v37.
+- **v35's download case:** confirm at the next OTA to a v35+ device.
+- **Alert 14's remaining uses:** review once older firmware has left the fleet (WO-2026-10-02-003, later cleanup).
+
+**Observations to watch** (no action yet).
+- **PCKL3 restarted twice with reset reason 0,** 7 minutes after its v35 update (also seen on v25 on 28 Sep).
+- **Dev-09 raised one stale alert 41** after its test setting was reverted: it applied its stale local copy before the reverted settings synced.
+- **A missing occupancy start report after a restart** (three times). Check whether v37's item B changes it (4 Oct Codex report §B).
+- **Duplicate deliveries:** with the fleet-ops agent (handover document, WO-2026-09-25-004). Moved here from the Phase 4 list.
 
 ## Guardrails (`AI_DEVELOPMENT_WORKFLOW.md` §12)
 
