@@ -710,7 +710,11 @@ void handleSleepingState() {
   // We only need to tear down the cloud session (quickly) before sleeping.
   bool stillOn;
 #if Wiring_Cellular
-  stillOn = useNetworkStandbyEffective ? Particle.connected() : (Particle.connected() || Connectivity::isRadioPoweredOn());
+  // WO-2026-10-04-001 item A2: Device OS has in-between modem states where
+  // both isOn() and isOff() are false. System.sleep() then blocks up to 120 s
+  // waiting for the modem, which is longer than the 60 s MCU watchdog, so the
+  // non-standby gate tests !Cellular.isOff() instead of isOn().
+  stillOn = useNetworkStandbyEffective ? Particle.connected() : (Particle.connected() || !Cellular.isOff());
 #else
   // On WiFi platforms, waiting for WiFi.isOn() to flip false can take a long
   // time and is not required for safe low-power sleep. Only gate on cloud.
@@ -808,7 +812,7 @@ void handleSleepingState() {
   }
 #if Wiring_Cellular
   if (disconnectRequested && !useNetworkStandbyEffective &&
-      !radioOffCompleteLogged && !Connectivity::isRadioPoweredOn()) {
+      !radioOffCompleteLogged && Cellular.isOff()) {
     modemOffElapsedMs = (disconnectRequestStartMs == 0) ? 0UL : (millis() - disconnectRequestStartMs);
     if (SystemConfig::get_verboseMode()) {
       Log.info("SLEEP: modem-off complete elapsed=%lu ms", modemOffElapsedMs);
@@ -890,7 +894,7 @@ void handleSleepingState() {
   auto sleepPreconditionsSatisfied = [&]() -> bool {
 #if Wiring_Cellular
     if (!useNetworkStandbyEffective) {
-      return !Particle.connected() && !Connectivity::isRadioPoweredOn();
+      return !Particle.connected() && Cellular.isOff();
     }
 #endif
     return !Particle.connected();
@@ -1640,7 +1644,7 @@ void handleSleepingState() {
       
       // Match the rest of the occupancy state machine: only KEEP_ALIVE mode
       // forces an immediate report/connect on occupancy transitions.
-      if (reportNow) {
+      if (reportNow && !closeResult.stillOpen) {
         session.occupancyChangeTriggered = true;
         transitionTo(REPORTING_STATE, "sleep-occupancy-debounce-report");
         return;

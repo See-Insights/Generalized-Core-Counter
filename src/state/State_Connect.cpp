@@ -382,18 +382,9 @@ void handleConnectingState() {
   lastConnPhase = currentConnPhase;
 
   if (!connectRequested) {
-    // Log signal strength at start of connection attempt for field
-    // correlation with connectivity failures (alert 31). On cellular
-    // platforms this gives us a baseline RSSI before the modem fully
-    // connects, helping diagnose poor-reception issues.
-#if Wiring_Cellular
-    CellularSignal sig = Cellular.RSSI();
-    float strengthPct = sig.getStrength();
-    float qualityPct = sig.getQuality();
-    (void)strengthPct;
-    (void)qualityPct;
-#else
-#endif
+    // WO-2026-10-04-001 item A1: no signal read before the cloud connects.
+    // Cellular.RSSI() is a synchronous modem transaction, and the main loop
+    // must never wait on the modem.
     Log.info("Connect: start budget=%lus heap=%lu",
          (unsigned long)(budgetMs / 1000UL),
          (unsigned long)System.freeMemory());
@@ -445,58 +436,30 @@ void handleConnectingState() {
       lastConnectHeartbeatMs = nowMs;
     }
     if (lastConnDiagLogMs == 0 || (nowMs - lastConnDiagLogMs) >= CONNECT_DIAG_LOG_MS) {
-      int sigStrength = -1;
-      int sigQuality = -1;
-      bool sigValid = false;
-      sampleConnectionSignal(sigStrength, sigQuality, sigValid);
   #if ENABLE_CONNECT_TRACE
       const uint16_t queueDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
       const bool standbyRequested =
           (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) &&
           isWithinOpenHours();
       const bool standbyEffective = standbyRequested && !session.modemStandbySuppressed;
+      // WO-2026-10-04-001 item A1: no signal sample during acquisition, so
+      // this diagnostic always reports sig=na.
+      Log.info("ConnDiag: elapsed=%lu/%lu phase=%s phaseElapsed=%lu cell=%d net=%d cloud=%d sig=na heap=%lu q=%u deep=%d standby=%d/%d",
+               (unsigned long)elapsedMs,
+               (unsigned long)budgetMs,
+               connAcquirePhaseLabel(currentConnPhase),
+         (unsigned long)phaseElapsedMs,
+               cellularReady ? 1 : 0,
+               networkReady ? 1 : 0,
+               cloudConnected ? 1 : 0,
+               (unsigned long)System.freeMemory(),
+               (unsigned)queueDepth,
+               deepAttemptThisConnect ? 1 : 0,
+               standbyRequested ? 1 : 0,
+               standbyEffective ? 1 : 0);
   #else
-      (void)sigStrength;
-      (void)sigQuality;
-      (void)sigValid;
       (void)deepAttemptThisConnect;
   #endif
-
-      if (sigValid) {
-    #if ENABLE_CONNECT_TRACE
-        Log.info("ConnDiag: elapsed=%lu/%lu phase=%s phaseElapsed=%lu cell=%d net=%d cloud=%d sig=%d/%d heap=%lu q=%u deep=%d standby=%d/%d",
-                 (unsigned long)elapsedMs,
-                 (unsigned long)budgetMs,
-                 connAcquirePhaseLabel(currentConnPhase),
-           (unsigned long)phaseElapsedMs,
-                 cellularReady ? 1 : 0,
-                 networkReady ? 1 : 0,
-                 cloudConnected ? 1 : 0,
-                 sigStrength,
-                 sigQuality,
-                 (unsigned long)System.freeMemory(),
-                 (unsigned)queueDepth,
-                 deepAttemptThisConnect ? 1 : 0,
-                 standbyRequested ? 1 : 0,
-                 standbyEffective ? 1 : 0);
-#endif
-      } else {
-#if ENABLE_CONNECT_TRACE
-        Log.info("ConnDiag: elapsed=%lu/%lu phase=%s phaseElapsed=%lu cell=%d net=%d cloud=%d sig=na heap=%lu q=%u deep=%d standby=%d/%d",
-                 (unsigned long)elapsedMs,
-                 (unsigned long)budgetMs,
-                 connAcquirePhaseLabel(currentConnPhase),
-           (unsigned long)phaseElapsedMs,
-                 cellularReady ? 1 : 0,
-                 networkReady ? 1 : 0,
-                 cloudConnected ? 1 : 0,
-                 (unsigned long)System.freeMemory(),
-                 (unsigned)queueDepth,
-                 deepAttemptThisConnect ? 1 : 0,
-                 standbyRequested ? 1 : 0,
-                 standbyEffective ? 1 : 0);
-#endif
-      }
       lastConnDiagLogMs = nowMs;
     }
   }
@@ -622,32 +585,21 @@ void handleConnectingState() {
       }
 
       size_t pending = PublishQueuePosix::instance().getNumEvents();
-    #if Wiring_Cellular
-      {
-        CellularSignal sig = Cellular.RSSI();
-        Log.info("Connect: ok elapsed=%lums sig=%.0f/%.0f q=%u heap=%lu",
+      // WO-2026-10-04-001 item A1: reuse the one signal sample taken above
+      // for ConnSummary instead of a second modem transaction.
+      if (summarySigValid) {
+        Log.info("Connect: ok elapsed=%lums sig=%d/%d q=%u heap=%lu",
              (unsigned long)(connectedStartMs - connectionStartTimeStamp),
-             (double)sig.getStrength(),
-             (double)sig.getQuality(),
+             summarySigStrength,
+             summarySigQuality,
+             (unsigned)pending,
+             (unsigned long)System.freeMemory());
+      } else {
+        Log.info("Connect: ok elapsed=%lums sig=na q=%u heap=%lu",
+             (unsigned long)(connectedStartMs - connectionStartTimeStamp),
              (unsigned)pending,
              (unsigned long)System.freeMemory());
       }
-    #elif Wiring_WiFi
-      {
-        WiFiSignal sig = WiFi.RSSI();
-        Log.info("Connect: ok elapsed=%lums sig=%.0f/%.0f q=%u heap=%lu",
-             (unsigned long)(connectedStartMs - connectionStartTimeStamp),
-             (double)sig.getStrength(),
-             (double)sig.getQuality(),
-             (unsigned)pending,
-             (unsigned long)System.freeMemory());
-      }
-    #else
-      Log.info("Connect: ok elapsed=%lums q=%u heap=%lu",
-           (unsigned long)(connectedStartMs - connectionStartTimeStamp),
-           (unsigned)pending,
-           (unsigned long)System.freeMemory());
-    #endif
 
       if (!session.firstConnectionObserved) {
         session.firstConnectionObserved = true;
@@ -687,36 +639,19 @@ void handleConnectingState() {
                (unsigned long)cloudAcquireElapsedMs);
     }
 
-    int summarySigStrength = -1;
-    int summarySigQuality = -1;
-    bool summarySigValid = false;
-    sampleConnectionSignal(summarySigStrength, summarySigQuality, summarySigValid);
+    // WO-2026-10-04-001 item A1: the timeout path must not touch the modem,
+    // so the summary reports sig=na.
     const uint16_t summaryQueueDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
-    if (summarySigValid) {
-      Log.warn("ConnSummary: fail elapsed=%lu last=%s cellMs=%lu netMs=%lu cloudMs=%lu cloudRecoverStage=%u cloudRecoverCount=%u sig=%d/%d heap=%lu q=%u",
-               (unsigned long)elapsedMs,
-               connAcquirePhaseLabel(lastConnPhase),
-               (unsigned long)connPhaseCellMs,
-               (unsigned long)connPhaseNetMs,
-               (unsigned long)connPhaseCloudMs,
-               (unsigned)cloudRecoverStage,
-               (unsigned)cloudRecoverCount,
-               summarySigStrength,
-               summarySigQuality,
-               (unsigned long)System.freeMemory(),
-               (unsigned)summaryQueueDepth);
-    } else {
-      Log.warn("ConnSummary: fail elapsed=%lu last=%s cellMs=%lu netMs=%lu cloudMs=%lu cloudRecoverStage=%u cloudRecoverCount=%u sig=na heap=%lu q=%u",
-               (unsigned long)elapsedMs,
-               connAcquirePhaseLabel(lastConnPhase),
-               (unsigned long)connPhaseCellMs,
-               (unsigned long)connPhaseNetMs,
-               (unsigned long)connPhaseCloudMs,
-               (unsigned)cloudRecoverStage,
-               (unsigned)cloudRecoverCount,
-               (unsigned long)System.freeMemory(),
-               (unsigned)summaryQueueDepth);
-    }
+    Log.warn("ConnSummary: fail elapsed=%lu last=%s cellMs=%lu netMs=%lu cloudMs=%lu cloudRecoverStage=%u cloudRecoverCount=%u sig=na heap=%lu q=%u",
+             (unsigned long)elapsedMs,
+             connAcquirePhaseLabel(lastConnPhase),
+             (unsigned long)connPhaseCellMs,
+             (unsigned long)connPhaseNetMs,
+             (unsigned long)connPhaseCloudMs,
+             (unsigned)cloudRecoverStage,
+             (unsigned)cloudRecoverCount,
+             (unsigned long)System.freeMemory(),
+             (unsigned)summaryQueueDepth);
 
     Log.warn("Connect: fail elapsed=%lums budget=%lums heap=%lu",
              (unsigned long)elapsedMs,

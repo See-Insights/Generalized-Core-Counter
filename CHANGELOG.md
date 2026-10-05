@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v37-PreStep6Fixes] - 2026-10-05
+
+### Changed
+
+- No modem waits in the main loop or at sleep; mid-session restarts keep their minutes; on-time hibernate wakes report ok; reports carry cell voltage
+
 ## [v36-HourRules] - 2026-10-03
 
 ### Changed
