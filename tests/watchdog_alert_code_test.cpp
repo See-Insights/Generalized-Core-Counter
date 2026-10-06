@@ -1,6 +1,7 @@
 // Host-side regression test for item 3 (new watchdog-reset alert code) of
-// WO-2026-08-10-001: the alert severity tier, its exclusion from
-// isAutoClearAfterReportAlert(), and confirmation that the code actually
+// WO-2026-08-10-001: the alert severity tier, its inclusion in
+// isAutoClearAfterReportAlert() (WO-2026-10-06-001; it was excluded, so
+// sticky, before), and confirmation that the code actually
 // reaches the Ubidots-bound webhook payload's "alerts" field.
 //
 // getAlertSeverity() (src/MyPersistentData.cpp) and
@@ -73,6 +74,7 @@ int getAlertSeverity(int8_t code) {
 bool isAutoClearAfterReportAlert(int alertCode) {
   switch (alertCode) {
   case 15:
+  case 19:
   case 31:
   case 41:
   case 43:
@@ -150,8 +152,11 @@ void testNewAlertCodeIsItsOwnTierAboveExistingTier3Group() {
   printf("PASS: testNewAlertCodeIsItsOwnTierAboveExistingTier3Group\n");
 }
 
-void testNewAlertCodeAbsentFromAutoClearList() {
-  assert(isAutoClearAfterReportAlert(WATCHDOG_ALERT_CODE) == false);
+// WO-2026-10-06-001: alert 19 now clears after it has been reported once.
+void testWatchdogAlertCodeInAutoClearList() {
+  assert(isAutoClearAfterReportAlert(WATCHDOG_ALERT_CODE) == true);
+  // Codes outside the list still don't auto-clear.
+  assert(isAutoClearAfterReportAlert(40) == false);
   // Sanity: confirm the function still behaves correctly for known
   // auto-clear codes, so a trivial "always false" stub wouldn't pass silently.
   assert(isAutoClearAfterReportAlert(15) == true);
@@ -159,7 +164,7 @@ void testNewAlertCodeAbsentFromAutoClearList() {
   assert(isAutoClearAfterReportAlert(41) == true);
   assert(isAutoClearAfterReportAlert(43) == true);
   assert(isAutoClearAfterReportAlert(44) == true);
-  printf("PASS: testNewAlertCodeAbsentFromAutoClearList\n");
+  printf("PASS: testWatchdogAlertCodeInAutoClearList\n");
 }
 
 void testRaiseAlertSupersedesLowerSeverityButStaysStickyAgainstEqual() {
@@ -233,7 +238,7 @@ void testAlertCodeReachesCountingWebhookPayload() {
 
 int main() {
   testNewAlertCodeIsItsOwnTierAboveExistingTier3Group();
-  testNewAlertCodeAbsentFromAutoClearList();
+  testWatchdogAlertCodeInAutoClearList();
   testRaiseAlertSupersedesLowerSeverityButStaysStickyAgainstEqual();
   testAlert18ActiveThenRaiseAlert19Wins();
   testAlert19ActiveThenRaiseAlert18DoesNotOverride();

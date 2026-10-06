@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v38-Alert19Clears] - 2026-10-06
+
+### Changed
+
+- Alert 19 (watchdog reset) is reported once, in the first report after a watchdog reboot, then cleared, so it no longer hides other alerts (WO-2026-10-06-001).
+
 ## [v37-PreStep6Fixes] - 2026-10-05
 
 ### Changed

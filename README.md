@@ -8,7 +8,7 @@ This repository includes key documentation files that contributors and AI coding
 
 # Generalized-Core-Counter
 
-**Version:** v37-PreStep6Fixes | **Latest:** No modem waits in the main loop or at sleep; mid-session restarts keep their minutes; on-time hibernate wakes report ok; reports carry cell voltage
+**Version:** v38-Alert19Clears | **Latest:** Alert 19 (watchdog reset) is reported once, in the first report after a watchdog reboot, then cleared, so it no longer hides other alerts (WO-2026-10-06-001).
 
 Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v14 release packages cloud recovery tuning and release-safe logging cleanup without changing the existing production power, sleep, connectivity, watchdog, ledger, or PMIC behavior.
 

@@ -52,10 +52,11 @@ if ! echo "$tier3_block" | grep -q "case 18:"; then
   exit 1
 fi
 
-# Code 19 must NOT appear in isAutoClearAfterReportAlert()'s case list.
+# WO-2026-10-06-001: code 19 MUST appear in isAutoClearAfterReportAlert()'s
+# case list (reported once, then cleared). Before, it was excluded (sticky).
 autoclear_body=$(awk '/static bool isAutoClearAfterReportAlert/,/^}/' "$app_src")
-if echo "$autoclear_body" | grep -q "case 19:"; then
-  echo "FIDELITY CHECK FAILED: alert code 19 must NOT be in isAutoClearAfterReportAlert()" >&2
+if ! echo "$autoclear_body" | grep -q "case 19:"; then
+  echo "FIDELITY CHECK FAILED: alert code 19 must be in isAutoClearAfterReportAlert()" >&2
   exit 1
 fi
 
