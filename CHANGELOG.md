@@ -16,11 +16,11 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
-## [v38-Alert19Clears] - 2026-10-06
+## [v38-EventAlertsClear] - 2026-10-06
 
 ### Changed
 
-- Alert 19 (watchdog reset) is reported once, in the first report after a watchdog reboot, then cleared, so it no longer hides other alerts (WO-2026-10-06-001).
+- Event alerts are reported once and then cleared, so none can hide other alerts: 19 (watchdog reset) and 42 (data ledger publish failure / OTA updates pending). 18 (state-machine thrash) stays sticky for now (WO-2026-10-06-001).
 
 ## [v37-PreStep6Fixes] - 2026-10-05
 

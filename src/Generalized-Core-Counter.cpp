@@ -1945,6 +1945,7 @@ static bool isAutoClearAfterReportAlert(int alertCode) {
   case 19:
   case 31:
   case 41:
+  case 42:
   case 43:
   case 44:
     return true;

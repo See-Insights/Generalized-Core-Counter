@@ -1,7 +1,8 @@
 #!/bin/zsh
-# WO-2026-10-06-001 - alert 19 (watchdog reset) is reported once, in the first
-# report after a watchdog reboot, and then cleared, so it no longer hides
-# other alerts.
+# WO-2026-10-06-001 - event alerts are reported once and then cleared, so none
+# can hide other alerts: 19 (watchdog reset) and, from round 2, 42 (data
+# ledger publish failure / OTA updates pending). 18 (state-machine thrash) is
+# deliberately left sticky; see testThrashStaysSetAfterReport.
 #
 # Behavioural test: the REAL getAlertSeverity() and raiseAlert()
 # (src/MyPersistentData.cpp), isAutoClearAfterReportAlert() and publishData()'s
@@ -132,11 +133,42 @@ void testNineteenStillOutranksWhileSet() {
   printf("PASS: testNineteenStillOutranksWhileSet\n");
 }
 
+// Alert 18 (state-machine thrash) stays set after a report: it is NOT in the
+// clear list. Round 2's Stage 7 found that clearing it can lose a tier-3 18:
+// ThrashGuard raises 18 and resets at once (ThrashGuard.cpp:150-152), before
+// the 250 ms deferred save (MyPersistentData.cpp:681). Chip dropped 18 from
+// v38 (2026-10-06); this guard fails if 18 is re-added without that fix.
+void testThrashStaysSetAfterReport() {
+  reset();
+  raiseAlert(18);
+  assert(publishReport(true) == 18);
+  assert(g_alertCode == 18);            // still set
+  assert(publishReport(true) == 18);
+  printf("PASS: testThrashStaysSetAfterReport\n");
+}
+
+// Round 2: alert 42 (data ledger publish failure, or OTA updates pending at the
+// sleep gate; severity 2) is an event. Reported once, then cleared, and a later
+// lower alert (44, severity 1) is visible.
+void testLedgerFailureReportedOnceThenLaterAlertVisible() {
+  reset();
+  raiseAlert(42);
+  raiseAlert(44);                       // masked while 42 is set
+  assert(g_alertCode == 42);
+  assert(publishReport(true) == 42);
+  assert(g_alertCode == 0);
+  raiseAlert(44);
+  assert(publishReport(true) == 44);
+  printf("PASS: testLedgerFailureReportedOnceThenLaterAlertVisible\n");
+}
+
 int main() {
   testWatchdogReportedOnceThenLaterAlertVisible();
   testUnqueuedReportDoesNotClear();
   testNineteenStillOutranksWhileSet();
-  printf("Alert 19 clears after report test passed\n");
+  testThrashStaysSetAfterReport();
+  testLedgerFailureReportedOnceThenLaterAlertVisible();
+  printf("Event alerts clear after report test passed\n");
   return 0;
 }
 CPP

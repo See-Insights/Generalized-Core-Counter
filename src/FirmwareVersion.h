@@ -18,6 +18,6 @@
 #define FIRMWARE_PRODUCT_VERSION 38
 
 /** @brief Current firmware release string. */
-inline const char* FIRMWARE_VERSION = "v38-Alert19Clears";
+inline const char* FIRMWARE_VERSION = "v38-EventAlertsClear";
 
 #endif /* FIRMWARE_VERSION_H */
