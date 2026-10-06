@@ -361,6 +361,8 @@ Claude Code performs workflow completeness checks and compares the resulting beh
 
 Dispatch Codex with codex exec <dispatch>; codex review --uncommitted rejects custom instructions (CLI 0.154.0).
 
+Any WO that adds, removes or changes how an alert is raised, ranked or cleared updates `docs/reference/alert-codes.md` in the same PR. Stage 7 checks it.
+
 #### Mandatory: linkage verification
 
 Every new module, function, or behavior introduced by a change must be proven
