@@ -18,6 +18,8 @@ enum SensorMode {
   MEASUREMENT = 2
 };
 
+enum ConnectionMode { CONNECTED = 0, INTERMITTENT = 1, DISCONNECTED = 2, INTERMITTENT_KEEP_ALIVE = 3 };
+
 inline uint16_t get_connectAttemptBudgetSec() { return testSysStatus.get_connectAttemptBudgetSec(); }
 inline uint8_t get_connectionAttemptCounter() { return testSysStatus.get_connectionAttemptCounter(); }
 inline time_t get_lastReport() { return testSysStatus.get_lastReport(); }
@@ -30,7 +32,7 @@ inline uint8_t get_openTime() { return testSysStatus.get_openTime(); }
 inline uint8_t get_closeTime() { return testSysStatus.get_closeTime(); }
 inline bool get_serialConnected() { return testSysStatus.get_serialConnected(); }
 inline uint8_t get_sensorMode() { return testSysStatus.get_sensorMode(); }
-inline uint8_t get_connectionMode() { return testSysStatus.get_connectionMode(); }
+inline uint8_t get_configuredConnectionMode() { return testSysStatus.get_configuredConnectionMode(); }
 inline uint8_t get_reportingMode() { return testSysStatus.get_reportingMode(); }
 inline uint8_t get_samplingMode() { return testSysStatus.get_samplingMode(); }
 inline uint16_t get_cloudDisconnectBudgetSec() { return testSysStatus.get_cloudDisconnectBudgetSec(); }

@@ -321,7 +321,7 @@ void sysStatusData::set_sensorMode(uint8_t value) {
     setValue<uint8_t>(offsetof(SysData,sensorMode), value);
 }
 
-uint8_t sysStatusData::get_connectionMode() const {
+uint8_t sysStatusData::get_configuredConnectionMode() const {
     return getValue<uint8_t>(offsetof(SysData,connectionMode));
 }
 void sysStatusData::set_connectionMode(uint8_t value) {
@@ -1047,7 +1047,7 @@ void set_sensorType(uint8_t value) { sysStatus.set_sensorType(value); }
 uint8_t get_sensorMode() { return sysStatus.get_sensorMode(); }
 void set_sensorMode(uint8_t value) { sysStatus.set_sensorMode(value); }
 
-uint8_t get_connectionMode() { return sysStatus.get_connectionMode(); }
+uint8_t get_configuredConnectionMode() { return sysStatus.get_configuredConnectionMode(); }
 void set_connectionMode(uint8_t value) { sysStatus.set_connectionMode(value); }
 
 uint8_t get_reportingMode() { return sysStatus.get_reportingMode(); }

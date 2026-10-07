@@ -85,7 +85,7 @@ void logTeardownContext(const char *prefix,
 
   Log.info("%s mode=%s standby=%d/%d tier=%s occ=%d",
            prefix,
-           connectionModeLabel(static_cast<SystemConfig::ConnectionMode>(SystemConfig::get_connectionMode())),
+           connectionModeLabel(static_cast<SystemConfig::ConnectionMode>(PowerManager::instance().effectiveConnectionMode())),
            standbyRequested ? 1 : 0,
            standbyEffective ? 1 : 0,
            batteryTierLabel(PowerConfig::get_currentBatteryTier()),
@@ -370,7 +370,7 @@ void handleSleepingState() {
   // wake cycle; if connect never succeeded, preserving the modem state buys
   // nothing and can carry a bad NCP state into the next wake.
   bool useNetworkStandbyRequested =
-      (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) &&
+      (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) &&
       isWithinOpenHours();
   bool preserveStandbyForThisPass = false;
 #if HAL_PLATFORM_CELLULAR
@@ -403,7 +403,7 @@ void handleSleepingState() {
   // consistent with every other CONNECTED-mode site this step converts:
   // abort the sleep and stay awake/connected so a resync can occur, rather
   // than committing to a sleep the device can't actually justify.
-  if (SystemConfig::get_connectionMode() == SystemConfig::CONNECTED && Clock::openness() != Clock::Openness::Closed) {
+  if (PowerManager::instance().effectiveConnectionMode() == SystemConfig::CONNECTED && Clock::openness() != Clock::Openness::Closed) {
     ensureSensorEnabled("SLEEP abort: CONNECTED+OPEN");
     transitionTo(IDLE_STATE, "sleep-abort-open-hours");
     return;
@@ -866,7 +866,7 @@ void handleSleepingState() {
              modemOffElapsedMs,
              useNetworkStandbyRequested ? 1 : 0,
              useNetworkStandbyEffective ? 1 : 0,
-         connectionModeLabel(static_cast<SystemConfig::ConnectionMode>(SystemConfig::get_connectionMode())),
+         connectionModeLabel(static_cast<SystemConfig::ConnectionMode>(PowerManager::instance().effectiveConnectionMode())),
              batteryTierLabel(PowerConfig::get_currentBatteryTier()),
              CurrentReadings::get_occupied() ? 1 : 0);
     session.lastCloudDisconnectElapsedMs = cloudDisconnectElapsedMs;
@@ -1624,7 +1624,7 @@ void handleSleepingState() {
 
       // In CONNECTED operating mode, the device should reconnect at the
       // start of open hours so it can resume normal connected behavior.
-      if (SystemConfig::get_connectionMode() == SystemConfig::CONNECTED && !Particle.connected()) {
+      if (PowerManager::instance().effectiveConnectionMode() == SystemConfig::CONNECTED && !Particle.connected()) {
         logWakeSummary(wakeReasonLabel);
         transitionTo(CONNECTING_STATE, "sleep-open-hours-reconnect");
         return;
@@ -1635,7 +1635,7 @@ void handleSleepingState() {
     // This ensures we don't immediately undo state changes from PIR processing
     if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
       // LED timeout expired - debounce period elapsed without motion
-      const bool reportNow = (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
+      const bool reportNow = (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
       const OccupancyCloseResult closeResult = closeOccupancySessionSafely("sleep");
       signalLED(false);  // Turn off LED
       if (closeResult.valid) {
@@ -1716,7 +1716,7 @@ void handleSleepingState() {
             debounceMs = Config::occupancyDebounceMsForRuntime();
           }
           signalLED(true, debounceMs);
-          const bool reportNow = (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
+          const bool reportNow = (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
           logOccupiedEvent("pir-wake", debounceMs / 1000UL, reportNow);
           
           // Match the rest of the occupancy state machine: only KEEP_ALIVE mode
@@ -1754,7 +1754,7 @@ void handleSleepingState() {
       // while occupied UNLESS one is due for this reporting interval
       // (WO-2026-10-02-002: report every hour, occupied or not).
       if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && CurrentReadings::get_occupied() &&
-          SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE && !reportDueThisInterval()) {
+          PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE && !reportDueThisInterval()) {
         transitionTo(SLEEPING_STATE, "sleep-timer-occupied-suppress-report");
         return;
       }
@@ -1773,7 +1773,7 @@ void handleSleepingState() {
       // reports only when one is due for this reporting interval
       // (WO-2026-10-02-002); otherwise it only resets debounce.
       if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && CurrentReadings::get_occupied() &&
-          SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
+          PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
         if (reportDueThisInterval()) { transitionTo(REPORTING_STATE, "sleep-pir-overdue-report"); return; }
       } else {
       uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
@@ -1790,7 +1790,7 @@ void handleSleepingState() {
     // If PIR woke us in INTERMITTENT or DISCONNECTED mode and no report is needed,
     // return immediately to sleep. This check comes AFTER opportunistic reporting
     // so overdue reports are not missed.
-    if (pirWake && SystemConfig::get_connectionMode() != SystemConfig::CONNECTED) {
+    if (pirWake && PowerManager::instance().effectiveConnectionMode() != SystemConfig::CONNECTED) {
       transitionTo(SLEEPING_STATE, "sleep-pir-return-to-sleep");
       return;
     }

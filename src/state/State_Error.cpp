@@ -5,6 +5,7 @@
 #include "LocalTimeRK.h"
 #include "persist/RecoveryState.h"
 #include "persist/SystemConfig.h"
+#include "power/PowerManager.h"
 #include "PublishQueuePosixRK.h"
 #include "sensors/SensorManager.h"
 #include "device_pinout.h"
@@ -123,7 +124,7 @@ void handleErrorState() {
     Connectivity::requestFullDisconnectAndRadioOff();
 
     // In INTERMITTENT or DISCONNECTED modes, avoid reset loops for connectivity/sleep alerts.
-    if (SystemConfig::get_connectionMode() != SystemConfig::CONNECTED) {
+    if (PowerManager::instance().effectiveConnectionMode() != SystemConfig::CONNECTED) {
       int8_t alert = RecoveryState::get_alertCode();
       if (alert == 15 || alert == 16 || alert == 31) {
         Log.warn("Low-power mode: clearing alert %d to avoid reset loop", alert);

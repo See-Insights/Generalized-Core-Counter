@@ -56,7 +56,7 @@ void handleIdleState() {
 
       if (timeSinceLastEvent >= debounceMs) {
         // Debounce timeout expired - space is now unoccupied
-        const bool reportNow = (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
+        const bool reportNow = (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
         const OccupancyCloseResult closeResult = closeOccupancySessionSafely("idle");
         signalLED(false);  // Turn off LED
         if (closeResult.valid) {
@@ -109,7 +109,7 @@ void handleIdleState() {
   // a wrong belief about what time it is. Unknown is treated as Open here:
   // stay awake/connected rather than transition to sleep, so a resync can
   // occur.
-  if (SystemConfig::get_connectionMode() == SystemConfig::CONNECTED) {
+  if (PowerManager::instance().effectiveConnectionMode() == SystemConfig::CONNECTED) {
     const Clock::Openness parkOpenness = Clock::openness();
     // logTimeDiag()'s own isOpen= stays sourced from isWithinOpenHours() (its
     // existing fail-open answer), not parkOpenness - openness= in that same
@@ -183,7 +183,7 @@ void handleIdleState() {
     // when one is due for this reporting interval (WO-2026-10-02-002: report
     // every hour, occupied or not).
     if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && CurrentReadings::get_occupied() &&
-        SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
+        PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
       if (reportDueThisInterval()) { transitionTo(REPORTING_STATE, "report interval"); return; }
     } else {
     uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
@@ -207,7 +207,7 @@ void handleIdleState() {
 
   // ********** Power Management **********
   // In INTERMITTENT (1) or DISCONNECTED (2) modes, manage connection lifecycle.
-  if (SystemConfig::get_connectionMode() != SystemConfig::CONNECTED) {
+  if (PowerManager::instance().effectiveConnectionMode() != SystemConfig::CONNECTED) {
     // In CONNECTED mode during open hours, never auto-sleep.
     // NOTE (WO-2026-09-19 Step 3b, flagged not fixed): this condition's own
     // `connectionMode() == CONNECTED` term can never be true here - it is
@@ -215,7 +215,7 @@ void handleIdleState() {
     // above. Pre-existing dead code, unrelated to the trust-standard fix;
     // converting it mechanically for consistency costs nothing since it
     // never executes either way. Not touching the surrounding logic.
-    if (Clock::openness() == Clock::Openness::Open && SystemConfig::get_connectionMode() == SystemConfig::CONNECTED) {
+    if (Clock::openness() == Clock::Openness::Open && PowerManager::instance().effectiveConnectionMode() == SystemConfig::CONNECTED) {
       return;
     }
 
@@ -286,7 +286,7 @@ void handleIdleState() {
     // now it requires an actual confirmed sync.
     const bool openHoursKeepAwakeValid = (Clock::openness() == Clock::Openness::Open);
     const bool healthyConnectedAwakePath =
-      (SystemConfig::get_connectionMode() == SystemConfig::CONNECTED) &&
+      (PowerManager::instance().effectiveConnectionMode() == SystemConfig::CONNECTED) &&
       openHoursKeepAwakeValid &&
       cloudConnected;
 
@@ -315,7 +315,7 @@ void handleIdleState() {
         const unsigned long elapsedMs = nowMs - startMs;
         if (elapsedMs > budgetMs) {
           Log.warn("IDLE ceiling trip: mode=%d cloud=%d radioOn=%d elapsedMs=%lu connectedStartMs=%lu -> forcing teardown and sleep",
-                   (int)SystemConfig::get_connectionMode(),
+                   (int)PowerManager::instance().effectiveConnectionMode(),
                    (int)cloudConnected,
                    (int)radioOn,
                    elapsedMs,

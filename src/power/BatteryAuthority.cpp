@@ -3,7 +3,7 @@
 // zero stubbing, exactly like BatteryTierGuard/PowerTier/BatteryHealth
 // already are, so it deliberately does NOT include Particle.h,
 // MyPersistentData.h, or StorageHelperRK.h. The COMMAND half (commit(),
-// currentTier(), clearLowBatteryMode() - all of which need real sysStatus
+// currentTier() - both of which need real sysStatus
 // access) lives in the sibling BatteryAuthorityCommand.cpp, in its own
 // translation unit, specifically so linking this file alone (as
 // tests/reporting_policy_adapter_test.sh does) never pulls in the

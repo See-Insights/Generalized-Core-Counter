@@ -7,6 +7,7 @@
 namespace PowerConfig {
 
 inline uint8_t get_currentBatteryTier() { return testSysStatus.get_currentBatteryTier(); }
+inline bool get_lowBatteryMode() { return testSysStatus.get_lowBatteryMode(); }
 inline bool get_solarPowerMode() { return testSysStatus.get_solarPowerMode(); }
 
 }  // namespace PowerConfig

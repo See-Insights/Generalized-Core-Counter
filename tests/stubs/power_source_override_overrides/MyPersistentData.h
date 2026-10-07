@@ -90,7 +90,7 @@ struct TestSystemStatus {
   uint8_t get_closeTime() const { return closeTime; }
   bool get_serialConnected() const { return serialConnected; }
   uint8_t get_sensorMode() const { return sensorMode; }
-  uint8_t get_connectionMode() const { return connectionMode; }
+  uint8_t get_configuredConnectionMode() const { return connectionMode; }
   uint8_t get_reportingMode() const { return reportingMode; }
   uint8_t get_samplingMode() const { return samplingMode; }
   uint16_t get_cloudDisconnectBudgetSec() const { return cloudDisconnectBudgetSec; }

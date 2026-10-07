@@ -110,7 +110,7 @@ void formatConfigGeneration(char *buffer, size_t bufferSize) {
     updateFnv1aField(hash, "timing.closeHour", (unsigned long)SystemConfig::get_closeTime());
     updateFnv1aField(hash, "timing.connectAttemptBudgetSec", (unsigned long)SystemConfig::get_connectAttemptBudgetSec());
     updateFnv1aField(hash, "modes.sensorMode", (unsigned long)SystemConfig::get_sensorMode());
-    updateFnv1aField(hash, "modes.connectionMode", (unsigned long)SystemConfig::get_connectionMode());
+    updateFnv1aField(hash, "modes.connectionMode", (unsigned long)SystemConfig::get_configuredConnectionMode());
     updateFnv1aField(hash, "modes.reportingMode", (unsigned long)SystemConfig::get_reportingMode());
     updateFnv1aField(hash, "modes.samplingMode", (unsigned long)SystemConfig::get_samplingMode());
     updateFnv1aField(hash, "modes.cloudDisconnectBudgetSec", (unsigned long)SystemConfig::get_cloudDisconnectBudgetSec());
@@ -247,12 +247,14 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     writerBase.name("vcell").value(batteryVoltage, 2);
     writerBase.name("chargeState").value(SensorManager::instance().cachedChargeStateLabel());
     // WO-2026-09-21 Step 4 (bench telemetry): read-and-publish only, no new
-    // sampling and no change to evaluate()/commit(). tier/lowBatteryMode are
-    // the two values BatteryAuthority::commit() persists; vcellState/socTrust
+    // sampling and no change to evaluate()/commit(). tier is persisted by
+    // BatteryAuthority::commit(); lowBatteryMode is the derived downgrade
+    // (PowerManager::downgradeActive()), not the raw persisted flag, so a
+    // stale flag is never published; vcellState/socTrust
     // distinguish which guard-pipeline path a SURVIVAL/CRITICAL verdict took
     // (unconditional vcell floor vs. SoC-driven) - see BatteryAuthority.cpp.
     writerBase.name("tier").value(ReportingPolicyResolver::batteryTierName(reportingPolicy.batteryTier));
-    writerBase.name("lowBatteryMode").value(PowerConfig::get_lowBatteryMode());
+    writerBase.name("lowBatteryMode").value(PowerManager::instance().downgradeActive());
     writerBase.name("vcellState").value(vcellSampleStateLabel(vcellState));
     writerBase.name("socTrust").value(socTrustLabel(SensorManager::instance().cachedSocTrust()));
     writerBase.endObject();

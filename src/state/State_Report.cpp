@@ -198,7 +198,7 @@ void handleReportingState() {
     
     // Check if occupied in low-power mode - need to return to sleep after reporting
     // to wake periodically and check debounce timeout
-    if (CurrentReadings::get_occupied() && SystemConfig::get_connectionMode() != SystemConfig::CONNECTED) {
+    if (CurrentReadings::get_occupied() && PowerManager::instance().effectiveConnectionMode() != SystemConfig::CONNECTED) {
 #if ENABLE_CONNECT_DECISION_TRACE
       Log.info("REPORTING: Occupied in low-power mode - will return to sleep after report tier=%s",
                tierName);
@@ -228,7 +228,7 @@ void handleReportingState() {
       Log.info("REPORTING: Forcing connection due to long-term webhook health (OPEN hours)");
 #endif
       transitionTo(CONNECTING_STATE, "webhook health check");
-    } else if (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
+    } else if (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
       // In INTERMITTENT_KEEP_ALIVE mode, connect immediately for all reports
       if (deferAutoConnectForUnstableModem) {
         Log.warn("MODEM_POLICY: reconnect deferred reason=unstable_modem remaining=%lu ms trigger=keep_alive",

@@ -204,6 +204,34 @@ public:
   uint8_t batteryState() const;
 
   /**
+   * @brief True while the sticky low-battery downgrade is in effect.
+   *
+   * Derived, never stored: OCCUPANCY sensor mode, configured
+   * INTERMITTENT_KEEP_ALIVE and lowBatteryMode set. The raw lowBatteryMode
+   * flag can be stale between a configuration change and the next
+   * BatteryAuthority::commit(); code that acts on "a downgrade is active"
+   * (failsafe, status) reads this, the same condition as
+   * effectiveConnectionMode().
+   *
+   * @return true when effectiveConnectionMode() is lowered to INTERMITTENT
+   */
+  bool downgradeActive() const;
+
+  /**
+   * @brief Returns the connection mode the device is actually using.
+   *
+   * Derived, never stored: the configured mode, except INTERMITTENT while the
+   * sticky low-battery downgrade is active (OCCUPANCY sensor mode, configured
+   * INTERMITTENT_KEEP_ALIVE, lowBatteryMode set). The configured mode itself
+   * is written only by configuration apply. Readers that connect, sleep or
+   * set reporting cadence use this; only configuration reporting and
+   * comparison read SystemConfig::get_configuredConnectionMode().
+   *
+   * @return SystemConfig::ConnectionMode value in use
+   */
+  uint8_t effectiveConnectionMode() const;
+
+  /**
    * @brief Converts availability enum values to stable log labels.
    *
    * @param availability Availability enum to stringify

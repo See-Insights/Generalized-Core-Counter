@@ -2564,7 +2564,7 @@ void clearConnectivityFailsafeRecovery(const char *reason) {
  * @see docs/architecture/connectivity-failsafe.md for escalation timing and policy details
  */
 void connectivityFailsafeSupervisor() {
-  if (SystemConfig::get_connectionMode() == SystemConfig::DISCONNECTED) {
+  if (PowerManager::instance().effectiveConnectionMode() == SystemConfig::DISCONNECTED) {
 #if CONNECTIVITY_FAILSAFE_TEST_MODE
     ConnectivityFailsafeTest::logDeferDisconnectedMode();
 #endif
@@ -2661,7 +2661,7 @@ void connectivityFailsafeSupervisor() {
   const bool lowBatteryHardActionBlocked =
       nextStage >= 2 &&
       !externalPowerPresent &&
-      (PowerConfig::get_lowBatteryMode() || tier == TIER_SURVIVAL);
+      (PowerManager::instance().downgradeActive() || tier == TIER_SURVIVAL);
 
   if (lowBatteryHardActionBlocked) {
 #if CONNECTIVITY_FAILSAFE_TEST_MODE

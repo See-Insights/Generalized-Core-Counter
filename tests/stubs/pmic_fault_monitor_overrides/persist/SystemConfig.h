@@ -9,6 +9,11 @@
 
 namespace SystemConfig {
 
+enum SensorMode { COUNTING = 0, OCCUPANCY = 1, MEASUREMENT = 2 };
+enum ConnectionMode { CONNECTED = 0, INTERMITTENT = 1, DISCONNECTED = 2, INTERMITTENT_KEEP_ALIVE = 3 };
+
 inline bool get_verboseMode() { return testSysStatus.get_verboseMode(); }
+inline uint8_t get_sensorMode() { return testSysStatus.get_sensorMode(); }
+inline uint8_t get_configuredConnectionMode() { return testSysStatus.get_configuredConnectionMode(); }
 
 }  // namespace SystemConfig

@@ -439,7 +439,7 @@ void handleConnectingState() {
   #if ENABLE_CONNECT_TRACE
       const uint16_t queueDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
       const bool standbyRequested =
-          (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) &&
+          (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) &&
           isWithinOpenHours();
       const bool standbyEffective = standbyRequested && !session.modemStandbySuppressed;
       // WO-2026-10-04-001 item A1: no signal sample during acquisition, so

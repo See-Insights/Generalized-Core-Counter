@@ -136,7 +136,7 @@ int plannedClosedHoursSleepSec() {
 }
 
 FailsafeDeferReason currentFailsafeEligibilityReason() {
-  if (SystemConfig::get_connectionMode() == SystemConfig::DISCONNECTED) {
+  if (PowerManager::instance().effectiveConnectionMode() == SystemConfig::DISCONNECTED) {
     return FAILSAFE_DEFER_DISCONNECTED_MODE;
   }
 
@@ -183,7 +183,7 @@ FailsafeDeferReason currentFailsafeEligibilityReason() {
         const bool externalPowerPresent = connectivityFailsafeHasExternalPowerLocal();
         const bool lowBatteryHardActionBlocked =
             nextStage >= 2 && !externalPowerPresent &&
-            (PowerConfig::get_lowBatteryMode() || tier == TIER_SURVIVAL);
+            (PowerManager::instance().downgradeActive() || tier == TIER_SURVIVAL);
 
         if (lowBatteryHardActionBlocked) {
           return FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED;
@@ -251,7 +251,7 @@ void logDeferDisconnectedMode() {
   if (claimFailsafeDeferLog(FAILSAFE_DEFER_DISCONNECTED_MODE)) {
     Log.info("FailsafeDefer: reason=%s mode=%u",
              failsafeDeferReasonName(FAILSAFE_DEFER_DISCONNECTED_MODE),
-             (unsigned)SystemConfig::get_connectionMode());
+             (unsigned)PowerManager::instance().effectiveConnectionMode());
   }
 }
 

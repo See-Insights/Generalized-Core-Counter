@@ -154,7 +154,7 @@ void set_sensorType(uint8_t value);
 uint8_t get_sensorMode();
 void set_sensorMode(uint8_t value);
 
-uint8_t get_connectionMode();
+uint8_t get_configuredConnectionMode();
 void set_connectionMode(uint8_t value);
 
 uint8_t get_reportingMode();

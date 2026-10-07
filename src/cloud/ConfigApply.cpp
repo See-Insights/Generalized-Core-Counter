@@ -1,7 +1,6 @@
 #include "cloud/Cloud.h"
 
 #include "../Config.h"
-#include "power/BatteryAuthority.h"
 #include "power/ChargeInhibitPolicy.h"
 #include "persist/PowerConfig.h"
 #include "persist/SystemConfig.h"
@@ -445,14 +444,10 @@ bool Cloud::applyModesConfig(const LedgerData &defaults, const LedgerData &devic
     // Connection mode: 0=CONNECTED, 1=INTERMITTENT, 2=DISCONNECTED, 3=INTERMITTENT_KEEP_ALIVE
     if (getMergedIntValue(defaultModes, deviceModes, "connectionMode", connectionMode)) {
         if (validateRange(connectionMode, 0, 3, "connectionMode")) {
-            if (SystemConfig::get_connectionMode() != static_cast<SystemConfig::ConnectionMode>(connectionMode) ||
-                PowerConfig::get_lowBatteryMode()) {
+            // Compares configured mode only: a low-battery downgrade lives in
+            // lowBatteryMode (battery's flag) and never rewrites this value.
+            if (SystemConfig::get_configuredConnectionMode() != static_cast<SystemConfig::ConnectionMode>(connectionMode)) {
                 SystemConfig::set_connectionMode(static_cast<SystemConfig::ConnectionMode>(connectionMode));
-                // WO-2026-09-21 Step 4: routes through BatteryAuthority, the
-                // single owner of the persisted low-battery-mode field -
-                // this operator override should clear any sticky downgrade
-                // rather than have it silently reassert itself.
-                BatteryAuthority::clearLowBatteryMode();
                 const char *modeStr = connectionMode == SystemConfig::CONNECTED ? "CONNECTED" :
                                      connectionMode == SystemConfig::INTERMITTENT ? "INTERMITTENT" :
                                      connectionMode == SystemConfig::DISCONNECTED ? "DISCONNECTED" : "INTERMITTENT_KEEP_ALIVE";
