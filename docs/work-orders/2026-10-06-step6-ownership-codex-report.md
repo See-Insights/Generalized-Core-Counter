@@ -1,5 +1,7 @@
 **1. Inventory — observed at `85bd316`**
 
+*Re-cited 2026-10-07 against main `e78d59d` (v37 merged), by Claude Code. `src/` is identical to `85bd316`, so every source line stands. The one change: `AI_DEVELOPMENT_WORKFLOW.md:672–673` → `:674–675`, after PR #65 added a line. Recovery-plan Step 6 is still `:47–59`.*
+
 | Report basis | Result |
 |---|---|
 | Execution | **gpt-6-astra; reasoning: high.** Read-only; no files created, edits, builds, network access, or device actions. |
@@ -73,4 +75,4 @@
 | **2: SensorManager split** | Remove dead code first (**−180 to −280**); separately move battery sampling, thermal decision, PMIC execution/diagnostics and PIR/occupancy ownership (**target −20 to 0 each**). Depends on 1; preserve fresh-temperature coupling, boot inhibit synchronization and readback distinction (`SensorManager.cpp:938–957,1158–1202`; `ChargeInhibit.h:41–52`). |
 | **3: evidence, then trust/tier tuning** | After a week of v37 `vc`, assess adequacy before tuning; if insufficient, add coherent raw/accepted SOC, voltage, charge/radio/source/context/age/tier snapshot (**+40–60**). Separate validated curve/threshold change (**0–10**). Depends on stable sampling; `vc` alone lacks those contexts (`Main:2004–2021`; `SensorManager.cpp:827–834`). |
 | **4: M-SoM and Muon** | Fill compile-time implementations; separate battery capability/cache, charging, and TMP112/pins WOs (**+20–50 each**), then authorized bring-up (**0 source lines**). Depends on 2; do not bundle unfinished tuning into portability. |
-| **Size control** | Keep expected order. Large moves exceed **60 gross changed lines despite near-zero net**: split by the four concerns above; isolate the 135-line dead charge-test deletion (`SensorManager.cpp:1284–1418`). Record gross moves separately; stop/report net-budget overruns. Budget tests separately per WO; require existing ownership/thermal regression coverage plus behavior-specific cases (`AI_DEVELOPMENT_WORKFLOW.md:672–673`). |
+| **Size control** | Keep expected order. Large moves exceed **60 gross changed lines despite near-zero net**: split by the four concerns above; isolate the 135-line dead charge-test deletion (`SensorManager.cpp:1284–1418`). Record gross moves separately; stop/report net-budget overruns. Budget tests separately per WO; require existing ownership/thermal regression coverage plus behavior-specific cases (`AI_DEVELOPMENT_WORKFLOW.md:674–675`). |
