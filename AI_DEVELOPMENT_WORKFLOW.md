@@ -548,6 +548,8 @@ Escalation is always explicit. "Auto" is never used to get more power.
 
 Resolve model IDs and reasoning levels at dispatch time from the CLI's list of what's available. Don't hardcode them in this document, since pinned IDs go stale.
 
+Before a long dispatch, Claude Code confirms the account accepts the chosen model by sending it a one-line prompt. If the tier's first choice is rejected, it uses the next accepted model in the same tier and records the substitution, with the rejection message, in the dispatch header. If a dispatch needs a model that only the Codex app offers, the architect says so in the header ("Manual via the Codex app: model, reasoning, reason"), Chip runs it, and the verdict is saved in `docs/work-orders/` as usual. A manual run must still meet Stage 7's local build, `nm` and test requirements, or Claude Code runs those parts locally. Which models the current accounts accept is recorded in `docs/notes/vendor-model-notes-2026-09.md`, not here, so this section doesn't go stale when the list changes.
+
 Historical vendor notes (model availability and deprecations as of 2026-09-14) are kept in `docs/notes/vendor-model-notes-2026-09.md`. They are not a rule.
 
 ### Evaluating a change to the defaults
