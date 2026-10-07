@@ -292,7 +292,7 @@ public:
 	uint8_t get_sensorMode() const;
 	void set_sensorMode(uint8_t value);
 
-	uint8_t get_connectionMode() const;
+	uint8_t get_configuredConnectionMode() const;
 	void set_connectionMode(uint8_t value);
 
 	uint8_t get_reportingMode() const;

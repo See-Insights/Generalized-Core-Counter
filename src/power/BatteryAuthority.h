@@ -144,16 +144,4 @@ Verdict evaluateCurrent(float currentSoC);
  */
 void commit(const Verdict &verdict, float currentSoC);
 
-/**
- * @brief Clears the sticky low-battery connection-mode downgrade flag.
- *
- * @details Used only by `ConfigApply.cpp`, when an operator explicitly sets
- *          a new `connectionMode` via cloud config - that explicit choice
- *          should override any sticky low-battery downgrade rather than
- *          have it silently reassert itself on the next commit(). Routed
- *          through the same private write path as commit() itself, so the
- *          persisted low-battery-mode field keeps exactly one write site.
- */
-void clearLowBatteryMode();
-
 } // namespace BatteryAuthority

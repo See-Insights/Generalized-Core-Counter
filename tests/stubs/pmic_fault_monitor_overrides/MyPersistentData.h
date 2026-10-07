@@ -34,10 +34,16 @@ struct TestCurrentStatus {
 struct TestSystemStatus {
   bool verboseMode = false;
   bool solarPowerMode = false;
+  uint8_t sensorMode = 0;
+  uint8_t connectionMode = 0;
+  bool lowBatteryMode = false;
 
   bool get_verboseMode() const { return verboseMode; }
   uint8_t get_currentBatteryTier() const { return 0; }
   bool get_solarPowerMode() const { return solarPowerMode; }
+  uint8_t get_sensorMode() const { return sensorMode; }
+  uint8_t get_configuredConnectionMode() const { return connectionMode; }
+  bool get_lowBatteryMode() const { return lowBatteryMode; }
 };
 
 inline TestCurrentStatus testCurrent;

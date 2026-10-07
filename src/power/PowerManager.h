@@ -204,6 +204,20 @@ public:
   uint8_t batteryState() const;
 
   /**
+   * @brief Returns the connection mode the device is actually using.
+   *
+   * Derived, never stored: the configured mode, except INTERMITTENT while the
+   * sticky low-battery downgrade is active (OCCUPANCY sensor mode, configured
+   * INTERMITTENT_KEEP_ALIVE, lowBatteryMode set). The configured mode itself
+   * is written only by configuration apply. Readers that connect, sleep or
+   * set reporting cadence use this; only configuration reporting and
+   * comparison read SystemConfig::get_configuredConnectionMode().
+   *
+   * @return SystemConfig::ConnectionMode value in use
+   */
+  uint8_t effectiveConnectionMode() const;
+
+  /**
    * @brief Converts availability enum values to stable log labels.
    *
    * @param availability Availability enum to stringify

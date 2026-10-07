@@ -136,7 +136,7 @@ int plannedClosedHoursSleepSec() {
 }
 
 FailsafeDeferReason currentFailsafeEligibilityReason() {
-  if (SystemConfig::get_connectionMode() == SystemConfig::DISCONNECTED) {
+  if (PowerManager::instance().effectiveConnectionMode() == SystemConfig::DISCONNECTED) {
     return FAILSAFE_DEFER_DISCONNECTED_MODE;
   }
 
@@ -251,7 +251,7 @@ void logDeferDisconnectedMode() {
   if (claimFailsafeDeferLog(FAILSAFE_DEFER_DISCONNECTED_MODE)) {
     Log.info("FailsafeDefer: reason=%s mode=%u",
              failsafeDeferReasonName(FAILSAFE_DEFER_DISCONNECTED_MODE),
-             (unsigned)SystemConfig::get_connectionMode());
+             (unsigned)PowerManager::instance().effectiveConnectionMode());
   }
 }
 

@@ -183,7 +183,7 @@ bool isTrusted() { return trusted; }
 namespace SystemConfig {
 enum ConnectionMode { CONNECTED = 0, DISCONNECTED_KEEP_ALIVE = 2, INTERMITTENT_KEEP_ALIVE = 3 };
 uint8_t connectionMode = INTERMITTENT_KEEP_ALIVE;
-uint8_t get_connectionMode() { return connectionMode; }
+uint8_t get_configuredConnectionMode() { return connectionMode; }
 time_t lastReport = 0;
 time_t get_lastReport() { return lastReport; }
 namespace SensorSettings {
@@ -191,6 +191,15 @@ uint32_t sensorSetting1 = 0;
 uint32_t get_sensorSetting1() { return sensorSetting1; }
 }  // namespace SensorSettings
 }  // namespace SystemConfig
+
+// This test never sets lowBatteryMode, so the mode in use equals the configured one.
+struct PowerManager {
+  static PowerManager &instance() {
+    static PowerManager pm;
+    return pm;
+  }
+  uint8_t effectiveConnectionMode() const { return SystemConfig::get_configuredConnectionMode(); }
+};
 
 namespace Config {
 uint32_t occupancyDebounceMsForRuntime() { return 300000UL; }  // the shipped default, 5 minutes

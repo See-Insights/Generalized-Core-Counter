@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "persist/CurrentReadings.h"
 #include "persist/PowerConfig.h"
+#include "persist/SystemConfig.h"
 #include "power/PowerDiagnostics.h"
 #include "power/PowerPlatform.h"
 
@@ -233,6 +234,15 @@ float PowerManager::soc() const {
 
 uint8_t PowerManager::batteryState() const {
   return CurrentReadings::get_batteryState();
+}
+
+uint8_t PowerManager::effectiveConnectionMode() const {
+  const uint8_t configured = SystemConfig::get_configuredConnectionMode();
+  const bool lowBatteryDowngrade =
+      SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY &&
+      configured == SystemConfig::INTERMITTENT_KEEP_ALIVE &&
+      PowerConfig::get_lowBatteryMode();
+  return lowBatteryDowngrade ? SystemConfig::INTERMITTENT : configured;
 }
 
 const char *PowerManager::availabilityLabel(PowerAvailability availability) {

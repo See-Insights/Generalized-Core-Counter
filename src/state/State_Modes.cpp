@@ -4,6 +4,7 @@
 #include "LocalTimeRK.h"
 #include "persist/CurrentReadings.h"
 #include "persist/SystemConfig.h"
+#include "power/PowerManager.h"
 #include "PublishQueuePosixRK.h"
 #include "sensors/SensorManager.h"
 #include "device_pinout.h"
@@ -76,7 +77,7 @@ void handleOccupancyMode() {
         debounceSeconds = 60;  // Minimum 60 second debounce for occupancy
       }
       signalLED(true, debounceSeconds * 1000UL);  // Turn on LED until debounce expires
-      const bool reportNow = (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
+      const bool reportNow = (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
       logOccupiedEvent("pir", debounceSeconds, reportNow);
       
       // In INTERMITTENT_KEEP_ALIVE mode, report immediately on occupancy state changes
@@ -139,7 +140,7 @@ void updateOccupancyState() {
 
   // Check if debounce timeout has expired
   if (timeSinceLastEvent > debounceMs) {
-    const bool reportNow = (SystemConfig::get_connectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
+    const bool reportNow = (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
     const OccupancyCloseResult closeResult = closeOccupancySessionSafely("modes");
     if (closeResult.valid) {
       logUnoccupiedEvent("debounce", closeResult.sessionSeconds, closeResult.totalSeconds, reportNow);

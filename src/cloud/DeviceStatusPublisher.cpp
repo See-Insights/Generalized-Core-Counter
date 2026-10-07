@@ -110,7 +110,7 @@ void formatConfigGeneration(char *buffer, size_t bufferSize) {
     updateFnv1aField(hash, "timing.closeHour", (unsigned long)SystemConfig::get_closeTime());
     updateFnv1aField(hash, "timing.connectAttemptBudgetSec", (unsigned long)SystemConfig::get_connectAttemptBudgetSec());
     updateFnv1aField(hash, "modes.sensorMode", (unsigned long)SystemConfig::get_sensorMode());
-    updateFnv1aField(hash, "modes.connectionMode", (unsigned long)SystemConfig::get_connectionMode());
+    updateFnv1aField(hash, "modes.connectionMode", (unsigned long)SystemConfig::get_configuredConnectionMode());
     updateFnv1aField(hash, "modes.reportingMode", (unsigned long)SystemConfig::get_reportingMode());
     updateFnv1aField(hash, "modes.samplingMode", (unsigned long)SystemConfig::get_samplingMode());
     updateFnv1aField(hash, "modes.cloudDisconnectBudgetSec", (unsigned long)SystemConfig::get_cloudDisconnectBudgetSec());

@@ -1,5 +1,5 @@
 // WO-2026-09-21 Step 4 (corrected same day): this file is the COMMAND half
-// of BatteryAuthority - commit(), currentTier(), and clearLowBatteryMode().
+// of BatteryAuthority - commit() and currentTier().
 // Unlike the sibling BatteryAuthority.cpp (evaluate() only, pure, zero
 // stubbing needed), everything here genuinely needs real sysStatus access
 // and lives in its own translation unit specifically so linking
@@ -27,9 +27,10 @@ const char *tierName(BatteryTier tier) {
 }
 
 // The one and only call site for PowerConfig::set_lowBatteryMode() outside
-// MyPersistentData.cpp - both commit()'s own tier-driven decision and
-// clearLowBatteryMode() (ConfigApply.cpp's operator-override case) commit
-// through this single wrapper.
+// MyPersistentData.cpp - commit()'s tier-driven decision writes through this
+// single wrapper. (WO-2026-10-07-002: ConfigApply.cpp no longer clears the
+// flag; it belongs to battery, and commit() clears it when the configured
+// mode leaves KEEP_ALIVE.)
 void commitLowBatteryMode(bool value) {
   PowerConfig::set_lowBatteryMode(value);
 }
@@ -47,10 +48,6 @@ Verdict evaluateCurrent(float currentSoC) {
       SensorManager::instance().cachedBatteryVoltageState(vcell);
   const BatteryHealth::SocTrust trust = SensorManager::instance().cachedSocTrust();
   return evaluate(currentSoC, vcellState, vcell, trust, currentTier());
-}
-
-void clearLowBatteryMode() {
-  commitLowBatteryMode(false);
 }
 
 void commit(const Verdict &verdict, float currentSoC) {
@@ -72,24 +69,25 @@ void commit(const Verdict &verdict, float currentSoC) {
   // downgraded (INTERMITTENT) mode. This is exactly why the decision lives
   // here, in command, and not in the pure evaluate(): it depends on the
   // CURRENT persisted connectionMode/sensorMode/lowBatteryMode, none of
-  // which a pure function may read.
+  // which a pure function may read. The decision reads the CONFIGURED mode
+  // and only ever writes lowBatteryMode; the mode in use is derived by
+  // PowerManager::effectiveConnectionMode(), so the configured mode is never
+  // overwritten here and the flag must not re-fire while it is already set.
   if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY) {
-    const SystemConfig::ConnectionMode currentMode = static_cast<SystemConfig::ConnectionMode>(SystemConfig::get_connectionMode());
+    const SystemConfig::ConnectionMode currentMode = static_cast<SystemConfig::ConnectionMode>(SystemConfig::get_configuredConnectionMode());
     const bool lowBatteryDowngradeActive = PowerConfig::get_lowBatteryMode();
 
-    if (currentMode == SystemConfig::INTERMITTENT_KEEP_ALIVE && verdict.tier >= TIER_CONSERVING) {
+    if (currentMode == SystemConfig::INTERMITTENT_KEEP_ALIVE && !lowBatteryDowngradeActive && verdict.tier >= TIER_CONSERVING) {
       Log.info("Battery conservation: Disabling KEEP_ALIVE mode (tier=%s, SoC=%.1f%%) - switching to INTERMITTENT",
                tierName(verdict.tier), (double)currentSoC);
-      SystemConfig::set_connectionMode(SystemConfig::INTERMITTENT);
       commitLowBatteryMode(true);
-    } else if (currentMode == SystemConfig::INTERMITTENT && lowBatteryDowngradeActive && verdict.tier == TIER_HEALTHY) {
+    } else if (currentMode == SystemConfig::INTERMITTENT_KEEP_ALIVE && lowBatteryDowngradeActive && verdict.tier == TIER_HEALTHY) {
       Log.info("Battery recovery: clearing lowBatteryMode (tier=HEALTHY, SoC=%.1f%%)",
                (double)currentSoC);
       Log.info("Battery recovery: restoring INTERMITTENT_KEEP_ALIVE (tier=HEALTHY, SoC=%.1f%%)",
                (double)currentSoC);
-      SystemConfig::set_connectionMode(SystemConfig::INTERMITTENT_KEEP_ALIVE);
       commitLowBatteryMode(false);
-    } else if (currentMode != SystemConfig::INTERMITTENT && lowBatteryDowngradeActive) {
+    } else if (currentMode != SystemConfig::INTERMITTENT_KEEP_ALIVE && lowBatteryDowngradeActive) {
       Log.info("Battery recovery: clearing lowBatteryMode (tier=%s, SoC=%.1f%%)",
                tierName(verdict.tier), (double)currentSoC);
       commitLowBatteryMode(false);
