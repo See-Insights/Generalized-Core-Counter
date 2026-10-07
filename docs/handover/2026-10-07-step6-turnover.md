@@ -112,7 +112,7 @@ Its **WO order:**
 - **Reading modes:** polling, threshold and interrupt.
 - **Wakes** are routed to the sensor that caused them.
 - **Payloads and the data ledger** are built from the sensors, in the form Ubidots expects.
-  - **Today's webhook template names each field (12 of them),** so any new report field needs its own template line. Add it only after every device sends the field: an edit naming a field the fleet doesn't send yet has already broken the JSON once.
+  - **Today's webhook template names each field (12 of them),** so a new field gets its template line only after every device sends it (older firmware would send an empty value). A malformed template edit has broken the JSON once (a 400 from Ubidots), so copy the old template first and check for 201 Created after any change.
   - **If payloads become fully Ubidots-ready,** the webhook could forward the event as it is. That belongs with the webhook-rename WO after Step 6.
 - **Per-sensor settings,** and **compile-time selection.**
 - **Tested against** PIR occupancy, the counting mode, temperature, and humidity.
