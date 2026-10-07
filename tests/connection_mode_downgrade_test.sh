@@ -123,10 +123,19 @@ mutate_and_expect_failure "downgrade overwrites the configured mode" \
 # Mutation 2: the derivation drops its OCCUPANCY term.
 mkdir -p "$work/m2"
 plant "$real_pm" "$work/m2/PowerManager.cpp" \
-  "      SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY &&
-" ""
+  "  return SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY &&
+         SystemConfig::get_configuredConnectionMode()" \
+  "  return SystemConfig::get_configuredConnectionMode()"
 mutate_and_expect_failure "mode in use ignores the OCCUPANCY condition" \
   "$real_bac" "$work/m2/PowerManager.cpp" "$work"
+
+# Mutation 2b: the derivation drops its configured-mode term.
+mkdir -p "$work/m2b"
+plant "$real_pm" "$work/m2b/PowerManager.cpp" \
+  "         SystemConfig::get_configuredConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE &&
+" ""
+mutate_and_expect_failure "downgrade ignores the configured-mode condition" \
+  "$real_bac" "$work/m2b/PowerManager.cpp" "$work"
 
 # Mutation 3: config apply compares against the flag again.
 mkdir -p "$work/m3"
@@ -148,5 +157,26 @@ if python3 "$repo_root/tests/connection_mode_downgrade_structural_test.py" "$wor
   exit 1
 fi
 echo "OK (mutation): 'connect-path reader uses the configured getter' correctly detected"
+
+# Mutations 5 and 6: the failsafe (F) and the status ledger (S) read the raw flag.
+structural_mutation() {
+  local name="$1" rel="$2" old="$3" new="$4" dir="$work/$5"
+  mkdir -p "$dir"
+  cp -R "$repo_root/src" "$dir/src"
+  plant "$repo_root/src/$rel" "$dir/src/$rel" "$old" "$new"
+  if python3 "$repo_root/tests/connection_mode_downgrade_structural_test.py" "$dir/src" >/dev/null 2>&1; then
+    echo "FAIL (mutation): '$name' was NOT detected" >&2
+    exit 1
+  fi
+  echo "OK (mutation): '$name' correctly detected"
+}
+structural_mutation "failsafe reads the raw flag" "Generalized-Core-Counter.cpp" \
+  "PowerManager::instance().downgradeActive() || tier == TIER_SURVIVAL" \
+  "PowerConfig::get_lowBatteryMode() || tier == TIER_SURVIVAL" m5
+structural_mutation "diagnostic failsafe mirror reads the raw flag" "diagnostics/ConnectivityFailsafeTest.cpp" \
+  "PowerManager::instance().downgradeActive() || tier == TIER_SURVIVAL" \
+  "PowerConfig::get_lowBatteryMode() || tier == TIER_SURVIVAL" m5b
+structural_mutation "status lowBatteryMode reads the raw flag" "cloud/DeviceStatusPublisher.cpp" \
+  "value(PowerManager::instance().downgradeActive())" "value(PowerConfig::get_lowBatteryMode())" m6
 
 echo "connection_mode_downgrade_test: clean run passed and all mutations detected"

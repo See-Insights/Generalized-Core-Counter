@@ -115,8 +115,34 @@ else:
     if "get_configuredConnectionMode()" not in block:
         fail("cloud/ConfigApply.cpp: the connection-mode block does not compare the configured mode")
 
+# Round 2: acting on "a downgrade is active" reads the derived getter; the
+# setup gate and post-wake gates keep the raw flag.
+RAW = "PowerConfig::get_lowBatteryMode()"
+DERIVED = "PowerManager::instance().downgradeActive()"
+for rel in ("Generalized-Core-Counter.cpp", "diagnostics/ConnectivityFailsafeTest.cpp"):
+    text = sources.get(rel, "")
+    m = re.search(r"lowBatteryHardActionBlocked\s*=([^;]*);", text)
+    if not m:
+        fail(f"{rel}: lowBatteryHardActionBlocked not found")
+    elif DERIVED not in m.group(1) or RAW in m.group(1):
+        fail(f"{rel}: lowBatteryHardActionBlocked must read downgradeActive(), not the raw flag")
+
+status = sources.get("cloud/DeviceStatusPublisher.cpp", "")
+if f'name("lowBatteryMode").value({DERIVED})' not in status or RAW in status:
+    fail("cloud/DeviceStatusPublisher.cpp: status lowBatteryMode must come from downgradeActive()")
+
+RAW_GATES = {
+    "Generalized-Core-Counter.cpp": 1,
+    "state/State_Sleep.cpp": 2,
+}
+for rel, expected in RAW_GATES.items():
+    found = sources.get(rel, "").count(f"if ({RAW})")
+    if found != expected:
+        fail(f"{rel}: expected {expected} raw-flag gate(s), found {found}")
+
 power_manager = sources.get("power/PowerManager.cpp", "")
-if "effectiveConnectionMode" not in power_manager or "get_lowBatteryMode()" not in power_manager:
+if ("effectiveConnectionMode" not in power_manager or "get_lowBatteryMode()" not in power_manager
+        or "downgradeActive() ?" not in power_manager):
     fail("power/PowerManager.cpp: the derivation of the mode in use is missing")
 
 if failures:

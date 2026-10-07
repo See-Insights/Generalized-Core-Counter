@@ -247,12 +247,14 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
     writerBase.name("vcell").value(batteryVoltage, 2);
     writerBase.name("chargeState").value(SensorManager::instance().cachedChargeStateLabel());
     // WO-2026-09-21 Step 4 (bench telemetry): read-and-publish only, no new
-    // sampling and no change to evaluate()/commit(). tier/lowBatteryMode are
-    // the two values BatteryAuthority::commit() persists; vcellState/socTrust
+    // sampling and no change to evaluate()/commit(). tier is persisted by
+    // BatteryAuthority::commit(); lowBatteryMode is the derived downgrade
+    // (PowerManager::downgradeActive()), not the raw persisted flag, so a
+    // stale flag is never published; vcellState/socTrust
     // distinguish which guard-pipeline path a SURVIVAL/CRITICAL verdict took
     // (unconditional vcell floor vs. SoC-driven) - see BatteryAuthority.cpp.
     writerBase.name("tier").value(ReportingPolicyResolver::batteryTierName(reportingPolicy.batteryTier));
-    writerBase.name("lowBatteryMode").value(PowerConfig::get_lowBatteryMode());
+    writerBase.name("lowBatteryMode").value(PowerManager::instance().downgradeActive());
     writerBase.name("vcellState").value(vcellSampleStateLabel(vcellState));
     writerBase.name("socTrust").value(socTrustLabel(SensorManager::instance().cachedSocTrust()));
     writerBase.endObject();

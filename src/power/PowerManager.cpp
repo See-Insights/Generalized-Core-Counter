@@ -236,13 +236,14 @@ uint8_t PowerManager::batteryState() const {
   return CurrentReadings::get_batteryState();
 }
 
+bool PowerManager::downgradeActive() const {
+  return SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY &&
+         SystemConfig::get_configuredConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE &&
+         PowerConfig::get_lowBatteryMode();
+}
+
 uint8_t PowerManager::effectiveConnectionMode() const {
-  const uint8_t configured = SystemConfig::get_configuredConnectionMode();
-  const bool lowBatteryDowngrade =
-      SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY &&
-      configured == SystemConfig::INTERMITTENT_KEEP_ALIVE &&
-      PowerConfig::get_lowBatteryMode();
-  return lowBatteryDowngrade ? SystemConfig::INTERMITTENT : configured;
+  return downgradeActive() ? SystemConfig::INTERMITTENT : SystemConfig::get_configuredConnectionMode();
 }
 
 const char *PowerManager::availabilityLabel(PowerAvailability availability) {

@@ -2661,7 +2661,7 @@ void connectivityFailsafeSupervisor() {
   const bool lowBatteryHardActionBlocked =
       nextStage >= 2 &&
       !externalPowerPresent &&
-      (PowerConfig::get_lowBatteryMode() || tier == TIER_SURVIVAL);
+      (PowerManager::instance().downgradeActive() || tier == TIER_SURVIVAL);
 
   if (lowBatteryHardActionBlocked) {
 #if CONNECTIVITY_FAILSAFE_TEST_MODE

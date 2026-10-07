@@ -183,7 +183,7 @@ FailsafeDeferReason currentFailsafeEligibilityReason() {
         const bool externalPowerPresent = connectivityFailsafeHasExternalPowerLocal();
         const bool lowBatteryHardActionBlocked =
             nextStage >= 2 && !externalPowerPresent &&
-            (PowerConfig::get_lowBatteryMode() || tier == TIER_SURVIVAL);
+            (PowerManager::instance().downgradeActive() || tier == TIER_SURVIVAL);
 
         if (lowBatteryHardActionBlocked) {
           return FAILSAFE_DEFER_LOW_BATTERY_HARD_STAGE_SUPPRESSED;

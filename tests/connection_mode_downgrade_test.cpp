@@ -99,6 +99,7 @@ void commitAt(BatteryTier tier) {
 uint8_t inUse() { return PowerManager::instance().effectiveConnectionMode(); }
 uint8_t configured() { return SystemConfig::get_configuredConnectionMode(); }
 bool flag() { return PowerConfig::get_lowBatteryMode(); }
+bool downgrade() { return PowerManager::instance().downgradeActive(); }
 
 void testDowngrade() {
   setStore(SystemConfig::OCCUPANCY, kKeepAlive, false, TIER_HEALTHY);
@@ -166,6 +167,32 @@ void testLedgerChangeWhileDowngraded() {
   CHECK(configured() == kConnected && inUse() == kConnected, "CONNECTED is in use, not INTERMITTENT");
 }
 
+// Stage 7 check 9: between a config change and the next commit() the raw flag
+// is stale; the derived downgrade must already be false.
+void testStaleFlagBeforeCommit() {
+  const int ledgerValues[] = {kIntermittent, kConnected, 2};
+  for (int ledger : ledgerValues) {
+    setStore(SystemConfig::OCCUPANCY, kKeepAlive, false, TIER_HEALTHY);
+    commitAt(TIER_CONSERVING);
+    CHECK(downgrade() && flag(), "downgraded state: the derived downgrade is active");
+
+    CHECK(applyConnectionModeFromLedger(ledger), "gap: ledger change applied");
+    CHECK(flag(), "gap: the raw flag is still set (no commit yet)");
+    CHECK(!downgrade(), "gap: the derived downgrade is false");
+    CHECK(inUse() == static_cast<uint8_t>(ledger), "gap: the mode in use is the ledger value");
+  }
+
+  setStore(SystemConfig::OCCUPANCY, kKeepAlive, false, TIER_HEALTHY);
+  commitAt(TIER_CONSERVING);
+  SystemConfig::set_sensorMode(SystemConfig::COUNTING);
+  CHECK(flag() && !downgrade(), "gap: COUNTING with a stale flag is not a downgrade");
+
+  setStore(SystemConfig::OCCUPANCY, kKeepAlive, false, TIER_HEALTHY);
+  commitAt(TIER_CONSERVING);
+  commitAt(TIER_HEALTHY);
+  CHECK(!flag() && !downgrade(), "recovery: the derived downgrade is false");
+}
+
 void testRestart() {
   setStore(SystemConfig::OCCUPANCY, kKeepAlive, true, TIER_CONSERVING);
   CHECK(inUse() == kIntermittent, "after reload, persisted 3 + flag gives INTERMITTENT in use");
@@ -225,6 +252,7 @@ int main() {
   testRecovery();
   testReapplyWhileDowngraded();
   testLedgerChangeWhileDowngraded();
+  testStaleFlagBeforeCommit();
   testRestart();
   testCountingModeNeverDowngrades();
   testOtherModesAreNotDowngraded();
