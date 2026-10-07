@@ -1310,8 +1310,10 @@ void setup() {
     // New watchdog-reset alert code (its own tier, strictly above tier-3;
     // see getAlertSeverity() in MyPersistentData.cpp - this must outrank
     // any already-active tier-3 alert like thrash detection or a boot
-    // storm). One-time forensic marker - intentionally NOT added to
-    // isAutoClearAfterReportAlert() so it stays sticky.
+    // storm). WO-2026-10-06-001: reported once, in the first report after
+    // the watchdog reboot, then cleared by isAutoClearAfterReportAlert() so
+    // it no longer hides later alerts. The forensics persist elsewhere:
+    // watchdogResetCount, the lastWatchdog* fields and the watchdog event.
     RecoveryState::raiseAlert(19);
 
     // Queue watchdog forensic event only after PublishQueuePosix setup above
@@ -1940,8 +1942,10 @@ void logTimeDiag(bool isOpen) {
 static bool isAutoClearAfterReportAlert(int alertCode) {
   switch (alertCode) {
   case 15:
+  case 19:
   case 31:
   case 41:
+  case 42:
   case 43:
   case 44:
     return true;
