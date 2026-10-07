@@ -89,6 +89,7 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 - **The Ubidots template:** add `"vc": "{{vc}}"` once every device runs v37.
 - **v35's download case:** confirm at the next OTA to a v35+ device.
 - **Alert 14's remaining uses:** review once older firmware has left the fleet (WO-2026-10-02-003, later cleanup).
+- **Structural tests and `build-tmp/`:** `tests/thermal_coupling_structural_test.py:256` and `:264` scan the whole repo and skip only `.claude`, so a build copy of `src/` under `build-tmp/` makes them fail (Copilot and Claude Code, WO-2026-10-07-002). There is no shared scan helper; the other structural tests scan only `src/`. Skip `build-tmp` there too (a test change, not `src/`), then remove the temporary build-copy bullet from `AI_DEVELOPMENT_WORKFLOW.md` §2.
 
 **Observations to watch** (no action yet).
 - **PCKL3 restarted twice with reset reason 0,** 7 minutes after its v35 update (also seen on v25 on 28 Sep).

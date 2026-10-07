@@ -93,12 +93,31 @@ be verified against a binary that does not correspond to the source.
   Clearing `target/` is *not* a clean build — it holds link output only. The
   compiled objects live at
   `~/.particle/toolchains/deviceOS/<ver>/build/target/user/platform-<id>-m/<app>/`.
-- **When switching `EXTRA_CFLAGS` between release and bench builds, run
-  `make clean-user` first, or stale object files are reused.** A flag passed
-  only on the command line changes no file timestamp, so `make` sees nothing to
-  rebuild and silently links the previous build's objects. Found 2026-09-28 in
-  WO-2026-09-28-001, when the first bench builds with
-  `-DENABLE_DIAGNOSTICS_PUBLISH_MODE=1` reused the release objects.
+- **Start every build type from clean objects, or stale object files are
+  reused.** A flag passed only on the command line changes no file timestamp,
+  so `make` sees nothing to rebuild and silently links the previous build's
+  objects. Found 2026-09-28 in WO-2026-09-28-001, when the first bench builds
+  with `-DENABLE_DIAGNOSTICS_PUBLISH_MODE=1` reused the release objects. In
+  this Device OS tree (6.4.1):
+  - **Agents:** use a fresh `BUILD_PATH_BASE` for every build type, in a
+    directory that doesn't exist yet, for example
+    `build-tmp/<wo>-stage7/obj-release` and `…/obj-bench`.
+  - **Reusing a path** (for example, Chip in a terminal): run `make clean` in
+    `deviceOS/6.4.1/main` with the same `PLATFORM`, `APPDIR` and
+    `BUILD_PATH_BASE` arguments as the build.
+
+  Workbench's `make clean-user` (from `buildscripts/<ver>/Makefile`) only runs
+  `make clean` in `deviceOS/<ver>/main` with Workbench's own arguments, so it
+  cleans only Workbench's default build path under
+  `deviceOS/<ver>/build/target`. It does **not** clean a build made with the
+  §3 command and its own `BUILD_PATH_BASE`. (Corrected 2026-10-07: this rule
+  used to say `make clean-user`, which has no effect on agents' scratch
+  builds.)
+- **Keep build copies out of the repo while the host suite runs.** Structural
+  tests scan the repository, and a copy of `src/` under `build-tmp/` fails
+  `thermal_coupling_structural_test.py`. Run the suite before making the copy,
+  or after removing it. (Temporary: remove this bullet once the test excludes
+  `build-tmp/`; see the recovery plan, "Rollout and follow-ups".)
 - Prove presence/absence with `nm` on the linked ELF **and** on the object
   itself. Never with `strings`.
 - Record the `text`/`data` sizes at both flag values. A size that matches the
@@ -407,10 +426,13 @@ resolution-order dependent and may work only by accident.
     cd ~/.particle/toolchains/deviceOS/6.4.1/main
     make -s PLATFORM=boron APPDIR=<copy-of-tree> TARGET_DIR=<copy>/localbuild \
          DEVICE_OS_PATH=~/.particle/toolchains/deviceOS/6.4.1 \
-         BUILD_PATH_BASE=<scratch>
+         BUILD_PATH_BASE=<fresh scratch dir that doesn't exist yet>
 
 This is also the build that produces the symbolised ELF the linkage check above
 requires, so the two checks share the work.
+
+Use a new `BUILD_PATH_BASE` for each build type (see §2, "Verifying compile-time
+flags"); `make clean-user` does not clean this path.
 
 Added 2026-08-26 after WO-2026-08-25-001. An include rewritten from
 `"../Config.h"` to `"Config.h"` broke the local build and survived **seven
