@@ -75,6 +75,13 @@ This is a factual handover for the fresh Step 6 session, as of main `41ad238` on
 
 **Open PRs:** none (GitHub, 7 Oct).
 
+**The bench and the hardware** (Chip, 2026-10-07):
+- **Dev-09 and Dev-14 are BRN404X Borons** (North American LTE-M) on Singtel, so their connectivity results don't represent the US fleet.
+- **Dev-11 is retired:** its Boron's clock is faulty.
+- **For Step 6's M-SoM work,** a Muon with an M524 is on hand; it connects in seconds on Singtel.
+- **Future options:** an M635e (beta) and the M404.
+- **The US production fleet stays on Borons.**
+
 ## 3. Step 6 inputs
 
 **The Codex ownership report:** `docs/work-orders/2026-10-06-step6-ownership-codex-report.md` (PR #63; re-cited after v37 in PR #66). Its **proposed owners**:
@@ -105,6 +112,8 @@ Its **WO order:**
 - **Reading modes:** polling, threshold and interrupt.
 - **Wakes** are routed to the sensor that caused them.
 - **Payloads and the data ledger** are built from the sensors, in the form Ubidots expects.
+  - **Today's webhook template names each field (12 of them),** so any new report field needs its own template line. Add it only after every device sends the field: an edit naming a field the fleet doesn't send yet has already broken the JSON once.
+  - **If payloads become fully Ubidots-ready,** the webhook could forward the event as it is. That belongs with the webhook-rename WO after Step 6.
 - **Per-sensor settings,** and **compile-time selection.**
 - **Tested against** PIR occupancy, the counting mode, temperature, and humidity.
 
@@ -139,3 +148,4 @@ Its **WO order:**
 4. **Measure, then narrow down when and where.** The heap loss was measured per wake cycle, then traced to the reused `SystemSleepConfiguration` and Device OS's move assignment (WO-2026-10-02-003; `docs/work-orders/2026-10-02-wake-heap-loss-codex-report.md`).
 5. **Spell out "don't merge".** The v33 PR was merged when only opening it was intended (`AI_DEVELOPMENT_WORKFLOW.md` §2, the 2026-10-02 notes).
 6. **Check the power before blaming the firmware.** Dev-14 stopped charging on 3 Oct because of a faulty USB cable. After the swap it charged to DONE overnight (WO-2026-10-04-001, bench section).
+7. **One change at a time in production.** Editing the shared webhook template affects every device at once. Copy the old version first, change one thing, and check for 201 Created before doing anything else (Chip, 2026-10-07).
