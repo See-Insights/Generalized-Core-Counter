@@ -44,7 +44,7 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 
 **Phase 3: clarity (Step 5.5).** Pilot: the reporting state in four plain steps (always report → daily cleanup if closing → already connected? → connect now or later), about 20 lines, with the details in named owners (`DailyBoundary`, `Connectivity::shouldConnectNow`) and the response wait restored explicitly. Then `setup()` as named phases, then the other states.
 
-**Step 6: the power-owner split.** Items deferred to it so far:
+**Step 6: the power-owner split.** Items deferred to it so far: *(Citations checked against main `e78d59d`, v37 merged, on 2026-10-07.)*
 - **Duplicated power-source codes and PMIC fault masks** (WO-2026-09-29-002).
 - **Boron versus M-SoM build selection** (WO-2026-09-29-002).
 - **Connection-mode tug-of-war** (2026-10-03, found while explaining Trail02's 2-hour delivery spacing on v34):
@@ -53,7 +53,7 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
   - the mode flips, and is persisted, on every connection.
 
   **Fix:** separate the configured mode from the battery downgrade. The effective mode is derived, and neither overwrites the other.
-- **The failsafe's allowance for deliberate spacing.** Its only allowance today is the low-battery block (`Generalized-Core-Counter.cpp:2641–2656`), which works only because the tug-of-war above sets the low-battery flag. **Goal:** the failsafe counts only the time when the device was expected to connect.
+- **The failsafe's allowance for deliberate spacing.** Its only allowance today is the low-battery block (`Generalized-Core-Counter.cpp:2657–2672`), which works only because the tug-of-war above sets the low-battery flag. **Goal:** the failsafe counts only the time when the device was expected to connect.
 - **Battery trust and tier.** The gauge is compared with a resting-voltage table (`kOcvKnots`, `BatteryHealth.cpp:19–32`) using a voltage sampled while awake, so healthy devices were marked untrusted and dropped to CRITICAL: Court3 at 82%, PCKL1 at 77% (the 4 Oct Codex report's ledger snapshot: 79.8% and 76.5%, both Untrusted/CRITICAL), and Dev-14 showing CRITICAL at 65%. Decide only after a week of v37's `vc` data (WO-2026-10-04-001 item D). If that isn't enough, add the fuller battery-decision snapshot proposed in the 4 Oct Codex report §D (raw and accepted SOC, vcell, charge state, radio state, sample age, source, resulting tier).
 - **CONSERVING threshold.** A device drops to CONSERVING below 70% and returns to HEALTHY at 75% (`BatteryBackoffPolicy.h:21–26`; corrected per the 6 Oct Codex Step 6 ownership report). That may be too high for solar sites going into shorter days. Tune it from field data on how often devices actually get that low. (Moved here from the Phase 4 list.)
 - **Power-source misreads:** USB_ADAPTER and USB_HOST swapping on the same supply, as seen in Dev-09's and Dev-14's PowerDiag lines.
