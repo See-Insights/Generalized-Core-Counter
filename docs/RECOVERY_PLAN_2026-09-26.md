@@ -55,7 +55,7 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
   **Fix:** separate the configured mode from the battery downgrade. The effective mode is derived, and neither overwrites the other.
 - **The failsafe's allowance for deliberate spacing.** Its only allowance today is the low-battery block (`Generalized-Core-Counter.cpp:2641–2656`), which works only because the tug-of-war above sets the low-battery flag. **Goal:** the failsafe counts only the time when the device was expected to connect.
 - **Battery trust and tier.** The gauge is compared with a resting-voltage table (`kOcvKnots`, `BatteryHealth.cpp:19–32`) using a voltage sampled while awake, so healthy devices were marked untrusted and dropped to CRITICAL: Court3 at 82%, PCKL1 at 77% (the 4 Oct Codex report's ledger snapshot: 79.8% and 76.5%, both Untrusted/CRITICAL), and Dev-14 showing CRITICAL at 65%. Decide only after a week of v37's `vc` data (WO-2026-10-04-001 item D). If that isn't enough, add the fuller battery-decision snapshot proposed in the 4 Oct Codex report §D (raw and accepted SOC, vcell, charge state, radio state, sample age, source, resulting tier).
-- **CONSERVING threshold.** CONSERVING starts at 75% charge (`BatteryBackoffPolicy.h:21`), which may be too high for solar sites going into shorter days. Tune it from field data on how often devices actually get that low. (Moved here from the Phase 4 list.)
+- **CONSERVING threshold.** A device drops to CONSERVING below 70% and returns to HEALTHY at 75% (`BatteryBackoffPolicy.h:21–26`; corrected per the 6 Oct Codex Step 6 ownership report). That may be too high for solar sites going into shorter days. Tune it from field data on how often devices actually get that low. (Moved here from the Phase 4 list.)
 - **Power-source misreads:** USB_ADAPTER and USB_HOST swapping on the same supply, as seen in Dev-09's and Dev-14's PowerDiag lines.
 
 **Phase 4: backlog**, in order: build provenance (vendored versus registry libraries; WO-2026-09-26-001), then the connect stall (WO-2026-09-25-005). The rest is grouped below.
@@ -82,6 +82,7 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 - **Occupied courts reporting more often than hourly,** with mid-session reports carrying the session's minutes so far.
 - **The reporting-state pilot (Phase 3),** starting with a voice walkthrough of `handleReportingState()`.
 - **Muon M524 bring-up,** then the M635e and M404.
+- **Alert 18 (state-machine thrash):** raised just before the tier-3 reset, so it may not be persisted. Fix with the ThrashGuard/persistence work (save state before any deliberate reset), then make 18 report-once like 19 and 42. (WO-2026-10-06-001 round 2: Stage 7 found the tier-3 loss, so 18 was dropped from v38. Until then it clears: never (planned).)
 
 **Rollout and follow-ups** (not WOs).
 - **Hibernate fleet-wide:** after v37's item A has a few days in the field. Trail02 woke on time on all three trial nights (4 Oct Codex report §C).
