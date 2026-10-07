@@ -45,10 +45,7 @@ void handleIdleState() {
   if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY) {
     // Check if debounce timeout expired (no motion for debounce period)
     if (CurrentReadings::get_occupied()) {
-      uint32_t debounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
-      if (debounceMs == 0) {
-        debounceMs = Config::occupancyDebounceMsForRuntime();
-      }
+      const uint32_t debounceMs = occupancyDebounceMs();
 
       uint32_t lastEvent = CurrentReadings::get_lastOccupancyEvent();
       if (lastEvent == 0) {
@@ -69,7 +66,7 @@ void handleIdleState() {
         // In INTERMITTENT_KEEP_ALIVE mode (connectionMode 3), report immediately
         // on occupancy transitions. In other modes, occupancy transitions are
         // still tracked, but do not force an immediate report/connect.
-        if (reportNow) {
+        if (reportNow && !closeResult.stillOpen) {
           session.occupancyChangeTriggered = true;
           transitionTo(REPORTING_STATE, "occupancy transition");
           return;

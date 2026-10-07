@@ -982,6 +982,16 @@ void setup() {
   SystemConfig::SensorSettings::setup(); // Initialize the sensor configuration
   CurrentReadings::setup();      // Initialize the current status data
 
+  // WO-2026-10-04-001 item B: lastOccupancyEvent is a millis() value, so the
+  // persisted one belongs to the previous boot. Clearing it lets the existing
+  // zero sentinel re-arm the debounce from this boot. Remember a session that
+  // was already open so the first trusted close can credit it (item B3). The
+  // anchor is captured here, once: a report sent later in this boot advances
+  // lastReport and must not move the cap.
+  session.occupancySessionBootAnchor = CurrentReadings::get_occupied()
+      ? std::max(CurrentReadings::get_occupancyStartTime(), SystemConfig::get_lastReport()) : 0;
+  CurrentReadings::set_lastOccupancyEvent(0);
+
   // WO-2026-08-25-001 Amendment C, Decision C1 boot-ordering corollary
   // (AC-C5): PowerManager::instance().setup() is deliberately NOT called
   // here anymore. It rebuilds the DCT power configuration via
@@ -1991,6 +2001,10 @@ void publishData(time_t stampOverride) {
   rtInfo.size = sizeof(rtInfo);
   HAL_Core_Runtime_Info(&rtInfo, nullptr);
 
+  // WO-2026-10-04-001 item D: cell voltage, 0.00 when no plausible sample.
+  float vc = 0.0f;
+  (void)SensorManager::instance().cachedBatteryVoltage(vc);
+
   // Build webhook payload based on sensor mode
   if (sensorMode == SystemConfig::OCCUPANCY) {
     const unsigned long timeStampValue = stampOverride != 0 ? (unsigned long)stampOverride : nowStampSec;
@@ -1998,10 +2012,11 @@ void publishData(time_t stampOverride) {
 
     // Occupancy mode webhook format (occupancy as 0/1 numeric value)
     snprintf(data, sizeof(data),
-             "{\"occupancy\":%d,\"dailyoccupancy\":%lu,\"battery\":%4.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"alerts\":%i,\"resets\":%i,\"connecttime\":%i,\"fh\":%lu,\"lfb\":%lu,\"cyc\":%lu,\"slp\":%lu,\"timestamp\":%lu000}",
+             "{\"occupancy\":%d,\"dailyoccupancy\":%lu,\"battery\":%4.2f,\"vc\":%.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"alerts\":%i,\"resets\":%i,\"connecttime\":%i,\"fh\":%lu,\"lfb\":%lu,\"cyc\":%lu,\"slp\":%lu,\"timestamp\":%lu000}",
              CurrentReadings::get_occupied() ? 1 : 0,
              totalOccupiedMinutes,
              stateOfCharge,
+             (double)vc,
              batteryContext[battState],
              CurrentReadings::get_internalTempC(),
              reportedAlertCode,
@@ -2016,10 +2031,11 @@ void publishData(time_t stampOverride) {
 
     // Counting mode webhook format (original format)
     snprintf(data, sizeof(data),
-             "{\"hourly\":%i,\"daily\":%i,\"battery\":%4.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"resets\":%i,\"alerts\":%i,\"connecttime\":%i,\"fh\":%lu,\"lfb\":%lu,\"cyc\":%lu,\"slp\":%lu,\"timestamp\":%lu000}",
+             "{\"hourly\":%i,\"daily\":%i,\"battery\":%4.2f,\"vc\":%.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"resets\":%i,\"alerts\":%i,\"connecttime\":%i,\"fh\":%lu,\"lfb\":%lu,\"cyc\":%lu,\"slp\":%lu,\"timestamp\":%lu000}",
              CurrentReadings::get_hourlyCount(),
              CurrentReadings::get_dailyCount(),
              stateOfCharge,
+             (double)vc,
              batteryContext[battState],
              CurrentReadings::get_internalTempC(),
              RecoveryState::get_resetCount(),

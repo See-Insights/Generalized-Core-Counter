@@ -65,6 +65,106 @@ void testGatePassesClassifiesNone() {
   assert(classifyGateArmMirror(in) == GateArm::kNone);
 }
 
+// WO-2026-10-04-001 item C. The AB1805 library labels every wake
+// DEEP_POWER_DOWN while REG_SLEEP_CTRL_SLST is set and never clears it, so
+// after one deepPowerDown() a correct timer wake is mislabelled and the gate
+// reported `fail` with actual/err zeroed. v37 also accepts DEEP_POWER_DOWN,
+// but only inside a 0 to +60 s window around the requested wake time, so an
+// early wake (a button) or a late wake still fails.
+//
+// This is a manually-maintained MIRROR of the in.wakeReasonIsAlarm expression
+// in HibernateCycle.cpp, the same pattern classifyGateArmMirror() above uses,
+// and the .sh fidelity checks pin the real source text verbatim.
+enum class MirrorWakeReason { kAlarm, kDeepPowerDown, kWatchdog, kUnknown };
+
+bool wakeReasonIsAlarmMirror(MirrorWakeReason wakeReason, bool rtcReadOk, int64_t rtcBefore,
+                             uint32_t requestedSleepSec, int64_t rtcAtWake) {
+  const int64_t dpdExpectedWake = rtcBefore + (int64_t)requestedSleepSec;
+  const bool dpdOnTime = rtcReadOk && rtcAtWake >= dpdExpectedWake && rtcAtWake <= dpdExpectedWake + 60;
+  return (wakeReason == MirrorWakeReason::kAlarm) ||
+         (wakeReason == MirrorWakeReason::kDeepPowerDown && dpdOnTime);
+}
+
+// Build the GateInputs for a wake `skewSec` seconds away from the requested
+// wake time, with the wake reason label the AB1805 reported.
+GateInputs wakeInputs(MirrorWakeReason wakeReason, int64_t skewSec, bool rtcReadOk = true) {
+  GateInputs in{};
+  in.resetReasonIsPowerManagement = true;
+  in.rtcReadOk = rtcReadOk;
+  in.rtcBefore = 1000;
+  in.requestedSleepSec = 3600;
+  in.rtcAtWake = 1000 + 3600 + skewSec;
+  in.wakeReasonIsAlarm = wakeReasonIsAlarmMirror(wakeReason, in.rtcReadOk, in.rtcBefore,
+                                                 in.requestedSleepSec, in.rtcAtWake);
+  return in;
+}
+
+void testDeepPowerDownOnTimeWakeReportsSuccessWithRealTiming() {
+  const GateInputs in = wakeInputs(MirrorWakeReason::kDeepPowerDown, /*skewSec=*/30);
+  assert(in.wakeReasonIsAlarm);
+  assert(classifyGateArmMirror(in) == GateArm::kNone);
+
+  const uint32_t actual = (uint32_t)(in.rtcAtWake - in.rtcBefore);
+  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30,
+                                          "DEEP_POWER_DOWN", /*hibernateCount=*/11,
+                                          /*actualSleepSecOnSuccess=*/actual,
+                                          /*sleepErrorSecOnSuccess=*/(int32_t)actual - (int32_t)in.requestedSleepSec);
+
+  char payload[256];
+  const int written = buildEventPayload(payload, sizeof(payload), f);
+  assert(written > 0 && (size_t)written < sizeof(payload));
+  assert(strstr(payload, "\"result\":\"ok\"") != nullptr);
+  assert(strstr(payload, "\"wakeReason\":\"DEEP_POWER_DOWN\"") != nullptr);
+  assert(strstr(payload, "\"actual\":3630") != nullptr);  // real timing, not zeroed
+  assert(strstr(payload, "\"err\":30") != nullptr);
+}
+
+void testDeepPowerDownWindowBoundaries() {
+  // Exactly on time and exactly at +60 s are inside the window.
+  assert(wakeInputs(MirrorWakeReason::kDeepPowerDown, 0).wakeReasonIsAlarm);
+  assert(wakeInputs(MirrorWakeReason::kDeepPowerDown, 60).wakeReasonIsAlarm);
+  assert(classifyGateArmMirror(wakeInputs(MirrorWakeReason::kDeepPowerDown, 0)) == GateArm::kNone);
+  assert(classifyGateArmMirror(wakeInputs(MirrorWakeReason::kDeepPowerDown, 60)) == GateArm::kNone);
+
+  // One second late is outside it.
+  const GateInputs late = wakeInputs(MirrorWakeReason::kDeepPowerDown, 61);
+  assert(!late.wakeReasonIsAlarm);
+  assert(classifyGateArmMirror(late) == GateArm::kWakeReason);
+
+  // A button press partway through the sleep is early, and still fails.
+  const GateInputs early = wakeInputs(MirrorWakeReason::kDeepPowerDown, -1800);
+  assert(!early.wakeReasonIsAlarm);
+  assert(classifyGateArmMirror(early) == GateArm::kWakeReason);
+  const GateInputs earlyByOne = wakeInputs(MirrorWakeReason::kDeepPowerDown, -1);
+  assert(!earlyByOne.wakeReasonIsAlarm);
+
+  // Without a trustworthy RTC read there is no window to test against.
+  const GateInputs noRtc = wakeInputs(MirrorWakeReason::kDeepPowerDown, 0, /*rtcReadOk=*/false);
+  assert(!noRtc.wakeReasonIsAlarm);
+  assert(classifyGateArmMirror(noRtc) == GateArm::kWakeReason);
+}
+
+void testOtherWakeReasonsStillFail() {
+  for (const MirrorWakeReason reason : {MirrorWakeReason::kWatchdog, MirrorWakeReason::kUnknown}) {
+    for (const int64_t skewSec : {(int64_t)0, (int64_t)30, (int64_t)-1800}) {
+      const GateInputs in = wakeInputs(reason, skewSec);
+      assert(!in.wakeReasonIsAlarm);
+      assert(classifyGateArmMirror(in) == GateArm::kWakeReason);
+    }
+  }
+}
+
+void testAlarmHandlingIsUnchangedByTheDeepPowerDownWindow() {
+  // ALARM is accepted regardless of timing, exactly as before v37.
+  for (const int64_t skewSec : {(int64_t)0, (int64_t)600, (int64_t)-1800}) {
+    assert(wakeInputs(MirrorWakeReason::kAlarm, skewSec).wakeReasonIsAlarm);
+  }
+  // ... including with no RTC read, which then fails on the later kRtcRead arm.
+  const GateInputs noRtc = wakeInputs(MirrorWakeReason::kAlarm, 0, /*rtcReadOk=*/false);
+  assert(noRtc.wakeReasonIsAlarm);
+  assert(classifyGateArmMirror(noRtc) == GateArm::kRtcRead);
+}
+
 // buildEventFields() is the exact function production calls immediately
 // after HibernateCycle::classifyWake() classifies the gate outcome, to combine it with the
 // already-computed actual/error values (see Generalized-Core-Counter.cpp's
@@ -379,6 +479,10 @@ void testWorstCasePayloadFitsBudget() {
 
 int main() {
   testGatePassesClassifiesNone();
+  testDeepPowerDownOnTimeWakeReportsSuccessWithRealTiming();
+  testDeepPowerDownWindowBoundaries();
+  testOtherWakeReasonsStillFail();
+  testAlarmHandlingIsUnchangedByTheDeepPowerDownWindow();
   testBuildEventFieldsOnSuccessReportsProvidedActualAndError();
   testBuildEventFieldsOnFailureZeroesActualAndErrorRegardlessOfInput();
   testBuildEventFieldsOnSuccessForwardsEveryForensicInputFaithfully();

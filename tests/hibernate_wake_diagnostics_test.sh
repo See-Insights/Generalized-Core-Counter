@@ -123,7 +123,19 @@ check "in.resetReasonIsPowerManagement maps from osResetReason, not a literal" \
   "in.resetReasonIsPowerManagement = (osResetReason == RESET_REASON_POWER_MANAGEMENT);" \
   "$hc_src"
 check "in.wakeReasonIsAlarm maps from the AB1805 wake reason, not a literal" \
-  "in.wakeReasonIsAlarm = (wakeReason == AB1805::WakeReason::ALARM);" \
+  "in.wakeReasonIsAlarm = (wakeReason == AB1805::WakeReason::ALARM) ||" \
+  "$hc_src"
+# WO-2026-10-04-001 item C: DEEP_POWER_DOWN is sticky once SLST is set, so an
+# on-time DEEP_POWER_DOWN wake is also accepted. The window bounds are pinned
+# here because the .cpp mirror (wakeReasonIsAlarmMirror()) reproduces them.
+check "DEEP_POWER_DOWN is accepted only when on time" \
+  "(wakeReason == AB1805::WakeReason::DEEP_POWER_DOWN && dpdOnTime);" \
+  "$hc_src"
+check "the DEEP_POWER_DOWN expected wake time comes from rtcBefore + requested" \
+  "const int64_t dpdExpectedWake = in.rtcBefore + (int64_t)in.requestedSleepSec;" \
+  "$hc_src"
+check "the DEEP_POWER_DOWN acceptance window is 0 to +60 s and requires a good RTC read" \
+  "const bool dpdOnTime = in.rtcReadOk && in.rtcAtWake >= dpdExpectedWake && in.rtcAtWake <= dpdExpectedWake + 60;" \
   "$hc_src"
 check "in.rtcReadOk maps from the real RTC read outcome, not a literal" \
   "in.rtcReadOk = v.rtcReadOk;" \

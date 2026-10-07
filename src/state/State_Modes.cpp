@@ -126,10 +126,7 @@ void updateOccupancyState() {
   }
 
   // V3.23: Occupancy debounce timeout comes from sensor.setting1
-  uint32_t debounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
-  if (debounceMs == 0) {
-    debounceMs = Config::occupancyDebounceMsForRuntime();
-  }
+  const uint32_t debounceMs = occupancyDebounceMs();
 
   uint32_t lastEvent = CurrentReadings::get_lastOccupancyEvent();
   if (lastEvent == 0) {
@@ -152,7 +149,7 @@ void updateOccupancyState() {
     
     // In INTERMITTENT_KEEP_ALIVE mode, report immediately on occupancy state changes
     // This allows dashboard to show real-time occupancy transitions
-    if (reportNow) {
+    if (reportNow && !closeResult.stillOpen) {
       session.occupancyChangeTriggered = true;
       if (state == IDLE_STATE) {
         transitionTo(REPORTING_STATE, "occupancy cleared");

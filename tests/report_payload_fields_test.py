@@ -20,6 +20,9 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP = os.path.join(REPO, "src", "Generalized-Core-Counter.cpp")
 
 NEW_KEYS = ("fh", "lfb", "cyc", "slp")
+# WO-2026-10-04-001 item D: the cell voltage. Unquoted like the rest, but a
+# %.2f rather than a %lu, so it is checked separately from NEW_KEYS.
+VC_KEY = "vc"
 BUFFER_BYTES = 256
 
 # Worst-case rendered value per key, taken from the type that feeds it.
@@ -36,6 +39,9 @@ BUFFER_BYTES = 256
 #   connecttime     uint16_t seconds                            -> 65535
 #   fh / lfb        uint32_t, but bounded by the nRF52840's 256 KB of RAM
 #   cyc / slp       uint32_t RAM counters, bounded only by the type
+#   vc              cell voltage; SensorManager only caches a plausible
+#                   sample (2.5 V < vcell < 5.0 V, not NaN) and publishData()
+#                   starts from 0.0f, so %.2f renders at most "5.00"
 #   timestamp       UTC epoch seconds, plus the format's literal "000"
 WORST_VALUE = {
     "hourly": "65535",
@@ -51,6 +57,7 @@ WORST_VALUE = {
     "lfb": "262144",
     "cyc": "4294967295",
     "slp": "4294967295",
+    "vc": "5.00",
     "timestamp": "9999999999",
 }
 
@@ -136,6 +143,12 @@ def main():
             check(isinstance(parsed.get(key), int) and not isinstance(parsed.get(key), bool),
                   "%s: %r parses as an unquoted JSON number" % (name, key))
 
+        check(conv.get(VC_KEY) == "%.2f",
+              "%s: %r is an unquoted %%.2f conversion in the format string (found %r)"
+              % (name, VC_KEY, conv.get(VC_KEY)))
+        check(isinstance(parsed.get(VC_KEY), float),
+              "%s: %r parses as an unquoted JSON number" % (name, VC_KEY))
+
         string_keys = sorted(k for k, v in parsed.items() if isinstance(v, str))
         check(string_keys == ["key1"],
               "%s: the only string-valued key is still key1 (found %s)"
@@ -165,6 +178,10 @@ def main():
     check("AwakeCycles::cycles" in body and "AwakeCycles::sleeps" in body,
           "cyc and slp are the AwakeCycles counters "
           "(cyc >= slp is proven in tests/awake_cycle_counters_test.sh)")
+    check("SensorManager::instance().cachedBatteryVoltage(vc)" in body,
+          "vc comes from SensorManager::cachedBatteryVoltage()")
+    check("float vc = 0.0f;" in body,
+          "vc starts at 0.0f, so an implausible or unsampled cell voltage publishes 0.00")
 
     print("")
     if failures:

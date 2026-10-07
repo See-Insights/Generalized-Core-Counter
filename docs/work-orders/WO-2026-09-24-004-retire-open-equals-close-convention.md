@@ -137,6 +137,90 @@ v32's failsafe counts open hours only; with open == close (legacy always-open), 
 7. **The build:** a clean boron release build; `strings` shows `v36-HourRules`, product 36.
 8. **The budget:** net negative `src/` lines, with nothing compressed. Record budget versus actual.
 
+## Bench (Dev-09 and Dev-14, v36-HourRules; Chip)
+
+**Setup:** Chip set rule-breaking hours in each device's `device-settings` ledger.
+
+| Device | Setting | Rule broken | Changed (ledger `updated_at`) |
+|---|---|---|---|
+| Dev-09 | `openHour` 13 (close 22) | rule 3 | 10:34:18Z, 3 Oct |
+| Dev-14 | `openHour` 11, `closeHour` 10 | rule 2 | 10:36:21Z, 3 Oct |
+
+**Pass:** each device logs `Invalid hours openHour=… closeHour=… (rule …); keeping 6/22`, and no `Open/close hours ->` line appears. After that:
+- `TimeDiag` still shows `open=6 close=22`;
+- reports and the open/closed state are unchanged;
+- the status shows `v36-HourRules`;
+- there is no run of `LedgerDuplicateStillInflight`.
+
+**Expected side effect:** a rejected setting makes the apply report failure, so ConnectState raises alert 41 ("Configuration apply failed") at each connection while the test values stay.
+
+### Check 1, 2026-10-03 10:38Z (Claude Code: serial archive and Particle API). Result: PENDING, neither device has connected since the change
+
+| Device | Last heard (Particle) | Last connection in serial | Firmware |
+|---|---|---|---|
+| Dev-09 | 10:30:33Z | `10:30:07 Connect: ok elapsed=25794ms` (after a reboot at about 10:29Z) | fw 36 |
+| Dev-14 | 10:28:45Z | `10:28:20 ConnSummary: ok` | fw 36 |
+
+- **Neither device has seen the new settings yet,** so there is no `Invalid hours` or `Open/close hours ->` line in either log.
+- **Next connection:** both should pick the settings up at the 11:00Z report. A second check is scheduled for 11:12Z.
+- **Observation (not this WO):** Dev-14 logged `Config: Connection mode -> INTERMITTENT_KEEP_ALIVE` at both connections (10:22:12, 10:28:26), and its sleep line reads `mode=INT tier=C` (10:30:28). That is live evidence of the connection-mode tug-of-war already recorded under Step 6 of the recovery plan.
+
+### Check 2, 2026-10-03 11:12Z (Claude Code: serial archive, status and report events, Particle API)
+
+**Dev-09 (open 13, rule 3): PASS.** It updated to v36 by OTA: status `v36-HourRules`, reset reason 70, at 10:30:03Z. The first connection after the change that synced the settings was the 19:00 SGT report. Serial (UTC):
+
+```
+11:00:21 ConnSummary: ok elapsed=11219 last=CONNECTED … sig=82/29 heap=76384 q=1
+11:00:25 WARN: Invalid hours openHour=13 closeHour=22 (rule 3: openHour must be 0-12); keeping 6/22
+11:00:26 WARN: Configuration apply failed: sensor=OK timing=FAIL messaging=OK modes=OK reporting=OK power=OK
+11:00:26 WARN: Configuration apply failed (will raise alert 41)
+11:00:27 WARN: Alert 41 context: ledgersSynced=true connectDuration=394 ms
+11:00:29 Connect: ok elapsed=11720ms sig=82/33 q=1 heap=76344
+```
+
+- **The rejection:** the right rule and values, and the device kept 6/22. **No `Open/close hours ->` line** at any point since the change.
+- **Only the timing section failed;** every other section applied. **Alert 41 was raised, as expected.**
+- **The status ledger** was rewritten at 11:00:23Z: `firmware.version` `v36-HourRules`, `config.generation` `BA69F072`, clock trusted.
+- **Reports are unchanged:** 18:43:51 SGT (dd 96, cyc 28), then the hourly 19:00:03 (dd 96, cyc 29, slp 28).
+- **Limits of the evidence:**
+  - **TimeDiag:** no `TimeDiag` line has been logged since the change, so the "keeping 6/22" line is the direct evidence of the hours in use;
+  - **open/closed state:** at 19:00 SGT both 6/22 and 13/22 count as open, so this check can't tell them apart. The next evidence is tomorrow's 06:00 SGT wake: under 13/22 the device would stay asleep until 13:00.
+- **`LedgerDuplicateStillInflight`:** one line, not a run, at 10:46:43 (`kind=DATA orig=ReportState new=ConnectState age=159842 … pendingData=1`). That's v35's single deferral during a slow connection (cloud recovery stage 2, 159 s).
+
+**Dev-14 (open 11, close 10, rule 2): NOT TESTED YET.** It has not connected since the change.
+- **Particle `last_heard`:** 10:28:45Z.
+- **Status ledger:** last written 10:28:28Z (`v36-HourRules`, generation `4A9E5686`), before the 10:36:21Z change.
+- **Serial:** nothing since 10:30:33Z. The forwarder logged `SerialException … device disconnected` at 10:30:30.
+- **What was expected:** in CONSERVING / intermittent (1800 s × 2), the next aligned connection was 11:00Z, and it didn't happen.
+- **Earlier events:** an OTA to v36 at 10:23:24Z (reset reason 70), then a restart between 10:23 and 10:28 (cyc 5 → 2) with no status event in the archive.
+- **Needs a physical check** (USB, power), then a recheck.
+
+### Check 3, 2026-10-03 15:02Z (Claude Code: serial archive, report events, Particle API). Result: **Dev-14 PASS**, so **the bench PASSES on both devices**
+
+**Dev-14 (open 11, close 10, rule 2): PASS.** It reconnected at 12:00Z, after Check 2. Its tier had dropped, so connections were spaced 2 hours apart. Serial (UTC):
+
+```
+12:00:25 ConnSummary: ok elapsed=13988 last=CONNECTED … sig=78/25 heap=76152 q=5
+12:00:44 WARN: Invalid hours openHour=11 closeHour=10 (rule 2: closeHour must be greater than openHour); keeping 6/22
+12:00:45 WARN: Configuration apply failed: sensor=OK timing=FAIL messaging=OK modes=OK reporting=OK power=OK
+12:00:53 INFO: TimeDiag: tz=SGT-8 … local=2026-10-03 20:00:44 open=6 close=22 isOpen=1 trusted=1 …
+14:01:32 WARN: Invalid hours openHour=11 closeHour=10 (rule 2: closeHour must be greater than openHour); keeping 6/22
+14:01:36 WARN: Configuration apply failed (will raise alert 41)
+14:01:51 WARN: Invalid hours openHour=11 closeHour=10 (rule 2: …); keeping 6/22
+```
+
+- **The rejection:** the right rule and values, and the device kept 6/22. **`TimeDiag` confirms `open=6 close=22`.** No `Open/close hours ->` line at any point.
+- **Alert 41** was raised at the 14:01 connection. A connection can apply the configuration twice (on connect, and again when the settings ledger syncs). Each apply rejected the hours.
+- **Reports are unchanged:** every 30 minutes (Dev-14's interval is 1800 s), from 18:30:02 to 21:30:02 SGT, delivered in batches at 12:00Z and 14:01Z. **The closing report is stamped 21:59:59 SGT**, so the device closed at 22:00 under 6/22, which shows the rejected hours were never used.
+- **Status ledger:** rewritten at 14:01:27Z, `v36-HourRules`.
+- **`LedgerDuplicateStillInflight`:** one line per connection, not a run (12:00:35 and 14:01:39). Each is v35's single deferral. Because connections are 2 hours apart, the in-flight DATA write had waited about 90 minutes (`age=5415393`).
+
+**Observations (not this WO):**
+- **The connection-mode tug-of-war (Step 6):** `Config: Connection mode -> INTERMITTENT_KEEP_ALIVE` at both connections (12:00:32, 14:01:33).
+- **An odd battery tier:** the 12:00:52 sleep line reads `tier=CR` (CRITICAL), while reports show 65% charge, which would normally be CONSERVING. Possibly the voltage-floor path; worth a look separately.
+
+**Bench result: PASS.** Both rule violations were rejected, each with its rule and values, and both devices kept 6/22. Dev-09's open/closed check at the 06:00 SGT wake is a further confirmation, not a gate.
+
 ## Approval record
 
 - [x] Stage 5: Chip, 2026-10-03, in the opening dispatch. Covers the rules, enforcement in ConfigApply, the removals, a net-negative budget, the Stage 7 checks, and v36 / product 36. Routing: one Copilot round (`claude-opus-5`, medium) and one narrow Stage 7 (Codex, `gpt-6-astra`, high). Not authorized: commits, merging, flashing, device settings.

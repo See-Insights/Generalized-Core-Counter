@@ -15,9 +15,9 @@
 #define FIRMWARE_VERSION_H
 
 /** @brief Particle Product integer version (must be an integer). */
-#define FIRMWARE_PRODUCT_VERSION 36
+#define FIRMWARE_PRODUCT_VERSION 37
 
 /** @brief Current firmware release string. */
-inline const char* FIRMWARE_VERSION = "v36-HourRules";
+inline const char* FIRMWARE_VERSION = "v37-PreStep6Fixes";
 
 #endif /* FIRMWARE_VERSION_H */

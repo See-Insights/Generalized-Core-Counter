@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include "../Config.h"
 #include "Particle.h"
 #include "persist/CurrentReadings.h"
@@ -286,7 +288,20 @@ struct OccupancyCloseResult {
 	bool valid = false;
 	uint32_t sessionSeconds = 0;
 	uint32_t totalSeconds = 0;
+	bool stillOpen = false;
 };
+
+/**
+ * @brief The occupancy debounce period in milliseconds.
+ *
+ * @details sensor.setting1 when configured, otherwise the runtime default.
+ *          This is the single definition used by the debounce checks and by
+ *          the cross-boot credit cap in closeOccupancySessionSafely().
+ */
+inline uint32_t occupancyDebounceMs() {
+	const uint32_t configured = SystemConfig::SensorSettings::get_sensorSetting1();
+	return configured != 0 ? configured : Config::occupancyDebounceMsForRuntime();
+}
 
 /**
  * @brief Safely closes the current occupancy session and guards wrapped time math.
@@ -306,8 +321,26 @@ inline OccupancyCloseResult closeOccupancySessionSafely(const char *path, time_t
 	// duration arithmetic below (now - start) must not run on an RTC-seeded-
 	// but-unconfirmed epoch, which can produce a wildly wrong session length.
 	const bool timeValid = Clock::isTrusted();
+	// WO-2026-10-04-001 item B2: an untrusted clock cannot credit a session.
+	// Keep it open, credit nothing, and re-arm the debounce so the close is
+	// retried one debounce later, instead of discarding the session and
+	// signalling an unoccupied transition that never happened.
+	if (!timeValid && occupied) {
+		CurrentReadings::set_lastOccupancyEvent(millis());
+		result.stillOpen = true;
+		return result;
+	}
 	const time_t now = Time.now();
 	const time_t start = CurrentReadings::get_occupancyStartTime();
+	// WO-2026-10-04-001 item B3: the first trusted close of a session that was
+	// already open at boot credits no later than this boot started, and no
+	// later than one debounce past the last evidence the session was open.
+	if (session.occupancySessionBootAnchor != 0) {
+		const time_t bootEpoch = now - (time_t)(millis() / 1000UL);
+		const time_t anchor = session.occupancySessionBootAnchor;
+		session.occupancySessionBootAnchor = 0;
+		closeAt = std::min(closeAt, std::min(bootEpoch, anchor + (time_t)(occupancyDebounceMs() / 1000UL)));
+	}
 	const uint32_t previousTotal = CurrentReadings::get_totalOccupiedSeconds();
 	result.totalSeconds = previousTotal;
 

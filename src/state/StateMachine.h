@@ -68,6 +68,7 @@ struct SessionState {
   uint32_t lastModemOffElapsedMs = 0;
   uint32_t lastTotalTeardownElapsedMs = 0;
   uint32_t failsafeDeferLogMask = 0;      // One-shot failsafe defer reasons logged this boot
+  time_t occupancySessionBootAnchor = 0; // max(start, lastReport) captured at boot for a session open across the restart; 0 = none
 };
 
 /// Connection and service timing constants shared across the state machine.

@@ -93,11 +93,18 @@ WakeVerdict classifyWake(int osResetReason, AB1805 &rtc) {
 
     HibernateWakeDiagnostics::GateInputs &in = v.gateInputs;
     in.resetReasonIsPowerManagement = (osResetReason == RESET_REASON_POWER_MANAGEMENT);
-    in.wakeReasonIsAlarm = (wakeReason == AB1805::WakeReason::ALARM);
     in.rtcReadOk = v.rtcReadOk;
     in.rtcBefore = (int64_t)retainedHibernateRtcBefore;
     in.requestedSleepSec = retainedHibernateRequestedSleep;
     in.rtcAtWake = v.rtcAtWake;
+    // WO-2026-10-04-001 item C: the AB1805 library labels every wake
+    // DEEP_POWER_DOWN once SLST is set and never clears it, so accept that
+    // label when the RTC shows the wake 0 to +60 s after the requested time.
+    // An early wake (a button) or a late wake still fails the gate.
+    const int64_t dpdExpectedWake = in.rtcBefore + (int64_t)in.requestedSleepSec;
+    const bool dpdOnTime = in.rtcReadOk && in.rtcAtWake >= dpdExpectedWake && in.rtcAtWake <= dpdExpectedWake + 60;
+    in.wakeReasonIsAlarm = (wakeReason == AB1805::WakeReason::ALARM) ||
+                           (wakeReason == AB1805::WakeReason::DEEP_POWER_DOWN && dpdOnTime);
 
     using HibernateWakeDiagnostics::GateArm;
     if (!in.resetReasonIsPowerManagement) {

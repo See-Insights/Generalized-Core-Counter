@@ -2,7 +2,7 @@
 
 PROJECT_NAME           = "Generalized-Core-Counter"
 PROJECT_BRIEF          = "Particle-based generalized core counter firmware"
-PROJECT_NUMBER         = "v36-HourRules"
+PROJECT_NUMBER         = "v37-PreStep6Fixes"
 
 # Where to put generated docs
 OUTPUT_DIRECTORY       = docs
