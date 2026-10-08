@@ -78,6 +78,7 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 **After Step 6.**
 - **Ledger content review:** what we send to the status and data ledgers, and why. The STATUS payload is 834 of 896 bytes (62 bytes of headroom), so decide what belongs there, what can be dropped, and what belongs in events instead. Supersedes the separate "ledger headroom" item.
 - **`connecttime` is the previous connection's duration:** the payload is built in Report, before Connect (`State_Report.cpp:69`, `Generalized-Core-Counter.cpp:2028`). Rename it or document it in the payload review.
+- **Widen the reporting-interval storage if a daily cadence is ever needed.** `reportingIntervalSec` is stored as `uint16_t` (`MyPersistentData.h:137`). WO-2026-10-08-001 caps it at 65535 s (about 18.2 h) in ConfigApply's validation.
 - **CI:** run the host test suite (sh via zsh, py via python3) plus the WITH_ACK structural test on every PR via GitHub Actions, so a PR with failing tests can't be merged.
 - **Renaming the webhook event:** its own WO, with a cut-over that never leaves a gap. No name may be a prefix of another.
 - **Occupied courts reporting more often than hourly,** with mid-session reports carrying the session's minutes so far.
