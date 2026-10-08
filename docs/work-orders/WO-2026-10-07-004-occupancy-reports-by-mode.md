@@ -106,8 +106,82 @@ Agents may open a PR and never merge. The two-round rule applies.
 
 **Concern, for the architect to accept or reject (pre-existing, not introduced by this WO):** the CONNECTED+open sleep abort (`State_Sleep.cpp:406-409`, from 2026-01 and 2026-06; WO-002 only swapped its getter) leaves for Idle without resetting `cloudSyncStartMs`. If the mode in use becomes CONNECTED during a gate wait, a later sleep's gate could time out at once. The fix would be the same one line as the controller edit.
 
-## Closing record (to be completed)
+## Closing record (2026-10-08)
 
-- Budget versus actual.
-- The rule table as tested.
-- The release it ships in (suggested: v39).
+**Result:** VERIFIED WITH CONCERNS at Stage 7 round 2 (`docs/work-orders/WO-2026-10-07-004-stage7-round2-verdict.md`), within the two-round rule. **Stage 8 approved** by the architect, pending the bench. **Bench: PASS** (below). **Release: v39** (suggested bundle with WO 1a and later Step 6 WOs; Chip's call).
+
+### Rounds and models
+
+| Stage | Agent / model | Result |
+|---|---|---|
+| Step 0 | Claude Code, separate session, `claude-sonnet-5-5`, `--effort high` | PROCEED: option (B) plus one shared predicate, est. +18 |
+| Stage 6 round 1 | Copilot, `claude-sonnet-5.5`, high | +14; 69/69 |
+| Stage 7 round 1 | Codex, `gpt-5.6-sol`, high | NOT VERIFIED (stale flag on Report early exits, teardown interruption, test copies) |
+| Stage 6 round 2 | Copilot, `claude-sonnet-5.5`, high | 0 net (F1 entry take, F2 `!disconnectRequested`, F3 harness) |
+| Controller edit | Claude Code, pre-authorized; **not a round** | +1: `cloudSyncStartMs = 0;` in the sleep pending exit |
+| Stage 7 round 2 | Codex, `gpt-5.6-sol`, high | VERIFIED WITH CONCERNS; 13/13 mutations caught |
+
+Every model was confirmed with a one-line probe before dispatch (§5).
+
+### Budget versus actual (figures from the Stage 7 round 2 verdict)
+
+| Item | Budget | Raised to (reason) | Actual net `src/` lines | Tests |
+|---|---|---|---|---|
+| Round 1 | +20 WO cap | — | +14 | 68/68 → 69/69 |
+| Round 2 | +6 remaining | — | 0 | 69/69 |
+| Controller edit | inside the cap (pre-authorized) | — | +1 | 69/69; `midgate:` |
+| **WO total** (`400ff48` → branch) | **+20** | — | **+15** (Common +5, Idle +4, Modes 0, Report +1, Sleep +5) | **69/69 (sh via zsh, py via python3)** |
+
+- **Moved lines:** 0 against the base.
+- **Replaced call sites:** 5 one-for-one `reportNow` expressions.
+- **ARM build:** 150956 / 1090 / 2196 (−8 text against `400ff48`).
+
+### The controller edit
+
+- **What:** the sleep-prep pending exit sets `cloudSyncStartMs = 0` before its transition, as the firmware-update exit does.
+- **Why:** without it, leaving mid-gate keeps a stale start time, and the next sleep's gate times out at once. Teardown could then start before the queued occupancy report drains.
+- **How it was found:** Copilot flagged it in round 2, and Claude Code confirmed it in the source.
+- **Verification:**
+  - ELF: zero store at `c2b24`, with `r4` pointing at `handleSleepingState()::cloudSyncStartMs`.
+  - Test: `midgate:`.
+  - Mutation: dropping the line is caught by `midgate:`.
+
+### Rule table as tested (Stage 7 round 2)
+
+`IMM` = an occupancy-triggered Report in that pass. `LATCH` = flag set outside Idle; the first eligible Idle or sleep-prep pass reports. `WAIT` = no flag; waits for the scheduled report.
+
+| Mode in use | Idle start | Idle end | Outside-Idle start | Outside-Idle end | Sleep-wake start | Sleep-wake end |
+|---|---|---|---|---|---|---|
+| KEEP_ALIVE | IMM | IMM | LATCH | LATCH | IMM | IMM |
+| CONNECTED | IMM | IMM | LATCH | LATCH | normally unreachable while open; IMM if reached | normally unreachable while open; IMM if reached |
+| INTERMITTENT | WAIT | WAIT | WAIT | WAIT | WAIT | WAIT |
+| DISCONNECTED | WAIT | WAIT | WAIT | WAIT | WAIT | WAIT |
+| Downgraded KEEP_ALIVE | WAIT | WAIT | WAIT | WAIT | WAIT | WAIT |
+
+- **One report per change:** every Report path (alert-40, config-invalid, service request, offline occupancy, already connected) sends one report per occupancy change and never repeats.
+- **Teardown:** a flag latched after teardown is requested is reported on the first pass after the wake.
+
+### Bench (Chip, Dev-14 on Laptop, KEEP_ALIVE, 2026-10-08)
+
+The log is `2026-10-08 09-05-50 Boron CDC Mode #1.log`. The INTERMITTENT half was skipped by the architect; it is covered by tests and Stage 7.
+
+| Case | Evidence | Result |
+|---|---|---|
+| Occupancy **start** | Last sleep: `0000005646 Sleep: ULP standby=0 reason=scheduled dur=1800s occ=0` (09:09:48). Then `0000214962 Report: occ=1 …` and `StateReq: Report->Connect reason=occupancy change` (about 09:13), roughly 210 s into an 1800 s scheduled sleep, so not the boundary. `ConnSummary: ok elapsed=106016` (cellular re-acquire on Singtel, CloudRecover stage 1), `Connect: ok`. | **PASS**: reported right away and connected. |
+| Occupancy **end** | `0000634840 Occ: state=0 reason=debounce session=420s total=1398s report=1` → `StateReq: Sleep->Report reason=sleep-occupancy-debounce-report` → `0000635282 Report: occ=0` → `Report->Connect reason=occupancy change` → `ConnSummary: ok elapsed=57881`, `Connect: ok`. Compare the 2026-10-07 soak, where the end waited for the 18:00 boundary. | **PASS**: reported right away and connected. |
+
+**Bench notes:**
+- The start's `Occ: state=1` and wake lines fall in the serial gap while USB re-enumerated after the wake. The report timing and the `occupancy change` reason establish the immediate report.
+- The end went through the wake-path check, because the clock was trusted and the LED gate held. The new `occupancy change pending` path was not exercised on the bench; host tests (`soak:`, `latched`, `midgate:`, `teardown:`) and Stage 7 cover it.
+- `LedgerDuplicateStillInflight` appeared on both connects. It is a known observation (WO-2026-10-07-005), unrelated to this WO.
+
+### Known, accepted items
+
+1. **A stale flag after a mode change** (architect, 2026-10-07) produces at most one report, never a repeat. Stage 7 round 2 confirmed this on every Report path.
+2. **The CONNECTED+open sleep abort** (`State_Sleep.cpp:406-409`) does not reset `cloudSyncStartMs`. It predates this WO and is logged in the recovery plan under the alert-44 item; it was deliberately not folded in.
+3. **Test copies:** `occupancy_report_by_mode_test` copies 17 source blocks, verified byte-identical, with a loud `COPY_MISMATCH`. Compiling the real source is a recovery-plan backlog item.
+
+### Remaining for Chip
+
+- Review and merge the PR.
+- Release: v39, bundled as you decide.
