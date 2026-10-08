@@ -78,6 +78,10 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 **After Step 6.**
 - **Ledger content review:** what we send to the status and data ledgers, and why. The STATUS payload is 834 of 896 bytes (62 bytes of headroom), so decide what belongs there, what can be dropped, and what belongs in events instead. Supersedes the separate "ledger headroom" item.
 - **`connecttime` is the previous connection's duration:** the payload is built in Report, before Connect (`State_Report.cpp:69`, `Generalized-Core-Counter.cpp:2028`). Rename it or document it in the payload review.
+- **Widen the reporting-interval storage if a daily cadence is ever needed.** `reportingIntervalSec` is stored as `uint16_t` (`MyPersistentData.h:137`). WO-2026-10-08-001 caps it at 65535 s (about 18.2 h) in ConfigApply's validation.
+- **All-or-nothing config apply (possible later WO).** `applyConfigurationFromLedger()` (`ConfigApply.cpp:132-139`) applies each section's valid fields, then combines the results. So a ledger update with one out-of-range value applies everything else and keeps only that field's old value. WO-2026-10-08-001 accepted this as existing behaviour. Validate every section first if all-or-nothing is ever wanted.
+- **Compute the failsafe jitter once at boot.** `connectivityFailsafeJitterSec()` (`Generalized-Core-Counter.cpp:386-400`) builds a `String` from `System.deviceID()` on every call. Since WO-2026-10-08-001 moved the cadence rule below the cooldown check (`:2648`), long-cadence devices make that call on every loop pass while they wait out their extended threshold. Main already does the same for any device past 3 h in open hours. The value is a deterministic hash of the device ID, so compute it once at boot.
+- **The cadence-shortening gap in the failsafe** (WO-2026-10-08-001, accepted edge). The threshold (cadence + 3 h when the cadence is ≥ 3 h) uses only the *current* cadence. If the battery recovers and the cadence shortens (for example from 12× to 1×) after age has passed 3 h, the failsafe can reset before Report gets its first chance on the new schedule. It isn't a regression against main, which resets at 3 h anyway. Closing it needs a stored "cadence since the last connection", which is new state.
 - **CI:** run the host test suite (sh via zsh, py via python3) plus the WITH_ACK structural test on every PR via GitHub Actions, so a PR with failing tests can't be merged.
 - **Renaming the webhook event:** its own WO, with a cut-over that never leaves a gap. No name may be a prefix of another.
 - **Occupied courts reporting more often than hourly,** with mid-session reports carrying the session's minutes so far.
@@ -106,6 +110,15 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
   - **Background:** Device OS 6.4.1 exposes no inbound-pending signal (WO-2026-10-07-005 evidence). The question has been asked on the Particle forum.
   - **Implementation is a later WO.**
 - **Host tests that copy source:** `connection_mode_downgrade_test` (WO-2026-10-07-002) and `occupancy_report_by_mode_test` (WO-2026-10-07-004) extract code blocks from `src/` into the test rather than compiling the real files, so they can drift from the source. Switch them to compiling the real source the next time the test harness is touched.
+- **Court3's daytime failsafe resets** (v36, 4 and 5 Oct; reset 140, data 2, `failsafeStage 2`): Court3 runs connectionMode 3 (KEEP_ALIVE, the product default). It reconnects through CONNECTING on every wake, which refreshes `lastConnection`. Its resets ended **real connectivity silences**; they were not healthy-device resets from the CONNECTED-online gap found in WO-2026-10-08-001 (Chip, 2026-10-08).
+- **Failsafe flash churn at stage 0** (WO-2026-10-08-001 Step 0 addendum §5):
+  - **Where:** at stage 0 the cooldown test (`Generalized-Core-Counter.cpp:2651`) doesn't apply. So while the low-battery block (`:2661-2664`) keeps firing, with age ≥ 3 h, Open, on battery with a downgrade or SURVIVAL, `persistConnectivityFailsafeState(..., now, false)` (`:2674`) runs `SystemConfig::flushNow()` (`:404-413`) on every loop pass.
+  - **Bound:** about one flash write per second, since `setValue` dirties the file only when `now` changes. At stage ≥ 1 the 6 h cooldown bounds it.
+  - **Not yet measured:** flash wear and how long the loop stays awake.
+- **`reportingIntervalSec` truncation** (WO-2026-10-08-001 Step 0 addendum §4):
+  - **The wrap:** `ConfigApply.cpp:265` accepts 300–86400 s, but the store is `uint16_t` (`MyPersistentData.h:137`). So 65536–86400 wraps; for example 86400 is stored as 20864.
+  - **Rewritten on every apply:** the comparison at `ConfigApply.cpp:266` (`uint16_t` against `int`) never matches a wrapped value, so the value is rewritten on every config apply (INF).
+  - **Ruling pending:** the wrap is on the 1b fix's input path, and the architect's ruling on capping the range at 65535 is pending. The `uint16_t intervalSec` locals in `State_Idle.cpp` and `State_Sleep.cpp` lose nothing, since the source is already `uint16_t`.
 
 ## Guardrails (`AI_DEVELOPMENT_WORKFLOW.md` §12)
 

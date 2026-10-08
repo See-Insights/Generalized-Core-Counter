@@ -276,6 +276,8 @@ void handleReportingState() {
       transitionTo(IDLE_STATE, "not aligned");
     }
   } else {
+    // An online device has a working cloud connection; Connect never runs for it.
+    SystemConfig::set_lastConnection(Time.now());
     transitionTo(IDLE_STATE, "already connected");
   }
 
