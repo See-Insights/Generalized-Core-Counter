@@ -16,6 +16,13 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v39-OccupancyReports] - 2026-10-08
+
+### Changed
+
+- **The configured connection mode is never overwritten by a battery downgrade** (WO-2026-10-07-002, PR #72). The device works out the mode it uses from the configured mode plus any active downgrade. When the downgrade ends, it returns to exactly what the ledger says, and re-applying the config while downgraded no longer flip-flops. `battery.lowBatteryMode` in device-status now means "downgrade active" (OCCUPANCY, configured KEEP_ALIVE, and the low-battery flag set). The key name is unchanged.
+- **Occupancy changes report by mode** (WO-2026-10-07-004, PR #75). In KEEP_ALIVE and CONNECTED, every occupancy change, start or end, reports immediately, including a change caught outside Idle or during sleep prep. INTERMITTENT, DISCONNECTED and battery-downgraded devices report on schedule. Expect one extra report per occupancy session (the end), and never a repeat for the same change.
+
 ## [v38-EventAlertsClear] - 2026-10-06
 
 ### Changed
