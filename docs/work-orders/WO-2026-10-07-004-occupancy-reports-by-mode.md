@@ -77,6 +77,24 @@ Agents may open a PR and never merge. The two-round rule applies.
 
 **Bench note (Chip):** Dev-14 is still in INTERMITTENT because the ledger restore hasn't landed. Flashing the WO-004 build reboots it, which gives the restore another chance at the boot connection. If it still doesn't land, the KEEP_ALIVE half of the bench waits on WO-005. The INTERMITTENT half (no immediate report; the flag is paid at the boundary) can run as is.
 
+## Stage 7 round 1, Stage 6 round 2 and the controller edit (2026-10-08)
+
+- **Stage 7 round 1** (Codex, `gpt-5.6-sol`, high): **NOT VERIFIED.** Three findings:
+  1. the flag survived Report's early exits (repeat reports, and a loop when the config is invalid);
+  2. the sleep-prep check could interrupt a teardown already underway;
+  3. the test copies weren't byte-identical, and the soak test didn't follow the real order.
+- **Round 2 approved** (architect, 2026-10-08), using existing patterns only:
+  - **F1:** Report takes the flag right after `publishData()`, as it does for service requests; the `:275` clear is removed.
+  - **F2:** the sleep-prep check moves below `disconnectRequested` and acts only while it is false.
+  - **F3:** byte-identical copies, source-order passes, and no-repeat, teardown and connected-once tests.
+- **Stage 6 round 2** (Copilot, `claude-sonnet-5.5`, high): net 0 lines this round, WO total +14. Tests 69/69 (sh via zsh, py via python3).
+- **Controller edit** (Claude Code, pre-authorized by the architect; **not a round**):
+  - **What:** the sleep pending exit now sets `cloudSyncStartMs = 0` before its transition, matching the firmware-update exit. Copilot flagged the gap; Claude Code confirmed it in the source.
+  - **Why:** leaving mid-gate with a stale start time made the next sleep's gate time out at once, so it could tear down without draining the queued occupancy report.
+  - **Size and test:** +1 line, bringing the WO total to **+15**. Test "midgate:", with a mutation that drops the line, caught by `midgate:`.
+  - **Checks after the edit:** fresh-path ARM build 150956 / 1090 / 2196 (unchanged text: the store shares the firmware-update exit's tail); ELF shows the zero store at `c2b24`. Suite 69/69.
+- **Not this cause:** the Dev-14 false alert 44 (recovery plan). That gate waited the full 70 s.
+
 ## Closing record (to be completed)
 
 - Budget versus actual.
