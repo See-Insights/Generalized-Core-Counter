@@ -8,7 +8,7 @@ This repository includes key documentation files that contributors and AI coding
 
 # Generalized-Core-Counter
 
-**Version:** v39-OccupancyReports | **Latest:** Configured connection mode never overwritten by a downgrade; occupancy changes report immediately in KEEP_ALIVE and CONNECTED
+**Version:** v40-FailsafeAndSensorType | **Latest:** Failsafe counts only overdue expected connections; ledger sensor.type reaches sensor creation; config range checks raise alert 41
 
 Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v14 release packages cloud recovery tuning and release-safe logging cleanup without changing the existing production power, sleep, connectivity, watchdog, ledger, or PMIC behavior.
 
