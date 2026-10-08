@@ -95,6 +95,9 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 - **Dev-09 raised one stale alert 41** after its test setting was reverted: it applied its stale local copy before the reverted settings synced.
 - **A missing occupancy start report after a restart** (three times). Check whether v37's item B changes it (4 Oct Codex report §B).
 - **Duplicate deliveries:** with the fleet-ops agent (handover document, WO-2026-09-25-004). Moved here from the Phase 4 list.
+- **A false alert 44 after a boot clock step** (Dev-14, PR #72 build, 2026-10-08). `ClockResync: sync advanced` at `0005171470`, then `GateFail: reason=ledger timeout=70000` and `raising alert 44` at `0005240897`–`0005240899`. The `LedgerSleepTimeout` line shows `pendingData=0 pendingStatus=0`, with `dataUpd=414217309 > dataSync=414210391` and `statusSync > statusUpd`. Log: `2026-10-07 17-12-25 Boron CDC Mode #1.log`. Cause not yet traced.
+- **A once-a-day config window for INTERMITTENT** (decision to record). In INTERMITTENT, ledger configuration is picked up only when the device connects for a scheduled report, so a ledger change (such as WO-002's restore) can wait a long time. Whether to add a once-a-day config window is the open decision. See WO-2026-10-07-005's evidence for the sleep gate and inbound syncs.
+- **Host tests that copy source:** `connection_mode_downgrade_test` (WO-2026-10-07-002) and `occupancy_report_by_mode_test` (WO-2026-10-07-004) extract code blocks from `src/` into the test rather than compiling the real files, so they can drift from the source. Switch them to compiling the real source the next time the test harness is touched.
 
 ## Guardrails (`AI_DEVELOPMENT_WORKFLOW.md` §12)
 

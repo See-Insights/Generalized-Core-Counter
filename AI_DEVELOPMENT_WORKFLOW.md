@@ -68,6 +68,7 @@ nothing elsewhere in this document or the repository overrides it.
 
 - Must not modify production source code, except narrow edits Chip pre-authorizes case by case, with the scope stated.
 - Must not commit, push, merge, or release code.
+- Exception (Chip, 2026-10-08): Claude Code commits and pushes each WO's records (the WO file, dispatches, reports and verdicts) on the WO branch at the end of each stage, and opens the WO's PR after the architect's Stage 8. Only Chip merges.
 - Must not merge pull requests. Agents may open PRs; only the user merges. A request to "open a PR" never includes merging. (Added 2026-10-02: the v33 PR was merged when only opening it was intended.)
 - Must not operate, configure, restart, or update Fleet devices.
 - Fleet Ops access must be read-only.
