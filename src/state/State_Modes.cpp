@@ -77,10 +77,10 @@ void handleOccupancyMode() {
         debounceSeconds = 60;  // Minimum 60 second debounce for occupancy
       }
       signalLED(true, debounceSeconds * 1000UL);  // Turn on LED until debounce expires
-      const bool reportNow = (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
+      const bool reportNow = reportsOccupancyChangesNow();
       logOccupiedEvent("pir", debounceSeconds, reportNow);
       
-      // In INTERMITTENT_KEEP_ALIVE mode, report immediately on occupancy state changes
+      // In INTERMITTENT_KEEP_ALIVE and CONNECTED modes, report immediately on occupancy state changes
       // This allows dashboard to show real-time occupancy transitions
       if (reportNow) {
         session.occupancyChangeTriggered = true;
@@ -140,7 +140,7 @@ void updateOccupancyState() {
 
   // Check if debounce timeout has expired
   if (timeSinceLastEvent > debounceMs) {
-    const bool reportNow = (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
+    const bool reportNow = reportsOccupancyChangesNow();
     const OccupancyCloseResult closeResult = closeOccupancySessionSafely("modes");
     if (closeResult.valid) {
       logUnoccupiedEvent("debounce", closeResult.sessionSeconds, closeResult.totalSeconds, reportNow);
@@ -148,7 +148,7 @@ void updateOccupancyState() {
 
     signalLED(false);  // Turn off LED
     
-    // In INTERMITTENT_KEEP_ALIVE mode, report immediately on occupancy state changes
+    // In INTERMITTENT_KEEP_ALIVE and CONNECTED modes, report immediately on occupancy state changes
     // This allows dashboard to show real-time occupancy transitions
     if (reportNow && !closeResult.stillOpen) {
       session.occupancyChangeTriggered = true;

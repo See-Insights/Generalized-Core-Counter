@@ -148,9 +148,9 @@ mutate_and_expect_failure "config apply compares against lowBatteryMode" \
 # Mutation 4: a connect-path reader reads the configured getter (structural).
 mkdir -p "$work/m4"
 cp -R "$repo_root/src" "$work/m4/src"
-plant "$repo_root/src/state/State_Sleep.cpp" "$work/m4/src/state/State_Sleep.cpp" \
-  "const bool reportNow = (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);" \
-  "const bool reportNow = (SystemConfig::get_configuredConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);"
+plant "$repo_root/src/state/State_Common.h" "$work/m4/src/state/State_Common.h" \
+  "const uint8_t mode = PowerManager::instance().effectiveConnectionMode();" \
+  "const uint8_t mode = SystemConfig::get_configuredConnectionMode();"
 python3 "$repo_root/tests/connection_mode_downgrade_structural_test.py" "$repo_root/src" >/dev/null
 if python3 "$repo_root/tests/connection_mode_downgrade_structural_test.py" "$work/m4/src" >/dev/null 2>&1; then
   echo "FAIL (mutation): 'connect-path reader uses the configured getter' was NOT detected" >&2

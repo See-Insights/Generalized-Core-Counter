@@ -56,14 +56,14 @@ void handleIdleState() {
 
       if (timeSinceLastEvent >= debounceMs) {
         // Debounce timeout expired - space is now unoccupied
-        const bool reportNow = (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
+        const bool reportNow = reportsOccupancyChangesNow();
         const OccupancyCloseResult closeResult = closeOccupancySessionSafely("idle");
         signalLED(false);  // Turn off LED
         if (closeResult.valid) {
           logUnoccupiedEvent("debounce", closeResult.sessionSeconds, closeResult.totalSeconds, reportNow);
         }
         
-        // In INTERMITTENT_KEEP_ALIVE mode (connectionMode 3), report immediately
+        // In INTERMITTENT_KEEP_ALIVE and CONNECTED modes, report immediately
         // on occupancy transitions. In other modes, occupancy transitions are
         // still tracked, but do not force an immediate report/connect.
         if (reportNow && !closeResult.stillOpen) {
@@ -80,6 +80,13 @@ void handleIdleState() {
     } else if (!CurrentReadings::get_occupied() && signalLEDStatus()) {
       signalLED(false);  // Ensure LED off when unoccupied
     }
+  }
+
+  // A change latched while not in Idle (main-loop handler, or CONNECTED, which
+  // does not sleep while open) goes out from the first Idle pass.
+  if (session.occupancyChangeTriggered) {
+    transitionTo(REPORTING_STATE, "occupancy change pending");
+    return;
   }
 
   // If configuration changes (for example, device-settings ledger updates)

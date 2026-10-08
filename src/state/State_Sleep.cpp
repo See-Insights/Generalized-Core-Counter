@@ -488,6 +488,17 @@ void handleSleepingState() {
     return;
   }
 
+  // An occupancy change latched after the last wake decision (for example by
+  // the main-loop handler while already SLEEPING) reports before any
+  // sleep-or-suppress decision below can commit to sleep. Once this span has
+  // requested teardown it stays latched and reports on the first pass after
+  // the wake, so Report/Connect never starts while the disconnect is in flight.
+  if (session.occupancyChangeTriggered && !disconnectRequested) {
+    cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
+    transitionTo(REPORTING_STATE, "occupancy change pending");
+    return;
+  }
+
   // Only wait for cloud operations *before* requesting disconnect.
   if (Particle.connected() && !disconnectRequested) {
     // Initialize timer on first check
@@ -1635,15 +1646,15 @@ void handleSleepingState() {
     // This ensures we don't immediately undo state changes from PIR processing
     if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
       // LED timeout expired - debounce period elapsed without motion
-      const bool reportNow = (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
+      const bool reportNow = reportsOccupancyChangesNow();
       const OccupancyCloseResult closeResult = closeOccupancySessionSafely("sleep");
       signalLED(false);  // Turn off LED
       if (closeResult.valid) {
         logUnoccupiedEvent("debounce", closeResult.sessionSeconds, closeResult.totalSeconds, reportNow);
       }
       
-      // Match the rest of the occupancy state machine: only KEEP_ALIVE mode
-      // forces an immediate report/connect on occupancy transitions.
+      // Match the rest of the occupancy state machine: only KEEP_ALIVE and
+      // CONNECTED force an immediate report/connect on occupancy transitions.
       if (reportNow && !closeResult.stillOpen) {
         session.occupancyChangeTriggered = true;
         transitionTo(REPORTING_STATE, "sleep-occupancy-debounce-report");
@@ -1716,11 +1727,11 @@ void handleSleepingState() {
             debounceMs = Config::occupancyDebounceMsForRuntime();
           }
           signalLED(true, debounceMs);
-          const bool reportNow = (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE);
+          const bool reportNow = reportsOccupancyChangesNow();
           logOccupiedEvent("pir-wake", debounceMs / 1000UL, reportNow);
           
-          // Match the rest of the occupancy state machine: only KEEP_ALIVE mode
-          // forces an immediate report/connect on occupancy transitions.
+          // Match the rest of the occupancy state machine: only KEEP_ALIVE and
+          // CONNECTED force an immediate report/connect on occupancy transitions.
           if (reportNow) {
             session.occupancyChangeTriggered = true;
             setAppBreadcrumb(5);

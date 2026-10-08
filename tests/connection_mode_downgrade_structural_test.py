@@ -47,11 +47,12 @@ CONFIGURED_READERS = {
 
 EFFECTIVE_READERS = {
     "state/State_Connect.cpp": 1,
-    "state/State_Sleep.cpp": 10,
-    "state/State_Idle.cpp": 7,
+    "state/State_Sleep.cpp": 8,
+    "state/State_Idle.cpp": 6,
     "state/State_Report.cpp": 2,
     "state/State_Error.cpp": 1,
-    "state/State_Modes.cpp": 2,
+    "state/State_Common.h": 1,
+    "state/State_Modes.cpp": 0,
     "Generalized-Core-Counter.cpp": 1,
     "diagnostics/ConnectivityFailsafeTest.cpp": 2,
 }
