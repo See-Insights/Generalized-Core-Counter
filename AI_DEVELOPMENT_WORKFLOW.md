@@ -21,7 +21,7 @@ nothing elsewhere in this document or the repository overrides it.
 | Role | Who | Does | Never |
 |---|---|---|---|
 | Architect | Claude, in the Claude app chat | Authors and revises Work Orders; makes design decisions together with Chip; recommends model tiers | Approves its own architecture; commits, pushes, merges, or operates devices |
-| Workflow controller | Claude Code | Dispatches Copilot and Codex through their CLIs; runs read-only investigation (repository, Fleet Ops, telemetry); runs builds and tests; performs workflow completeness checks; makes narrow edits only when pre-authorized case by case | Commits, pushes, merges, releases, or operates devices |
+| Workflow controller | Claude Code | Dispatches Copilot and Codex through their CLIs; runs read-only investigation (repository, Fleet Ops, telemetry); runs builds and tests; performs workflow completeness checks; makes narrow edits only when pre-authorized case by case; commits and pushes each WO's records on the WO branch at the end of each stage; after the architect's Stage 8, commits the verified implementation and opens the WO's PR | Commits unverified source; merges, releases, or operates devices |
 | Pre-approval investigator (Stage 4) | Codex | Independent investigation of the evidence and the proposed architecture, before approval | Rewrites the Architect's proposal; edits source; merges |
 | Implementer (Stage 6) | GitHub Copilot | Implements the approved Work Order as an uncommitted working-tree diff | Changes the approved architecture; commits, pushes, or merges |
 | Verifier (Stage 7) | Codex | Adversarial verification of the diff against the Work Order, including mutation checks | Makes lasting source edits (mutations are restored byte-identically); commits, pushes, or merges |
@@ -67,8 +67,11 @@ nothing elsewhere in this document or the repository overrides it.
 **Restrictions:**
 
 - Must not modify production source code, except narrow edits Chip pre-authorizes case by case, with the scope stated.
-- Must not commit, push, merge, or release code.
-- Exception (Chip, 2026-10-08): Claude Code commits and pushes each WO's records (the WO file, dispatches, reports and verdicts) on the WO branch at the end of each stage, and opens the WO's PR after the architect's Stage 8. Only Chip merges.
+- Commits and pushes only (Chip, 2026-10-08):
+  - each WO's records (the WO file, dispatches, reports and verdicts) on the WO branch at the end of each stage;
+  - the verified implementation, when it opens the WO's PR after the architect's Stage 8.
+
+  Must not merge or release code.
 - Must not merge pull requests. Agents may open PRs; only the user merges. A request to "open a PR" never includes merging. (Added 2026-10-02: the v33 PR was merged when only opening it was intended.)
 - Must not operate, configure, restart, or update Fleet devices.
 - Fleet Ops access must be read-only.
