@@ -145,9 +145,10 @@ void set_lastTimeSync(time_t value);
 
 // *************** Operating modes ***************
 
-/// sysStatus-level sensor type (0 = pressure, 1 = PIR). Distinct from
-/// SensorSettings::get_sensorType(), which is the /usr/sensor.dat field -
-/// Finding 3 requires the two stay distinct.
+/// Legacy sysStatus-level sensor type, kept only for the persisted layout.
+/// Sensor creation reads SensorSettings::get_sensorType() (the
+/// /usr/sensor.dat field, which the ledgers write) - Finding 3 requires the
+/// two stay distinct.
 uint8_t get_sensorType();
 void set_sensorType(uint8_t value);
 

@@ -54,4 +54,37 @@ At most **+20** net `src/` lines; **about +2 expected** (two getter swaps, one v
   - **Where the causes are recorded:** both are in CHANGELOG "Unreleased" for v40.
   - **Options:** the architect may still want the one-line note.
 
-## Closing record (to be completed)
+## Closing record (2026-10-08)
+
+**Result: VERIFIED WITH CONCERNS** at Stage 7 round 1 (`WO-2026-10-08-002-stage7-verdict.md`). **Stage 8 approved** by the architect. It ships in **v40** together with WO 1b.
+
+### Rounds and models
+
+| Stage | Agent / model | Result |
+|---|---|---|
+| Step 0 | Claude Code, separate session, `claude-sonnet-5-5`, `--effort high` | PROCEED, fix A (never worked; no restore). Migration gate checked: default `sensor.type` 1, no device overrides |
+| Stage 6 | Copilot, `claude-sonnet-5.5`, medium | +1; 72/72 → 73/73 |
+| Stage 7 | Codex, `gpt-5.6-sol`, medium | VERIFIED WITH CONCERNS; one low finding (F1) |
+
+Every model was confirmed with a one-line probe (§5).
+
+### What changed
+
+- **Sensor creation reads the ledger-written store.** `SensorManager.cpp:307` and `Generalized-Core-Counter.cpp:1127` call `SystemConfig::SensorSettings::get_sensorType()`. The `sysStatus.sensorType` field stays as an unused legacy field, kept for the layout. Its only production reader is the dead `sensorISR`, left for WO 2a.
+- **`sensor.type` validated to 1** (`ConfigApply.cpp:351`). Other values are rejected; the field keeps its value, the apply reports failure, and alert 41 is raised at connect. Other fields still apply, as accepted in WO 1b.
+- **A type change takes effect at the next reboot** (ruling 2).
+- **F1 (low), the alert reference:** resolved at Stage 8. The architect added the line to alert 41 in `docs/reference/alert-codes.md`: "Common causes from v40: `reportingIntervalSec` above 65535; `sensor.type` other than 1." Docs only, not a round.
+
+### Budget versus actual
+
+| Item | Budget | Raised to (reason) | Actual net `src/` lines | Tests |
+|---|---|---|---|---|
+| WO-2026-10-08-002 | +20 (about +2 expected) | — | **+1** (8 added, 7 removed) | **73/73 (sh via zsh, py via python3)**; 2 new tests; 4 of 4 mutations caught |
+
+ARM build: 151004 / 1090 / 2196 (−24 text against main `23ccd81`).
+
+### Migration and release
+
+- **Migration gate (2026-10-08):** `default-settings.sensor.type` is 1, and no `device-settings` instance sets `sensor`. **Repeat before the v40 OTA** (recovery plan, "Rollout and follow-ups").
+- **Release:** v40, with WO 1b. CHANGELOG "Unreleased" carries both lines.
+- **Bench:** none for this WO. With the fleet all at type 1, behaviour is unchanged. The v40 soak covers it.

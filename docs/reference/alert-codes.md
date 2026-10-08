@@ -41,7 +41,7 @@ The code is persisted in `/usr/current.dat` (`MyPersistentData.h:684`), so it su
 | 31 | failed to connect to cloud | Connection attempt exceeded its budget (C:666) | 2 (:881) | v3.09 | event | Report; a successful connection (C:539–540); E:128–130 |
 | 32 | connect taking too long | Not raised | 2 (:882) | — | — | — |
 | 40 | repeated webhook failures | Webhook response timeout (G:1692); no successful response for over 3 h in open hours (R:116); no webhook response before sleep (S:640) | 2 (:883) | v3.09 | condition | Any non-empty webhook response (G:2412–2414) |
-| 41 | config / ledger apply failure | Configuration apply failed at connect (C:566) | 2 (:884) | v3.09 | event | Report |
+| 41 | config / ledger apply failure | Configuration apply failed at connect (C:566). Common causes from v40: `reportingIntervalSec` above 65535; `sensor.type` other than 1. | 2 (:884) | v3.09 | event | Report |
 | 42 | data ledger publish failure, **or** OTA updates pending | Report's data-ledger publish failed (G:2114); ConnectState's data-ledger publish failed (C:574); OTA updates pending at the sleep gate (S:637) | 2 (:885) | v3.09 | event | **Report once, then clear, since v38** (`isAutoClearAfterReportAlert()`). **Before v38: never** (no clear site), so a device on older firmware keeps 42. For "OTA updates pending", the sleep gate raises it again on each timeout while the update is pending (S:506, S:635–637). |
 | 43 | publish queue not drained before sleep | S:628 | 2 (:886) | v3.09 | event | Report |
 | 44 | ledger sync timeout before sleep | S:634 | 1 (:888–889) | v3.12 (`15db55c`) | event | Report; after the boot status event (G:1406–1408) |

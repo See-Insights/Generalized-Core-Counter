@@ -1124,7 +1124,7 @@ void setup() {
   // Ensure sensor-board LED power default matches configured sensor type
   // TODO: Consider moving this sensor-specific logic to device_pinout.cpp or SensorManager
   pinMode(ledPower, OUTPUT);
-  SensorType configuredType = static_cast<SensorType>(SystemConfig::get_sensorType());
+  SensorType configuredType = static_cast<SensorType>(SystemConfig::SensorSettings::get_sensorType());
   const SensorDefinition* sensorDef = SensorDefinitions::getDefinition(configuredType);
   if (sensorDef && sensorDef->ledDefaultOn) {
     digitalWrite(ledPower, HIGH);

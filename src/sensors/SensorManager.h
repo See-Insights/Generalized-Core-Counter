@@ -89,7 +89,7 @@ public:
     /**
      * @brief Create and initialize the active sensor based on configuration.
      *
-     * Uses SystemConfig::get_sensorType() and SensorFactory to select the
+     * Uses SystemConfig::SensorSettings::get_sensorType() and SensorFactory to select the
      * concrete implementation, then calls the sensor's initializeHardware().
      */
     void initializeFromConfig();
