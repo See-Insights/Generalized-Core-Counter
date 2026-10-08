@@ -34,4 +34,14 @@ WO total ≤ **+20** net `src/` lines; **+10 expected**. Going over means stop a
 - Every model is confirmed with a one-line probe (§5).
 - The two-round rule applies.
 
+## Pre-ruling for Stage 7 (architect, 2026-10-08)
+
+**Alert 41 on an over-range `reportingIntervalSec` is accepted**, provided Codex confirms both of these:
+1. other out-of-range values already reject the whole config apply in the same way;
+2. the device keeps its last good configuration, rather than defaults or a partial apply.
+
+If either fails, it is a round-2 finding. Otherwise the closing record lists it as an accepted behaviour change, with a CHANGELOG line for v40.
+
+*Claude Code's note before the verdict:* `applyConfigurationFromLedger()` (`ConfigApply.cpp:133-140`) runs all six sections before combining their results. So within one ledger update, valid fields are applied and only the rejected field keeps its previous value. Condition 2 needs Codex's judgement on whether that counts as a "partial apply". It is how every field behaves today.
+
 ## Closing record (to be completed)
