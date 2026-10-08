@@ -95,6 +95,17 @@ Agents may open a PR and never merge. The two-round rule applies.
   - **Checks after the edit:** fresh-path ARM build 150956 / 1090 / 2196 (unchanged text: the store shares the firmware-update exit's tail); ELF shows the zero store at `c2b24`. Suite 69/69.
 - **Not this cause:** the Dev-14 false alert 44 (recovery plan). That gate waited the full 70 s.
 
+## Stage 7 round 2 (2026-10-08)
+
+**VERIFIED WITH CONCERNS** (Codex, `gpt-5.6-sol`, high; `docs/work-orders/WO-2026-10-07-004-stage7-round2-verdict.md`).
+
+- **Checks:** all round-1 checks and all round-2 checks pass, including no repeat on every Report path, the teardown gate, the controller edit (confirmed in the ELF), byte-identical copies (17 blocks), and 13 of 13 mutations caught.
+- **Tests:** 69/69 (sh via zsh, py via python3).
+- **ARM build:** 150956 / 1090 / 2196 (−8 text against `400ff48`).
+- **WO total:** +15 against +20.
+
+**Concern, for the architect to accept or reject (pre-existing, not introduced by this WO):** the CONNECTED+open sleep abort (`State_Sleep.cpp:406-409`, from 2026-01 and 2026-06; WO-002 only swapped its getter) leaves for Idle without resetting `cloudSyncStartMs`. If the mode in use becomes CONNECTED during a gate wait, a later sleep's gate could time out at once. The fix would be the same one line as the controller edit.
+
 ## Closing record (to be completed)
 
 - Budget versus actual.
