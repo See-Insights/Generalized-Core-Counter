@@ -10,12 +10,19 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- **Over-range reporting interval raises alert 41** (WO-2026-10-08-001). `timing.reportingIntervalSec` is now validated to 300–65535 s, the range its storage can hold. A larger value is rejected rather than silently wrapped (86400 used to become 20864 s), so the config apply reports failure and alert 41 is raised on each connection while the ledger holds it. Valid fields in the same update still apply, and the interval keeps its previous value.
-- **`sensor.type` from the ledgers now chooses the sensor** (WO-2026-10-08-002). Sensor creation reads the ledger-configured `sensor.type`; before this it read a legacy field that only ever held its default of 1. `sensor.type` is validated to 1 (PIR, the only sensor built today); other values are rejected at config apply. A type change takes effect at the **next reboot**, not at config apply.
+- (none)
 
 ### Fixed
 
 - (none)
+
+## [v40-FailsafeAndSensorType] - 2026-10-08
+
+### Changed
+
+- **The connectivity failsafe counts only overdue expected connections** (WO-2026-10-08-001, PR #77). When the effective reporting cadence is 3 h or more (a battery multiplier or a long configured interval), the failsafe waits until the connection age reaches cadence + 3 h before escalating; with shorter cadences it stays at 3 h, as in v32. A CONNECTED device that stays online now refreshes `lastConnection` at each report, so it is no longer reset every 3 open hours. Alert 40's "connected recently" test now covers such devices.
+- **Over-range reporting interval raises alert 41** (WO-2026-10-08-001, PR #77). `timing.reportingIntervalSec` is now validated to 300–65535 s, the range its storage can hold. A larger value is rejected rather than silently wrapped (86400 used to become 20864 s), so the config apply reports failure and alert 41 is raised on each connection while the ledger holds it. Valid fields in the same update still apply, and the interval keeps its previous value.
+- **`sensor.type` from the ledgers now chooses the sensor** (WO-2026-10-08-002, PR #78). Sensor creation reads the ledger-configured `sensor.type`; before this it read a legacy field that only ever held its default of 1. `sensor.type` is validated to 1 (PIR, the only sensor built today); other values are rejected at config apply. A type change takes effect at the **next reboot**, not at config apply.
 
 ## [v39-OccupancyReports] - 2026-10-08
 
