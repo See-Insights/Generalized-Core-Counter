@@ -67,4 +67,49 @@ Agents: Copilot, Sonnet tier, medium; Codex, `gpt-5.6-sol`, high.
 - **Low:** the test retypes the stale-return line rather than extracting it; it is checked by location and order.
 - **Two-round rule:** this was the last round. The WO stops unless the architect accepts both edges.
 
-## Closing record (to be completed)
+## Closing record (2026-10-08)
+
+**Result: Stage 7 NOT VERIFIED** in round 2, the last under the two-round rule, on two edges. **The architect accepted both and approved Stage 8**, because neither is a regression against main and edge 2 would need new state. Every check, test and mutation in Stage 7 round 2 passed, with no survivors. The WO ships in **v40** together with 1c.
+
+### Rounds and models
+
+| Stage | Agent / model | Result |
+|---|---|---|
+| Step 0 + addendum | Claude Code, separate session `2291df78`, `claude-sonnet-5-5`, `--effort high` | PROCEED after the rulings (est. +10) |
+| Stage 6 round 1 | Copilot, `claude-sonnet-5.5`, medium | +9; 72/72 |
+| Stage 7 round 1 | Codex, `gpt-5.6-sol`, high | NOT VERIFIED: partial config apply (accepted as existing behaviour, option a); cadence test re-implemented the formula; cost of `resolveRuntime()` |
+| Stage 6 round 2 | Copilot, `claude-sonnet-5.5`, medium | 0 net (rule moved below the stage and cooldown returns; test drives the real block) |
+| Stage 7 round 2 | Codex, `gpt-5.6-sol`, high | NOT VERIFIED on two edges, **accepted by the architect** |
+
+Every model was confirmed with a one-line probe (§5).
+
+### What changed
+
+- **Cadence rule** (`Generalized-Core-Counter.cpp`, `connectivityFailsafeSupervisor()`, after the stage and cooldown returns): when the effective cadence (`resolveRuntime(...).effectiveIntervalSec`) is ≥ 3 h, the failsafe waits until age reaches cadence + 3 h; otherwise 3 h, as in v32. It applies in every mode and is compiled out of the failsafe test build.
+- **CONNECTED fix, option (b)** (`State_Report.cpp`, the `already connected` branch): refreshes `lastConnection`. The accepted side effect is that alert 40's "connected recently" now covers CONNECTED-online devices.
+- **Interval cap** (`ConfigApply.cpp`): `reportingIntervalSec` is validated to 300–65535. Over-range values are rejected, which raises alert 41 on each connection while the ledger holds one. This is an accepted behaviour change, and CHANGELOG "Unreleased" carries the line for v40.
+
+### Budget versus actual (from the Stage 7 verdicts)
+
+| Item | Budget | Raised to (reason) | Actual net `src/` lines | Tests |
+|---|---|---|---|---|
+| Round 1 | +20 WO cap | — | +9 (physical +15) | 69/69 → 72/72 |
+| Round 2 | 0 (move) | — | 0 (13 physical lines moved) | 72/72 |
+| **WO total** | **+20** (+10 expected) | — | **+9** | **72/72 (sh via zsh, py via python3)**; 3 new test pairs; all mutations caught |
+
+ARM build: 151028 / 1090 / 2196 (+72 text against v39). The failsafe test-mode build has no cadence rule.
+
+### Accepted items
+
+1. **Per-field config apply** (round 1, option a): within one update, valid fields apply and a rejected field keeps its old value. This is existing behaviour. "All-or-nothing config apply" is in the recovery plan.
+2. **Edge 1 (round 2):** a per-pass `String` allocation in `connectivityFailsafeJitterSec()` for long-cadence devices waiting out the extended threshold. It isn't a regression against main. Recovery plan: compute the jitter once at boot.
+3. **Edge 2 (round 2):** the cadence-shortening gap. The threshold uses the current cadence only. It isn't a regression against main, and closing it needs new state. Logged in the recovery plan.
+4. **Test scope (low):** the stale-return line is retyped in the test and checked by location and order.
+
+### Bench: deferred to the v40 soak
+
+One device in **CONNECTED (`connectionMode` 0)** for **at least 4 open hours**. **Expected:** no failsafe reset (no reset 140 with data 2), and `lastConnection` keeps refreshing at each online report. The cadence rule is covered by host tests and Stage 7; a field check at CRITICAL or a long interval is optional.
+
+### Release
+
+**v40**, together with WO 1c. CHANGELOG "Unreleased" already holds the alert-41 line. The cadence rule and the CONNECTED fix get their own lines at release time.
