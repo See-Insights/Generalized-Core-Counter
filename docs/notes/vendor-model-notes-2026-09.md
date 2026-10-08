@@ -17,6 +17,7 @@ Carried over verbatim from the retired `AGENT_MODEL_ROUTING_2026-09.md` (2026-09
 ## Codex CLI
 
 - **Current top model, for reference:** GPT-6 Astra (shipped 2026-09-03), requires Codex CLI ≥0.153.0. OpenAI has assessed Astra at their **Critical** cybersecurity capability tier under their Preparedness Framework — the first model placed there. Not currently routed to for this project; Sol remains standard until reassessed.
+- **2026-10-07, Codex CLI with a ChatGPT account:** accepts `gpt-6-astra`, `gpt-5.6-sol` and `gpt-5.6-terra`. Rejects `gpt-6.1-sol`, `gpt-6-sol` and `gpt-6-luna` ("not supported when using Codex with a ChatGPT account"). The Codex app offers all of them. Until this changes, the Codex standard tier means `gpt-5.6-sol`, and the top tier means `gpt-6-astra`. (Found when WO-2026-10-07-002's Stage 7 round 2 dispatch was rejected on `gpt-6.1-sol`; Codex CLI 0.154.0.)
 
 ## Open question, not yet resolved
 
