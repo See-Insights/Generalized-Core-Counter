@@ -106,6 +106,15 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
   - **Background:** Device OS 6.4.1 exposes no inbound-pending signal (WO-2026-10-07-005 evidence). The question has been asked on the Particle forum.
   - **Implementation is a later WO.**
 - **Host tests that copy source:** `connection_mode_downgrade_test` (WO-2026-10-07-002) and `occupancy_report_by_mode_test` (WO-2026-10-07-004) extract code blocks from `src/` into the test rather than compiling the real files, so they can drift from the source. Switch them to compiling the real source the next time the test harness is touched.
+- **Court3's daytime failsafe resets** (v36, 4 and 5 Oct; reset 140, data 2, `failsafeStage 2`): Court3 runs connectionMode 3 (KEEP_ALIVE, the product default). It reconnects through CONNECTING on every wake, which refreshes `lastConnection`. Its resets ended **real connectivity silences**; they were not healthy-device resets from the CONNECTED-online gap found in WO-2026-10-08-001 (Chip, 2026-10-08).
+- **Failsafe flash churn at stage 0** (WO-2026-10-08-001 Step 0 addendum §5):
+  - **Where:** at stage 0 the cooldown test (`Generalized-Core-Counter.cpp:2651`) doesn't apply. So while the low-battery block (`:2661-2664`) keeps firing, with age ≥ 3 h, Open, on battery with a downgrade or SURVIVAL, `persistConnectivityFailsafeState(..., now, false)` (`:2674`) runs `SystemConfig::flushNow()` (`:404-413`) on every loop pass.
+  - **Bound:** about one flash write per second, since `setValue` dirties the file only when `now` changes. At stage ≥ 1 the 6 h cooldown bounds it.
+  - **Not yet measured:** flash wear and how long the loop stays awake.
+- **`reportingIntervalSec` truncation** (WO-2026-10-08-001 Step 0 addendum §4):
+  - **The wrap:** `ConfigApply.cpp:265` accepts 300–86400 s, but the store is `uint16_t` (`MyPersistentData.h:137`). So 65536–86400 wraps; for example 86400 is stored as 20864.
+  - **Rewritten on every apply:** the comparison at `ConfigApply.cpp:266` (`uint16_t` against `int`) never matches a wrapped value, so the value is rewritten on every config apply (INF).
+  - **Ruling pending:** the wrap is on the 1b fix's input path, and the architect's ruling on capping the range at 65535 is pending. The `uint16_t intervalSec` locals in `State_Idle.cpp` and `State_Sleep.cpp` lose nothing, since the source is already `uint16_t`.
 
 ## Guardrails (`AI_DEVELOPMENT_WORKFLOW.md` §12)
 
