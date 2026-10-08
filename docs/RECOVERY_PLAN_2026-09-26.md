@@ -57,6 +57,8 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 - **Battery trust and tier.** The gauge is compared with a resting-voltage table (`kOcvKnots`, `BatteryHealth.cpp:19–32`) using a voltage sampled while awake, so healthy devices were marked untrusted and dropped to CRITICAL: Court3 at 82%, PCKL1 at 77% (the 4 Oct Codex report's ledger snapshot: 79.8% and 76.5%, both Untrusted/CRITICAL), and Dev-14 showing CRITICAL at 65%. Decide only after a week of v37's `vc` data (WO-2026-10-04-001 item D). If that isn't enough, add the fuller battery-decision snapshot proposed in the 4 Oct Codex report §D (raw and accepted SOC, vcell, charge state, radio state, sample age, source, resulting tier).
 - **CONSERVING threshold.** A device drops to CONSERVING below 70% and returns to HEALTHY at 75% (`BatteryBackoffPolicy.h:21–26`; corrected per the 6 Oct Codex Step 6 ownership report). That may be too high for solar sites going into shorter days. Tune it from field data on how often devices actually get that low. (Moved here from the Phase 4 list.)
 - **Power-source misreads:** USB_ADAPTER and USB_HOST swapping on the same supply, as seen in Dev-09's and Dev-14's PowerDiag lines.
+- **WO 2b (the sensor list) supplies the allowed `sensor.type` values.** WO-2026-10-08-002 (1c) narrowed `sensor.type` validation to 1 (PIR), the only type `SensorFactory` builds, and so hard-coded "PIR only" in `ConfigApply.cpp`. When 2b introduces the sensor list, config apply should take the allowed types from it.
+- **WO 2b: a sensor that fails to start is silent.** If `SensorFactory::createSensor` returns null, `SensorManager::initializeFromConfig` logs an error and the device carries on with no sensor (`SensorManager.cpp:311-313`). Reports go out with zero counts and no alert is raised (WO-2026-10-08-002 Step 0 §3). Add an alert or a status flag with the sensor list.
 
 **Phase 4: backlog**, in order: build provenance (vendored versus registry libraries; WO-2026-09-26-001), then the connect stall (WO-2026-09-25-005). The rest is grouped below.
 
@@ -90,6 +92,7 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 - **Alert 18 (state-machine thrash):** raised just before the tier-3 reset, so it may not be persisted. Fix with the ThrashGuard/persistence work (save state before any deliberate reset), then make 18 report-once like 19 and 42. (WO-2026-10-06-001 round 2: Stage 7 found the tier-3 loss, so 18 was dropped from v38. Until then it clears: never (planned).)
 
 **Rollout and follow-ups** (not WOs).
+- **v40 release step: repeat the 1c migration check.** Before releasing v40, read the resolved `sensor.type` for every device: the `default-settings` and every `device-settings` instance. Any value other than 1 would now be rejected at config apply, and a value already stored would stop that device counting after its next reboot. On 2026-10-08 the default was 1 and no device overrode it (WO-2026-10-08-002 Step 0 report, appendix).
 - **Hibernate fleet-wide:** after v37's item A has a few days in the field. Trail02 woke on time on all three trial nights (4 Oct Codex report §C).
 - **The Ubidots template:** add `"vc": "{{vc}}"` once every device runs v37.
 - **v35's download case:** confirm at the next OTA to a v35+ device.

@@ -348,7 +348,7 @@ bool Cloud::applySensorConfig(const LedgerData &defaults, const LedgerData &devi
 
     // sensor.type
     if (getMergedIntValue(defaultSensor, deviceSensor, "type", sensorType)) {
-        if (validateRange(sensorType, 0, 255, "sensor.type")) {
+        if (validateRange(sensorType, 1, 1, "sensor.type")) {
             if (SystemConfig::SensorSettings::get_sensorType() != (uint8_t)sensorType) {
                 SystemConfig::SensorSettings::set_sensorType((uint8_t)sensorType);
                 Log.info("Config: Sensor type -> %d", sensorType);

@@ -304,7 +304,7 @@ void SensorManager::setSensor(ISensor* sensor) {
 }
 
   void SensorManager::initializeFromConfig() {
-    SensorType sensorType = static_cast<SensorType>(SystemConfig::get_sensorType());
+    SensorType sensorType = static_cast<SensorType>(SystemConfig::SensorSettings::get_sensorType());
     ISensor* sensor = SensorFactory::createSensor(sensorType);
 
     if (!sensor) {
