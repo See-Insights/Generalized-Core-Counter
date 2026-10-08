@@ -7,6 +7,7 @@
 #include "persist/CurrentReadings.h"
 #include "persist/RecoveryState.h"
 #include "persist/SystemConfig.h"
+#include "power/PowerManager.h"
 #include "state/StateHandlers.h"
 #include "state/StateMachine.h"
 #include "time/Clock.h"
@@ -38,6 +39,22 @@ inline bool reportDueThisInterval() {
 	const time_t interval = Config::reportingIntervalSecForRuntime();
 	const time_t lastReport = SystemConfig::get_lastReport();
 	return lastReport == 0 || Time.now() / interval != lastReport / interval;
+}
+
+/**
+ * @brief WO-2026-10-07-004: does an occupancy change (start or end) report
+ *        right away in the connection mode in use?
+ *
+ * @details A positive list: only INTERMITTENT_KEEP_ALIVE and CONNECTED report
+ *          at once. INTERMITTENT and DISCONNECTED wait for the scheduled
+ *          report. Reads the mode in use, so a battery-downgraded KEEP_ALIVE
+ *          counts as INTERMITTENT.
+ *
+ * @return true when an occupancy change should start a report immediately.
+ */
+inline bool reportsOccupancyChangesNow() {
+	const uint8_t mode = PowerManager::instance().effectiveConnectionMode();
+	return mode == SystemConfig::INTERMITTENT_KEEP_ALIVE || mode == SystemConfig::CONNECTED;
 }
 
 /**

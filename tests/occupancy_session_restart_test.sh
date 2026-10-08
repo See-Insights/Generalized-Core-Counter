@@ -235,6 +235,8 @@ CPP
 
   echo ""
   echo "// ===== Extracted verbatim from src/state/State_Common.h ====="
+  extract_braced_block "$common_src" "inline bool reportsOccupancyChangesNow() {"
+  echo ""
   extract_braced_block "$common_src" "struct OccupancyCloseResult {"
   echo ""
   extract_braced_block "$common_src" "inline uint32_t occupancyDebounceMs() {"

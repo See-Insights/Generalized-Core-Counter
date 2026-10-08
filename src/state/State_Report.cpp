@@ -68,6 +68,11 @@ void handleReportingState() {
 
   publishData(due ? boundary - 1 : 0); // Queue report; actual send depends on connectivity policy
 
+  // The payload above already carries the occupancy change. Take the flag here,
+  // before any early exit below, so no path can leave it set for a second report.
+  const bool occupancyChangeTriggered = session.occupancyChangeTriggered;
+  session.occupancyChangeTriggered = false;
+
   if (due) {
     dailyCleanup();
     if (close == 24 && wasOccupied) {
@@ -213,8 +218,7 @@ void handleReportingState() {
                tierName);
 #endif
       transitionTo(CONNECTING_STATE, "service request");
-    } else if (session.occupancyChangeTriggered) {
-      session.occupancyChangeTriggered = false;  // Clear flag after processing
+    } else if (occupancyChangeTriggered) {
 #if ENABLE_CONNECT_DECISION_TRACE
       Log.info("REPORTING: Immediate connection (occupancy change) - bypassing alignment tier=%s",
                tierName);
