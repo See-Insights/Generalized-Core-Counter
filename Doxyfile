@@ -2,7 +2,7 @@
 
 PROJECT_NAME           = "Generalized-Core-Counter"
 PROJECT_BRIEF          = "Particle-based generalized core counter firmware"
-PROJECT_NUMBER         = "v38-EventAlertsClear"
+PROJECT_NUMBER         = "v39-OccupancyReports"
 
 # Where to put generated docs
 OUTPUT_DIRECTORY       = docs
