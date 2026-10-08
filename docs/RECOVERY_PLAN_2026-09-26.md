@@ -77,6 +77,7 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 
 **After Step 6.**
 - **Ledger content review:** what we send to the status and data ledgers, and why. The STATUS payload is 834 of 896 bytes (62 bytes of headroom), so decide what belongs there, what can be dropped, and what belongs in events instead. Supersedes the separate "ledger headroom" item.
+- **`connecttime` is the previous connection's duration:** the payload is built in Report, before Connect (`State_Report.cpp:69`, `Generalized-Core-Counter.cpp:2028`). Rename it or document it in the payload review.
 - **CI:** run the host test suite (sh via zsh, py via python3) plus the WITH_ACK structural test on every PR via GitHub Actions, so a PR with failing tests can't be merged.
 - **Renaming the webhook event:** its own WO, with a cut-over that never leaves a gap. No name may be a prefix of another.
 - **Occupied courts reporting more often than hourly,** with mid-session reports carrying the session's minutes so far.
@@ -96,6 +97,14 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 - **Dev-09 raised one stale alert 41** after its test setting was reverted: it applied its stale local copy before the reverted settings synced.
 - **A missing occupancy start report after a restart** (three times). Check whether v37's item B changes it (4 Oct Codex report §B).
 - **Duplicate deliveries:** with the fleet-ops agent (handover document, WO-2026-09-25-004). Moved here from the Phase 4 list.
+- **A false alert 44 after a boot clock step** (Dev-14, PR #72 build, 2026-10-08). `ClockResync: sync advanced` at `0005171470`, then `GateFail: reason=ledger timeout=70000` and `raising alert 44` at `0005240897`–`0005240899`. The `LedgerSleepTimeout` line shows `pendingData=0 pendingStatus=0`, with `dataUpd=414217309 > dataSync=414210391` and `statusSync > statusUpd`. Log: `2026-10-07 17-12-25 Boron CDC Mode #1.log`. Cause not yet traced.
+- **Inbound ledger config and INTERMITTENT:**
+  - **Decided 2026-10-07 (Chip):** no per-connection dwell for inbound ledger syncs. The cost would be paid on every connect, and inbound config changes are rare.
+  - **INTERMITTENT devices get one config wait per day:** the first connection after open hour, plus the boot connection. The gate holds a few seconds after outbound syncs, ending early on an input `onSync`.
+  - **Consequence:** a config change may take up to a day to reach an INTERMITTENT device.
+  - **Background:** Device OS 6.4.1 exposes no inbound-pending signal (WO-2026-10-07-005 evidence). The question has been asked on the Particle forum.
+  - **Implementation is a later WO.**
+- **Host tests that copy source:** `connection_mode_downgrade_test` (WO-2026-10-07-002) and `occupancy_report_by_mode_test` (WO-2026-10-07-004) extract code blocks from `src/` into the test rather than compiling the real files, so they can drift from the source. Switch them to compiling the real source the next time the test harness is touched.
 
 ## Guardrails (`AI_DEVELOPMENT_WORKFLOW.md` §12)
 
