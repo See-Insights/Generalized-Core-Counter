@@ -25,7 +25,7 @@ nothing elsewhere in this document or the repository overrides it.
 | Pre-approval investigator (Stage 4) | Codex | Independent investigation of the evidence and the proposed architecture, before approval | Rewrites the Architect's proposal; edits source; merges |
 | Implementer (Stage 6) | GitHub Copilot | Implements the approved Work Order as an uncommitted working-tree diff | Changes the approved architecture; commits, pushes, or merges |
 | Verifier (Stage 7) | Codex | Adversarial verification of the diff against the Work Order, including mutation checks | Makes lasting source edits (mutations are restored byte-identically); commits, pushes, or merges |
-| Chief Engineer | Chip (the user) | Sole authority for Stage 5 approval, commits, pushes, merges, releases, and device operations; also performs the "AWS agent" role personally | — |
+| Chief Engineer | Chip (the user) | Sole authority for Stage 5 approval, merges, releases, and device operations; may commit and push at any time; also performs the "AWS agent" role personally | — |
 
 ### Architect — Claude (app chat)
 
@@ -269,8 +269,8 @@ made the artifact invisible to a routine `ls` and easy to miss in
 - Review the completed diff, test results, Codex verification, and telemetry evidence.
 - Resolve disagreements between the agents.
 - Perform or authorize any required hardware validation.
-- Make the only Git commit.
-- Push, merge, release, deploy, or authorize Fleet changes.
+- Merge every PR. Claude Code commits and pushes WO records each stage, and the verified implementation with the PR after the architect's Stage 8 (§2); Chip may also commit and push.
+- Release, deploy, or authorize Fleet changes.
 - Perform all device operations (flashing, bench tests, Fleet changes).
 - Perform the "AWS agent" role personally: AWS resource review, deployment impact, and any AWS change.
 - Decide whether the task is complete.
@@ -440,7 +440,7 @@ Boron `stateOfCharge` commit. Every test passed.
 
 ### Stage 8 — Final engineering gate
 
-Chip reviews:
+The architect reviews, and Chip reviews again before merging:
 
 - Approved Engineering Work Order
 - Claude Code’s evidence and the Architect’s architecture
@@ -449,7 +449,7 @@ Chip reviews:
 - Complete uncommitted diff
 - Remaining risks and rollback plan
 
-Only Chip may commit and push the change.
+After the architect's Stage 8 review, Claude Code commits the verified implementation, pushes, and opens the PR. Only Chip merges.
 
 ### Stage 9 — Release and feedback
 
@@ -578,10 +578,10 @@ Every Work Order should include:
 ### Repository controls
 
 - Architect: read access; no write access to the working tree.
-- Claude Code: read access; runs builds and tests; working-tree edits only when Chip pre-authorizes them case by case; issue drafting only where specifically authorized; no commit or push.
+- Claude Code: read access; runs builds and tests; working-tree edits only when Chip pre-authorizes them case by case; issue drafting only where specifically authorized; commits and pushes WO records each stage, and the verified implementation with the PR after the architect's Stage 8 (§2); no merge.
 - Codex: read-only access, except the temporary mutation edits Stage 7 requires, restored byte-identically.
 - Copilot: local working-tree write access but no push credentials.
-- Chip: commit, push, merge, and release authority.
+- Chip: merge and release authority; may also commit and push.
 - Main branches should be protected.
 - Chip’s commits should be signed where practical.
 - CI must pass before merge or release.
