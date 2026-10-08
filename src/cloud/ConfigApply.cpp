@@ -262,7 +262,7 @@ bool Cloud::applyTimingConfig(const LedgerData &defaults, const LedgerData &devi
     }
 
     if (getMergedIntValue(defaultTiming, deviceTiming, "reportingIntervalSec", reportingInterval)) {
-        if (validateRange(reportingInterval, 300, 86400, "timing.reportingIntervalSec")) {
+        if (validateRange(reportingInterval, 300, 65535, "timing.reportingIntervalSec")) {
             if (SystemConfig::get_reportingInterval() != reportingInterval) {
                 SystemConfig::set_reportingInterval(reportingInterval);
                 Log.info("Config: Reporting interval -> %ds", reportingInterval);

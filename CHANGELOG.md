@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- (none)
+- **Over-range reporting interval raises alert 41** (WO-2026-10-08-001). `timing.reportingIntervalSec` is now validated to 300–65535 s, the range its storage can hold. A larger value is rejected rather than silently wrapped (86400 used to become 20864 s), so the config apply reports failure and alert 41 is raised on each connection while the ledger holds it. Valid fields in the same update still apply, and the interval keeps its previous value.
 
 ### Fixed
 

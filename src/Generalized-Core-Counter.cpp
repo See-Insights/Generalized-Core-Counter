@@ -2652,6 +2652,19 @@ void connectivityFailsafeSupervisor() {
     return;
   }
 
+  // WO-2026-10-08-001: a connection is not overdue until one cadence after it
+  // was due, so with a cadence of 3 h or more the threshold is cadence + 3 h.
+  // Compiled out of the test build, where the 5 min threshold must stay a
+  // 5 min threshold for the bench reset.
+#if !CONNECTIVITY_FAILSAFE_TEST_MODE
+  const time_t cadenceSec = (time_t)ReportingPolicyResolver::resolveRuntime(
+      PowerManager::instance().soc(), now).effectiveIntervalSec;
+  if (cadenceSec >= ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC &&
+      connectionAgeSec < ConnectivityPolicy::CONNECTIVITY_FAILSAFE_STALE_SEC + cadenceSec) {
+    return;
+  }
+#endif
+
   if (activeConnectAttemptWithinBudget()) {
     return;
   }
