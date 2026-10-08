@@ -55,4 +55,16 @@ The rulings for round 2, the last under the two-round rule:
 
 Agents: Copilot, Sonnet tier, medium; Codex, `gpt-5.6-sol`, high.
 
+## Stage 6 round 2 and Stage 7 round 2 (2026-10-08)
+
+- **Stage 6 round 2** (Copilot, `claude-sonnet-5.5`, medium):
+  - **F3:** the cadence-rule block moved below the stage-3 and cooldown returns. It is byte-identical to round 1, at 0 net lines.
+  - **F2:** the test extracts the real block with a `COPY_MISMATCH` check.
+  - **Results:** tests 72/72 (sh via zsh, py via python3); release build 151028 / 1090 / 2196.
+- **Stage 7 round 2** (Codex, `gpt-5.6-sol`, high): **NOT VERIFIED** (`WO-2026-10-08-001-stage7-round2-verdict.md`). Every check, test and mutation passes; there are no survivors. Check 8 passes under the narrowed condition 2, and `alert-codes.md` needs no change. The two medium findings are edges for the architect to accept or reject:
+  1. **Per-pass `String` allocation.** The move crosses `connectivityFailsafeJitterSec()` (`Generalized-Core-Counter.cpp:386-400`, called at `:2648`). It builds a `String` from `System.deviceID()` on every call, so long-cadence devices between 3 h and their extended threshold allocate and free a device-ID string on every loop pass. *Claude Code's note:* main already does this on every pass for any device past 3 h in open hours (before it resets), so it is not new relative to main, only relative to round 1.
+  2. **Cadence shortening.** The threshold uses the current cadence only. If the battery recovers and the cadence shortens (for example from 12× to 1×) after age has passed 3 h, the failsafe can reset before Report gets its first chance on the new schedule. *Claude Code's note:* main resets at 3 h in that case anyway, so this is a residual gap against the plain goal, not a regression.
+- **Low:** the test retypes the stale-return line rather than extracting it; it is checked by location and order.
+- **Two-round rule:** this was the last round. The WO stops unless the architect accepts both edges.
+
 ## Closing record (to be completed)
