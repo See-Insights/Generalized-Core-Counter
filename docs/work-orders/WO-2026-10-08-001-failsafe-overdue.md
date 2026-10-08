@@ -44,4 +44,15 @@ If either fails, it is a round-2 finding. Otherwise the closing record lists it 
 
 *Claude Code's note before the verdict:* `applyConfigurationFromLedger()` (`ConfigApply.cpp:133-140`) runs all six sections before combining their results. So within one ledger update, valid fields are applied and only the rejected field keeps its previous value. Condition 2 needs Codex's judgement on whether that counts as a "partial apply". It is how every field behaves today.
 
+## Stage 7 round 1 and the architect's rulings (2026-10-08)
+
+**Stage 7 round 1** (Codex, `gpt-5.6-sol`, high): **NOT VERIFIED** (`WO-2026-10-08-001-stage7-verdict.md`). Two medium findings and one low.
+
+The rulings for round 2, the last under the two-round rule:
+1. **Finding 1, per-field config apply: option (a).** The per-field apply is accepted as existing behaviour. Pre-ruling condition 2 is narrowed to "no defaults, no half-applied field", which holds. **Alert 41 on an over-range `reportingIntervalSec` is an accepted behaviour change** (CHANGELOG, "Unreleased", for v40). "All-or-nothing config apply" goes in the recovery plan as a possible later WO.
+2. **Finding 2, the cadence test:** fix the test so it drives the real supervisor block (or a byte-checked copy), so the 4 h checks fail when the formula is mutated. No `src/` change.
+3. **Finding 3, cost:** move the cadence rule below the stage and cooldown returns. 0 net lines, same behaviour.
+
+Agents: Copilot, Sonnet tier, medium; Codex, `gpt-5.6-sol`, high.
+
 ## Closing record (to be completed)
