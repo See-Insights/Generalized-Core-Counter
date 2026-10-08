@@ -41,4 +41,17 @@ At most **+20** net `src/` lines; **about +2 expected** (two getter swaps, one v
 
 **v40**, together with WO 1b. The CHANGELOG "Unreleased" line is written.
 
+## Stage 6 and Stage 7 (2026-10-08)
+
+- **Stage 6** (Copilot, `claude-sonnet-5.5`, medium):
+  - **Code:** the two getter swaps, validation limited to 1, and comment fixes. **+1 net `src/` line.**
+  - **Tests:** `sensor_type_source_test` and `sensor_type_validation_test` extract the real blocks from `src/` and fail loudly with `EXTRACT_FAILED`. Three mutations were caught. Suite 72/72 → 73/73 (sh via zsh, py via python3).
+  - **ARM build:** 151004 / 1090 / 2196.
+- **Pre-ruling (architect):** if `alert-codes.md` lists specific triggers for alert 41, add both new causes (1b's over-range interval and 1c's unsupported `sensor.type`). If the entry is generic, no change. Docs only, not a round.
+- **Stage 7** (Codex, `gpt-5.6-sol`, medium): **VERIFIED WITH CONCERNS** (`WO-2026-10-08-002-stage7-verdict.md`). All 8 checks pass on the code, and four mutations were caught, including Codex's own A1-only mutation. Finding **F1 (low):** add a one-line v40 trigger note to alert 41 in `alert-codes.md`.
+- **Disposition of F1 under the pre-ruling: no change.** The alert-41 entry (`alert-codes.md:44`) is generic ("Configuration apply failed at connect (C:566)") and lists no causes. Codex agrees it is generic.
+  - **The tension, for Stage 8:** the file's rule (`alert-codes.md`, "Keeping this current") requires an update when a WO "changes how an alert is raised". Alert 41's raise site and condition ("apply failed") are unchanged; there are only two new ways for the apply to fail.
+  - **Where the causes are recorded:** both are in CHANGELOG "Unreleased" for v40.
+  - **Options:** the architect may still want the one-line note.
+
 ## Closing record (to be completed)
