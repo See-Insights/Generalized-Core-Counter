@@ -64,4 +64,23 @@ The bench is the **next release's soak**: Dev-09 in CONNECTED (`connectionMode` 
   - **Checks:** all 9 pass; all 24 possible keys are unique; four mutations caught.
   - **Entry-pass gap:** the early returns are the occupancy reports at `State_Idle.cpp:73` and `:90`. Only the entry log is skipped, and it is recovered on the next key change, as ruling 1 accepted.
 
-## Closing record (to be completed)
+## Closing record (2026-10-09)
+
+**Result:** **VERIFIED, no findings** at Stage 7 round 1 (`WO-2026-10-09-001-stage7-verdict.md`). **Stage 8 approved** by the architect. **Release: held for v41**, bundled with the config-window WO (WO-2026-10-09-002) and the standby-latch WO.
+
+| Stage | Agent / model | Result |
+|---|---|---|
+| Step 0 | Claude Code, separate session, `claude-sonnet-5-5`, `--effort medium` | PROCEED, est. +6 to +8 |
+| Stage 6 | Copilot, `claude-sonnet-5.5`, medium | +8 code lines; 73/73 → 74/74 |
+| Stage 7 | Codex, `gpt-5.6-sol`, medium | VERIFIED, no findings; 4 of 4 mutations caught |
+
+Every model was probed first (§5).
+
+| Item | Budget | Raised to (reason) | Actual net `src/` lines | Tests |
+|---|---|---|---|---|
+| WO-2026-10-09-001 | +10 | — | **+8** (+10 with 2 comment lines) | **74/74 (sh via zsh, py via python3)**; new `idle_timediag_on_change_test` |
+
+- **ARM build:** 151068 / 1094 / 2196 (+56 text against v40).
+- **What changed:** in CONNECTED Idle, TimeDiag is logged on Idle entry and when `isOpen`, `openness`, `trusted` or `valid` changes, never on every pass. The `FIELD_MEANINGS_REFERENCE.md` entry was corrected.
+- **Accepted:** the entry-pass gap (ruling 1), and a narrow test allowlist line for `Clock::isTimeValid()` in `State_Idle.cpp` (judged at Stage 7 not to weaken the guard).
+- **Bench: deferred to the v41 soak.** Dev-09 in CONNECTED (`connectionMode` 0) for at least 4 open hours, with one TimeDiag per change and no reset 140 data 2. That step also completes WO-2026-10-08-001 (1b)'s deferred CONNECTED step.

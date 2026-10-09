@@ -59,6 +59,13 @@ ALLOWED_ISTIMEVALID_LINES = {
     "if (!Clock::isTimeValid()) {",
 }
 
+# WO-2026-10-09-001: Idle's TimeDiag change-key reads the same valid= value
+# logTimeDiag() prints. It is telemetry only, never a decision, and is allowed
+# in State_Idle.cpp alone.
+ALLOWED_IDLE_KEY_LINES = {
+    "(isClockTrusted() ? 8 : 0) | (Clock::isTimeValid() ? 16 : 0);",
+}
+
 # (file, expected substring, description) - each of the fourteen converted
 # decision sites, checked at its specific location rather than as a
 # file-wide count, since several files have more than one conversion.
@@ -104,6 +111,8 @@ def main() -> None:
         for line in text.splitlines():
             stripped = line.strip()
             if "Clock::isTimeValid()" in stripped and stripped not in ALLOWED_ISTIMEVALID_LINES:
+                if path == STATE_IDLE and stripped in ALLOWED_IDLE_KEY_LINES:
+                    continue
                 offenders.append(f"{path.relative_to(REPO_ROOT)}: {stripped}")
     if offenders:
         fail(
@@ -122,6 +131,10 @@ def main() -> None:
             f"line(s): {missing} - update this test if these were deliberately "
             "rephrased, or investigate if they were accidentally removed"
         )
+
+    idle_lines = {line.strip() for line in texts[STATE_IDLE].splitlines()}
+    if ALLOWED_IDLE_KEY_LINES - idle_lines:
+        fail("State_Idle.cpp is missing the allowlisted TimeDiag change-key line")
 
     # --- Invariant 3: each converted site is present at its specific location. ---
     for path, expected_substring, description in CONVERTED_SITES:
