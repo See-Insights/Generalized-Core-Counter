@@ -87,4 +87,34 @@ At most **+20** net `src/` lines. Over budget means stop and report.
   - **Passes:** every round-1 and round-2 check. F1 is confirmed for both equal- and unequal-baseline backward steps, and output writes can't move the input snapshots. F3 catches `>`. Codex's own "snapshot only the default ledger" mutation was caught. No P1 or P2 findings.
   - **P3 concern, for the architect:** the stored marker `1` (from F2) can allow **one** extra first-after-open hold once the clock becomes trusted. It is reachable if the first successful connection stamped `lastConnection = 0` before trust arrived. It is bounded to once, because the next connection writes a real epoch, and it fails toward one extra delivery-safe hold. This edge was not explicitly pre-accepted.
 
-## Closing record (to be completed)
+## Closing record (2026-10-09)
+
+**Result:** **VERIFIED WITH CONCERNS** at Stage 7 round 2 (`WO-2026-10-09-002-stage7-round2-verdict.md`), within the two-round rule. **Stage 8 approved** by the architect. **The P3 is accepted:** at most one extra first-after-open hold, and only if the first connection recorded `lastConnection = 0`; it fails toward delivering config. **Release: held for v41**, with WO-2026-10-09-001 (TimeDiag on change) and the standby-latch WO.
+
+| Stage | Agent / model | Result |
+|---|---|---|
+| Step 0 | Claude Code, separate session, `claude-sonnet-5-5`, `--effort high` | PROCEED, est. +17 |
+| Stage 6 round 1 | Copilot, `claude-sonnet-5.5`, high | +18; 74/74 |
+| Stage 7 round 1 | Codex, `gpt-5.6-sol`, high | NOT VERIFIED: F1 max-based snapshot, F2 zero marker, F3 test gap |
+| Stage 6 round 2 | Copilot, `claude-sonnet-5.5`, high | +2 (F1 per-ledger snapshots; F2 `? : 1`; F3 test) |
+| Stage 7 round 2 | Codex, `gpt-5.6-sol`, high | VERIFIED WITH CONCERNS; one bounded P3, accepted |
+
+Every model was probed first (§5).
+
+| Item | Budget | Raised to (reason) | Actual net `src/` lines | Tests |
+|---|---|---|---|---|
+| Round 1 | +20 WO cap | — | +18 | 74/74 |
+| Round 2 | — | — | +2 | 74/74; 9 of 9 mutations caught |
+| **WO total** | **+20** | — | **+20** (`LedgerClient.cpp` +19, `State_Sleep.cpp` +1) | **74/74 (sh via zsh, py via python3)**; new `config_window_hold_test` (14 cases) |
+
+- **ARM build:** 151316 / 1090 / 2220 (+304 text against v40).
+- **What changed:**
+  - **`LedgerClient.cpp`, `areLedgersSynced()`:** on the boot connection (regardless of clock trust) and on the first connection after today's open (clock trusted), the gate holds after the outbound ledgers clear. The hold ends when either input ledger's `lastSynced` changes (`onSync`) or after `LEDGER_SYNC_TIMEOUT_MS` (10 s cellular). Only a completed hold counts toward "once a day". All state is RAM-only, with no persisted field.
+  - **`State_Sleep.cpp`:** the CONNECTED+open abort now resets `cloudSyncStartMs`.
+- **Accepted:**
+  - a second input ledger may land a day later;
+  - a rare false alert 44 when the output ledger clears within 10 s of the 70 s budget;
+  - the bounded P3 above.
+- **Bench: in the v41 soak.**
+  - A Dev-09 `device-settings` change lands at boot or on the first connection after open, **without a pin reset** (`ConfigHold: ended reason=onSync`, `LedgerCallback: kind=input`, then the `Config:` line).
+  - Exactly one extra wait per device-day when nothing changed.
