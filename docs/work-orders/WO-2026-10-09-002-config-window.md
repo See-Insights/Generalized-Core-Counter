@@ -68,4 +68,13 @@ At most **+20** net `src/` lines. Over budget means stop and report.
   - **F2 (P2):** the hold stamps `holdDoneEpoch = currentConnectionEpoch`. If `lastConnection` is 0, the zero sentinel stays, and every later connection pays the boot hold.
   - **F3 (P3):** a `!=` → `>` mutation survives every committed case; the test suite has no unequal-baseline backward-clock case.
 
+## Round 2 (approved by the architect, 2026-10-09; the last under the two-round rule)
+
+- **F1:** keep a separate snapshot for each input ledger, and end the hold when **either** ledger's `lastSynced` differs from its snapshot.
+- **F2:** `holdDoneEpoch = currentConnectionEpoch ? currentConnectionEpoch : 1;`, on the same line, so "done" is never stored as 0.
+- **F3:** add a different-baselines, backward-clock test case, so the `!=` → `>` mutation fails.
+- **Cap:** +20 for the whole WO.
+- **Pre-ruled fallback:** if the total exceeds +20, implement F1 and F3 only, and record F2 as **accepted**. It fails toward extra holds, and extra holds deliver config.
+- **Agents:** Copilot on Sonnet, high; Codex on `gpt-5.6-sol`, high.
+
 ## Closing record (to be completed)
