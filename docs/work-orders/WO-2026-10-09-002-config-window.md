@@ -77,4 +77,14 @@ At most **+20** net `src/` lines. Over budget means stop and report.
 - **Pre-ruled fallback:** if the total exceeds +20, implement F1 and F3 only, and record F2 as **accepted**. It fails toward extra holds, and extra holds deliver config.
 - **Agents:** Copilot on Sonnet, high; Codex on `gpt-5.6-sol`, high.
 
+## Stage 6 round 2 and Stage 7 round 2 (2026-10-09)
+
+- **Stage 6 round 2** (Copilot, `claude-sonnet-5.5`, high):
+  - **Code:** F1, per-ledger snapshots ending on either change (+2 net); F2, `holdDoneEpoch = currentConnectionEpoch ? currentConnectionEpoch : 1;` (0 net).
+  - **Tests:** F3 (an unequal-baseline backward-clock case) and a zero-epoch case. 9 of 9 mutations caught.
+  - **Totals:** WO **+20 code lines, exactly at the cap**; the fallback was not needed. Suite 74/74 (sh via zsh, py via python3); ARM 151316 / 1090 / 2220.
+- **Stage 7 round 2** (Codex, `gpt-5.6-sol`, high): **VERIFIED WITH CONCERNS** (`WO-2026-10-09-002-stage7-round2-verdict.md`).
+  - **Passes:** every round-1 and round-2 check. F1 is confirmed for both equal- and unequal-baseline backward steps, and output writes can't move the input snapshots. F3 catches `>`. Codex's own "snapshot only the default ledger" mutation was caught. No P1 or P2 findings.
+  - **P3 concern, for the architect:** the stored marker `1` (from F2) can allow **one** extra first-after-open hold once the clock becomes trusted. It is reachable if the first successful connection stamped `lastConnection = 0` before trust arrived. It is bounded to once, because the next connection writes a real epoch, and it fails toward one extra delivery-safe hold. This edge was not explicitly pre-accepted.
+
 ## Closing record (to be completed)
