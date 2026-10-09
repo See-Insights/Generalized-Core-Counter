@@ -56,4 +56,16 @@ At most **+20** net `src/` lines. Over budget means stop and report.
 
 **v41**, with WO-2026-10-09-001 (TimeDiag on change) and the standby-latch WO.
 
+## Stage 6 and Stage 7 round 1 (2026-10-09)
+
+- **Stage 6** (Copilot, `claude-sonnet-5.5`, high): +18 net code lines.
+  - **Code:** the hold in `areLedgersSynced()`, and `cloudSyncStartMs = 0;` at the CONNECTED+open abort (its declaration moved up, behaviour-neutral).
+  - **Test:** new `config_window_hold_test` (real function, byte-checked, 12 cases; 6 mutations caught).
+  - **Results:** suite 74/74 (sh via zsh, py via python3); ARM 151308 / 1090 / 2212.
+- **Stage 7 round 1** (Codex, `gpt-5.6-sol`, high): **NOT VERIFIED** (`WO-2026-10-09-002-stage7-verdict.md`).
+  - **Passes:** the warm-path hold, no cost elsewhere (the `4c2b734` return intact), ruling 4, gate interactions, the `:407` change, and the budget.
+  - **F1 (P2):** `inputLanded` compares only `max(defaultSync, deviceSync)` with one saved maximum. One ledger's `onSync` can be masked by the other, for example after a backward clock step. The hold then runs to the timeout instead of ending early.
+  - **F2 (P2):** the hold stamps `holdDoneEpoch = currentConnectionEpoch`. If `lastConnection` is 0, the zero sentinel stays, and every later connection pays the boot hold.
+  - **F3 (P3):** a `!=` → `>` mutation survives every committed case; the test suite has no unequal-baseline backward-clock case.
+
 ## Closing record (to be completed)
