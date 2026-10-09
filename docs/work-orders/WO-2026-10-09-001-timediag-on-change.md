@@ -52,4 +52,16 @@ A host test simulates CONNECTED Idle for 1000 passes. TimeDiag must be logged **
 
 The bench is the **next release's soak**: Dev-09 in CONNECTED (`connectionMode` 0) for at least 4 open hours, expecting **one TimeDiag per change** and **no failsafe reset** (no reset 140 with data 2). That same step **completes WO-2026-10-08-001 (1b)'s deferred CONNECTED step**.
 
+## Stage 6 and Stage 7 (2026-10-09)
+
+- **Stage 6** (Copilot, `claude-sonnet-5.5`, medium): +8 code lines (+10 with comments).
+  - **Code:** `enteredIdle` captured before `publishStateTransition()`; a four-field key; a static `lastTimeDiagKey`.
+  - **Docs:** the `FIELD_MEANINGS_REFERENCE.md` entry.
+  - **Test:** new `idle_timediag_on_change_test`, which extracts the real Idle code with a byte check.
+  - **Deviation, accepted at Stage 7:** a narrow allowlist line in `clock_trust_standard_structural_test.py` for `Clock::isTimeValid()` in `State_Idle.cpp`.
+  - **Results:** suite 74/74 (sh via zsh, py via python3); ARM 151068 / 1094 / 2196.
+- **Stage 7** (Codex, `gpt-5.6-sol`, medium): **VERIFIED, no findings** (`WO-2026-10-09-001-stage7-verdict.md`).
+  - **Checks:** all 9 pass; all 24 possible keys are unique; four mutations caught.
+  - **Entry-pass gap:** the early returns are the occupancy reports at `State_Idle.cpp:73` and `:90`. Only the entry log is skipped, and it is recovered on the next key change, as ruling 1 accepted.
+
 ## Closing record (to be completed)
