@@ -100,6 +100,23 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 - **Muon M524 bring-up,** then the M635e and M404.
 - **Alert 18 (state-machine thrash):** raised just before the tier-3 reset, so it may not be persisted. Fix with the ThrashGuard/persistence work (save state before any deliberate reset), then make 18 report-once like 19 and 42. (WO-2026-10-06-001 round 2: Stage 7 found the tier-3 loss, so 18 was dropped from v38. Until then it clears: never (planned).)
 
+**Queued WOs** (in order; architect, 2026-10-09):
+1. **The TimeDiag flood in CONNECTED.**
+   - **Bug:** Idle's CONNECTED branch calls `logTimeDiag()` on every loop pass in open hours (`State_Idle.cpp:119-125`), unthrottled since `a95e284` (2026-06-06, v14).
+   - **Field case:** Dev-09 on v40, 2026-10-09 14:27 SGT. It emitted about 100 lines/s, the forwarder carried about 1 line/s, and Chip powered it off.
+   - **Evidence:** `docs/work-orders/2026-10-09-connected-idle-sleep-inventory.md` (PR #83).
+   - **Next:** the Step 0 is in progress.
+2. **WO-005: a config wait for inbound ledger syncs.** Chip's 2026-10-07 decision: one config wait per day, at the first connection after open hour plus the boot connection.
+   - **Field evidence (Dev-09, v40, 2026-10-09):** `connectionMode: 0` was set in `device-settings` at 13:04:51 SGT. It did not land through five connections; at 14:00:44 and 14:10:49 the inbound sync failed with `-1001` about 3 s after `GateRelease … reason=ledger`. It landed only on the boot connection after a pin reset (14:27:00, `Config: Connection mode -> CONNECTED`).
+3. **The modem standby latch.**
+   - **Mechanism:** a teardown over 10 s marks the modem unstable and suppresses standby (`MODEM_UNSTABLE_SLOW_TEARDOWN_MS`, `State_Sleep.cpp:31`, `:887`). Recovery needs a teardown under 5 s (`MODEM_UNSTABLE_RECOVERY_TEARDOWN_MS`, `:32`, `:136`). With standby suppressed, every teardown is a full modem-off, so on a modem that takes about 19 s to power off the device never recovers until a reboot (RAM flag).
+   - **Field case:** Dev-09 was latched from 2026-10-08 12:19 (after its breadcrumb-28 watchdog) through all 56 sleeps that day, and again on 2026-10-09 after a failed dial at 13:49.
+   - **Cost:** every connection is a cold registration.
+4. **A general log-flood limiter.**
+   - **Design (trimmed by the architect):** a `SerialLogHandler` subclass that mutes per-key repeats only: the key is the message with digits stripped, about 8 slots, one summary line per muted burst, ERROR exempt, and lines are dropped, not queued.
+   - **Out of scope:** no global token bucket, and no status-ledger counter (the status payload is at about 847/896 bytes).
+   - **Budget:** about **+30**, pending Chip's approval. History-first Step 0. Not yet dispatched.
+
 **Rollout and follow-ups** (not WOs).
 - **v40 release step: repeat the 1c migration check.** Before releasing v40, read the resolved `sensor.type` for every device: the `default-settings` and every `device-settings` instance. Any value other than 1 would now be rejected at config apply, and a value already stored would stop that device counting after its next reboot. On 2026-10-08 the default was 1 and no device overrode it (WO-2026-10-08-002 Step 0 report, appendix).
 - **Hibernate fleet-wide:** after v37's item A has a few days in the field. Trail02 woke on time on all three trial nights (4 Oct Codex report §C).
