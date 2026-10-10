@@ -58,6 +58,9 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 - **WO 3 (battery): which sensor modes a low tier downgrades.**
   - **Today's rule:** the connection-mode downgrade applies only to OCCUPANCY devices configured for KEEP_ALIVE (`PowerManager::downgradeActive()` from v39; the `:83` write on v38). A COUNTING device in a low tier stays in its configured mode.
   - **Decision for WO 3:** whether low tiers should downgrade every sensor mode.
+  - **WO 3b: recalibrate the gauge (architect, 2026-10-10; part of this WO, after the Dev-14 controlled drain).** When SOC is Untrusted and the battery is at rest (no charge current, radio off), re-seed the gauge with `quickStart`.
+    - **Open question for the evidence:** what caused Trail02's 52 → 2.6% jump at 16:00:41Z on 8 Oct? vcell was steady, and no firmware `quickStart` path matches it.
+  - **The Trail02 evidence run is complete (architect, 2026-10-10).** The battery never went flat; the gauge re-estimated. See the evidence notes below and PR #87.
   - **Live data, 2026-10-08:** the only device below HEALTHY is Trail02. It runs OCCUPANCY (`sensorMode` 1) in KEEP_ALIVE (`connectionMode` 3), from the product defaults, at SURVIVAL on v38, **so it is downgraded**.
   - **Its flag flips on v38.** `device-status` showed `battery.lowBatteryMode: true` at 03:00:16Z (the AWS fleet-ops copy) and `false` at 03:00:22Z (Particle's current version, written after that connection's config apply cleared the flag). That is the flip-flop WO-2026-10-07-002 fixed in v39.
   - **Consequence for checks:** on v38, a single ledger read can show either value. Fleet checks should judge a downgrade from tier and modes, not from the flag alone.
@@ -111,13 +114,18 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
    - **Mechanism:** a teardown over 10 s marks the modem unstable and suppresses standby (`MODEM_UNSTABLE_SLOW_TEARDOWN_MS`, `State_Sleep.cpp:31`, `:887`). Recovery needs a teardown under 5 s (`MODEM_UNSTABLE_RECOVERY_TEARDOWN_MS`, `:32`, `:136`). With standby suppressed, every teardown is a full modem-off, so on a modem that takes about 19 s to power off the device never recovers until a reboot (RAM flag).
    - **Field case:** Dev-09 was latched from 2026-10-08 12:19 (after its breadcrumb-28 watchdog) through all 56 sleeps that day, and again on 2026-10-09 after a failed dial at 13:49.
    - **Cost:** every connection is a cold registration.
-4. **A general log-flood limiter.**
+4. **WO 3a: publish a trusted battery value** (architect, 2026-10-10). In v41 if it's ready.
+   - **Change:** when `socTrust` ≠ Trusted, the webhook `battery` field and both ledgers' `battery.soc` publish the voltage-based estimate the tier already uses, not the raw gauge SOC.
+   - **Budget:** ≤ +10 expected.
+   - **Field case:** Trail02 reported about 10% at 4.11–4.14 V with the charger showing DONE (the voltage-based estimate is about 94%; WO 3 evidence, PR #87).
+5. **A general log-flood limiter.**
    - **Design (trimmed by the architect):** a `SerialLogHandler` subclass that mutes per-key repeats only: the key is the message with digits stripped, about 8 slots, one summary line per muted burst, ERROR exempt, and lines are dropped, not queued.
    - **Out of scope:** no global token bucket, and no status-ledger counter (the status payload is at about 847/896 bytes).
    - **Budget:** about **+30**, pending Chip's approval. History-first Step 0. Not yet dispatched.
 
 **Rollout and follow-ups** (not WOs).
 - **v40 release step: repeat the 1c migration check.** Before releasing v40, read the resolved `sensor.type` for every device: the `default-settings` and every `device-settings` instance. Any value other than 1 would now be rejected at config apply, and a value already stored would stop that device counting after its next reboot. On 2026-10-08 the default was 1 and no device overrode it (WO-2026-10-08-002 Step 0 report, appendix).
+- **Trail02 stays locked to v38** until the v40 fleet rollout, then joins it (architect, 2026-10-10).
 - **Hibernate fleet-wide:** after v37's item A has a few days in the field. Trail02 woke on time on all three trial nights (4 Oct Codex report §C).
 - **The Ubidots template:** add `"vc": "{{vc}}"` once every device runs v37.
 - **v35's download case:** confirm at the next OTA to a v35+ device.
