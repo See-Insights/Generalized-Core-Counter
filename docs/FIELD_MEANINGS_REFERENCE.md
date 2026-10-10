@@ -24,9 +24,9 @@ This document captures source-traced interpretations of logging fields and patte
 
 ---
 
-### `TimeDiag: tz=... valid=... epoch=... utc=... local=... open=... close=... isOpen=...`
+### `TimeDiag: tz=... valid=... epoch=... utc=... local=... open=... close=... isOpen=... trusted=... openness=... syncAgeMs=... lastSyncEpoch=...`
 
-**Represents:** Time diagnostic check at state transition (not sleep-mode related)  
+**Represents:** Time diagnostic. Logged on entry to Idle, when `isOpen`, `openness`, `trusted` or `valid` changes while CONNECTED in Idle, and once per sleep prep.  
 **Components:**
 - `isOpen` = whether currently within business hours (open/close window); 0=closed, 1=open
 - `open=` and `close=` = configured business hours (6-22 by default)

@@ -34,7 +34,8 @@ void ensureSensorEnabled(const char* context) {
 void handleIdleState() {
   setLoopStage(LOOP_STAGE_IDLE_PROCESSING);
 
-  if (state != oldState) {
+  const bool enteredIdle = (state != oldState);
+  if (enteredIdle) {
     publishStateTransition();
   }
 
@@ -122,7 +123,16 @@ void handleIdleState() {
     // existing fail-open answer), not parkOpenness - openness= in that same
     // log line is Clock::openness()'s verdict, and the two are meant to be
     // compared, not merged into one value here.
-    logTimeDiag(isWithinOpenHours());
+    // Logged on Idle entry and when its key changes, not every pass: this
+    // branch runs on every loop pass, which flooded the serial log.
+    const bool isOpen = isWithinOpenHours();
+    const int timeDiagKey = (isOpen ? 1 : 0) | ((int)parkOpenness << 1) |
+                            (isClockTrusted() ? 8 : 0) | (Clock::isTimeValid() ? 16 : 0);
+    static int lastTimeDiagKey = -1;
+    if (enteredIdle || timeDiagKey != lastTimeDiagKey) {
+      logTimeDiag(isOpen);
+      lastTimeDiagKey = timeDiagKey;
+    }
     if (parkOpenness == Clock::Openness::Closed) {
       Log.info("CONNECTED mode: park CLOSED - transitioning to SLEEPING_STATE for overnight sleep");
       transitionTo(SLEEPING_STATE, "park closed");
