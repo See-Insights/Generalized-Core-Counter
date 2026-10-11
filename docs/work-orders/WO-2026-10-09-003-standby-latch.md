@@ -66,6 +66,33 @@ Standard: linkage, fresh `BUILD_PATH_BASE` build, binary contains the new path (
 
 Agents may open the PR; only Chip merges. Two-round rule applies. Records committed and pushed per stage.
 
-## Closing record
+## Closing record (2026-10-12)
 
-(To be added: rounds and models, budget versus actual, controller edits, accepted edges, release.)
+**Result:** **VERIFIED WITH CONCERNS** at Stage 7 round 1 (`WO-2026-10-09-003-stage7-verdict.md`). **Stage 8 approved** by the architect. **Release: v41**, with WO-2026-10-09-001 (TimeDiag on change, #85) and WO-2026-10-09-002 (config window, #86).
+
+| Stage | Agent / model | Result |
+|---|---|---|
+| Step 0 | Claude Code, separate session, `claude-sonnet-5-5`, `--effort high` | PROCEED with option (b), est. +8 |
+| Stage 6 | Copilot, `claude-sonnet-5.5`, medium | +9 (7 code, 2 comment); 75/75 → 76/76 |
+| Stage 7 | Codex, `gpt-5.6-sol`, medium | VERIFIED WITH CONCERNS; 7 of 7 mutations caught (including Codex's log-text mutation) |
+
+Every model was probed first (§5). One round; no controller edits.
+
+| Item | Budget | Raised to (reason) | Actual net `src/` lines | Tests |
+|---|---|---|---|---|
+| WO-2026-10-09-003 | +20 | — | **+9** (`State_Report.cpp`: 7 code, 2 comment) | **76/76 (sh via zsh, py via python3)**; new `standby_latch_daily_clear_test` |
+
+- **ARM build:** 151468 / 1094 / 2220, which is +96 text over HEAD (151372 / 1094 / 2220, main with #85 and #86).
+- **What changed:** in `State_Report.cpp`, inside `if (due)` after `set_lastDailyCleanup(now)`, a latched device (`session.modemUnstable`) clears the four RAM fields and logs `MODEM_POLICY: standby re-allowed at daily close; night modem-off decides`. `State_Sleep.cpp` and `StateMachine.h` are unchanged.
+- **Finding 1 (medium), accepted under ruling 4.**
+  - The Stage 7 dispatch's "never in open hours" overstated the design.
+  - `due` means the last daily boundary hasn't been consumed (`DailyBoundary.cpp:34-42`), not that the park is closed now. So the clear runs at whichever report first consumes the boundary.
+  - On normal days that is the close report, before the night's full modem-off.
+  - Close hour 24 (midnight inside always-open hours; no fleet device uses it) and a missed close can return standby with no modem-off having run.
+  - **The guarantee is "the night's modem-off decides".** Nights without one were already accepted (ruling 4), with the two-connect-timeout trip as the protection.
+- **Finding 2 (low), noted.** The dispatch cited HEAD `c1c0f3a`. The actual HEAD was `27a2481`, which differs only by the Stage 7 dispatch file.
+- **Accepted edges (ruling 4):**
+  - an always-slow modem re-trips every night;
+  - an untrusted clock (`due` false) clears nothing;
+  - a night without a modem-off returns standby without a verdict.
+- **Bench:** none before merge, because the bench devices hibernate, which already clears the latch. **Field check after v41:** a US device that logs `MODEM_POLICY: standby temporarily disabled` should show `standby=1/1` again the morning after a clean night.
