@@ -134,6 +134,14 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
    - **Design (trimmed by the architect):** a `SerialLogHandler` subclass that mutes per-key repeats only: the key is the message with digits stripped, about 8 slots, one summary line per muted burst, ERROR exempt, and lines are dropped, not queued.
    - **Out of scope:** no global token bucket, and no status-ledger counter (the status payload is at about 847/896 bytes).
    - **Budget:** about **+30**, pending Chip's approval. History-first Step 0. Not yet dispatched.
+6. **Small fix: alert 40's 3 h window appears to count closed hours** (architect, 2026-10-11).
+   - **Mechanism:** at the first open report, the age of `lastHookResponse` spans the overnight close (about 8 h). That is more than `WEBHOOK_LONGTERM_ALERT40_SEC` (3 h, `ConnectivityPolicy.h:223`), so `raiseAlert(40)` runs (`State_Report.cpp:108-121`) on every non-hibernating device at every open. The first webhook response clears it (`Generalized-Core-Counter.cpp:2412-2416`). The only suppression is for an overnight hibernate wake at the open hour (`:1478-1485`), whose own comment calls the overnight gap "expected, not an error".
+   - **Evidence (v40 fleet health check, pass 2):**
+     - all eight non-hibernating US devices showed alert 40 on their 10 Oct OTA-boot status, each with `lastAlert` equal to its 06:00 open-report timestamp;
+     - Court2's v38 OTA boot on 7 Oct showed the same;
+     - Trail02, which hibernates, showed 0.
+   - **Limit:** an ordinary morning can't show it. The report payload records the alert code before the raise (`State_Report.cpp:69`), `device-status` has no alert field, and `status` events are published only at boot.
+   - **Why it matters:** only the 3 h cooldown, stamped by the raise itself (`MyPersistentData.cpp:913`), stops the 6 h ERROR_STATE escalation (`State_Report.cpp:136-147`) on that same pass.
 
 **Rollout and follow-ups** (not WOs).
 - **v40 release step: repeat the 1c migration check.** Before releasing v40, read the resolved `sensor.type` for every device: the `default-settings` and every `device-settings` instance. Any value other than 1 would now be rejected at config apply, and a value already stored would stop that device counting after its next reboot. On 2026-10-08 the default was 1 and no device overrode it (WO-2026-10-08-002 Step 0 report, appendix).
