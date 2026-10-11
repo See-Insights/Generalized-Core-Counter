@@ -130,11 +130,15 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
    - **Change:** when `socTrust` ≠ Trusted, the webhook `battery` field and both ledgers' `battery.soc` publish the voltage-based estimate the tier already uses, not the raw gauge SOC.
    - **Budget:** ≤ +10 expected.
    - **Field case:** Trail02 reported about 10% at 4.11–4.14 V with the charger showing DONE (the voltage-based estimate is about 94%; WO 3 evidence, PR #87).
-5. **A general log-flood limiter.**
+5. **The downgrade check misses connected KEEP_ALIVE devices** (architect, 2026-10-11).
+   - **Bug:** the battery check that sets the downgrade runs only on a report taken while the device is disconnected (`State_Report.cpp:168`, `:184`; the flag is set at `BatteryAuthorityCommand.cpp:80-83`). So a device that stays connected in a low tier never downgrades.
+   - **Field case (11 Oct, v40 fleet health check, PR #89):** Court1 was CONSERVING at 3.97 V in KEEP_ALIVE with `lowBatteryMode: false`. Court3, in the same state, did downgrade.
+   - **Same in v38 and v40.** Step 0 is history first.
+6. **A general log-flood limiter.**
    - **Design (trimmed by the architect):** a `SerialLogHandler` subclass that mutes per-key repeats only: the key is the message with digits stripped, about 8 slots, one summary line per muted burst, ERROR exempt, and lines are dropped, not queued.
    - **Out of scope:** no global token bucket, and no status-ledger counter (the status payload is at about 847/896 bytes).
    - **Budget:** about **+30**, pending Chip's approval. History-first Step 0. Not yet dispatched.
-6. **Small fix: alert 40's 3 h window appears to count closed hours** (architect, 2026-10-11).
+7. **Small fix: alert 40's 3 h window appears to count closed hours** (architect, 2026-10-11).
    - **Mechanism:** at the first open report, the age of `lastHookResponse` spans the overnight close (about 8 h). That is more than `WEBHOOK_LONGTERM_ALERT40_SEC` (3 h, `ConnectivityPolicy.h:223`), so `raiseAlert(40)` runs (`State_Report.cpp:108-121`) on every non-hibernating device at every open. The first webhook response clears it (`Generalized-Core-Counter.cpp:2412-2416`). The only suppression is for an overnight hibernate wake at the open hour (`:1478-1485`), whose own comment calls the overnight gap "expected, not an error".
    - **Evidence (v40 fleet health check, pass 2):**
      - all eight non-hibernating US devices showed alert 40 on their 10 Oct OTA-boot status, each with `lastAlert` equal to its 06:00 open-report timestamp;
