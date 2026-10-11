@@ -1,6 +1,8 @@
 #include "cloud/Cloud.h"
 #include "power/ConnectivityPolicy.h"
 #include "persist/SystemConfig.h"
+#include "time/Clock.h"
+#include "time/DailyBoundary.h"
 
 namespace {
 
@@ -108,6 +110,11 @@ bool Cloud::areLedgersSynced() const {
     static time_t lastObservedConnectionEpoch = 0;
     static bool timeoutOutcomeLogged = false;
     static bool readyOutcomeLogged = false;
+    // RAM only. Config hold (WO-2026-10-09-002): boot hold never depends on clock trust.
+    static time_t holdDoneEpoch = 0;
+    static bool configHold = false;
+    static time_t holdBaseDefault = 0;
+    static time_t holdBaseDevice = 0;
     unsigned long nowMs = millis();
     
     if (Particle.connected()) {
@@ -121,6 +128,10 @@ bool Cloud::areLedgersSynced() const {
             lastObservedConnectionEpoch = currentConnectionEpoch;
             timeoutOutcomeLogged = false;
             readyOutcomeLogged = false;
+            configHold = (holdDoneEpoch == 0) ||
+                         (Clock::isTrusted() && holdDoneEpoch < DailyBoundary::todayAt(SystemConfig::get_openTime()));
+            holdBaseDefault = defaultSync;
+            holdBaseDevice = deviceSync;
             if (SystemConfig::get_verboseMode()) {
                 Log.info("Connected - starting %lu ms ledger sync window", 
                          ConnectivityPolicy::LEDGER_SYNC_TIMEOUT_MS);
@@ -133,9 +144,19 @@ bool Cloud::areLedgersSynced() const {
 #endif
         }
 
+        // Count the hold window from the moment the output ledgers clear.
+        if (configHold && hasPendingOutputLedgerSync()) {
+            firstConnectedTime = nowMs;
+        }
+        const bool inputLanded = (defaultSync != holdBaseDefault) || (deviceSync != holdBaseDevice);
+        if (configHold && (inputLanded || nowMs - firstConnectedTime > ConnectivityPolicy::LEDGER_SYNC_TIMEOUT_MS)) {
+            Log.info("ConfigHold: ended reason=%s elapsed=%lu", inputLanded ? "onSync" : "timeout", nowMs - firstConnectedTime);
+            configHold = false;
+            holdDoneEpoch = currentConnectionEpoch ? currentConnectionEpoch : 1;
+        }
         // If both ledgers are already synced for this connection, do not force the
         // caller to wait out the remaining window. This is the key Alert 44 fix.
-        if (defaultSynced && deviceSynced) {
+        if (defaultSynced && deviceSynced && !configHold) {
             if (!readyOutcomeLogged) {
                 unsigned long elapsedSinceConnect = nowMs - firstConnectedTime;
 #if ENABLE_LEDGER_TRACE

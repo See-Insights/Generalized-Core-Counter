@@ -394,6 +394,7 @@ void handleSleepingState() {
   useNetworkStandbyEffective = false;
 #endif
 
+  static unsigned long cloudSyncStartMs = 0;
   // If a ledger update (or time progression) moves the park into OPEN hours
   // while we are in SLEEPING_STATE, abort sleeping immediately in CONNECTED
   // mode so we stay awake/connected and resume counting.
@@ -405,6 +406,7 @@ void handleSleepingState() {
   // than committing to a sleep the device can't actually justify.
   if (PowerManager::instance().effectiveConnectionMode() == SystemConfig::CONNECTED && Clock::openness() != Clock::Openness::Closed) {
     ensureSensorEnabled("SLEEP abort: CONNECTED+OPEN");
+    cloudSyncStartMs = 0;
     transitionTo(IDLE_STATE, "sleep-abort-open-hours");
     return;
   }
@@ -423,7 +425,6 @@ void handleSleepingState() {
   // Use a timeout budget to prevent battery drain if operations hang.
   // NOTE: This code is non-blocking at application level (Particle.process() called)
   // but blocks state transition until prerequisites complete or timeout.
-  static unsigned long cloudSyncStartMs = 0;
   static unsigned long cloudSyncBudgetMs = 0;
   static uint16_t cloudSyncMaxQueueDepth = 0;
   static uint16_t lastQueueDepth = 0xFFFF;
