@@ -16,6 +16,14 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v41-ConfigWindowLatch] - 2026-10-12
+
+### Changed
+
+- **Config changes now reach every sleeping device within a day** (WO-2026-10-09-002, PR #86): one short wait a day, at the first connection after open, and one at boot, so an inbound ledger sync is no longer cut off by sleep; no reset needed.
+- **A latched modem standby is re-allowed at each daily close** (WO-2026-10-09-003, PR #90): the night's full modem-off decides, so a still-slow modem re-trips and a healthy one has standby back the next morning, instead of waiting for a reboot.
+- **TimeDiag logs only on change in CONNECTED** (WO-2026-10-09-001, PR #85): on Idle entry and when its open, openness, trusted or valid state changes, instead of on every loop pass (about 100 lines/s).
+
 ## [v40-FailsafeAndSensorType] - 2026-10-08
 
 ### Changed
