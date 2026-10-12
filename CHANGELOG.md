@@ -16,7 +16,15 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
-## [v41-ConfigWindowLatch] - 2026-10-12
+## [v42-ConfigWindowLatch] - 2026-10-12
+
+### Changed
+
+- **Fleet release of v41's code, with a version-string change only.** v42 contains exactly v41's three changes below. The only `src/` difference from the soaked v41 build is the version string. Product firmware v41 holds the release PR's first build, which reports `v41-ConfigWindowAndStandby`, and Particle can't replace a binary once it has been deployed. So the fleet gets v42.
+
+## [v41-ConfigWindowAndStandby] - 2026-10-12
+
+Bench only (Dev-09 and Dev-14); this is the string product firmware v41 reports. Released to the fleet as v42.
 
 ### Changed
 
