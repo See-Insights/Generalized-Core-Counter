@@ -15,9 +15,9 @@
 #define FIRMWARE_VERSION_H
 
 /** @brief Particle Product integer version (must be an integer). */
-#define FIRMWARE_PRODUCT_VERSION 41
+#define FIRMWARE_PRODUCT_VERSION 42
 
 /** @brief Current firmware release string. */
-inline const char* FIRMWARE_VERSION = "v41-ConfigWindowLatch";
+inline const char* FIRMWARE_VERSION = "v42-ConfigWindowLatch";
 
 #endif /* FIRMWARE_VERSION_H */
