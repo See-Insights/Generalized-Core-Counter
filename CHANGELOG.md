@@ -16,6 +16,14 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v41-ConfigWindowAndStandby] - 2026-10-12
+
+### Changed
+
+- **A ledger config change reaches a sleeping device within a day, without a reset** (WO-2026-10-09-002, PR #86). On the boot connection, and on the first connection after each day's open, the sleep gate holds briefly after the outbound ledgers clear. The hold ends when an input ledger syncs, or after 10 s. Before this, an inbound sync could be cut off by teardown, and a change landed only at the next reboot. No other connection waits. The CONNECTED+open sleep abort now also resets the gate's start time.
+- **The modem standby latch clears once a day** (WO-2026-10-09-003, PR #90). A device whose standby was suppressed after a slow teardown gets standby back at the daily boundary. The night's full modem-off decides: a still-slow modem re-trips, and a healthy one has standby back the next morning. Before this, the latch lasted until a reboot. Logs `MODEM_POLICY: standby re-allowed at daily close; night modem-off decides`.
+- **Idle logs TimeDiag only when it changes** (WO-2026-10-09-001, PR #85). In CONNECTED during open hours, TimeDiag used to be logged on almost every loop pass, about 100 lines/s. It is now logged on Idle entry and when `isOpen`, `openness`, `trusted` or `valid` changes.
+
 ## [v40-FailsafeAndSensorType] - 2026-10-08
 
 ### Changed
