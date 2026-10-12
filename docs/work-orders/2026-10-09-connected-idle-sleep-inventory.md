@@ -88,8 +88,14 @@ Each row's line numbers are at HEAD. Net lines come from the diffs.
 | 6 | Idle CONNECTED branch | `State_Idle.cpp:119-133` | Mode CONNECTED: read `Clock::openness()` (`:120`; `Clock.cpp:567`: Unknown if untrusted or config invalid, else Open or Closed), then call `logTimeDiag()` (`:125`) on every pass. If Closed, go to Sleep as "park closed" (`:128`). If Open or Unknown, fall through. |
 | 7 | Rest of Idle | `:217`, `:262-338` | The `!= CONNECTED` block is skipped. The ceiling is exempt when cloud is up and openness is Open (`:295-298`), so there is no transition. Idle returns and the next loop pass repeats step 6. This steady state matches the sample: no `StateReq`, TimeDiag about 10 ms apart. |
 
-**Cycle-capable paths (INF, not seen in the sample):**
-- **Ceiling trip:** a CONNECTED device with cloud down or openness Unknown is not exempt (`:295-298`). After `connectAttemptBudgetSec` (30-900 s, 300 s fallback), the ceiling trips (`:324-335`) and sends it to Sleep. The abort at `:406` returns it to Idle, because Unknown is not Closed. The trip forces the radio off (`:331`).
+**Cycle-capable paths:**
+- **Ceiling trip (OBSERVED 2026-10-13; was INF):** a CONNECTED device with cloud down or openness Unknown is not exempt (`:295-298`). After `connectAttemptBudgetSec` (30-900 s, 300 s fallback), the ceiling trips (`:324-335`) and sends it to Sleep. The abort at `:406` returns it to Idle, because Unknown is not Closed. The trip forces the radio off (`:331`).
+  - **Field case (Dev-09, v41, CONNECTED, 13 Oct 2026 06:23:56–07:00 SGT; forwarded serial; line numbers above are at `c745ac3`):**
+    - `06:23:56 [comm.protocol] ERROR: Event loop error 1`, then `Communication loop error, closing cloud socket`.
+    - `06:23:59 IDLE ceiling trip: mode=0 cloud=0 radioOn=1 elapsedMs=1418478 … -> forcing teardown and sleep`, then `Idle->Sleep reason=idle ceiling exceeded` and `THRASH st=Sleeping … action=backoff`.
+    - `06:24:04 Sleep->Idle reason=sleep-abort-open-hours`.
+    - `06:28` DNS, `Cloud handshake failed`, `No response from NCP`, `PPP error event data=5`.
+    - **No reconnect until the scheduled report:** `07:00:09 Idle->Report reason=report interval`, then `Report->Connect`, then `07:00:41 Connect->Idle reason=connect-complete`. The device was offline about 30 min while in CONNECTED.
 - **Boundary flip:** a Closed↔Open flip between an Idle pass and the next Sleep pass would bounce between `:128` and `:406`. Both use `Clock::openness()`, so this needs a trust or hour change between passes.
 
 ## Where the attempts agree and disagree
@@ -116,7 +122,7 @@ No record shows a failed attempt at this bug, so I cannot list approaches that a
 ## Open points
 
 1. **Device log:** only a forwarded 1-line/s sample exists. I cannot say from the repo whether any `Sleep->Idle` repeats beyond the one shown. A full-rate log or `StateReq` count would settle cycle vs steady state.
-2. **Radio after the ceiling:** after a ceiling trip and abort, the radio is off and Idle's CONNECTED branch has no reconnect call. I did not trace who reconnects (INF).
+2. **Radio after the ceiling:** after a ceiling trip and abort, the radio is off and Idle's CONNECTED branch has no reconnect call. I did not trace who reconnects (INF). **Answered by observation (2026-10-13):** nothing reconnected until the next scheduled report (Dev-09, about 30 min offline; see "Ceiling trip" above).
 3. **Snapshot lag:** `Clock::openness()` reads a per-UTC-minute `LocalTimeCache` snapshot (`Clock.cpp:581-582`), while TimeDiag's `local=` is live (row F). The two can disagree for up to about 59 s at an open or close hour (INF).
 4. **First tag:** I did not find a first-shipped tag for rows D, E and F (no tag contains them; product versions 24 and 26 are read from the tree).
 5. **Method:** I searched the strings listed in the dispatch plus `ping-pong`, `abort`, `flood`, per-pass phrases and `revert`. I used `git log -S`, `-G`, `--follow`, `-L` and `blame`. I did not read every WO in full.
