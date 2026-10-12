@@ -18,6 +18,6 @@
 #define FIRMWARE_PRODUCT_VERSION 41
 
 /** @brief Current firmware release string. */
-inline const char* FIRMWARE_VERSION = "v41-ConfigWindowAndStandby";
+inline const char* FIRMWARE_VERSION = "v41-ConfigWindowLatch";
 
 #endif /* FIRMWARE_VERSION_H */
