@@ -19,20 +19,6 @@ Tier tierFromSoc(float soc) {
 
 } // namespace
 
-const char *label(Tier tier) {
-  switch (tier) {
-  case Tier::Full:
-    return "Full";
-  case Tier::Reduced:
-    return "Reduced";
-  case Tier::Low:
-    return "Low";
-  case Tier::Critical:
-    return "Critical";
-  }
-  return "Unknown";
-}
-
 Tier evaluate(float vcell, float soc, BatteryHealth::SocTrust trust) {
   if (vcell <= kCriticalVcell) {
     return Tier::Critical;

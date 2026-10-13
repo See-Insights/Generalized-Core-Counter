@@ -284,17 +284,6 @@ bool SensorManager::chargeDisableConfigVerified() const {
   return _chargeDisableConfigVerified;
 }
 
-void SensorManager::setup() {
-    if (!_sensor) {
-        Log.error("No sensor assigned! Call setSensor() first.");
-        return;
-    }
-    
-    if (!_sensor->setup()) {
-        Log.error("Sensor setup failed");
-    }
-}
-
 void SensorManager::setSensor(ISensor* sensor) {
     if (sensor) {
         _sensor = sensor;
@@ -357,13 +346,6 @@ bool SensorManager::loop() {
     }
     
     return false;
-}
-
-SensorData SensorManager::getSensorData() const {
-    if (_sensor) {
-        return _sensor->getData();
-    }
-    return SensorData();
 }
 
 bool SensorManager::isSensorReady() const {
@@ -1236,37 +1218,4 @@ bool SensorManager::measureTemperatureAndApplyChargeDecision() {
 #endif
 
   return safe;
-}
-
-void SensorManager::getSignalStrength() {
-  char signalStr[64] = {0};  // Initialize buffer to zeros to prevent garbage output
-  
-#if HAL_PLATFORM_CELLULAR
-  const char *radioTech[10] = {"Unknown",    "None",       "WiFi", "GSM",
-                               "UMTS",       "CDMA",       "LTE",  "IEEE802154",
-                               "LTE_CAT_M1", "LTE_CAT_NB1"};
-  // New Signal Strength capability -
-  // https://community.particle.io/t/boron-lte-and-cellular-rssi-funny-values/45299/8
-  CellularSignal sig = Cellular.RSSI();
-
-  auto rat = sig.getAccessTechnology();
-
-  // float strengthVal = sig.getStrengthValue();
-  float strengthPercentage = sig.getStrength();
-
-  // float qualityVal = sig.getQualityValue();
-  float qualityPercentage = sig.getQuality();
-
-  snprintf(signalStr, sizeof(signalStr), "%s S:%2.0f%%, Q:%2.0f%%",
-           radioTech[rat], strengthPercentage, qualityPercentage);
-  Log.info(signalStr);
-#elif HAL_PLATFORM_WIFI
-  WiFiSignal sig = WiFi.RSSI();
-  float strengthPercentage = sig.getStrength();
-  float qualityPercentage = sig.getQuality();
-  
-  snprintf(signalStr, sizeof(signalStr), "WiFi S:%2.0f%%, Q:%2.0f%%",
-           strengthPercentage, qualityPercentage);
-  Log.info(signalStr);
-#endif
 }

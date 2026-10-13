@@ -43,11 +43,6 @@ constexpr float kReducedSocThreshold = 55.0f;
 constexpr float kLowSocThreshold = 35.0f;
 
 /**
- * @brief Converts a tier value to a stable log label.
- */
-const char *label(Tier tier);
-
-/**
  * @brief Pure tier evaluation from cell voltage, gauge SoC, and F1's trust signal.
  *
  * @param vcell Measured cell voltage

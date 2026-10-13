@@ -363,34 +363,6 @@ public:
      */
     bool areLedgersSynced() const;
 
-    /**
-     * @brief Calculate connection interval multiplier based on battery tier
-     * 
-     * @details Returns multiplier to apply to base reportingInterval:
-     *          - TIER_HEALTHY: 1x (no change)
-     *          - TIER_CONSERVING: 2x (half connections per day)
-     *          - TIER_CRITICAL: 4x (quarter connections per day)
-     *          - TIER_SURVIVAL: 12x (e.g., 1hr base → 12hr, 30min base → 6hr)
-     * 
-     * @param tier Current battery tier
-     * @return Interval multiplier (1, 2, 4, or 12)
-     */
-    static uint16_t getIntervalMultiplier(BatteryTier tier);
-
-    /**
-     * @brief Evaluate connection history and return backoff multiplier
-     * 
-     * @details Analyzes lastConnectionDuration to determine location quality:
-     *          - Fast (<60s): 1.0x (no additional backoff)
-     *          - Normal (60-180s): 1.0x (no additional backoff)
-     *          - Slow (180-300s): 1.5x (additional backoff)
-     *          - Problem (>300s or failed): 2.0x (strong backoff)
-     * 
-     * @param lastDurationSec Last connection duration in seconds (0 = failed)
-     * @return Backoff multiplier (1.0, 1.5, or 2.0)
-     */
-    static float getConnectionBackoffMultiplier(uint16_t lastDurationSec);
-
 private:
 	// Match the device-status writer capacity so additive fields cannot make
 	// duplicate suppression compare a silently truncated prior payload.

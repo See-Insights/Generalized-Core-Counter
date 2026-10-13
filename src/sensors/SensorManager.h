@@ -39,14 +39,6 @@ enum class BatterySampleContext : uint8_t {
 
 /**
  * @brief Convenience macro for accessing the SensorManager singleton.
- *
- * Usage:
- * @code
- *   measure.setup();
- *   if (measure.loop()) {
- *       auto data = measure.getSensorData();
- *   }
- * @endcode
  */
 #define measure SensorManager::instance()
 
@@ -56,11 +48,6 @@ public:
      * @brief Get the SensorManager singleton instance.
      */
     static SensorManager &instance();
-
-    /**
-     * @brief Initialize the active sensor and any manager state.
-     */
-    void setup();
 
     /**
      * @brief Poll the active sensor; call from the main loop.
@@ -75,11 +62,6 @@ public:
      * @param sensor Pointer to a concrete ISensor (not owned).
      */
     void setSensor(ISensor* sensor);
-
-    /**
-     * @brief Get the latest sensor data from the active sensor.
-     */
-    SensorData getSensorData() const;
 
     /**
      * @brief Check whether the active sensor is initialized and ready.
@@ -189,11 +171,6 @@ public:
      * it.
      */
     bool chargeDisableConfigVerified() const;
-
-    /**
-     * @brief Update global signal strength strings for logging/telemetry.
-     */
-    void getSignalStrength();
 
     ///@}
     

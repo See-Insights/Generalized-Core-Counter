@@ -124,15 +124,6 @@ struct PowerReport {
 };
 
 /**
- * @brief Wake-context inputs used when sampling and classifying power state.
- */
-struct PowerInputs {
-  float enclosureTempC = NAN;
-  bool wokeFromLowPowerSleep = false;
-  bool radioIsOn = false;
-};
-
-/**
  * @brief Singleton that samples platform power telemetry and produces policy guidance.
  */
 class PowerManager {
@@ -164,27 +155,6 @@ public:
    * @return Reference to the latest PowerReport
    */
   const PowerReport &latestReport() const;
-
-  /**
-   * @brief Returns the detected hardware power capabilities.
-   *
-   * @return Reference to the capabilities snapshot
-   */
-  const PowerCapabilities &capabilities() const;
-
-  /**
-   * @brief Returns whether the current platform exposes a PMIC.
-   *
-   * @return true when PMIC support is available
-   */
-  bool hasPmic() const;
-
-  /**
-   * @brief Returns whether the current platform exposes a fuel gauge.
-   *
-   * @return true when fuel-gauge telemetry is available
-   */
-  bool hasFuelGauge() const;
 
   /**
    * @brief Returns the currently accepted battery state of charge.
@@ -232,22 +202,6 @@ public:
   uint8_t effectiveConnectionMode() const;
 
   /**
-   * @brief Converts availability enum values to stable log labels.
-   *
-   * @param availability Availability enum to stringify
-   * @return Stable C string label
-   */
-  static const char *availabilityLabel(PowerAvailability availability);
-
-  /**
-   * @brief Converts battery-context enum values to stable log labels.
-   *
-   * @param context Battery context enum to stringify
-   * @return Stable C string label
-   */
-  static const char *batteryContextLabel(PowerBatteryContext context);
-
-  /**
    * @brief Converts input-profile enum values to stable log labels.
    *
    * @param profile Input profile enum to stringify
@@ -284,5 +238,4 @@ private:
   PowerManager();
 
   PowerReport report_;
-  bool setupComplete_;
 };

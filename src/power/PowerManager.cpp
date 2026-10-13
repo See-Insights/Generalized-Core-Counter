@@ -87,7 +87,7 @@ PowerManager &PowerManager::instance() {
   return instance;
 }
 
-PowerManager::PowerManager() : report_(), setupComplete_(false) {
+PowerManager::PowerManager() : report_() {
   report_.capabilities = PowerPlatform::detectCapabilities();
   report_.action.chargingControlAvailable = report_.capabilities.hasChargingControl;
 }
@@ -96,7 +96,6 @@ bool PowerManager::setup() {
   report_.capabilities = PowerPlatform::detectCapabilities();
   report_.action.chargingControlAvailable = report_.capabilities.hasChargingControl;
   refreshInputProfile();
-  setupComplete_ = true;
   return true;
 }
 
@@ -216,18 +215,6 @@ const PowerReport &PowerManager::latestReport() const {
   return report_;
 }
 
-const PowerCapabilities &PowerManager::capabilities() const {
-  return report_.capabilities;
-}
-
-bool PowerManager::hasPmic() const {
-  return report_.capabilities.hasPmic;
-}
-
-bool PowerManager::hasFuelGauge() const {
-  return report_.capabilities.hasFuelGauge;
-}
-
 float PowerManager::soc() const {
   return CurrentReadings::get_stateOfCharge();
 }
@@ -244,14 +231,6 @@ bool PowerManager::downgradeActive() const {
 
 uint8_t PowerManager::effectiveConnectionMode() const {
   return downgradeActive() ? SystemConfig::INTERMITTENT : SystemConfig::get_configuredConnectionMode();
-}
-
-const char *PowerManager::availabilityLabel(PowerAvailability availability) {
-  return PowerDiagnostics::availabilityLabel(availability);
-}
-
-const char *PowerManager::batteryContextLabel(PowerBatteryContext context) {
-  return PowerDiagnostics::batteryContextLabel(context);
 }
 
 const char *PowerManager::inputProfileLabel(PowerInputProfile profile) {
