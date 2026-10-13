@@ -70,6 +70,42 @@ Release ELF before and after: only the removed symbols disappear; no other symbo
 
 None before merge (no behavior change). Rides the next release soak.
 
-## Closing record
+## Closing record (2026-10-13)
 
-Budget versus actual (net, gross, text bytes), what was kept for 2b and why.
+**Result:** **VERIFIED WITH CONCERNS** at Stage 7 round 1 (`WO-2026-10-13-001-stage7-verdict.md`), with no FAIL. **Stage 8 approved** by the architect. **Release: v43.** Don't merge until product v42 is uploaded from the `ff1715c` build.
+
+| Stage | Agent / model | Result |
+|---|---|---|
+| Step 0 | Claude Code, separate session, `claude-sonnet-5-5`, `--effort medium` | PROCEED, est. −450 |
+| Stage 6 | Copilot, `claude-sonnet-5.5`, medium | −460 net (+1/−461); kept ruling 4's function as live; 76/76 |
+| Stage 7 | Codex, `gpt-5.6-sol`, medium | VERIFIED WITH CONCERNS; every extra symbol change traced to a deletion |
+
+Every model was probed first (§5). One round; no controller edits.
+
+| Item | Budget | Actual | Gross `src/` additions | ARM text |
+|---|---|---|---|---|
+| Commit (a): PMIC charge-cycle test | ≤ 0 | **−158** | 0 | 151460 → 151444 |
+| Commit (b): everything else | ≤ 0 | **−302** | 1 (ruling 1's modified line) | → 151372 |
+| **WO total** | ≤ 0, target −180 to −280 | **−460** | **1** | **−88 bytes**; bss 2220 → 2212; data unchanged |
+
+- **Tests:** **76/76 (sh via zsh, py via python3)** before and after. No test changed.
+- **Deleted:**
+  - the charge-cycle test;
+  - `SensorManager` `setup`, `getSensorData` and `getSignalStrength`, and the doc example;
+  - all of `BatteryBackoff.cpp`, with the two Cloud wrapper declarations;
+  - the `PowerManager` wrappers (`capabilities`, `hasPmic`, `hasFuelGauge`, `availabilityLabel`, `batteryContextLabel`), `PowerInputs` and `setupComplete_`;
+  - `PowerPlatform::hasFuelGauge`, `PowerTier::label` and `SensorFactory::getSensorTypeName`;
+  - `PIRSensor::_isrCount` and `sensorISR`;
+  - `StateHandlers.cpp` and `SensorData.h`, plus their two `ARCHITECTURE_OVERVIEW.md` entries.
+- **Ruling 4 withdrawn:** `PowerManager::profileSelectionReasonLabel` is **kept as live**. It is called unqualified at `PowerManager.cpp:206` and inlined, so it has no ELF symbol. Step 0 searched only the qualified name. Copilot kept it, and Codex confirmed. §13 (c) now requires bare-name caller searches.
+- **Accepted symbol changes:**
+  - ruling 7: `pirISR()` 0x18→0x0c and `PowerManager()` 0x60→0x5c;
+  - the pre-ruling, each confirmed as compiler fallout: the `batteryState` lambda +8 with the `powerSource()` `.isra` clone inlined, and `CSWTCH.*` renumbering;
+  - accepted under ruling 1 at Stage 8: `PowerManager::setup()` 0x32→0x2e and the `PowerManager` instance 0x38→0x34.
+- **Kept for 2b, and why.** Each is dead or orphaned after 2a, but removing it touches a live branch, an interface, or a persisted-field accessor:
+  - `PowerDiagnostics::availabilityLabel` and `batteryContextLabel`, whose only callers were the deleted wrappers;
+  - `PowerCapabilities::hasFuelGauge`, set at `PowerPlatform.cpp` and never read;
+  - `ISensor::setup()`, still in `PIRSensor`'s vtable;
+  - `sensorDetect`, never written after `sensorISR`'s removal but still read in Sleep and Idle;
+  - the legacy `SystemConfig::get_sensorType()`, which has no reader but whose persisted field stays.
+- **Bench:** none, since there is no behavior change. It rides the v43 soak.
