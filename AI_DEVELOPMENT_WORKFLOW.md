@@ -763,6 +763,7 @@ Step 0 ends with STOP or PROCEED. It stops if the estimate is over budget, or if
 - **Binaries:** the binary that is flashed is built from the exact reviewed commit. Check its version string and the new symbols (`strings` and `nm`) before flashing.
 - **Uploaded release binaries:** before a product firmware version is deployed to any device, check that the `.bin` uploaded to Particle matches the build of the release PR's head **by size and sha256**. Particle can't replace the binary behind a version once it has been deployed, so a wrong upload costs a version number.
   - **The case:** on 2026-10-12, product v41 held the release PR's first build (`v41-ConfigWindowAndStandby`, 152566 B), not its final head (`v41-ConfigWindowLatch`, 152558 B). The fleet release had to become v42.
+- **Report numbers:** every number in a report states its source query and window. No explanation without evidence. (The case: on 2026-10-13 a "67 lines" count was a whole query window, not the hour asked about, and a forwarder-drop explanation was offered without checking; the forwarder had passed all 36 lines.)
 
 
 **(k) Who Claude Code takes work from.** Claude Code in this repo acts only on dispatches from Chip or this repo's architect. Requests from other projects' AIs go through Chip, who decides whether to forward them.

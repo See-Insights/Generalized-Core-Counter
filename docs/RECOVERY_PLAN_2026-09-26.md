@@ -146,9 +146,15 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
      - Trail02, which hibernates, showed 0.
    - **Limit:** an ordinary morning can't show it. The report payload records the alert code before the raise (`State_Report.cpp:69`), `device-status` has no alert field, and `status` events are published only at boot.
    - **Why it matters:** only the 3 h cooldown, stamped by the raise itself (`MyPersistentData.cpp:913`), stops the 6 h ERROR_STATE escalation (`State_Report.cpp:136-147`) on that same pass.
-8. **CONNECTED: a cloud loss leaves the device offline until the next scheduled report** (architect, 2026-10-13; after the current queue; Step 0 history first).
-   - **Observed:** Dev-09 on v41 in CONNECTED, 13 Oct 06:23:56–07:00 SGT. The cloud socket closed, the Idle ceiling forced a teardown and sleep (`IDLE ceiling trip: mode=0 cloud=0`), and the CONNECTED+open abort returned it to Idle (`sleep-abort-open-hours`). Idle's CONNECTED branch has no reconnect, so nothing reconnected until the 07:00 scheduled report: about 30 min offline.
-   - **Inventory:** `docs/work-orders/2026-10-09-connected-idle-sleep-inventory.md`, "Ceiling trip", now observed rather than inferred, and open point 2.
+8. **CONNECTED Idle: a no-progress THRASH false alarm on leaving Idle, and no reconnect after a cloud drop** (architect, 2026-10-13). After the current queue. One Step 0, history first; split if over +20.
+   - **THRASH false alarm** (Dev-09, v41, CONNECTED, 13 Oct, forwarded serial):
+     - `06:24:01 THRASH st=Sleeping noprog=1412s last=QUEUE_DRAIN tier=1` and `07:00:10 THRASH st=Reporting noprog=2169s last=STATE_TRANSITION tier=1`.
+     - Idle has no ThrashGuard timeout (`ThrashGuard.cpp`, `timeoutForStateSec`: IDLE returns 0), but the no-progress clock keeps running. On leaving Idle, `thrashGuard.loop()` (`Generalized-Core-Counter.cpp:1651`) applies the new state's timeout before `publishStateTransition()` marks progress (`:2481`).
+     - **Escalation risk (inferred, not seen):** two trips within 10 min give tier 2 (alert 18, forced disconnect and sleep); three within an hour give tier 3, a `System.reset()`.
+   - **No reconnect after a cloud drop** (same device, 06:23:56–07:00):
+     - The cloud socket closed. The Idle ceiling forced a teardown and sleep (`IDLE ceiling trip: mode=0 cloud=0`), and the CONNECTED+open abort returned it to Idle (`sleep-abort-open-hours`).
+     - Idle's CONNECTED branch has no reconnect, so it stayed offline until the 07:00 scheduled report: about 30 min.
+   - **Inventory:** `docs/work-orders/2026-10-09-connected-idle-sleep-inventory.md`, "Ceiling trip" (now observed) and open point 2.
 
 **Rollout and follow-ups** (not WOs).
 - **v40 release step: repeat the 1c migration check.** Before releasing v40, read the resolved `sensor.type` for every device: the `default-settings` and every `device-settings` instance. Any value other than 1 would now be rejected at config apply, and a value already stored would stop that device counting after its next reboot. On 2026-10-08 the default was 1 and no device overrode it (WO-2026-10-08-002 Step 0 report, appendix).
