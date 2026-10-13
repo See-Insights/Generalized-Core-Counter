@@ -49,7 +49,7 @@ Rulings:
 1. **Include `setupComplete_` (3k).** A modified line that only removes code is allowed: `PowerManager.cpp:90`, `: report_(), setupComplete_(false)` → `: report_()`.
 2. **Delete `src/cloud/BatteryBackoff.cpp` entirely,** including its history comments. The history stays in git and WO-2026-09-21.
 3. **Delete the doc example at `SensorManager.h:43–49`.** It names the deleted `setup()` and `getSensorData()`.
-4. **Add `PowerManager::profileSelectionReasonLabel`** (`PowerManager.cpp:264–268`, `PowerManager.h:266–274`). It has no caller and no ELF symbol.
+4. **~~Add `PowerManager::profileSelectionReasonLabel`~~ — WITHDRAWN (architect, 2026-10-13).** It is live: called unqualified at `PowerManager.cpp:206`, and inlined, so it has no ELF symbol. Copilot was right to keep it. Original ruling: add `PowerManager::profileSelectionReasonLabel` (`PowerManager.cpp:264–268`, `PowerManager.h:266–274`). It has no caller and no ELF symbol.
 5. **Fix `ARCHITECTURE_OVERVIEW.md:11` and `:88`,** which name the two deleted stubs.
 6. **List the 2b leftovers in the closing record:**
    - `PowerDiagnostics::availabilityLabel` and `batteryContextLabel`;
@@ -59,6 +59,8 @@ Rulings:
    - the legacy `SystemConfig::get_sensorType()`.
 7. **Stage 7:** `PIRSensor::pirISR()` may shrink, by losing `_isrCount++`, and so may `PowerManager::PowerManager()`, by losing `setupComplete_`. No other symbol may change size.
 8. **Two commits:** (a) the charge-cycle test alone, then (b) everything else.
+
+**Stage 7 pre-ruling (architect, 2026-10-13):** the `SensorManager::batteryState` lambda's +8 bytes, the `SystemClass::powerSource()` `.isra` clone that is now inlined, and the `CSWTCH.*` renumbering are **accepted as observations**, provided Codex confirms each is compiler fallout from a deletion, with no logic change.
 
 ## Verification (Stage 7, preview)
 
