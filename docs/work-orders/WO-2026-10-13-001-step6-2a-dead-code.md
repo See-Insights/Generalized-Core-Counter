@@ -41,6 +41,25 @@ Net `src/` lines **≤ 0**, target **−180 to −280**. Gross additions to `src
 4. Total net lines, split into two commits: (a) the charge-cycle test alone, (b) everything else — per the Codex report's advice to isolate the large deletion.
 5. **Stop and report** if any candidate is used by a release build, if removal needs any `src/` addition beyond deleting a declaration, or if the total is under −100 (then 2a may not be worth a separate WO; say so).
 
+## Step 0 (done) and the architect's rulings (2026-10-13)
+
+`WO-2026-10-13-001-step0-report.md`: **PROCEED**, about −450 net `src/` lines, with 0 additions. Step 0 ran as a separate session on `claude-sonnet-5-5` at `--effort medium`. Every candidate is dead in the release build and in the live test and bench builds. `sensorISR` and `_isrCount` are deleted, not kept for 2b. `clearLowBatteryMode` was already gone.
+
+Rulings:
+1. **Include `setupComplete_` (3k).** A modified line that only removes code is allowed: `PowerManager.cpp:90`, `: report_(), setupComplete_(false)` → `: report_()`.
+2. **Delete `src/cloud/BatteryBackoff.cpp` entirely,** including its history comments. The history stays in git and WO-2026-09-21.
+3. **Delete the doc example at `SensorManager.h:43–49`.** It names the deleted `setup()` and `getSensorData()`.
+4. **Add `PowerManager::profileSelectionReasonLabel`** (`PowerManager.cpp:264–268`, `PowerManager.h:266–274`). It has no caller and no ELF symbol.
+5. **Fix `ARCHITECTURE_OVERVIEW.md:11` and `:88`,** which name the two deleted stubs.
+6. **List the 2b leftovers in the closing record:**
+   - `PowerDiagnostics::availabilityLabel` and `batteryContextLabel`;
+   - `PowerCapabilities::hasFuelGauge`;
+   - `ISensor::setup()`;
+   - `sensorDetect`, which is never written after 2a;
+   - the legacy `SystemConfig::get_sensorType()`.
+7. **Stage 7:** `PIRSensor::pirISR()` may shrink, by losing `_isrCount++`, and so may `PowerManager::PowerManager()`, by losing `setupComplete_`. No other symbol may change size.
+8. **Two commits:** (a) the charge-cycle test alone, then (b) everything else.
+
 ## Verification (Stage 7, preview)
 
 Release ELF before and after: only the removed symbols disappear; no other symbol changes size. Text size drops. Tests `N/N (sh via zsh, py via python3)`. Fresh `BUILD_PATH_BASE`.
