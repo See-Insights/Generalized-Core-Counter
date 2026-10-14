@@ -77,12 +77,6 @@ public:
     virtual ~ISensor() {}
     
     /**
-     * @brief Initialize the sensor hardware
-     * @return true if successful, false otherwise
-     */
-    virtual bool setup() = 0;
-    
-    /**
      * @brief Poll the sensor for new data
      * @return true if new data is available and stored, false otherwise
      */
@@ -112,12 +106,10 @@ public:
     virtual void reset() = 0;
 
     /**
-     * @brief Initialize underlying hardware after power-on.
-     *
-     * Default implementation just calls setup(); sensors with more
-     * complex power sequencing can override this.
+     * @brief Initialize the sensor hardware after power-on.
+     * @return true if successful, false otherwise
      */
-    virtual bool initializeHardware() { return setup(); }
+    virtual bool initializeHardware() = 0;
 
     /**
      * @brief Notification that the device is entering deep sleep.

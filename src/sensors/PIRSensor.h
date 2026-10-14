@@ -33,10 +33,10 @@ public:
     }
 
     /**
-     * @brief Initialize the PIR sensor
+     * @brief Initialize the PIR sensor hardware (pins, interrupt, state)
      * @return true if initialization successful
      */
-    bool setup() override {
+    bool initializeHardware() override {
         // Configure PIR-related pins from device_pinout
         pinMode(intPin, INPUT_PULLDOWN);   // PIR interrupt output with pull-down
         pinMode(disableModule, OUTPUT);    // Sensor enable line (active LOW)
