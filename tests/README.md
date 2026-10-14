@@ -43,7 +43,8 @@ the actual shipped source directly:
 
 ```sh
 zsh tests/watchdog_ab1805_classification_test.sh   # item 1: AB1805 wake-reason classification
-zsh tests/watchdog_alert_code_test.sh              # item 3: new alert code severity/auto-clear/payload
+zsh tests/watchdog_alert_code_test.sh              # item 3: new alert code severity/auto-clear (payload bytes: report_payload_golden_test.sh)
+zsh tests/report_payload_golden_test.sh             # WO-2026-10-14-001: golden webhook payload bytes, event name and flags (175 vectors)
 python3 tests/sleep_breadcrumb_sequence_test.py    # item 2: sleep-entry breadcrumb ordering (traces real source)
 python3 tests/serial_settle_test.py                # item 4: always-on serial-settle placement/gating (traces real source)
 ```

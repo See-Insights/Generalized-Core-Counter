@@ -1,8 +1,8 @@
 // Host-side regression test for item 3 (new watchdog-reset alert code) of
 // WO-2026-08-10-001: the alert severity tier, its inclusion in
 // isAutoClearAfterReportAlert() (WO-2026-10-06-001; it was excluded, so
-// sticky, before), and confirmation that the code actually
-// reaches the Ubidots-bound webhook payload's "alerts" field.
+// sticky, before). The payload's "alerts" field is pinned by
+// report_payload_golden_test.sh, which runs the real publishData().
 //
 // getAlertSeverity() (src/MyPersistentData.cpp) and
 // isAutoClearAfterReportAlert() (src/Generalized-Core-Counter.cpp) are both
@@ -16,17 +16,11 @@
 //   2. Cross-checks that mirror against the actual source text via grep, so
 //      the mirror cannot silently drift from the real switch tables without
 //      failing (see the accompanying .sh driver).
-//   3. Builds a sample OCCUPANCY-mode and COUNTING-mode webhook payload using
-//      the exact snprintf format strings copied from publishData()
-//      (Generalized-Core-Counter.cpp) and confirms alert code 19 appears in
-//      the resulting "alerts" field, proving the existing
-//      current.get_alertCode() -> "alerts" pipeline requires no new plumbing.
 
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <string>
 
 namespace {
 
@@ -95,43 +89,6 @@ int8_t raiseAlert(int8_t existing, int8_t candidate) {
     return candidate;
   }
   return existing;
-}
-
-// Builds the OCCUPANCY-mode webhook payload using the exact snprintf format
-// string from publishData() (Generalized-Core-Counter.cpp), with the
-// "alerts" field driven by the given alert code - mirroring
-// `const int8_t reportedAlertCode = current.get_alertCode();` feeding
-// directly into the payload.
-std::string buildOccupancyPayload(int8_t alertCode) {
-  char data[256];
-  snprintf(data, sizeof(data),
-           "{\"occupancy\":%d,\"dailyoccupancy\":%lu,\"battery\":%4.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"alerts\":%i,\"resets\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
-           1,
-           120UL,
-           78.5f,
-           "Discharging",
-           23.4f,
-           (int)alertCode,
-           3,
-           45,
-           1723300000UL);
-  return std::string(data);
-}
-
-std::string buildCountingPayload(int8_t alertCode) {
-  char data[256];
-  snprintf(data, sizeof(data),
-           "{\"hourly\":%i,\"daily\":%i,\"battery\":%4.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"resets\":%i,\"alerts\":%i,\"connecttime\":%i,\"timestamp\":%lu000}",
-           12,
-           88,
-           78.5f,
-           "Discharging",
-           23.4f,
-           3,
-           (int)alertCode,
-           45,
-           1723300000UL);
-  return std::string(data);
 }
 
 constexpr int8_t WATCHDOG_ALERT_CODE = 19;
@@ -220,21 +177,6 @@ void testAlert17ActiveThenRaiseAlert19Wins() {
   printf("PASS: testAlert17ActiveThenRaiseAlert19Wins\n");
 }
 
-void testAlertCodeReachesOccupancyWebhookPayload() {
-  const std::string payload = buildOccupancyPayload(WATCHDOG_ALERT_CODE);
-  assert(payload.find("\"alerts\":19") != std::string::npos);
-  // Confirm this is really the legacy Ubidots contract (key1 field present).
-  assert(payload.find("\"key1\":") != std::string::npos);
-  printf("PASS: testAlertCodeReachesOccupancyWebhookPayload (%s)\n", payload.c_str());
-}
-
-void testAlertCodeReachesCountingWebhookPayload() {
-  const std::string payload = buildCountingPayload(WATCHDOG_ALERT_CODE);
-  assert(payload.find("\"alerts\":19") != std::string::npos);
-  assert(payload.find("\"key1\":") != std::string::npos);
-  printf("PASS: testAlertCodeReachesCountingWebhookPayload (%s)\n", payload.c_str());
-}
-
 } // namespace
 
 int main() {
@@ -244,8 +186,6 @@ int main() {
   testAlert18ActiveThenRaiseAlert19Wins();
   testAlert19ActiveThenRaiseAlert18DoesNotOverride();
   testAlert17ActiveThenRaiseAlert19Wins();
-  testAlertCodeReachesOccupancyWebhookPayload();
-  testAlertCodeReachesCountingWebhookPayload();
-  printf("All watchdog alert-code severity/auto-clear/payload tests passed\n");
+  printf("All watchdog alert-code severity/auto-clear tests passed\n");
   return 0;
 }

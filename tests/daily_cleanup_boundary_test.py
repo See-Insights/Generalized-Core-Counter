@@ -233,14 +233,7 @@ def verify_source_shape() -> None:
     )
     if "stampOverride != 0 ? (unsigned long)stampOverride : nowStampSec" not in publish_impl:
         fail("publishData() must apply a nonzero stamp override to the occupancy payload timestamp")
-    occupancy_branch = publish_impl.split("if (sensorMode == SystemConfig::OCCUPANCY)", 1)[1].split("} else {", 1)[0]
-    counting_branch = publish_impl.split("} else {", 1)[1]
-    if "stampOverride" not in occupancy_branch:
-        fail("occupancy payload must use the stamp override")
-    if "stampOverride" in counting_branch:
-        fail("counting payload must not use the stamp override")
-    if "const unsigned long timeStampValue = endOfPrevHourStampSec;" not in counting_branch:
-        fail("counting payload timestamp must remain endOfPrevHourStampSec")
+    # The stamp-override branch behaviour is pinned by report_payload_golden_test.sh.
 
     close_helper = extract_function(
         common_text,
