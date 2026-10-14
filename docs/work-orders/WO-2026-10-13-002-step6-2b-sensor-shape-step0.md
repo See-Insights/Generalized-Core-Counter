@@ -36,3 +36,28 @@ Every sensor fits one small shape, and the hourly report is built from what the 
 ## Budget
 
 Step 0: 0 `src/` lines. The eventual WOs: ≤ +20 net each, stated per WO when the architect accepts the sequence.
+
+## Architect's decision (2026-10-14): Option A, six WOs
+
+Following Step 0 round 2 (`WO-2026-10-13-002-step0-round2-report.md`, which said STOP pending a cut) and the Stage 4 check (`WO-2026-10-13-002-stage4-verdict.md`):
+
+| WO | Goal | Est. net `src/` |
+|---|---|---:|
+| 2b-1 | Golden payload test, through the real queue call (test-only): `WO-2026-10-14-001` | 0 |
+| 2b-2 | Merge `setup()` into `initializeHardware()`; remove `sensorDetect` | −8 |
+| 2b-3 | The sensor supplies its fields, with the `activeSensor()` fallback | +18 |
+| 2b-4 | The wake pin and edge come from the sensor | +17 |
+| 2b-5a | Reset hook on the sensor (not wired) | +16 |
+| 2b-6 | Wire the hourly and daily reset; cross-store work stays central | +13 |
+
+- **Deferred to the first new-sensor WO,** where they will have a real consumer: the report request and its kind (2b-7), and delivery of settings 1–4 and `samplingMode` (2b-8a/b).
+- **Dropped:** builder extraction (Stage 4's 2b-2a/b).
+- **Moved to a later power WO:** the power leftovers 6c (`PowerDiagnostics` labels) and 6d (`PowerCapabilities::hasFuelGauge`).
+
+**Rulings on the round-2 open points:**
+- keep the `alerts`/`resets` order swap per mode exactly;
+- pin MEASUREMENT's counting-format output;
+- pin `temp` NaN/Inf rendering as it is today;
+- `Config.cpp:94–101` (setting1 == 0 invalidates the config) goes to the recovery plan, not 2b;
+- the PIR-wake block stays in `State_Sleep.cpp`.
+

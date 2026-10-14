@@ -156,6 +156,9 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
      - The cloud socket closed. The Idle ceiling forced a teardown and sleep (`IDLE ceiling trip: mode=0 cloud=0`), and the CONNECTED+open abort returned it to Idle (`sleep-abort-open-hours`).
      - Idle's CONNECTED branch has no reconnect, so it stayed offline until the 07:00 scheduled report: about 30 min.
    - **Inventory:** `docs/work-orders/2026-10-09-connected-idle-sleep-inventory.md`, "Ceiling trip" (now observed) and open point 2.
+9. **`sensor.setting1 == 0` invalidates the config for every sensor type** (architect, 2026-10-14; found by WO-2026-10-13-002 Step 0 round 2).
+   - **Code:** `Config.cpp:94–101` treats setting1 as the occupancy debounce for all sensor types. A zero value logs `ConfigInvalid: sensor.setting1 (occupancy debounce) missing/zero` and marks the config invalid, which forces a connect at `State_Report.cpp:171`.
+   - **Why it matters:** harmless while PIR is the only sensor. A future sensor that doesn't use setting1 (or uses 0 legitimately) would be rejected. Decide the per-type rule with the first new-sensor WO.
 
 **Rollout and follow-ups** (not WOs).
 - **v40 release step: repeat the 1c migration check.** Before releasing v40, read the resolved `sensor.type` for every device: the `default-settings` and every `device-settings` instance. Any value other than 1 would now be rejected at config apply, and a value already stored would stop that device counting after its next reboot. On 2026-10-08 the default was 1 and no device overrode it (WO-2026-10-08-002 Step 0 report, appendix).
