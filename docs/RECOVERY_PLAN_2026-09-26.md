@@ -159,6 +159,7 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 9. **`sensor.setting1 == 0` invalidates the config for every sensor type** (architect, 2026-10-14; found by WO-2026-10-13-002 Step 0 round 2).
    - **Code:** `Config.cpp:94–101` treats setting1 as the occupancy debounce for all sensor types. A zero value logs `ConfigInvalid: sensor.setting1 (occupancy debounce) missing/zero` and marks the config invalid, which forces a connect at `State_Report.cpp:171`.
    - **Why it matters:** harmless while PIR is the only sensor. A future sensor that doesn't use setting1 (or uses 0 legitimately) would be rejected. Decide the per-type rule with the first new-sensor WO.
+   - **New-sensor note (architect, 2026-10-14, from WO-2026-10-14-003):** on a closed boot (`_sensor` null), `SensorManager::activeSensor()` asks the factory for the configured `sensor.type`. An invalid type logs `Sensor type %d not yet implemented` once per closing report before falling back to PIR. Accepted for now; revisit when the factory gains a second sensor type.
 
 **Rollout and follow-ups** (not WOs).
 - **v40 release step: repeat the 1c migration check.** Before releasing v40, read the resolved `sensor.type` for every device: the `default-settings` and every `device-settings` instance. Any value other than 1 would now be rejected at config apply, and a value already stored would stop that device counting after its next reboot. On 2026-10-08 the default was 1 and no device overrode it (WO-2026-10-08-002 Step 0 report, appendix).

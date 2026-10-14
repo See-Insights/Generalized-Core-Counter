@@ -40,6 +40,13 @@ Net `src/` **≤ +20** (estimate +18). Two commits: (a) `ISensor` + `PIRSensor` 
 
 None before merge; the v43 soak checks payloads end to end on Dev-09/Dev-14.
 
+## Stage 6: architect's rulings (2026-10-14)
+
+1. **Test budget raised to +180 added lines,** with no trim. The actual is +178 added / −33 removed, including the new 32-line `tests/stubs/report_golden/Particle.h`.
+2. **The `tests/watchdog_alert_code_test.sh` edit is accepted.** Its literal `"alerts":%i` check became two checks on the new argument form. Stage 7 confirms it still fails if `alerts` is renamed.
+3. **The invalid-type log on a closed boot is accepted.** The factory's `Sensor type %d not yet implemented` is logged once per closing report when the configured type is invalid. It goes to the recovery plan's new-sensor notes.
+4. **Dispatch correction:** the Stage 6 dispatch said `createSensor()` uses `new`. It doesn't: `createSensor(SensorType::PIR)` returns `&PIRSensor::instance()`, a function-local static (`SensorFactory.h:74`). So the fallback uses no heap.
+
 ## Closing record
 
 Budget versus actual per commit; any golden-test re-pointing and why.
