@@ -2007,47 +2007,29 @@ void publishData(time_t stampOverride) {
   float vc = 0.0f;
   (void)SensorManager::instance().cachedBatteryVoltage(vc);
 
-  // Build webhook payload based on sensor mode
-  if (sensorMode == SystemConfig::OCCUPANCY) {
-    const unsigned long timeStampValue = stampOverride != 0 ? (unsigned long)stampOverride : nowStampSec;
-    const unsigned long totalOccupiedMinutes = (unsigned long)(CurrentReadings::get_totalOccupiedSeconds() / 60UL);
+  // The active sensor renders its own leading fields; everything else is common.
+  char sensorFields[48];
+  SensorManager::instance().activeSensor()->reportFields(sensorFields, sizeof(sensorFields), sensorMode);
 
-    // Occupancy mode webhook format (occupancy as 0/1 numeric value)
-    snprintf(data, sizeof(data),
-             "{\"occupancy\":%d,\"dailyoccupancy\":%lu,\"battery\":%4.2f,\"vc\":%.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"alerts\":%i,\"resets\":%i,\"connecttime\":%i,\"fh\":%lu,\"lfb\":%lu,\"cyc\":%lu,\"slp\":%lu,\"timestamp\":%lu000}",
-             CurrentReadings::get_occupied() ? 1 : 0,
-             totalOccupiedMinutes,
-             stateOfCharge,
-             (double)vc,
-             batteryContext[battState],
-             CurrentReadings::get_internalTempC(),
-             reportedAlertCode,
-             RecoveryState::get_resetCount(),
-             SystemConfig::get_lastConnectionDuration(),
-             (unsigned long)System.freeMemory(), (unsigned long)rtInfo.largest_free_block_heap,
-             (unsigned long)AwakeCycles::cycles, (unsigned long)AwakeCycles::sleeps,
-             timeStampValue);
-
-  } else {
-    const unsigned long timeStampValue = endOfPrevHourStampSec;
-
-    // Counting mode webhook format (original format)
-    snprintf(data, sizeof(data),
-             "{\"hourly\":%i,\"daily\":%i,\"battery\":%4.2f,\"vc\":%.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"resets\":%i,\"alerts\":%i,\"connecttime\":%i,\"fh\":%lu,\"lfb\":%lu,\"cyc\":%lu,\"slp\":%lu,\"timestamp\":%lu000}",
-             CurrentReadings::get_hourlyCount(),
-             CurrentReadings::get_dailyCount(),
-             stateOfCharge,
-             (double)vc,
-             batteryContext[battState],
-             CurrentReadings::get_internalTempC(),
-             RecoveryState::get_resetCount(),
-             reportedAlertCode,
-             SystemConfig::get_lastConnectionDuration(),
-             (unsigned long)System.freeMemory(), (unsigned long)rtInfo.largest_free_block_heap,
-             (unsigned long)AwakeCycles::cycles, (unsigned long)AwakeCycles::sleeps,
-             timeStampValue);
-
-  }
+  // Occupancy keeps alerts before resets and the current/override timestamp; counting
+  // (and MEASUREMENT) keeps resets before alerts and the end-of-previous-hour timestamp.
+  const bool occupancyMode = sensorMode == SystemConfig::OCCUPANCY;
+  const unsigned long timeStampValue = occupancyMode ? (stampOverride != 0 ? (unsigned long)stampOverride : nowStampSec) : endOfPrevHourStampSec;
+  snprintf(data, sizeof(data),
+           "{%s\"battery\":%4.2f,\"vc\":%.2f,\"key1\":\"%s\",\"temp\":%4.2f,\"%s\":%i,\"%s\":%i,\"connecttime\":%i,\"fh\":%lu,\"lfb\":%lu,\"cyc\":%lu,\"slp\":%lu,\"timestamp\":%lu000}",
+           sensorFields,
+           stateOfCharge,
+           (double)vc,
+           batteryContext[battState],
+           CurrentReadings::get_internalTempC(),
+           occupancyMode ? "alerts" : "resets",
+           occupancyMode ? reportedAlertCode : RecoveryState::get_resetCount(),
+           occupancyMode ? "resets" : "alerts",
+           occupancyMode ? RecoveryState::get_resetCount() : reportedAlertCode,
+           SystemConfig::get_lastConnectionDuration(),
+           (unsigned long)System.freeMemory(), (unsigned long)rtInfo.largest_free_block_heap,
+           (unsigned long)AwakeCycles::cycles, (unsigned long)AwakeCycles::sleeps,
+           timeStampValue);
 
   // Get webhook name from cloud configuration (with fallback to convention)
   const char *webhookName = Cloud::instance().getWebhookName();

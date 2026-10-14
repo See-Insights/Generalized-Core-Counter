@@ -18,6 +18,7 @@ import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP = os.path.join(REPO, "src", "Generalized-Core-Counter.cpp")
+PIR = os.path.join(REPO, "src", "sensors", "PIRSensor.cpp")
 
 NEW_KEYS = ("fh", "lfb", "cyc", "slp")
 # WO-2026-10-04-001 item D: the cell voltage. Unquoted like the rest, but a
@@ -81,15 +82,30 @@ def battery_contexts(text):
     return re.findall(r'"([^"]*)"', m.group(1))
 
 
-def formats(text):
-    """The two report format strings, in source order, un-escaped."""
+def formats(text, pir_text):
+    """The two report format strings (occupancy, counting), un-escaped.
+
+    WO-2026-10-14-003: publishData() has one common format whose leading %s is the
+    sensor's fields (PIRSensor::reportFields(), one format per mode) and whose
+    alerts/resets key names are %s arguments, occupancy order first.
+    """
     start = text.index("void publishData(")
     end = text.index("const char *webhookName", start)
     body = text[start:end]
-    found = re.findall(r'"(\{\\"[^\n]*?)",\n', body)
-    if len(found) != 2:
-        sys.exit("EXTRACT_FAILED: expected 2 report format strings, found %d" % len(found))
-    return [f.replace('\\"', '"') for f in found]
+    found = re.findall(r'"(\{%s\\"[^\n]*?)",\n', body)
+    if len(found) != 1:
+        sys.exit("EXTRACT_FAILED: expected 1 report format string, found %d" % len(found))
+    common = found[0].replace('\\"', '"')
+    prefixes = [p.replace('\\"', '"') for p in
+                re.findall(r'snprintf\(out, len, "((?:[^"\\]|\\.)*)"', pir_text)]
+    if len(prefixes) != 2 or common.count('"%s":%i') != 2:
+        sys.exit("EXTRACT_FAILED: expected 2 sensor field formats and 2 keyed %%i slots")
+    out = []
+    for prefix, keys in zip(prefixes, (("alerts", "resets"), ("resets", "alerts"))):
+        slots = iter(keys)
+        fmt = common.replace("{%s", "{" + prefix, 1)
+        out.append(re.sub(r'"%s":%i', lambda m: '"%s":%%i' % next(slots), fmt))
+    return out
 
 
 def conversions(fmt):
@@ -118,7 +134,7 @@ def render(fmt, longest_context):
 def main():
     text = open(APP).read()
     longest_context = max(battery_contexts(text), key=len)
-    fmts = formats(text)
+    fmts = formats(text, open(PIR).read())
     names = ("occupancy", "counting")
 
     buf = re.search(r"char data\[(\d+)\];", text)
@@ -135,6 +151,12 @@ def main():
         parsed = json.loads(rendered)
 
         check(len(keys_in_order) == len(set(keys_in_order)), "%s: no duplicated key" % name)
+
+        alerts_first = keys_in_order.index("alerts") < keys_in_order.index("resets")
+        check(alerts_first == (name == "occupancy"), "%s: alerts/resets keep their legacy order" % name)
+        sensor_part = rendered[1:rendered.index('"battery"')]
+        check(len(sensor_part) <= 40,
+              "%s: the sensor's worst-case fields (%d bytes) fit the 40-byte limit" % (name, len(sensor_part)))
 
         for key in NEW_KEYS:
             check(conv.get(key) == "%lu",
@@ -175,6 +197,8 @@ def main():
     start = text.index("void publishData(time_t stampOverride) {")
     body = text[start:text.index("const char *webhookName", start)]
     check("System.freeMemory()" in body, "fh is System.freeMemory()")
+    check(not re.search(r'\\"(occupancy|dailyoccupancy|hourly|daily)\\"', body) and not re.search(r"get_(hourly|daily)Count|get_occupied", body),
+          "publishData() names no sensor field: the active sensor supplies them")
     check("AwakeCycles::cycles" in body and "AwakeCycles::sleeps" in body,
           "cyc and slp are the AwakeCycles counters "
           "(cyc >= slp is proven in tests/awake_cycle_counters_test.sh)")

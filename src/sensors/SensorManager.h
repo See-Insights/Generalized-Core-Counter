@@ -76,6 +76,9 @@ public:
      */
     void initializeFromConfig();
 
+    /** @brief Sensor supplying report fields; never null (a closed boot falls back to the configured type, then PIR). */
+    ISensor* activeSensor();
+
     /**
      * @brief Notify the sensor that the device is entering deep sleep.
      */

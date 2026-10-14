@@ -314,6 +314,12 @@ void SensorManager::setSensor(ISensor* sensor) {
     }
   }
 
+ISensor* SensorManager::activeSensor() {
+    if (_sensor) return _sensor;
+    ISensor* sensor = SensorFactory::createSensor(static_cast<SensorType>(SystemConfig::SensorSettings::get_sensorType()));
+    return sensor ? sensor : SensorFactory::createSensor(SensorType::PIR);
+}
+
 bool SensorManager::loop() {
     if (!_sensor || !_sensor->isReady()) {
         return false;
