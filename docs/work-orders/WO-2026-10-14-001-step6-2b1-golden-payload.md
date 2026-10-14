@@ -30,6 +30,12 @@ As in the round-2 report, Q3 ("The golden test (2b-1)"): markers `static const c
 
 None (test-only).
 
+## Stage 6 deviations: architect's ruling (2026-10-14)
+
+- **Accepted:** Copilot's deviations. These are removing the two alert-in-payload tests along with the stale mirror, replacing the stamp-override structural check with golden vectors, and recording the fixture once more with its first vectors byte-identical.
+- **Exception: add the SOC, battery-state, vc and event-name edge vectors in occupancy mode too.** 2b-3 merges the two format strings, so each edge case must be pinned in both layouts.
+- **Test budget raised to +450.** It's a test-only change, so it stays within this round, with no new round.
+
 ## Closing record
 
 Budget versus actual (test lines), vector count, mutations caught.
