@@ -32,6 +32,10 @@ Net `src/` about **−8** (≤ 0 required). Gross additions only where a rename 
 
 None before merge; rides the v43 soak.
 
+## Stage 7 pre-ruling (architect, 2026-10-14)
+
+The now-redundant outer parentheses at `State_Idle.cpp:255` (left when `sensorDetect ||` was dropped) **stay**. If Codex flags them, record them as an **observation**, not a finding.
+
 ## Closing record
 
 Budget versus actual; ELF symbol changes and their reasons.
