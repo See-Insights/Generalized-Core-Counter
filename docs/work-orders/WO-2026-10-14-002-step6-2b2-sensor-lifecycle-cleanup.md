@@ -36,6 +36,40 @@ None before merge; rides the v43 soak.
 
 The now-redundant outer parentheses at `State_Idle.cpp:255` (left when `sensorDetect ||` was dropped) **stay**. If Codex flags them, record them as an **observation**, not a finding.
 
-## Closing record
+## Closing record (2026-10-14)
 
-Budget versus actual; ELF symbol changes and their reasons.
+**Result:** **VERIFIED** at Stage 7 (`WO-2026-10-14-002-stage7-verdict.md`), with no findings. **Stage 8 approved** by the architect. **Release:** rides the next release (v43) with 2a and 2b-1.
+
+| Stage | Agent / model | Result |
+|---|---|---|
+| Citation re-check | Claude Code, at main `3092077` | no shift from round 2; `ISensor::setup()` had one caller (the default `initializeHardware()`); `sensorDetect` never written |
+| Stage 6 | Copilot, `claude-sonnet-5.5`, medium | −10 net `src/`; lifecycle test 147 lines; 77/77 → 78/78 |
+| Stage 7 | Codex, `gpt-5.6-sol`, medium | VERIFIED; 3 of 3 order mutations caught; golden test 175/0 at every step |
+
+Every model was probed first (§5). One round; no controller edits.
+
+| Item | Budget | Actual |
+|---|---|---|
+| Commit 1: lifecycle test | tests ≤ +150 | **147** (`pir_sensor_lifecycle_test.{sh,cpp}`, `tests/stubs/pir_lifecycle/Particle.h`) |
+| Commit 2: (a) `setup()` merge | net ≤ 0 | **+5/−13 = −8** (`ISensor.h`, `PIRSensor.h`) |
+| Commit 3: (b) `sensorDetect` removal | net ≤ 0 | **+4/−6 = −2** (`Generalized-Core-Counter.cpp`, `StateMachine.h`, `State_Sleep.cpp`, `State_Idle.cpp`) |
+| **WO `src/` total** | about −8, ≤ 0 | **−10** (+9/−19); every addition is from the rename or a simplification |
+
+- **ARM build:** text 151372 → **151308** (−64); data 1094 and bss 2212 unchanged.
+
+**ELF symbol changes and their reasons** (Stage 7 `nm -C -S`, HEAD against the working tree):
+
+| Symbol | Change | Reason |
+|---|---|---|
+| `PIRSensor::setup()` → `PIRSensor::initializeHardware()` | renamed, size unchanged (0x6c) | (a) the rename; the body is byte-identical (793 source bytes) |
+| `ISensor::initializeHardware()` (default forwarder) | removed (0x06) | (a) `initializeHardware()` is now pure virtual; the `{ return setup(); }` default is gone |
+| `vtable for PIRSensor` | 0x40 → 0x3c | (a) one slot fewer: `ISensor::setup()` removed |
+| `sensorDetect` | removed (1 byte, bss) | (b) the variable deleted; it was never written |
+| `handleIdleState()` | 0x4e8 → 0x4d8 | (b) the always-false `sensorDetect ||` test removed at `State_Idle.cpp:255` |
+| `handleSleepingState()` | 0x1c98 → 0x1c80 | (b) the always-false test and the `sensor=%d` log argument removed at `State_Sleep.cpp:1094–1096` |
+| `CSWTCH.*` | renumbered, sizes unchanged | compiler-local numbering after the edits |
+
+- **Lifecycle test:** it compiles the real `PIRSensor` against fakes and records the start, sleep and wake call order, with `attachInterrupt` last on start and wake. It also checks that the captured interrupt handler sets the motion flag. It passed on the unchanged HEAD before (a) and (b). Moving the attach first, swapping the first two pin calls, or removing the attach each fails it.
+- **Golden payload test:** unchanged, passing at every commit.
+- **Observations, not findings** (the architect's pre-ruling): the redundant outer parentheses at `State_Idle.cpp:255` stay. `State_Sleep.cpp:1095` has trailing whitespace, already present at HEAD.
+- **Bench:** none before merge; rides the v43 soak.
