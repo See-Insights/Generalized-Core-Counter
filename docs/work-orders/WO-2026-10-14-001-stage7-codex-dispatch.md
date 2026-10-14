@@ -18,10 +18,12 @@ AUTHORIZATION SCOPE:
 
 **Binding spec:** `docs/work-orders/WO-2026-10-14-001-step6-2b1-golden-payload.md`; the test spec is the Q3 text reproduced in `docs/work-orders/WO-2026-10-14-001-stage6-copilot-dispatch.md`.
 
-**Inputs:** the Stage 6 dispatch, and Copilot's report (the end of `build-tmp/WO-2026-10-14-001-stage6-copilot-output.log`). Treat every claim as unverified.
+**Inputs:** the Stage 6 dispatch and its addendum (`WO-2026-10-14-001-stage6-addendum-copilot-dispatch.md`), and Copilot's two reports (the ends of `build-tmp/WO-2026-10-14-001-stage6-copilot-output.log` and `build-tmp/WO-2026-10-14-001-stage6-addendum-copilot-output.log`). Treat every claim as unverified.
+
+**Architect's ruling (2026-10-14), within this round:** Copilot's deviations are accepted, except that the SOC, battery-state, vc and event-name edge vectors must also run in occupancy mode, because 2b-3 merges the two format strings. The addendum adds them. The test budget is raised to **+450**.
 
 **What changed** (uncommitted):
-- **New:** `tests/report_payload_golden_test.{sh,cpp}` and `tests/fixtures/report_payload_golden.txt` (129 vectors).
+- **New:** `tests/report_payload_golden_test.{sh,cpp}` and `tests/fixtures/report_payload_golden.txt` (129 vectors, plus the addendum's occupancy vectors).
 - **Edited:** `tests/watchdog_alert_code_test.cpp` (+1/−66: the stale payload mirror and the two tests that used it) and `tests/daily_cleanup_boundary_test.py` (+1/−8: the stamp-override branch checks).
 - **Claimed:** 77/77, and no `src/` or `lib/` diff.
 
@@ -40,9 +42,9 @@ AUTHORIZATION SCOPE:
    Add at least one mutation of your own that you think the test might miss, and report the result.
 5. **Determinism.** Every input listed in the Q3 spec is controlled and counted (one call each), including locale, `millis()`, heap allocation, and 32-bit `%lu` inputs. Run the test twice and compare. Note anything host-dependent (libc NaN/Inf text, `unsigned long` width) and whether the fixture header records the host.
 6. **The removed checks are really superseded.** For each assertion deleted from `watchdog_alert_code_test.cpp` and `daily_cleanup_boundary_test.py`, show the golden vectors that now pin the same behaviour: alert codes in both layouts, the stamp override used only by occupancy, and counting's `endOfPrevHourStampSec`. Flag any coverage lost.
-7. **The architect's rulings are pinned:** the `alerts`/`resets` swap, MEASUREMENT's counting format, and `temp` NaN/Inf rendering.
+7. **The architect's rulings are pinned:** the `alerts`/`resets` swap, MEASUREMENT's counting format, and `temp` NaN/Inf rendering. Also check that the SOC, battery-state, vc and event-name edge vectors now run in **both** layouts, and that the fixture rows from before the addendum are byte-identical.
 8. **Suite:** the full host suite, `N/N (sh via zsh, py via python3)`. Before the change it was 76/76 (Claude Code's run on this branch).
-9. **Budget:** test lines added and removed, against "about +300 / −40; stop past +400".
+9. **Budget:** test lines added and removed, against **+450** (raised by the architect).
 
 ## Verdict (your final message; it is saved as the verdict file)
 
