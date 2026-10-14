@@ -36,6 +36,37 @@ None (test-only).
 - **Exception: add the SOC, battery-state, vc and event-name edge vectors in occupancy mode too.** 2b-3 merges the two format strings, so each edge case must be pinned in both layouts.
 - **Test budget raised to +450.** It's a test-only change, so it stays within this round, with no new round.
 
-## Closing record
+## Closing record (2026-10-14)
 
-Budget versus actual (test lines), vector count, mutations caught.
+**Result:** **VERIFIED WITH CONCERNS** at Stage 7 (`WO-2026-10-14-001-stage7-verdict.md`), with two low, documentation-only findings. **Stage 8 approved** by the architect.
+
+| Stage | Agent / model | Result |
+|---|---|---|
+| Step 0 | (2b round 2, `WO-2026-10-13-002-step0-round2-report.md` Q3) | the spec |
+| Stage 6 | Copilot, `claude-sonnet-5.5`, high | 129 vectors; 9 built-in mutants caught; 77/77 |
+| Stage 6 addendum (same round, architect's ruling) | Copilot, `claude-sonnet-5.5`, high | +46 occupancy edge vectors (175 total); the original rows byte-identical |
+| Stage 7 | Codex, `gpt-5.6-sol`, medium | VERIFIED WITH CONCERNS; re-recorded all 175 rows from clean HEAD, byte-identical; no mutant survived |
+
+Every model was probed first (§5). One round. The Stage 7 run on the pre-addendum tree was stopped by Claude Code and re-run on the final tree.
+
+| Item | Budget | Actual |
+|---|---|---|
+| `src/` / `lib/` | 0 | **0** |
+| Test lines | about +300 / −40; stop past +400, **raised to +450** (architect) | **+436 / −71**, plus 2 lines in `tests/README.md` |
+
+- **Vectors: 175**, recorded from unchanged `src/`. The fixture is never regenerated.
+  - mode {0,1,2} × `stampOverride` × (min,sec);
+  - alert codes in both layouts;
+  - SOC × battery state, vc, and event name, **in both layouts**;
+  - temp, including NaN/Inf, in both layouts;
+  - widest-possible values, and a truncation sweep crossing 255/256 bytes;
+  - the queue returning false.
+
+  Each vector also asserts one publish call, flags `0x9`/`0`, the event-name pointer, length ≤ 255, and zero heap use.
+- **Mutations caught:**
+  - **Copilot (built into the `.sh`):** `battery` and `temp` specifiers, a renamed key, the `alerts`/`resets` swap undone, keys swapped across layouts, `PRIVATE` dropped, the event name changed, buffer 256 → 512, and a duplicated marker (`EXTRACT_FAILED`).
+  - **Codex (by hand):** the vc, timestamp and `%lu` specifiers, keys in both layouts, the swap in both layouts, `WITH_ACK` dropped, the event-name source, and the occupancy divisor. **No mutant survived.**
+- **Host-pinned:** the fixture was recorded on **Darwin arm64, Apple clang 14** (14.0.3). NaN/Inf text and the 64-bit host `unsigned long` are host-dependent. The fixture's recording-HEAD note (`74bff9d`) is kept as history; the extracted source is identical at the merged HEAD.
+- **Superseded:** the stale payload mirror and its two tests in `watchdog_alert_code_test.cpp`, and the stamp-override split checks in `daily_cleanup_boundary_test.py`. Both are now pinned by golden vectors. `tests/README.md` was updated (Stage 7 finding 1).
+- **Architect's rulings pinned:** the `alerts`/`resets` swap per mode, MEASUREMENT's counting format, and `temp` NaN/Inf rendering.
+- **Bench:** none (test-only).
