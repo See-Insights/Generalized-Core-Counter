@@ -47,6 +47,43 @@ None before merge; the v43 soak checks payloads end to end on Dev-09/Dev-14.
 3. **The invalid-type log on a closed boot is accepted.** The factory's `Sensor type %d not yet implemented` is logged once per closing report when the configured type is invalid. It goes to the recovery plan's new-sensor notes.
 4. **Dispatch correction:** the Stage 6 dispatch said `createSensor()` uses `new`. It doesn't: `createSensor(SensorType::PIR)` returns `&PIRSensor::instance()`, a function-local static (`SensorFactory.h:74`). So the fallback uses no heap.
 
-## Closing record
+## Closing record (2026-10-14)
 
-Budget versus actual per commit; any golden-test re-pointing and why.
+**Result:** **VERIFIED** at Stage 7 (`WO-2026-10-14-003-stage7-verdict.md`), with two observations and one low inference. **Stage 8 approved** by the architect. **Release:** rides v43, with 2a, 2b-1 and 2b-2.
+
+| Stage | Agent / model | Result |
+|---|---|---|
+| Citation re-check | Claude Code, at main `e149123` | structure as in round 2, with lines shifted by about −1. It also found the serial `Report:` log in `publishData()`, which was left unchanged as out of scope |
+| Stage 6 | Copilot, `claude-sonnet-5.5`, high | net +10 `src/`; golden 175 rows unchanged plus 11 fallback vectors; 78/78 |
+| Rulings | architect | test budget +180 added; the watchdog-test edit accepted; the invalid-type log accepted; the dispatch's `new` claim corrected (the factory returns a static) |
+| Stage 7 | Codex, `gpt-5.6-sol`, high | VERIFIED; original rows re-recorded from clean HEAD with zero-byte diffs; 16 + 1 mutations caught |
+
+Every model was probed first (§5). One round; no controller edits.
+
+| Item | Budget | Actual |
+|---|---|---|
+| Commit (a): field writer (`ISensor.h` +3, `PIRSensor.h` +3, `PIRSensor.cpp` +13), not yet used, plus the lifecycle test's link change | — | **+19** `src/` |
+| Commit (b): `SensorManager.{h,cpp}` +9; `publishData()` +23/−41 | — | **−9** `src/` |
+| **WO `src/` total** | ≤ +20 (estimate +18) | **+10** (+51/−41) |
+| Tests | stop past +150, **raised to +180 added** | **+178 / −33** (including the new 32-line `tests/stubs/report_golden/Particle.h`) |
+
+- **ARM build:** text 151308 → **151220** (−88); data and bss unchanged. `publishData` 0x390 → 0x344. Added: `PIRSensor::reportFields` (0x48) and `SensorManager::activeSensor` (0x16). `PIRSensor::instance()` and `SensorFactory::createSensor` are now out of line, so `initializeFromConfig` shrank 0xe8 → 0x80. The `PIRSensor` vtable gained one slot and is now emitted strongly. `CSWTCH.*` renumbered.
+
+**Why the golden harness was re-pointed.** Its extraction markers and its 175 original fixture rows are unchanged. The payload region now calls `SensorManager::activeSensor()->reportFields()`, so the harness had to:
+- compile the real `src/sensors/PIRSensor.cpp`;
+- extract `activeSensor()` verbatim from `SensorManager.cpp` (with a marker check);
+- link both against new non-static fakes and a Particle stub (`tests/stubs/report_golden/Particle.h`).
+
+That keeps it running the **real** code. It also gained 11 fallback vectors (closed boot with a valid type, invalid types 0/3/99, and a built sensor with a bad configured type), call-count checks showing `createSensor()` isn't called while the sensor exists, and mutations re-pointed to the new argument form.
+
+**Other test changes:**
+- `report_payload_fields_test.py` now reads the common format plus `PIRSensor.cpp`'s formats, and fails if a sensor field reappears in `publishData()`;
+- `watchdog_alert_code_test.sh` checks the new `alerts` argument form (ruling 2; a rename still fails it);
+- `pir_sensor_lifecycle_test.cpp` gains the `CurrentReadings` link definitions that `PIRSensor.cpp` now needs.
+
+**Observations and notes:**
+- the serial `Report:` log in `publishData()` still reads the PIR getters (out of scope; soak grading parses it);
+- an invalid configured type logs once per closing report (ruling 3; recovery-plan new-sensor note);
+- the snapshot-timing inference (recovery-plan new-sensor note).
+
+**Bench:** none before merge. The v43 soak checks payloads end to end on Dev-09 and Dev-14.
