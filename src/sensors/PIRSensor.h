@@ -124,6 +124,9 @@ public:
      */
     bool usesInterrupt() const override { return true; }
 
+    /** @brief occupancy/dailyoccupancy (OCCUPANCY) or hourly/daily (other modes); at most 40 characters. */
+    void reportFields(char* out, size_t len, uint8_t sensorMode) const override;
+
     /**
      * @brief Prepare sensor for deep sleep: detach ISR and power down.
      */

@@ -142,6 +142,9 @@ public:
      * @brief Last sensor-specific error code (if any).
      */
     virtual int lastErrorCode() const { return 0; }
+
+    /** @brief Leading report JSON members, each followed by a comma; the default writes nothing. */
+    virtual void reportFields(char* out, size_t len, uint8_t) const { if (out && len) out[0] = '\0'; }
 };
 
 // Implementation of SensorData::toJSON
