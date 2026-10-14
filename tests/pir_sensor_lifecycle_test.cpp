@@ -15,6 +15,14 @@ const pin_t intPin = 13;
 const pin_t disableModule = 12;
 const pin_t ledPower = 11;
 
+// PIRSensor::reportFields() reads these; the lifecycle test never calls it.
+namespace CurrentReadings {
+bool get_occupied() { return false; }
+uint32_t get_totalOccupiedSeconds() { return 0; }
+uint16_t get_hourlyCount() { return 0; }
+uint16_t get_dailyCount() { return 0; }
+}  // namespace CurrentReadings
+
 namespace {
 int failures = 0;
 

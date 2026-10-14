@@ -18,6 +18,11 @@
 #include <string>
 #include <vector>
 
+// Real facade declarations: PIRSensor.cpp (compiled below) reads these, so the fakes
+// further down are plain definitions of the real signatures, not private look-alikes.
+#include "persist/CurrentReadings.h"
+#include "persist/SystemConfig.h"
+
 static long g_heap = 0;
 void *operator new(size_t n) { ++g_heap; void *p = malloc(n ? n : 1); if (!p) abort(); return p; }
 void operator delete(void *p) noexcept { free(p); }
@@ -29,15 +34,16 @@ struct In {
   int8_t alert = 7; uint8_t resets = 3; uint16_t conn = 45; bool occ = true; uint32_t occSec = 7384;
   uint16_t hourly = 12, daily = 88; uint32_t freeMem = 61234, lfb = 40960, cycles = 5, sleeps = 3;
   const char *name = "my-hook"; bool queued = true;
+  bool built = true; uint8_t stype = 1;  // sensor built at boot (false = closed boot); configured SensorType
 };
 static In in;
 enum { NOW, MIN, SEC, FREE, RTINFO, CYC, SLP, MILLIS, BSTATE, SOC, VC, MODE, CONN, ALERT, RESETS, OCC, TOTOCC,
-       HOURLY, DAILY, TEMP, NAME, PUB, BREAD, NC };
+       HOURLY, DAILY, TEMP, NAME, PUB, BREAD, STYPE, NC };
 static const char *const cn[NC] = {"Time.now", "Time.minute", "Time.second", "freeMemory", "HAL_Core_Runtime_Info",
   "AwakeCycles::cycles", "AwakeCycles::sleeps", "millis", "batteryState", "soc", "cachedBatteryVoltage",
   "get_sensorMode", "get_lastConnectionDuration", "get_alertCode", "get_resetCount", "get_occupied",
   "get_totalOccupiedSeconds", "get_hourlyCount", "get_dailyCount", "get_internalTempC", "getWebhookName",
-  "publish", "setAppBreadcrumb"};
+  "publish", "setAppBreadcrumb", "SensorSettings::get_sensorType"};
 static int calls[NC];
 
 // Device OS values (lib/StorageHelperRK/automated-test/UnitTestLib/Particle.h:203-206).
@@ -55,21 +61,30 @@ static void HAL_Core_Runtime_Info(runtime_info_t *r, void *) {
 struct Ctr { int id; operator uint32_t() { ++calls[id]; return id == CYC ? in.cycles : in.sleeps; } };
 namespace AwakeCycles { static Ctr cycles{CYC}, sleeps{SLP}; }
 static unsigned long millis() { ++calls[MILLIS]; return 1000; }
+// Real sensor code under test; it takes Time/millis from the counted fakes above.
+#include "sensors/SensorFactory.h"
 struct PowerManager { static PowerManager &instance() { static PowerManager p; return p; }
   uint8_t batteryState() const { ++calls[BSTATE]; return in.bs; } float soc() const { ++calls[SOC]; return in.soc; } };
 struct SensorManager { static SensorManager &instance() { static SensorManager s; return s; }
-  bool cachedBatteryVoltage(float &v) const { ++calls[VC]; if (!in.vcOk) return false; v = in.vc; return true; } };
-namespace SystemConfig { enum { COUNTING = 0, OCCUPANCY = 1, MEASUREMENT = 2 };
-  static uint8_t get_sensorMode() { ++calls[MODE]; return in.mode; }
-  static uint16_t get_lastConnectionDuration() { ++calls[CONN]; return in.conn; } }
+  bool cachedBatteryVoltage(float &v) const { ++calls[VC]; if (!in.vcOk) return false; v = in.vc; return true; }
+  ISensor *_sensor = nullptr; ISensor *activeSensor(); };
+// The real SensorManager::activeSensor(), extracted verbatim by the .sh.
+#include "gen_active_sensor.inc"
+namespace SystemConfig {
+  uint8_t get_sensorMode() { ++calls[MODE]; return in.mode; }
+  uint16_t get_lastConnectionDuration() { ++calls[CONN]; return in.conn; }
+  namespace SensorSettings { uint8_t get_sensorType() { ++calls[STYPE]; return in.stype; } } }
 namespace RecoveryState { static int8_t get_alertCode() { ++calls[ALERT]; return in.alert; }
   static uint8_t get_resetCount() { ++calls[RESETS]; return in.resets; } }
 namespace CurrentReadings {
-  static bool get_occupied() { ++calls[OCC]; return in.occ; }
-  static uint32_t get_totalOccupiedSeconds() { ++calls[TOTOCC]; return in.occSec; }
-  static uint16_t get_hourlyCount() { ++calls[HOURLY]; return in.hourly; }
-  static uint16_t get_dailyCount() { ++calls[DAILY]; return in.daily; }
-  static float get_internalTempC() { ++calls[TEMP]; return in.temp; } }
+  bool get_occupied() { ++calls[OCC]; return in.occ; }
+  uint32_t get_totalOccupiedSeconds() { ++calls[TOTOCC]; return in.occSec; }
+  uint16_t get_hourlyCount() { ++calls[HOURLY]; return in.hourly; }
+  uint16_t get_dailyCount() { ++calls[DAILY]; return in.daily; }
+  float get_internalTempC() { ++calls[TEMP]; return in.temp; } }
+// The real PIRSensor::reportFields(), compiled into this test.
+const pin_t intPin = 13, disableModule = 12, ledPower = 11;
+#include "sensors/PIRSensor.cpp"
 struct Cloud { static Cloud &instance() { static Cloud c; return c; }
   const char *getWebhookName() const { ++calls[NAME]; return in.name; } };
 static void setAppBreadcrumb(uint8_t) { ++calls[BREAD]; }
@@ -121,6 +136,13 @@ static std::vector<V> vectors() {
   for (int s = 0; s < 8; s++) for (int b = 0; b < 5; b++) { In i; i.mode = 1; i.soc = socs[s]; i.bs = states[b]; add(S("occ_soc%d_bs%d", s, b), i); }
   for (int k = 0; k < 3; k++) { In i; i.mode = 1; i.vcOk = k != 0; i.vc = k == 1 ? 3.91f : 4.20f; add(S("occ_vc%d", k), i); }
   for (int n = 0; n < 3; n++) { In i; i.mode = 1; i.name = names[n]; add(S("occ_name%d", n), i); }
+  // A built sensor must win over any configured type: no factory call, no error.
+  for (int m = 0; m < 2; m++) { In i; i.mode = m; i.stype = 99; add(S("built_badtype99_m%d", m), i); }
+  // Closed boot (_sensor == nullptr): the configured PIR type, then invalid types that fall back to PIR.
+  for (int m = 0; m < 3; m++) { In i; i.mode = m; i.built = false; add(S("closed_pir_m%d", m), i); }
+  const uint8_t badTypes[] = {0, 3, 99};
+  for (int m = 0; m < 2; m++) for (int k = 0; k < 3; k++) {
+    In i; i.mode = m; i.built = false; i.stype = badTypes[k]; add(S("closed_badtype%d_m%d", badTypes[k], m), i); }
   return v;
 }
 
@@ -130,13 +152,17 @@ int main(int argc, char **argv) {
   std::vector<std::string> got, want;
   int fails = 0;
   for (const V &vec : vectors()) {
-    in = vec.in; memset(calls, 0, sizeof calls); obs = Obs{}; rtSizeOk = true;
+    in = vec.in; memset(calls, 0, sizeof calls); obs = Obs{}; rtSizeOk = true; g_logErrors = 0;
+    SensorManager::instance()._sensor = vec.in.built ? &PIRSensor::instance() : nullptr;
     const long heap0 = g_heap;
     const bool queued = run(vec.in.stamp);
     const long heapUsed = g_heap - heap0;
     int expect[NC]; for (int &e : expect) e = 1;
     expect[OCC] = expect[TOTOCC] = in.mode == 1; expect[HOURLY] = expect[DAILY] = in.mode != 1;
+    // The factory is only consulted (type read first) when no sensor was built; it errors once per unimplemented type.
+    expect[STYPE] = !in.built;
     for (int c = 0; c < NC; c++) if (calls[c] != expect[c]) { printf("FAIL %s: %s called %d times\n", vec.id.c_str(), cn[c], calls[c]); fails++; }
+    if (g_logErrors != (!in.built && in.stype != 1)) { printf("FAIL %s: factory errors %d\n", vec.id.c_str(), g_logErrors); fails++; }
     if (obs.name != in.name || obs.f1 != 0x9 || obs.f2 != 0 || queued != in.queued || obs.len > 255 || heapUsed != 0 || !rtSizeOk) {
       printf("FAIL %s: name/flags/return/length/heap (%p f1=%u f2=%u len=%zu heap=%ld)\n", vec.id.c_str(), (const void *)obs.name, obs.f1, obs.f2, obs.len, heapUsed); fails++; }
     char head[160]; snprintf(head, sizeof head, "%s|%s|%u|%u|%zu|%d|", vec.id.c_str(), obs.name, obs.f1, obs.f2, obs.len, queued);

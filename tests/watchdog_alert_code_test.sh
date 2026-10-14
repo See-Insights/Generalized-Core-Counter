@@ -67,7 +67,8 @@ check_file "$app_src" "RecoveryState::raiseAlert(19) call site present" "Recover
 # The webhook payload's "alerts" field must be fed directly from
 # current.get_alertCode() (confirms no new plumbing needed, per the WO).
 check_file "$app_src" "reportedAlertCode sourced from RecoveryState::get_alertCode()" "const int8_t reportedAlertCode = RecoveryState::get_alertCode();"
-check_file "$app_src" "\"alerts\" field present in OCCUPANCY payload format" "\\\\\"alerts\\\\\":%i"
+check_file "$app_src" "\"alerts\" key present in the payload (key name is a publishData() argument since WO-2026-10-14-003)" "occupancyMode ? \"alerts\" : \"resets\""
+check_file "$app_src" "\"alerts\" value is reportedAlertCode in the OCCUPANCY payload" "occupancyMode ? reportedAlertCode :"
 
 echo "Fidelity checks passed: alert-code 19 severity/auto-clear mirror matches real source"
 echo "Watchdog alert-code test suite passed"

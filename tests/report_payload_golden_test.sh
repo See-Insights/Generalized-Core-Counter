@@ -11,10 +11,16 @@ set -euo pipefail
 # Mutants are built from private copies of the app source in the temp dir (never the
 # worktree) and each must FAIL at run time; a mutant that does not compile is a broken
 # mutation, not a caught one. Set GOLDEN_APP_SRC to test another source file.
+#
+# WO-2026-10-14-003 (Step 6 2b-3): the sensor's leading fields now come from the real
+# src/sensors/PIRSensor.cpp (compiled into the test) and the closed-boot fallback from the
+# real SensorManager::activeSensor() body, extracted verbatim from
+# src/sensors/SensorManager.cpp (GOLDEN_SENSOR_MANAGER_SRC overrides it).
 
 tests_dir="${0:A:h}"
 repo_root="${tests_dir:h}"
 app_src="${GOLDEN_APP_SRC:-$repo_root/src/Generalized-Core-Counter.cpp}"
+sensor_mgr_src="${GOLDEN_SENSOR_MANAGER_SRC:-$repo_root/src/sensors/SensorManager.cpp}"
 fixture="$tests_dir/fixtures/report_payload_golden.txt"
 work="$(mktemp -d "${TMPDIR:-/tmp}/report_payload_golden.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
@@ -39,27 +45,53 @@ PY
 }
 
 compile() {
-  # $1 = dir holding gen_publish_region.inc, $2 = binary
-  c++ -std=c++14 -Wall -Wextra -Werror -I"$1" "$tests_dir/report_payload_golden_test.cpp" -o "$2"
+  # $1 = dir holding the gen_*.inc files (and, for PIR mutants, sensors/PIRSensor.cpp), $2 = binary
+  c++ -std=c++14 -Wall -Wextra -Werror -I"$1" -I"$tests_dir/stubs/report_golden" -I"$repo_root/src" \
+    "$tests_dir/report_payload_golden_test.cpp" -o "$2"
+}
+
+extract_active_sensor() {
+  # $1 = SensorManager source, $2 = output .inc
+  python3 - "$1" "$2" <<'PY'
+import sys
+
+src, out = sys.argv[1], sys.argv[2]
+text = open(src).read()
+start = "ISensor* SensorManager::activeSensor() {"
+if text.count(start) != 1:
+    sys.exit(f"EXTRACT_FAILED: marker count {text.count(start)} in {src}: {start}")
+i = text.index(start)
+j = text.index("\n}\n", i)
+open(out, "w").write(text[i:j + 3])
+PY
 }
 
 mkdir -p "$work/real"
 extract_region "$app_src" "$work/real/gen_publish_region.inc"
+extract_active_sensor "$sensor_mgr_src" "$work/real/gen_active_sensor.inc"
 compile "$work/real" "$work/real/bin"
 "$work/real/bin" "$fixture"
 
-# Region must also be byte-identical to the source it came from.
+# Regions must also be byte-identical to the source they came from.
 python3 - "$app_src" "$work/real/gen_publish_region.inc" <<'PY' || { echo "COPY_MISMATCH: extracted region differs from source" >&2; exit 1; }
 import sys
 assert open(sys.argv[2]).read().rstrip("\n") in open(sys.argv[1]).read()
 PY
+python3 - "$sensor_mgr_src" "$work/real/gen_active_sensor.inc" <<'PY' || { echo "COPY_MISMATCH: extracted activeSensor() differs from source" >&2; exit 1; }
+import sys
+assert open(sys.argv[2]).read().rstrip("\n") in open(sys.argv[1]).read()
+PY
 
-# Mutations of a private copy of the extracted region: each must make the golden test fail at run time.
+# Mutations of private copies of the extracted regions and of PIRSensor.cpp: each must make the golden test fail at run time.
 mutate() {
-  # $1 = label, $2 = python expression building (old, new) from the source text
-  local label="$1" dir="$work/mut_${1//[^a-z0-9]/_}"
-  mkdir -p "$dir"
-  python3 - "$work/real/gen_publish_region.inc" "$dir/gen_publish_region.inc" "$2" <<'PY'
+  # $1 = label, $2 = python expression building (old, new) from the source text,
+  # $3 = file to mutate: gen_publish_region.inc (default), gen_active_sensor.inc or sensors/PIRSensor.cpp
+  local label="$1" file="${3:-gen_publish_region.inc}" dir="$work/mut_${1//[^a-z0-9]/_}"
+  mkdir -p "$dir/sensors"
+  cp "$work/real/"*.inc "$dir/"
+  local from="$work/real/$file"
+  [[ "$file" == sensors/* ]] && from="$repo_root/src/$file"
+  python3 - "$from" "$dir/$file" "$2" <<'PY'
 import sys
 
 text = open(sys.argv[1]).read()
@@ -80,12 +112,22 @@ mutate "battery format %4.2f -> %4.1f" '(r"\"battery\":%4.2f", r"\"battery\":%4.
 # Equivalent for battery (clamped to 0..100, so never under 4 chars), but not for temp: " nan".
 mutate "temp format %4.2f -> %.2f" '(r"\"temp\":%4.2f", r"\"temp\":%.2f")'
 mutate "key connecttime renamed" '(r"\"connecttime\"", r"\"connect_time\"")'
-mutate "alerts/resets swap undone (occupancy)" '(
-  "reportedAlertCode,\n             RecoveryState::get_resetCount(),",
-  "RecoveryState::get_resetCount(),\n             reportedAlertCode,"
+mutate "alerts/resets values swapped undone (occupancy)" '(
+  "occupancyMode ? reportedAlertCode : RecoveryState::get_resetCount(),",
+  "occupancyMode ? RecoveryState::get_resetCount() : reportedAlertCode,"
 )'
-mutate "occupancy keys in counting order" '(r"\"alerts\":%i,\"resets\":%i", r"\"resets\":%i,\"alerts\":%i")'
-mutate "counting keys in occupancy order" '(r"\"resets\":%i,\"alerts\":%i", r"\"alerts\":%i,\"resets\":%i")'
+mutate "occupancy keys in counting order" '("occupancyMode ? \"alerts\" : \"resets\"", "occupancyMode ? \"resets\" : \"alerts\"")'
+mutate "counting keys in occupancy order" '("occupancyMode ? \"resets\" : \"alerts\"", "\"resets\"")'
+mutate "sensor prefix dropped" '("           sensorFields,\n", "           \"\",\n")'
+mutate "counting timestamp off by one" '(": endOfPrevHourStampSec;", ": endOfPrevHourStampSec + 1;")'
+mutate "PIR hourly/daily swapped" '(
+  "CurrentReadings::get_hourlyCount(), CurrentReadings::get_dailyCount()",
+  "CurrentReadings::get_dailyCount(), CurrentReadings::get_hourlyCount()"
+)' sensors/PIRSensor.cpp
+mutate "PIR dailyoccupancy not in minutes" '("/ 60UL", "/ 30UL")' sensors/PIRSensor.cpp
+mutate "activeSensor null on closed boot" '("if (_sensor) return _sensor;", "return _sensor;")' gen_active_sensor.inc
+mutate "activeSensor skips PIR fallback" '(": SensorFactory::createSensor(SensorType::PIR);", ": nullptr;")' gen_active_sensor.inc
+mutate "activeSensor consults factory over built sensor" '("if (_sensor) return _sensor;", "")' gen_active_sensor.inc
 mutate "PRIVATE dropped from flags" '("PRIVATE | WITH_ACK", "WITH_ACK")'
 mutate "event name changed" '("Cloud::instance().getWebhookName()", "\"wrong-event\"")'
 mutate "buffer size 256 -> 512" '("char data[256];", "char data[512];")'
