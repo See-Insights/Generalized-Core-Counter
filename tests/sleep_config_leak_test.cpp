@@ -115,6 +115,8 @@ using particle::SystemSleepNetworkFlag;
 static const hal_pin_t WAKEUP_PIN = 8;
 static const hal_pin_t BUTTON_PIN = 5;
 static const hal_pin_t intPin = 10;
+// The wake source the production sites read from the sensor (PIR: intPin, RISING).
+static const struct { hal_pin_t pin; InterruptMode edge; } sensorWake = {intPin, RISING}; static const bool sensorCanWake = true;
 static const uint32_t wakeInSeconds = 300;
 
 #include REAL_SITES_HEADER

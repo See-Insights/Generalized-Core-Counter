@@ -1359,10 +1359,12 @@ void handleSleepingState() {
   }
 #endif
   
+  const SensorWakeSource sensorWake = SensorManager::instance().activeSensor()->wakeSource();
+  const bool sensorCanWake = (sensorWake.pin != PIN_INVALID);
   SystemSleepConfiguration ulpConfig;
   ulpConfig.mode(SystemSleepMode::ULTRA_LOW_POWER)
-    .gpio(BUTTON_PIN, FALLING)     // Service button wake (active-low)
-    .gpio(intPin, RISING);         // PIR sensor wake
+    .gpio(BUTTON_PIN, FALLING);    // Service button wake (active-low)
+  if (sensorCanWake) ulpConfig.gpio(sensorWake.pin, sensorWake.edge);  // Sensor wake
     
   // Add network standby for occupancy mode to avoid reconnection delays
   // Note: Network standby is only supported/needed on cellular devices to prevent
@@ -1423,7 +1425,7 @@ void handleSleepingState() {
   const unsigned long sleepElapsedMs = millis() - sleepCallStartMs;
   pin_t wakePin = result.wakeupPin();
   const char *wakeReturnReason = (result.error() != SYSTEM_ERROR_NONE) ? "ERROR" :
-      ((wakePin == BUTTON_PIN) ? "BUTTON" : ((wakePin == intPin) ? "PIR" : "TIMER"));
+      ((wakePin == BUTTON_PIN) ? "BUTTON" : ((wakePin == sensorWake.pin) ? "PIR" : "TIMER"));
 
 #if HAL_PLATFORM_CELLULAR
   if (useNetworkStandby) {
@@ -1454,16 +1456,16 @@ void handleSleepingState() {
   // thrash in a tight loop.
   if (result.error() != SYSTEM_ERROR_NONE) {
     thrashGuard.markProgress("SLEEP_RETURNED");
-    Log.error("ULTRA_LOW_POWER sleep failed err=%d (wakeIn=%d sec, button=%d pir=%d) - falling back to STOP", (int)result.error(), wakeInSeconds, (int)BUTTON_PIN, (int)intPin);
+    Log.error("ULTRA_LOW_POWER sleep failed err=%d (wakeIn=%d sec, button=%d pir=%d) - falling back to STOP", (int)result.error(), wakeInSeconds, (int)BUTTON_PIN, (int)sensorWake.pin);
     RecoveryState::raiseAlert(16);
 
    // STOP generally supports a wider set of wake pins on some platforms.
     setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START (was stale literal 20, colliding with BREADCRUMB_REPORT_EXIT)
     SystemSleepConfiguration stopConfig;
     stopConfig.mode(SystemSleepMode::STOP)
-      .gpio(BUTTON_PIN, FALLING)
-      .gpio(intPin, RISING)
-      .duration((uint32_t)wakeInSeconds * 1000UL);
+      .gpio(BUTTON_PIN, FALLING);
+    if (sensorCanWake) stopConfig.gpio(sensorWake.pin, sensorWake.edge);
+    stopConfig.duration((uint32_t)wakeInSeconds * 1000UL);
     PowerDiagnostics::logPowerState("pre-sleep-stop-fallback");
     Cloud::instance().logLedgerSleepState();
     setAppBreadcrumb(25); // BREADCRUMB_SLEEP_SYSTEM_CALL (was stale literal 21, colliding with BREADCRUMB_IDLE_ENTRY) - entering final pre-sleep sequence
@@ -1517,7 +1519,7 @@ void handleSleepingState() {
   // Clear any pending interrupts on wake pins after sleep to ensure clean state
   // This is critical for proper interrupt handling after wake
   pinMode(BUTTON_PIN, INPUT);    // Reset pin mode
-  pinMode(intPin, INPUT);         // Reset pin mode
+  if (sensorCanWake) pinMode(sensorWake.pin, INPUT);  // Reset pin mode
   
   // Resume hardware watchdog immediately after wake
   ab1805.resumeWDT();
@@ -1578,7 +1580,7 @@ void handleSleepingState() {
 
   // When both GPIO and timer wake are configured, the wake source detection can be
   // ambiguous. The explicit approach: if neither GPIO pin woke us, it's the timer.
-  bool pirWake = (wakePin == intPin);
+  bool pirWake = sensorCanWake && (wakePin == sensorWake.pin);
   bool buttonWake = (wakePin == BUTTON_PIN);
   bool timerWake = !pirWake && !buttonWake;  // If no GPIO woke us, it's the timer
   const char *wakeReasonLabel = buttonWake ? "BUTTON" : (pirWake ? "PIR" : "TIMER");

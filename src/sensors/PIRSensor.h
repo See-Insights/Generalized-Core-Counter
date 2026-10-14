@@ -124,6 +124,8 @@ public:
      */
     bool usesInterrupt() const override { return true; }
 
+    SensorWakeSource wakeSource() const override { return {intPin, RISING}; }
+
     /** @brief occupancy/dailyoccupancy (OCCUPANCY) or hourly/daily (other modes); at most 40 characters. */
     void reportFields(char* out, size_t len, uint8_t sensorMode) const override;
 

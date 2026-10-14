@@ -57,6 +57,8 @@ BASELINE_COMMIT = "43b8a69"
 # The wake sources at each site, transcribed from 43b8a69. Keyed by the sleep
 # mode each site uses plus a disambiguating tag, because the variable names
 # are exactly what this WO changes and must not be pinned.
+# `sensorWake.pin`/`.edge` in the source resolve to PIR_SOURCE (see resolve_gpio).
+PIR_SOURCE = ("intPin", "RISING")
 EXPECTED_SITES = {
     "hibernate": {
         "mode": "SystemSleepMode::HIBERNATE",
@@ -242,6 +244,7 @@ def extract_sites(sleep_src_text):
                  if start_at < c[2] < m.start()]
         mode = None
         gpio = []
+        gpio_guarded = []
         duration = None
         network = None
         network_guarded = False
@@ -250,6 +253,8 @@ def extract_sites(sleep_src_text):
                 mode = args[0]
             elif method == "gpio" and len(args) >= 2:
                 gpio.append((args[0], args[1]))
+                gpio_guarded.append(bool(re.search(r"if\s*\(\s*sensorCanWake\s*\)\s*$",
+                                                   scrubbed[max(0, off - 60):off].rsplit(var, 1)[0])))
             elif method == "duration" and args:
                 duration = args[0]
             elif method == "network" and len(args) >= 2:
@@ -269,7 +274,7 @@ def extract_sites(sleep_src_text):
         else:
             tag = "unknown:%s" % mode
         sites[tag] = {
-            "mode": mode, "gpio": gpio, "duration": duration,
+            "mode": mode, "gpio": gpio, "gpio_guarded": gpio_guarded, "duration": duration,
             "network": network, "var": var, "decl_local": decl_local,
             "network_guarded": network_guarded,
             "line": line_of(text, m.start()),
@@ -330,6 +335,18 @@ def check_no_long_lived(src_root):
                      % (rel, line_of(text, m.start())))
 
 
+def resolve_gpio(site, source=PIR_SOURCE):  # source: (pin, edge), or None for no wake source
+    out = []
+    for (pin, edge), guarded in zip(site["gpio"], site["gpio_guarded"]):
+        if pin == "sensorWake.pin" and source is None:
+            if not guarded:
+                out.append(("PIN_INVALID", edge))
+            continue
+        out.append((source[0] if pin == "sensorWake.pin" else pin,
+                    source[1] if edge == "sensorWake.edge" and source else edge))
+    return out
+
+
 def check_sites(sites):
     """WO Acceptance 3, plus 'each site owns a fresh local'."""
     vars_seen = sites.get("__vars__", [])
@@ -355,9 +372,13 @@ def check_sites(sites):
         if actual["mode"] != expected["mode"]:
             fail("sleep site '%s': mode is %s, expected %s"
                  % (tag, actual["mode"], expected["mode"]))
-        if sorted(actual["gpio"]) != sorted(expected["gpio"]):
-            fail("sleep site '%s': wake pins/edges changed - found %s, expected %s"
-                 % (tag, sorted(actual["gpio"]), sorted(expected["gpio"])))
+        for label, source, want in (("PIR source", PIR_SOURCE, expected["gpio"]),
+                                    ("no wake source", None,
+                                     [g for g in expected["gpio"] if g != PIR_SOURCE])):
+            got = resolve_gpio(actual, source)
+            if got != want:
+                fail("sleep site '%s': wake pins/edges changed (%s, in order) - found %s, expected %s"
+                     % (tag, label, got, want))
         if actual["duration"] != expected["duration"]:
             fail("sleep site '%s': RTC duration changed - found %r, expected %r"
                  % (tag, actual["duration"], expected["duration"]))
@@ -391,8 +412,11 @@ def run_checks(src_root):
         return failures
     check_no_long_lived(src_root)
     with open(sleep_src, "r", errors="replace") as fh:
-        sites = extract_sites(fh.read())
+        sleep_text = fh.read()
+    sites = extract_sites(sleep_text)
     check_sites(sites)
+    if re.search(r"\bintPin\b", scrub(sleep_text)):
+        fail("State_Sleep.cpp still names intPin - the wake pin comes from the sensor")
     return failures
 
 
@@ -430,8 +454,14 @@ def run_mutations():
          "  static SystemSleepConfiguration ulpConfig;"),
         ("a wake edge is changed",
          "state/State_Sleep.cpp",
-         ".gpio(intPin, RISING);         // PIR sensor wake",
-         ".gpio(intPin, FALLING);        // PIR sensor wake"),
+         "ulpConfig.gpio(sensorWake.pin, sensorWake.edge);",
+         "ulpConfig.gpio(sensorWake.pin, FALLING);"),
+        ("the sensor-valid guard is dropped from the ULP sleep configuration",
+         "state/State_Sleep.cpp",
+         "if (sensorCanWake) ulpConfig.gpio(", "ulpConfig.gpio("),
+        ("the sensor-valid guard is dropped from the STOP fallback configuration",
+         "state/State_Sleep.cpp",
+         "if (sensorCanWake) stopConfig.gpio(", "stopConfig.gpio("),
     ]
     ok = True
     for label, rel, old, new in mutations:

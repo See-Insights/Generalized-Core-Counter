@@ -188,7 +188,7 @@ sfn = sleep.find("void handleSleepingState() {")
 decl = sleep.find("static bool disconnectRequested = false;", sfn)
 reset_end = sleep.find('Log.warn("SLEEP: disconnectRequested latched without timestamp', decl)
 teardown_site = sleep.find("disconnectRequested = true;", decl)
-wake_site = sleep.find("bool pirWake = (wakePin == intPin);", sfn)
+wake_site = sleep.find("bool pirWake = sensorCanWake && (wakePin == sensorWake.pin);", sfn)
 
 sleep_segments = []
 pend_idx = sleep.find("if (session.occupancyChangeTriggered", sfn, required=False)
