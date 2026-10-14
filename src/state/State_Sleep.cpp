@@ -1091,9 +1091,9 @@ void handleSleepingState() {
   // COUNTING MODE: Defer sleep until LED flash completes
   if (SystemConfig::get_sensorMode() == SystemConfig::COUNTING) {
     uint32_t ledRemaining = signalLEDTimeRemaining();
-    if (sensorDetect || ledRemaining > 0) {
-      Log.info("COUNTING: Deferring sleep - sensor=%d LED remaining=%lu sec", 
-               sensorDetect, ledRemaining);
+    if (ledRemaining > 0) {
+      Log.info("COUNTING: Deferring sleep - LED remaining=%lu sec", 
+               ledRemaining);
       transitionTo(IDLE_STATE, "sleep-counting-led-defer");
       return;
     }

@@ -153,7 +153,6 @@ State oldState = INITIALIZATION_STATE;
 
 // ********** Global Flags **********
 volatile bool userSwitchDetected = false;
-volatile bool sensorDetect = false; // Flag for sensor interrupt
 
 // Session state - consolidated flags for connection/webhook/hibernate tracking
 SessionState session;
