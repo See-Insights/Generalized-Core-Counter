@@ -720,6 +720,7 @@ These rules were agreed during WO-2026-10-07-002 through WO-2026-10-08-002. Sect
 - re-checks every citation the WO relies on (holds, moved or wrong);
 - searches the history (§12.1), where restoring old behaviour is the default fix;
 - names every reader and writer the change touches;
+- searches for callers by the **bare** name, not only the qualified one: a member function can call another unqualified (`profileSelectionReasonLabel(...)` inside `PowerManager`), and an inlined call leaves no ELF symbol. (The case: WO-2026-10-13-001 Step 0 marked a live function dead; Copilot caught it at Stage 6.)
 - gives a size estimate with its reasoning.
 
 Step 0 ends with STOP or PROCEED. It stops if the estimate is over budget, or if the fix needs a new persisted field, state, timer, schedule, alarm or config flag. The report is committed on the WO branch.

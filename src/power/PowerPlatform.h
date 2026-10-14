@@ -36,13 +36,6 @@ PowerCapabilities detectCapabilities();
 bool hasPmic();
 
 /**
- * @brief Returns whether the active platform has a fuel gauge.
- *
- * @return true when fuel-gauge APIs are available
- */
-bool hasFuelGauge();
-
-/**
  * @brief Records the last observed platform power source for later policy decisions.
  *
  * @param source Raw platform-specific power-source identifier

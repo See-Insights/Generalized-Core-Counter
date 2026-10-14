@@ -154,10 +154,6 @@ bool hasPmic() {
   return detectCapabilities().hasPmic;
 }
 
-bool hasFuelGauge() {
-  return detectCapabilities().hasFuelGauge;
-}
-
 void noteObservedPowerSource(int source) {
   if (!isUnavailablePowerSource(source)) {
     lastObservedPowerSource = source;

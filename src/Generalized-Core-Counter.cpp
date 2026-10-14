@@ -113,7 +113,6 @@ static void appWatchdogHandler(); // Application watchdog handler
 static void waitForDebugSerialIfConnected(); // Brief settle delay if a debug terminal is already attached at boot
 void publishData(time_t stampOverride); // Publish the data to the cloud
 void userSwitchISR();         // Interrupt for the user switch
-void sensorISR();             // Interrupt for legacy tire-counting sensor
 void dailyCleanup();          // Reset daily counters and housekeeping
 void UbidotsHandler(const char *event, const char *data); // Webhook response handler
 void publishStartupStatus();  // One-time status summary at boot
@@ -2705,15 +2704,6 @@ void connectivityFailsafeSupervisor() {
 }
 
 void userSwitchISR() { userSwitchDetected = true; }
-
-void sensorISR() {
-  static bool frontTireFlag = false;
-  if (frontTireFlag || SystemConfig::get_sensorType() == 1) { // Counts the rear tire for pressure sensors and once for PIR (sensor type 1)
-    sensorDetect = true;                                  // sets the sensor flag for the main loop
-    frontTireFlag = false;
-  } else
-    frontTireFlag = true;
-}
 
 /**
  * @brief Cleanup function that is run at the beginning of the day.

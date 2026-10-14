@@ -8,7 +8,6 @@ Source basis: `PROJECT_STATUS.md`, `README.md`, `docs/architecture-overview.md`,
 - Key files:
 	- `src/Generalized-Core-Counter.cpp`
 	- `src/state/StateMachine.h`
-	- `src/state/StateHandlers.cpp`
 	- `src/state/State_Idle.cpp`
 	- `src/state/State_Connect.cpp`
 	- `src/state/State_Report.cpp`
@@ -85,7 +84,6 @@ Runtime reporting policy centrally converts configured cadence and current power
 	- `src/sensors/ISensor.h`
 	- `src/sensors/SensorManager.cpp`
 	- `src/sensors/SensorFactory.h`
-	- `src/sensors/SensorData.h`
 	- `src/sensors/PIRSensor.cpp`
 - Dependencies:
 	- Internal: Device pinout, config and persistent sensor settings, state handlers.

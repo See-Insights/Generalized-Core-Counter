@@ -180,7 +180,6 @@ private:
 
     // PIR-specific state
     static volatile bool _motionDetected;  // Set by ISR, read/cleared in loop()
-    static volatile uint32_t _isrCount;    // Counts how many times ISR fired
 
     // ISR handler
     static void pirISR();

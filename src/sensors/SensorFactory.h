@@ -87,33 +87,6 @@ public:
                 return nullptr;
         }
     }
-    
-    /**
-     * @brief Get sensor type name as string
-     * @param type The sensor type
-     * @return const char* name of the sensor type (string literal, no allocation)
-     */
-    static const char* getSensorTypeName(SensorType type) {
-        switch(type) {
-            case SensorType::VEHICLE_PRESSURE:     return "VehiclePressure";
-            case SensorType::PIR:                  return "PIR";
-            case SensorType::VEHICLE_MAGNETOMETER: return "VehicleMagnetometer";
-            case SensorType::RAIN_BUCKET:          return "RainBucket";
-            case SensorType::VIBRATION_BASIC:      return "VibrationBasic";
-            case SensorType::VIBRATION_ADVANCED:   return "VibrationAdvanced";
-
-            case SensorType::INDOOR_OCCUPANCY:     return "IndoorOccupancy";
-            case SensorType::OUTDOOR_OCCUPANCY:    return "OutdoorOccupancy";
-            case SensorType::OPENMV_OCCUPANCY:     return "OpenMVOccupancy";
-            case SensorType::ACCEL_PRESENCE:       return "AccelPresence";
-
-            case SensorType::SOIL_MOISTURE:        return "SoilMoisture";
-            case SensorType::DISTANCE:             return "Distance";
-
-            case SensorType::LORA_GATEWAY:         return "LoRaGateway";
-            default: return "Unknown";
-        }
-    }
 };
 
 #endif /* SENSORFACTORY_H */
