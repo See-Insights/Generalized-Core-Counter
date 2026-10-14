@@ -252,7 +252,7 @@ void handleIdleState() {
       // for new motion, and SLEEPING_STATE already wakes on timer to evaluate
       // the debounce timeout. Keeping the device awake here causes it to
       // remain connected and burn power during continued motion.
-      if (sensorDetect || (SystemConfig::get_sensorMode() == SystemConfig::COUNTING && signalLEDTimeRemaining() > 0)) {
+      if ((SystemConfig::get_sensorMode() == SystemConfig::COUNTING && signalLEDTimeRemaining() > 0)) {
         return;
       }
 

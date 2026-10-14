@@ -33,7 +33,6 @@ extern AB1805 ab1805;
 /// Shared system health and ISR flags.
 extern int outOfMemory;
 extern volatile bool userSwitchDetected;
-extern volatile bool sensorDetect;
 
 /**
  * @brief ISR used for the user/service button input.
