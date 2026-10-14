@@ -11,7 +11,8 @@
 typedef uint16_t pin_t;
 enum PinMode { INPUT, OUTPUT, INPUT_PULLDOWN };
 enum PinState { LOW = 0, HIGH = 1 };
-enum InterruptMode { RISING = 1 };
+enum InterruptMode { CHANGE, RISING, FALLING };
+#define PIN_INVALID (0xff)  // Device OS 6.4.1 hal/inc/pinmap_hal.h:75
 
 inline void pinMode(pin_t, PinMode) {}
 inline void digitalWrite(pin_t, int) {}

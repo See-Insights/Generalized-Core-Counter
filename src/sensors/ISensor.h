@@ -66,6 +66,12 @@ struct SensorData {
     bool toJSON(char* buffer, size_t bufferSize) const;
 };
 
+/** @brief Pin and edge that wake the device from sleep; pin == PIN_INVALID means no wake source. */
+struct SensorWakeSource {
+    pin_t pin;  // pin_t, never uint8_t: wakeupPin() returns 0xFFFF on a timer wake
+    InterruptMode edge;
+};
+
 /**
  * @brief Abstract interface for all sensors
  * 
@@ -142,6 +148,9 @@ public:
      * @brief Last sensor-specific error code (if any).
      */
     virtual int lastErrorCode() const { return 0; }
+
+    /** @brief The pin and edge that wake the device from sleep; the default is no wake source. */
+    virtual SensorWakeSource wakeSource() const { return {PIN_INVALID, RISING}; }
 
     /** @brief Leading report JSON members, each followed by a comma; the default writes nothing. */
     virtual void reportFields(char* out, size_t len, uint8_t) const { if (out && len) out[0] = '\0'; }

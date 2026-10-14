@@ -66,8 +66,8 @@ for tag in order:
     fn = "cfg_" + tag.replace("-", "_")
     lines = ["  cfg.mode(%s);" % site["mode"]]
     n = 1
-    for pin, edge in site["gpio"]:
-        lines.append("  cfg.gpio(%s, %s);" % (pin, edge))
+    for (pin, edge), guarded in zip(site["gpio"], site["gpio_guarded"]):
+        lines.append("  %scfg.gpio(%s, %s);" % ("if (sensorCanWake) " if guarded else "", pin, edge))
         n += 1
     if site["duration"] is not None:
         lines.append("  cfg.duration(%s);" % site["duration"])
@@ -103,7 +103,7 @@ for tag, fn, n, has_net in emitted:
 PY
 
 echo "Wake sources lifted from $sleep_src:"
-grep -E "^  (cfg\.|if \(standby)" "$sites_header" | sed 's/^/  /'
+grep -E "^  (cfg\.|if \((standby|sensorCanWake)\))" "$sites_header" | sed 's/^/  /'
 echo ""
 
 # --- Part 2: compile against the real Device OS header and run ------------
