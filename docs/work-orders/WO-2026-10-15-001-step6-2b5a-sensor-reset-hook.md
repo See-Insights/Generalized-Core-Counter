@@ -40,7 +40,10 @@ None; no behavior change.
 
 ## Stage 6: architect's rulings (2026-10-15)
 
-1. **Test budget raised to +165 added lines,** with no trim (the actual is +161: the new 154-line test and 7 lines of link stubs). **From 2b-6 onward, the default test budget is +175 added lines when a new harness is needed, and +100 otherwise.** This is recorded in `AI_DEVELOPMENT_WORKFLOW.md` §13 (b).
+1. **The +161 test lines are accepted** (the new 154-line test plus 7 lines of link stubs, against the +100 stated). **New rule, also in `AI_DEVELOPMENT_WORKFLOW.md` §13 (b):**
+   - **`src/` budgets are hard:** stop and report.
+   - **Test budgets are a guideline:** record the actual and note an overrun, but don't stop; flag only if tests exceed about twice the guideline.
+   - **The default guideline from 2b-6 onward:** +175 added lines when a new harness is needed, +100 otherwise.
 2. **The link stubs are accepted:** no-op `CurrentReadings` setter stubs in `report_payload_golden_test.cpp`, `pir_sensor_lifecycle_test.cpp` and `sensor_wake_source_test.cpp`, needed because `PIRSensor.cpp` now calls the setters. The golden fixture and assertions are unchanged.
 3. **Stage 7 rebuilds both sides fresh,** expecting +56 text. Copilot's "before" of 150876 came from `make compile-all`, not the release recipe.
 
