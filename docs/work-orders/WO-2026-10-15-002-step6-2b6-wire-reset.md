@@ -73,6 +73,14 @@ Net `src/` **≤ +20, hard** (estimate +7 without the wrapper, +13 with it). One
 
 None in this WO. Bench validation is the v43 soak (Dev-09 and Dev-14): hourly counts restart each hour, daily totals are zero after the close, and PIR and timer wakes behave as on v42.
 
+## Stage 6: architect's rulings (2026-10-15)
+
+1. **+320 test lines accepted.** The WO wrongly said no new harness would be needed. The end-to-end and null-sensor checks needed one (`tests/reset_wiring_test.{sh,cpp}`, 227 lines), so the **+175 guideline** (§13 (b)) applied. The actual of +320 / −11 is about 1.8× that.
+2. **The `tests/pir_sensor_reset_totals_test.sh` edit is accepted** as a necessary consequence of wiring the hook:
+   - 2b-5a's "no caller" check now requires **exactly** the two new callers (the daily close and the hourly reset);
+   - its extraction no longer depends on the old no-argument `resetEverything()` signature;
+   - its added-caller mutation was re-targeted.
+
 ## Closing record
 
 Budget versus actual (`src/` and tests), ELF changes by symbol, suite `N/N`.
