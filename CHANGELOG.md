@@ -16,6 +16,18 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v43-SensorShape] - 2026-10-15
+
+### Changed
+
+- **No intended behaviour change.** v43 should report, wake, reset and sleep exactly like v42. It restructures the code for Step 6:
+  - **Dead code removed** (WO-2026-10-13-001, PR #94): about 460 lines nothing called, including an old PMIC charge-cycle test and unused helpers.
+  - **The sensor supplies its own report fields** (WO-2026-10-14-003, PR #99): `occupancy`/`dailyoccupancy` or `hourly`/`daily`. The report keeps the same keys, order and number formats.
+  - **The sensor supplies its own wake pin and edge** (WO-2026-10-14-004, PR #100): for PIR, still `intPin` on a rising edge, and a timer wake can never take the PIR path.
+  - **The sensor clears its own hourly and daily totals** (WO-2026-10-15-001/002, PRs #101 and #103), with the same fields, in the same order, at the same moments. `lastCountTime` and the reset count are still cleared centrally at the close.
+  - **One start operation for a sensor** instead of two, and the never-set `sensorDetect` flag removed (WO-2026-10-14-002, PR #98).
+  - **A golden test pins the report payload byte for byte** (WO-2026-10-14-001, PR #97). 186 vectors cover the event name, the payload and the publish flags.
+
 ## [v42-ConfigWindowLatch] - 2026-10-12
 
 ### Changed
