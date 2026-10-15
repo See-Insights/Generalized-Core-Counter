@@ -72,6 +72,9 @@ struct SensorWakeSource {
     InterruptMode edge;
 };
 
+/** @brief Which of the sensor's totals to clear. */
+enum class ResetPeriod { Hourly, Daily };
+
 /**
  * @brief Abstract interface for all sensors
  * 
@@ -151,6 +154,9 @@ public:
 
     /** @brief The pin and edge that wake the device from sleep; the default is no wake source. */
     virtual SensorWakeSource wakeSource() const { return {PIN_INVALID, RISING}; }
+
+    /** @brief Clear this sensor's hourly or daily totals; the default does nothing. */
+    virtual void resetTotals(ResetPeriod) {}
 
     /** @brief Leading report JSON members, each followed by a comma; the default writes nothing. */
     virtual void reportFields(char* out, size_t len, uint8_t) const { if (out && len) out[0] = '\0'; }
