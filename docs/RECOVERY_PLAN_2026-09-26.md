@@ -180,7 +180,7 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
   - **Related gate-timer gap (pre-existing):** the CONNECTED+open sleep abort (`State_Sleep.cpp:406-409`, from 2026-01 and 2026-06) leaves for Idle without resetting `cloudSyncStartMs`. If the mode in use becomes CONNECTED during a gate wait, a later sleep's gate starts with a stale timer and can time out at once, tearing down before its queued work drains. Found by WO-2026-10-07-004 Stage 7 round 2 (a CONCERN; deliberately not folded into that WO). The fix would be the same one line as WO-004's controller edit (`cloudSyncStartMs = 0;` before the transition). Not the Dev-14 alert-44 cause above.
 - **A modem-off sleep loop after a restart** (Dev-14, v42, KEEP_ALIVE, 2026-10-15; architect, 2026-10-15). For 18.5 min after a restart at about 06:11:08Z, the device never slept.
   - **Source:** S3 `serialLog` for `e00fce688e592afaf23ac4fb`, 15 Oct 06:11:07–06:30:28Z (forwarded USB serial; timestamps are the forwarder's).
-  - **The restart:** `06:11:07 0029423332 ConnSummary: fail elapsed=660002 last=CELLULAR_ACQUIRE … sig=na`. Then the serial port dropped, and the next line shows uptime restarted at `06:11:39 0000031407`. The reset reason is not yet known (the `status` event is queued on the device; Singtel registration was failing).
+  - **The restart:** `06:11:07 0029423332 ConnSummary: fail elapsed=660002 last=CELLULAR_ACQUIRE … sig=na`. Then the serial port dropped, and the next line shows uptime restarted at `06:11:39 0000031407`. It was the connectivity failsafe: the queued status, published 11:43:20.824Z, reads `resetReason 140, resetReasonData 2, watchdogResetCount 126` (next bullet).
   - **The loop, 38 times, about every 30 s** (the first pass is `06:11:39`–`06:11:53`, uptime `0000031407`–`0000031431`; every later pass repeats it):
     - **First pass only:** the 30 s budget was missed and the modem was marked unstable: `MODEM_HEALTH: unstable reason=slow_teardown elapsed=30010` (`State_Sleep.cpp:112`). Standby was then suppressed: `MODEM_POLICY: standby temporarily disabled reason=unstable_modem` (`:124`).
     - **Gate blocked:** `SLEEP: pre-sleep gate blocked (cloud=0 radioOn=1 standby=0) - requesting modem off` (`:936`).
@@ -197,6 +197,27 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
     - **What Step 6 changed:** `State_Sleep.cpp` only from `:1091` on (the COUNTING defer and the wake-source setup), `State_Idle.cpp` only at `:252`, and nothing in `State_Error.cpp` (`git diff ff1715c 71e346f`).
     - **What it didn't:** the gate, the budget and the alert-15 lines cited here.
     - **Line numbers:** at main `71e346f`.
+- **Firmware modem resets didn't recover registration; a power cycle did** (Dev-14, v42, KEEP_ALIVE, Singtel, 2026-10-15; architect, 2026-10-15).
+  - **Sources:**
+    - S3 `serialLog` for `e00fce688e592afaf23ac4fb`, 15 Oct 02:30–11:43:39Z (forwarded USB serial; the forwarder's timestamps);
+    - S3 `status` for the same device, 15 Oct, published 11:43:20–11:43:38Z.
+  - **The last good connection:** `02:30:09 0016165198 ConnSummary: ok elapsed=1418 … sig=80/25`.
+  - **15 failed attempts in a row,** `03:41:07` to `11:14:17`. Each one was the same:
+    - Device OS reset the modem at about 600 s (`[ncp.client] WARN: Resetting the modem due to the network registration timeout`, 15 times, 03:30–11:33Z);
+    - then the 660 s budget ran out: `ConnSummary: fail elapsed=66000x last=CELLULAR_ACQUIRE cellMs=66000x … cloudRecoverStage=0 … sig=na`, with `q` rising to 16.
+    - The first is `03:41:07 0020423078`; the last is `11:14:17 0018188559 … q=16`.
+  - **A failsafe reset in the middle:** at about 06:11:08Z, after the 06:11:07 failure (uptime `0029423332`). Its queued status, published `11:43:20.824Z`, reads `resetReason 140, resetReasonData 2, appBreadcrumb 10, appBreadcrumbMs 29423342, watchdogResetCount 126`.
+    - That is the connectivity failsafe (140/2), not a watchdog. `lastWatchdogBreadcrumb 28` / `lastWatchdogUptimeMs 1687188` are left over from an earlier watchdog, and the count is unchanged at 126.
+    - **The reboot didn't recover registration either:** 9 more attempts failed after it, from 06:41:11 on.
+  - **The power cycle and the recovery:**
+    - **Chip power-cycled it at about 11:33Z** (an attempt starting `11:31:14` was cut off). The status published `11:43:36.744Z` reads `resetReason 40` (power down).
+    - **Uptime restarted:** `11:33:41 0000004472 Using internal SIM card`.
+    - **The first attempt after the power cycle registered at about 516 s:** `11:42:14 0000517819 CloudRecover: stage=1 action=particle-reconnect phaseElapsed=516526`, then `11:42:27 0000522351 ConnSummary: ok elapsed=520556 … cellMs=516526 … cloudMs=4030 … sig=78/33 q=18`, then `Failsafe: cleared reason=cloud-ok`.
+    - **The v43 OTA followed at once.** The post-OTA boot registered in 6.8 s (`11:43:08 0000010749 ConnSummary: ok elapsed=9870 … cellMs=6812 … sig=80/33`).
+  - **INF, unproved:** the modem or SIM was stuck in a state that a power-off clears and that neither Device OS's modem reset nor a `System.reset()` cleared (the failsafe reboot didn't help).
+    - **Against it:** registration took 516 s even after the power cycle, so a network-side recovery at about 11:40Z can't be ruled out with this one case.
+    - **What would help:** a second case, or a carrier-side check.
+  - **Why it matters:** no firmware path short of a power cycle (for example a hard modem power-off via the PMIC or the modem's power pin) is known to clear this. That would be a recovery-plan item under Connectivity if it recurs.
 - **Inbound ledger config and INTERMITTENT:**
   - **Decided 2026-10-07 (Chip):** no per-connection dwell for inbound ledger syncs. The cost would be paid on every connect, and inbound config changes are rare.
   - **INTERMITTENT devices get one config wait per day:** the first connection after open hour, plus the boot connection. The gate holds a few seconds after outbound syncs, ending early on an input `onSync`.
