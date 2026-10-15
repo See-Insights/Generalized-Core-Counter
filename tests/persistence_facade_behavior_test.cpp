@@ -229,6 +229,36 @@ static void testResetEverythingCrossStore() {
   // The cross-store part: it reaches into the sysStatus reset count too.
   CHECK(RecoveryState::get_resetCount() == 0,
         "resetEverything still clears the sysStatus reset count (cross-store)");
+  CHECK(CurrentReadings::get_lastCountTime() == Time.now(), "resetEverything stamps lastCountTime");
+}
+
+// WO-2026-10-15-002: resetEverything(false) keeps the central work and leaves the sensor totals alone.
+static void testResetEverythingWithoutSensorTotals() {
+  RecoveryState::set_resetCount(5);
+  CurrentReadings::set_lastCountTime(1);
+  CurrentReadings::set_hourlyCount(17);
+  CurrentReadings::set_dailyCount(99);
+  CurrentReadings::set_occupied(true);
+  CurrentReadings::set_lastOccupancyEvent(55);
+  CurrentReadings::set_occupancyStartTime(66);
+  CurrentReadings::set_totalOccupiedSeconds(1234);
+
+  CurrentReadings::resetEverything(false);
+
+  CHECK(CurrentReadings::get_lastCountTime() == Time.now(), "resetEverything(false) stamps lastCountTime");
+  CHECK(RecoveryState::get_resetCount() == 0, "resetEverything(false) clears the reset count");
+  CHECK(CurrentReadings::get_hourlyCount() == 17, "resetEverything(false) leaves hourlyCount");
+  CHECK(CurrentReadings::get_dailyCount() == 99, "resetEverything(false) leaves dailyCount");
+  CHECK(CurrentReadings::get_occupied() == true, "resetEverything(false) leaves occupied");
+  CHECK(CurrentReadings::get_lastOccupancyEvent() == 55, "resetEverything(false) leaves lastOccupancyEvent");
+  CHECK(CurrentReadings::get_occupancyStartTime() == 66, "resetEverything(false) leaves occupancyStartTime");
+  CHECK(CurrentReadings::get_totalOccupiedSeconds() == 1234, "resetEverything(false) leaves occupied seconds");
+
+  CurrentReadings::resetEverything(true);
+  CHECK(CurrentReadings::get_hourlyCount() == 0 && CurrentReadings::get_dailyCount() == 0 &&
+            CurrentReadings::get_occupied() == false && CurrentReadings::get_lastOccupancyEvent() == 0 &&
+            CurrentReadings::get_occupancyStartTime() == 0 && CurrentReadings::get_totalOccupiedSeconds() == 0,
+        "resetEverything(true) clears all six sensor totals");
 }
 
 // --- 6. The two sensorType fields stay distinct (Finding 3). ---
@@ -270,6 +300,7 @@ int main() {
   testValidateAndCapacities();
   testDeferredVsForcedPersistence();
   testResetEverythingCrossStore();
+  testResetEverythingWithoutSensorTotals();
   testSensorTypeFieldsStayDistinct();
   testThermalThresholdFallback();
 
@@ -282,6 +313,7 @@ int main() {
   std::cout << "OK: validate() receives the pre-split size; capacities match the real field widths\n";
   std::cout << "OK: each facade's loop() services its OWN store; flushNow() stays forced\n";
   std::cout << "OK: resetEverything() still performs its cross-store reset-count clear\n";
+  std::cout << "OK: resetEverything(false) keeps the central work and leaves the sensor totals\n";
   std::cout << "OK: the two sensorType fields remain distinct\n";
   std::cout << "OK: thermal threshold set-wise fallback resolves through PowerConfig\n";
   std::cout << "persistence_facade_behavior_test: all checks passed\n";

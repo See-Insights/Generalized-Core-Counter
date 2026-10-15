@@ -98,7 +98,7 @@ void handleReportingState() {
   // After each hourly report, reset the hourly counter so
   // the next report contains only the counts for that hour.
   if (SystemConfig::get_sensorMode() == SystemConfig::COUNTING) {
-    CurrentReadings::set_hourlyCount(0);
+    SensorManager::instance().activeSensor()->resetTotals(ResetPeriod::Hourly);
   }
 
   // Long-term webhook supervision

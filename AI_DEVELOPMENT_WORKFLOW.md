@@ -747,6 +747,12 @@ Step 0 ends with STOP or PROCEED. It stops if the estimate is over budget, or if
 **(g) Tests.**
 - **Mutations:** each one must be caught **by the check aimed at it**. A compile failure doesn't count; a structural check alone doesn't count where a behaviour check is required.
 - **Real code:** tests drive real code. Where a test extracts blocks from `src/`, it checks each block byte-for-byte against the source and fails loudly on a mismatch (`COPY_MISMATCH`). Its passes run in source order. It never re-implements the formula under test.
+- **The controller reproduces the WO's mechanical proofs before accepting Stage 6** (architect, 2026-10-15). Before any Stage 7 dispatch, Claude Code re-runs the proofs the WO or the dispatch names (for example the marker delete and duplicate cases, the stated mutations, and the suite count) on its own. On any failure, it stops and reports.
+- **A test-only recheck skips the ARM builds when the `src/` tree hashes match.** When a later round changes only tests, and the working-tree `src/` tree hash (from a temporary index: `read-tree HEAD`, `add -A src`, `write-tree`, then `rev-parse <tree>:src`) equals the previously verified candidate's, Stage 7 doesn't rebuild. It records both hashes, and the earlier ELF results stand.
+- **Baseline reuse.**
+  - **When it applies:** Stage 7 may use the previous WO's verified candidate ELF as its baseline when `git rev-parse <base>:src` equals that candidate's `src` tree hash. It must record both hashes.
+  - **The candidate:** it always gets a fresh `BUILD_PATH_BASE`, with no object reuse between the two builds.
+  - **Keeping the ELF:** to make this possible, each Stage 7 keeps its verified candidate ELF with its `src` tree hash, for example `build-tmp/verified-elf/<src-tree-hash>.elf`. (The case: WO-2026-10-15-002's Stage 7 spent 44 of its 65 minutes on two fresh builds.)
 
 **(h) Every verification step names its environment:**
 - the host test suite;

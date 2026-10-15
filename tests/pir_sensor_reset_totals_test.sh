@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # WO-2026-10-15-001: PIRSensor::resetTotals() setter sequences, central-order match, ISR-pending,
-# and the hook-only (no caller in src/) check. Set PIR_RESET_SRC_DIR to a copy of src/ to test
+# and the exact-callers check (WO-2026-10-15-002 wired the daily and hourly sites). Set PIR_RESET_SRC_DIR to a copy of src/ to test
 # private sources; the mutation runs below do exactly that, in $TMPDIR.
 
 tests_dir="${0:A:h}"
@@ -17,7 +17,7 @@ run() {  # $1 = src dir; prints failures, returns non-zero if any check failed
   python3 - "$s/MyPersistentData.cpp" "$work/central.txt" <<'PY'
 import re, sys
 t = open(sys.argv[1]).read()
-b = t[t.index("void currentStatusData::resetEverything()"):]
+b = t[t.index("void currentStatusData::resetEverything("):]
 b = b[:b.index("\n}\n")]
 calls = re.findall(r"current\.(set_\w+\([^)]*\));", b)
 open(sys.argv[2], "w").write("\n".join(c for c in calls if "lastCountTime" not in c) + "\n")
@@ -25,12 +25,18 @@ PY
   c++ -std=c++17 -Wall -Wextra -pedantic -I"$tests_dir/stubs/pir_lifecycle" -I"$s" -I"$repo_root/src" \
     "$tests_dir/pir_sensor_reset_totals_test.cpp" "$s/sensors/PIRSensor.cpp" -o "$work/bin"
   "$work/bin" "$work/central.txt" || return 1
-  # Hook only: every resetTotals( outside its declarations and the PIR definition is a caller.
-  if grep -rn "resetTotals(" "$s" | grep -v -E "virtual void resetTotals\(ResetPeriod\)|void resetTotals\(ResetPeriod period\) override|PIRSensor::resetTotals\(ResetPeriod period\)"; then
-    echo "FAIL: caller of resetTotals( in src/"
+  # WO-2026-10-15-002: every resetTotals( outside its declarations and the PIR definition is a caller,
+  # and the only callers are the daily close and the hourly COUNTING reset.
+  local callers
+  callers="$(grep -rn "resetTotals(" "$s" | grep -v -E "virtual void resetTotals\(ResetPeriod\)|void resetTotals\(ResetPeriod period\) override|PIRSensor::resetTotals\(ResetPeriod period\)" | sed -E 's/^[^:]*\/([^\/:]+):[0-9]+:[[:space:]]*/\1: /' | sort)"
+  local expected="Generalized-Core-Counter.cpp: SensorManager::instance().activeSensor()->resetTotals(ResetPeriod::Daily);
+State_Report.cpp: SensorManager::instance().activeSensor()->resetTotals(ResetPeriod::Hourly);"
+  if [[ "$callers" != "$expected" ]]; then
+    echo "FAIL: callers of resetTotals( in src/ are not exactly the daily and hourly sites:"
+    echo "$callers"
     return 1
   fi
-  echo "ok: no caller of resetTotals( in src/"
+  echo "ok: resetTotals( callers are exactly the daily close and the hourly reset"
 }
 
 run "$src_dir"
@@ -60,6 +66,6 @@ mutant "resetTotals clears _motionDetected" sensors/PIRSensor.cpp \
     if (period" "CurrentReadings::set_hourlyCount(0);
     _motionDetected = false;
     if (period"
-mutant "caller added in State_Report.cpp" state/State_Report.cpp "CurrentReadings::set_hourlyCount(0);" \
-  "CurrentReadings::set_hourlyCount(0); sensor->resetTotals(ResetPeriod::Hourly);"
+mutant "extra caller added in State_Report.cpp" state/State_Report.cpp "SensorManager::instance().activeSensor()->resetTotals(ResetPeriod::Hourly);" \
+  "SensorManager::instance().activeSensor()->resetTotals(ResetPeriod::Hourly); sensor->resetTotals(ResetPeriod::Hourly);"
 echo "pir_sensor_reset_totals_test (with mutants) passed"
