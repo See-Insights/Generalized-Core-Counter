@@ -237,6 +237,25 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
     - **Against it:** registration took 516 s even after the power cycle, so a network-side recovery at about 11:40Z can't be ruled out with this one case.
     - **What would help:** a second case, or a carrier-side check.
   - **Why it matters:** no firmware path short of a power cycle (for example a hard modem power-off via the PMIC or the modem's power pin) is known to clear this. That would be a recovery-plan item under Connectivity if it recurs.
+  - **The connectivity-failsafe ladder** (architect, 2026-10-15; code at main `71e346f`, `Generalized-Core-Counter.cpp:2598–2685`):
+    - **When it checks:** only in open hours (`:2599`); once the age since `max(openedAt, lastConnection)` reaches `CONNECTIVITY_FAILSAFE_STALE_SEC` = 3 h (`ConnectivityPolicy.h:114`); and never during a connect attempt still within budget (`:2648`).
+    - **Stage 1 is retired** (`:2621–2625`). The first action is **stage 2**, a `System.reset(RESET_CAUSE_CONNECTIVITY_FAILSAFE)`: reset 140, data 2, breadcrumb 10 (`:2671–2677`).
+    - **Stage 3, an AB1805 deep power-down** (`ab1805.deepPowerDown()`, `:2681–2684`), follows only after `CONNECTIVITY_FAILSAFE_COOLDOWN_SEC` = 6 h (`ConnectivityPolicy.h:115`) plus a per-device, per-stage jitter of 0–30 min (`CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC`, `:116`; a hash of the device ID, `Generalized-Core-Counter.cpp:384–398`).
+    - **Stage 2 and 3 are deferred** on battery when a downgrade is active or the tier is SURVIVAL (`:2654–2668`).
+  - **On Dev-14, 15 Oct:**
+    - **Stage 2 fired at about 06:11:08Z,** straight after the `06:11:07` failed attempt. The status published 11:43:20.824Z reads `resetReason 140, resetReasonData 2, appBreadcrumb 10`.
+      - **INF:** the age base was the 03:00Z connection (the Particle API reads last heard 03:00:29Z), so the 3 h threshold passed at about 06:00Z during the attempt that started at about 05:55Z, and the stage fired when that attempt ended.
+    - **Stage 2 didn't recover registration:** 9 more attempts failed, 06:41–11:14Z.
+    - **Stage 3 would have come no earlier than 12:14:09Z:** 06:11:08Z + 6 h + Dev-14's stage-3 jitter of 181 s, computed from the hash at `:384–398`.
+      - In practice it would have come at the first check after that, outside a connect attempt (so, with about 41 min cycles, by about 12:55Z), and only if Dev-14 was still in open hours and not deferred for battery.
+    - **Chip's manual power cycle at about 11:33Z came first.** It was followed by registration at 11:42:27Z (see above), and `Failsafe: cleared reason=cloud-ok` at `11:42:28`.
+  - **Queued check** (read-only, later): **the fleet recovery rate within 1 h** after stage-2 resets and after stage-3 deep power-downs.
+    - **Source:** the S3 `status` history.
+      - Stage 2 is `resetReason 140, resetReasonData 2`.
+      - Stage 3 is identified from `failsafeStage 3` on the next status, together with its reset reason. Confirm which reason a deep power-down wake gives before counting.
+    - **"Recovered":** a webhook report or a `status` with a fresh connection within 1 h of the reset.
+    - **Per device and fleet-wide,** with the window stated.
+  - **The decision it feeds** (no code now): **shorten the stage-3 delay, or skip stage 2.** On this evidence a power-off recovered registration and a reset didn't, but that is one case.
 - **Inbound ledger config and INTERMITTENT:**
   - **Decided 2026-10-07 (Chip):** no per-connection dwell for inbound ledger syncs. The cost would be paid on every connect, and inbound config changes are rare.
   - **INTERMITTENT devices get one config wait per day:** the first connection after open hour, plus the boot connection. The gate holds a few seconds after outbound syncs, ending early on an input `onSync`.
