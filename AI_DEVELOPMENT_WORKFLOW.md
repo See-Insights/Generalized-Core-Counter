@@ -712,6 +712,7 @@ These rules were agreed during WO-2026-10-07-002 through WO-2026-10-08-002. Sect
 **(b) Small WOs.**
 - Every WO has one plain goal (§12.2).
 - Its default budget is **at most +20 net `src/` and `lib/` lines**; tests and docs get their own stated budget. A larger budget needs Chip's approval in the dispatch.
+- **Default test budget (from Step 6 2b-6 onward, architect 2026-10-15):** **+175 added test lines** when the WO needs a new test harness, and **+100** otherwise. A WO may state a different figure. (The case: 2b-1 to 2b-5a each needed a raise; 2b-5a used +161 against +100.)
 - Over budget means stop and report (§12.3).
 - At most two review rounds (§12.4, including the Stage 8 exception for accepted edge cases).
 - Findings outside the WO's goal go to the recovery plan (`docs/RECOVERY_PLAN_2026-09-26.md`), not into the WO.
