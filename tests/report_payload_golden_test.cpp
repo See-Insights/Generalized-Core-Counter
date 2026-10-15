@@ -81,6 +81,8 @@ namespace CurrentReadings {
   uint32_t get_totalOccupiedSeconds() { ++calls[TOTOCC]; return in.occSec; }
   uint16_t get_hourlyCount() { ++calls[HOURLY]; return in.hourly; }
   uint16_t get_dailyCount() { ++calls[DAILY]; return in.daily; }
+  void set_hourlyCount(uint16_t) {} void set_dailyCount(uint16_t) {} void set_occupied(bool) {} void set_lastOccupancyEvent(uint32_t) {}
+  void set_occupancyStartTime(time_t) {} void set_totalOccupiedSeconds(uint32_t) {}  // resetTotals() only, never called here
   float get_internalTempC() { ++calls[TEMP]; return in.temp; } }
 // The real PIRSensor::reportFields(), compiled into this test.
 const pin_t intPin = 13, disableModule = 12, ledPower = 11;

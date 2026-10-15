@@ -11,7 +11,9 @@ void (*g_isr)() = nullptr;
 unsigned long g_millis = 0;
 const pin_t intPin = 13, disableModule = 12, ledPower = 11;
 namespace CurrentReadings { bool get_occupied() { return false; } uint32_t get_totalOccupiedSeconds() { return 0; }
-  uint16_t get_hourlyCount() { return 0; } uint16_t get_dailyCount() { return 0; } }  // reportFields() only
+  uint16_t get_hourlyCount() { return 0; } uint16_t get_dailyCount() { return 0; }
+  void set_hourlyCount(uint16_t) {} void set_dailyCount(uint16_t) {} void set_occupied(bool) {} void set_lastOccupancyEvent(uint32_t) {}
+  void set_occupancyStartTime(time_t) {} void set_totalOccupiedSeconds(uint32_t) {} }  // reportFields() reads; set_* for resetTotals() link only
 namespace SystemConfig { namespace SensorSettings { uint8_t get_sensorType() { return 1; } } }
 struct SensorManager { static SensorManager &instance() { static SensorManager s; return s; }
   ISensor *_sensor = nullptr; ISensor *activeSensor(); };

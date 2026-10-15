@@ -21,6 +21,8 @@ bool get_occupied() { return false; }
 uint32_t get_totalOccupiedSeconds() { return 0; }
 uint16_t get_hourlyCount() { return 0; }
 uint16_t get_dailyCount() { return 0; }
+void set_hourlyCount(uint16_t) {} void set_dailyCount(uint16_t) {} void set_occupied(bool) {} void set_lastOccupancyEvent(uint32_t) {}
+void set_occupancyStartTime(time_t) {} void set_totalOccupiedSeconds(uint32_t) {}  // resetTotals() only, never called here
 }  // namespace CurrentReadings
 
 namespace {
