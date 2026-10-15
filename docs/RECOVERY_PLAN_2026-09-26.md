@@ -178,6 +178,25 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 - **Duplicate deliveries:** with the fleet-ops agent (handover document, WO-2026-09-25-004). Moved here from the Phase 4 list.
 - **A false alert 44 after a boot clock step** (Dev-14, PR #72 build, 2026-10-08). `ClockResync: sync advanced` at `0005171470`, then `GateFail: reason=ledger timeout=70000` and `raising alert 44` at `0005240897`–`0005240899`. The `LedgerSleepTimeout` line shows `pendingData=0 pendingStatus=0`, with `dataUpd=414217309 > dataSync=414210391` and `statusSync > statusUpd`. Log: `2026-10-07 17-12-25 Boron CDC Mode #1.log`. Cause not yet traced. **Not** the stale gate-timer cause fixed in WO-2026-10-07-004: that gate waited the full 70 s (`0005170895` → `0005240897`). The lead remains `dataUpd > dataSync` after the boot clock step.
   - **Related gate-timer gap (pre-existing):** the CONNECTED+open sleep abort (`State_Sleep.cpp:406-409`, from 2026-01 and 2026-06) leaves for Idle without resetting `cloudSyncStartMs`. If the mode in use becomes CONNECTED during a gate wait, a later sleep's gate starts with a stale timer and can time out at once, tearing down before its queued work drains. Found by WO-2026-10-07-004 Stage 7 round 2 (a CONCERN; deliberately not folded into that WO). The fix would be the same one line as WO-004's controller edit (`cloudSyncStartMs = 0;` before the transition). Not the Dev-14 alert-44 cause above.
+- **A modem-off sleep loop after a restart** (Dev-14, v42, KEEP_ALIVE, 2026-10-15; architect, 2026-10-15). For 18.5 min after a restart at about 06:11:08Z, the device never slept.
+  - **Source:** S3 `serialLog` for `e00fce688e592afaf23ac4fb`, 15 Oct 06:11:07–06:30:28Z (forwarded USB serial; timestamps are the forwarder's).
+  - **The restart:** `06:11:07 0029423332 ConnSummary: fail elapsed=660002 last=CELLULAR_ACQUIRE … sig=na`. Then the serial port dropped, and the next line shows uptime restarted at `06:11:39 0000031407`. The reset reason is not yet known (the `status` event is queued on the device; Singtel registration was failing).
+  - **The loop, 38 times, about every 30 s** (the first pass is `06:11:39`–`06:11:53`, uptime `0000031407`–`0000031431`; every later pass repeats it):
+    - **First pass only:** the 30 s budget was missed and the modem was marked unstable: `MODEM_HEALTH: unstable reason=slow_teardown elapsed=30010` (`State_Sleep.cpp:112`). Standby was then suppressed: `MODEM_POLICY: standby temporarily disabled reason=unstable_modem` (`:124`).
+    - **Gate blocked:** `SLEEP: pre-sleep gate blocked (cloud=0 radioOn=1 standby=0) - requesting modem off` (`:936`).
+    - **Budget missed and alert 15 raised:** `SLEEP: disconnect/modem-off exceeded budget (30001 ms, cloud=0 radioOn=0 standby=0) - raising alert 15` (`:838`), then `Sleep->Error reason=sleep-disconnect-timeout`.
+    - **The alert cleared again:** `Low-power mode: clearing alert 15 to avoid reset loop` (`State_Error.cpp:130`), then `Entering ERROR_STATE with alert=0, resetCount=1, resolution=0`.
+    - **Back to sleep:** `Error->Idle reason=error-no-recovery` (`State_Error.cpp:150`), `Low-power idle: offline with 7 queued event(s) - sleeping` (`State_Idle.cpp:261`), then `Idle->Sleep`.
+    - **How it ended:** the 38th budget miss was at `06:30:10 0001142210`. The scheduled report took over at `06:30:20` (`Idle->Report reason=report interval`), and its connection attempt failed at `06:41:11`. Normal 30 min sleeps followed: the next wake was at `07:11:14`, with uptime continuing.
+  - **INF:** the budget line reports `radioOn=0`, but the non-standby gate waits for `Cellular.isOff()` (`State_Sleep.cpp:729`). The modem appears to have been in Device OS's in-between state, neither on nor off (the case WO-2026-10-04-001 item A2 describes), for the whole loop. That would keep `stillOn` true (`:836`). Unproved: no line logs `Cellular.isOff()` directly.
+  - **Why it matters:**
+    - in INTERMITTENT/KEEP_ALIVE, alert 15 is raised and cleared on every pass, so nothing escalates and nothing recovers the modem;
+    - the device stays awake and drawing power until the next scheduled report;
+    - each pass also asks for a full disconnect and radio-off again (`State_Error.cpp:124`).
+  - **Same code in v43.**
+    - **What Step 6 changed:** `State_Sleep.cpp` only from `:1091` on (the COUNTING defer and the wake-source setup), `State_Idle.cpp` only at `:252`, and nothing in `State_Error.cpp` (`git diff ff1715c 71e346f`).
+    - **What it didn't:** the gate, the budget and the alert-15 lines cited here.
+    - **Line numbers:** at main `71e346f`.
 - **Inbound ledger config and INTERMITTENT:**
   - **Decided 2026-10-07 (Chip):** no per-connection dwell for inbound ledger syncs. The cost would be paid on every connect, and inbound config changes are rare.
   - **INTERMITTENT devices get one config wait per day:** the first connection after open hour, plus the boot connection. The gate holds a few seconds after outbound syncs, ending early on an input `onSync`.
