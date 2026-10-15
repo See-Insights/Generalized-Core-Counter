@@ -81,6 +81,52 @@ None in this WO. Bench validation is the v43 soak (Dev-09 and Dev-14): hourly co
    - its extraction no longer depends on the old no-argument `resetEverything()` signature;
    - its added-caller mutation was re-targeted.
 
-## Closing record
+## Closing record (2026-10-15)
 
-Budget versus actual (`src/` and tests), ELF changes by symbol, suite `N/N`.
+**Result:**
+- **Round 1:** **NOT VERIFIED** at Stage 7 (`WO-2026-10-15-002-stage7-verdict.md`), on check 5 alone.
+- **Round 2:** **VERIFIED, no findings** (`WO-2026-10-15-002-stage7-round2-verdict.md`), within the two-round rule.
+- **Stage 8:** pre-approved by the architect on that verdict.
+- **Release:** v43; the last 2b WO before it.
+
+| Stage | Agent / model | Result |
+|---|---|---|
+| Citation re-check | Claude Code, at main `d89a4ef` | the architect's table held unchanged; two anchoring tests identified |
+| Stage 6 | Copilot, `claude-sonnet-5.5`, high | `src/` +2; new `reset_wiring_test`; 80/80 → 81/81 |
+| Rulings | architect | tests +320 accepted (the +175 guideline applied, since a new harness was needed); the `pir_sensor_reset_totals_test.sh` edit accepted |
+| Stage 7 round 1 | Codex, `gpt-5.6-sol`, high | NOT VERIFIED on check 5 (marker uniqueness); checks 1–4 and 6–8 PASS; text +40 attributed by function |
+| Round 2 fix | Claude Code via a Sonnet subagent (`claude-sonnet-5-5`), medium | the `marker()` check in `reset_wiring_test.sh`, +11 test lines; the controller reproduced 12 of 12 delete/duplicate proofs; 81/81 |
+| Stage 7 round 2 | Codex, `gpt-5.6-sol`, medium, check 5 only, no ARM build | VERIFIED, no findings |
+
+Every model was probed first (§5). No controller edits to the code.
+
+| Item | Budget | Actual |
+|---|---|---|
+| `src/` (one commit) | ≤ +20, hard (estimate +7 without the wrapper) | **+2** (+8/−6). No `SensorManager` wrapper was added. |
+| Tests | **+175 guideline** (a new harness was needed; architect's ruling 1) | **+320 / −11 in Stage 6, plus +11 in round 2** (about 1.9× the guideline; accepted) |
+
+**`src/` tree hashes (§13 (g)):** HEAD `src` is `1f67937ba00074dffcb8b0698673eb66bdac4ed5`. Round 1's candidate and the committed `src` are both `845d28701360406b720b2fa295a0f98a096786f7`, so round 2 changed tests only and needed no ARM build.
+
+**ELF changes by function** (round 1, fresh release builds): text 151364 → **151404** (**+40**); data and bss unchanged.
+
+| Function | Change | Reason |
+|---|---|---|
+| `CurrentReadings::resetEverything` | 0xe → 0x14 (+6) | keeps the incoming bool across `currentStatusData::instance()` and forwards it |
+| `currentStatusData::resetEverything` | 0x72 → 0x78 (+6) | keeps the flag and branches after `resetCount` |
+| `currentStatusData::initialize` | 0x28 → 0x2c (+4) | passes `true` in `r1`, plus alignment |
+| `dailyCleanup` | 0x44 → 0x54 (+16) | the `false` argument, `activeSensor()`, and the virtual `resetTotals(Daily)` |
+| `handleReportingState` | 0x3d0 → 0x3e0 (+16) | `activeSensor()` and the virtual `resetTotals(Hourly)` replace the direct setter, under the unchanged guard |
+| `CSWTCH.339/350/352` | renumbered, all 0x1c | compiler-local |
+
+Function growth totals **+48**. Linker fill drops from 275 to 267 bytes (**−8**), for **+40**. The symbol count is unchanged at 2180.
+
+**Round 2's cause:** round 1's `reset_wiring_test.sh` counted whole regex-region matches, not boundary markers. So a duplicated hourly-block start marker was silently absorbed (the test passed), and duplicates of the other markers fell through to compiler errors instead of a named failure. Round 2 adds a `marker()` check: each of the five start markers, and the hourly end marker, must occur exactly once at the start of a line, or the test exits with `EXTRACT_FAILED: <start|end> marker for <name> found N times (expected 1)`.
+
+**Behaviour:**
+- **Daily** (`dailyCleanup()` → `resetEverything(false)` → `resetTotals(Daily)`): exactly today's eight setters in today's order, connected or not.
+- **Hourly:** clears only `hourlyCount`, in COUNTING only. OCCUPANCY and MEASUREMENT clear nothing.
+- **Unchanged:** `initialize()` still does a full reset, and the close order is unchanged.
+- **Null sensor:** it reaches PIR's hook for both periods.
+- **Golden test:** fixture unchanged.
+
+**Bench:** the v43 soak on Dev-09 and Dev-14: hourly counts restart each hour, daily totals are zero after the close, and PIR and timer wakes behave as on v42.
