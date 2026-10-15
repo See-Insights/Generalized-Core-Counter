@@ -76,4 +76,27 @@ if ! grep -q 'void loop() { sensorConfig.loop(); }' "$work/wrong_store.cpp"; the
 fi
 mutate_and_expect_failure "CurrentReadings::loop() services a sibling's store" "$work/wrong_store.cpp"
 
+# Mutation 3 (WO-2026-10-15-002): the early return moves above resetCount.
+python3 - "$repo_root/src/MyPersistentData.cpp" "$work/early_return_first.cpp" <<'PY'
+import sys
+t = open(sys.argv[1]).read()
+a, r = "  sysStatus.set_resetCount(0);", "  if (!includeSensorTotals) return;"
+if t.count(a) != 1 or t.count(r) != 1:
+    sys.exit("FAIL (mutation harness): resetEverything() has been rewritten, update this script")
+t = t.replace(r, "", 1).replace(a, r + "\n" + a, 1)
+open(sys.argv[2], "w").write(t)
+PY
+mutate_and_expect_failure "resetEverything(false) returns before resetCount" "$work/early_return_first.cpp"
+
+# Mutation 4 (WO-2026-10-15-002): resetEverything(false) still clears the six sensor totals.
+python3 - "$repo_root/src/MyPersistentData.cpp" "$work/no_early_return.cpp" <<'PY'
+import sys
+t = open(sys.argv[1]).read()
+r = "  if (!includeSensorTotals) return;"
+if t.count(r) != 1:
+    sys.exit("FAIL (mutation harness): resetEverything() has been rewritten, update this script")
+open(sys.argv[2], "w").write(t.replace(r, "", 1))
+PY
+mutate_and_expect_failure "resetEverything(false) clears the sensor totals" "$work/no_early_return.cpp"
+
 echo "persistence_facade_behavior_test: clean run passed and all mutations detected"

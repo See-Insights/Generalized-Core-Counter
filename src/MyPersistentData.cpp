@@ -686,7 +686,7 @@ void currentStatusData::loop() {
     current.flush(false);
 }
 
-void currentStatusData::resetEverything() {                             // The device is waking up in a new day or is a new install
+void currentStatusData::resetEverything(bool includeSensorTotals) {     // The device is waking up in a new day or is a new install
   // WO-2026-08-29-002 item 8: lastCountTime has no consumers anywhere in
   // this codebase (write-only telemetry field) - gating it on the trust
   // signal changes only the recorded value, never control flow. See
@@ -694,6 +694,7 @@ void currentStatusData::resetEverything() {                             // The d
   // Time.isValid() alone is not sufficient (Finding 3).
   current.set_lastCountTime(isClockTrusted() ? Time.now() : 0);
   sysStatus.set_resetCount(0);                                          // Reset the reset count as well
+  if (!includeSensorTotals) return;                                     // The active sensor clears its own totals
   
   // ********** Reset Counting Mode Fields **********
   current.set_hourlyCount(0);
@@ -1197,7 +1198,7 @@ namespace CurrentReadings {
 
 void setup() { current.setup(); }
 void loop() { current.loop(); }
-void resetEverything() { current.resetEverything(); }
+void resetEverything(bool includeSensorTotals) { current.resetEverything(includeSensorTotals); }
 void revalidateOccupancyStartTimeIfTimeAvailable() { current.revalidateOccupancyStartTimeIfTimeAvailable(); }
 
 uint16_t get_hourlyCount() { return current.get_hourlyCount(); }

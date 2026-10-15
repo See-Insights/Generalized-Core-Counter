@@ -36,7 +36,7 @@ void loop();
  * documented here so the behavior is not lost behind an accessor-shaped
  * facade.
  */
-void resetEverything();
+void resetEverything(bool includeSensorTotals = true);
 
 /**
  * @brief Re-run the occupancyStartTime future-date corruption clamp once a

@@ -2714,5 +2714,6 @@ void dailyCleanup() {
   
   Log.info("Running Daily Cleanup");
   
-  CurrentReadings::resetEverything(); // Zero the counts for the new day
+  CurrentReadings::resetEverything(false); // lastCountTime and resetCount; the sensor clears its own totals
+  SensorManager::instance().activeSensor()->resetTotals(ResetPeriod::Daily);
 }

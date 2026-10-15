@@ -633,7 +633,7 @@ public:
 	 * @brief Resets the current and hourly counts
 	 * 
 	 */
-	void resetEverything();  
+	void resetEverything(bool includeSensorTotals = true);  
 
 	/**
 	 * @brief Validates values and, if valid, checks that data is in the correct range.

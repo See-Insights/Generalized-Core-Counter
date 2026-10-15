@@ -159,10 +159,31 @@ def verify_source_shape() -> None:
     daily_cleanup = handle_code.find("dailyCleanup();")
     publish_calls = re.findall(r"\bpublishData\s*\(", handle_code)
     report_publish = re.search(r"\bpublishData\s*\(\s*due\s*\?\s*boundary\s*-\s*1\s*:\s*0\s*\)", handle_code)
-    hourly_reset = handle_code.find("CurrentReadings::set_hourlyCount(0)")
+    hourly_hook = "SensorManager::instance().activeSensor()->resetTotals(ResetPeriod::Hourly)"
+    hourly_reset = handle_code.find(hourly_hook)
     last_report_stamp = handle_code.find("SystemConfig::set_lastReport(now)")
     if -1 in (daily_cleanup, last_report_stamp, hourly_reset) or report_publish is None:
-        fail("handleReportingState() must retain dailyCleanup(), closing-record publish, lastReport stamp, and hourlyCount reset")
+        fail("handleReportingState() must retain dailyCleanup(), closing-record publish, lastReport stamp, and the hourly count reset")
+    # WO-2026-10-15-002: the hourly reset is the sensor's hook, inside the central COUNTING guard.
+    if "set_hourlyCount(0)" in report_code:
+        fail("State_Report.cpp must not clear hourlyCount directly; the sensor's resetTotals(Hourly) does")
+    if not re.search(
+        r"if\s*\(\s*SystemConfig::get_sensorMode\(\)\s*==\s*SystemConfig::COUNTING\s*\)\s*\{\s*"
+        + re.escape(hourly_hook) + r";\s*\}",
+        handle_code,
+    ):
+        fail("the hourly resetTotals(Hourly) call must be the only statement inside the COUNTING guard")
+    cleanup_code = strip_comment_lines(
+        extract_function(app_text, r"void\s+dailyCleanup\s*\(\s*\)\s*\{", "dailyCleanup")
+    )
+    if re.search(r"resetEverything\s*\(\s*\)", cleanup_code):
+        fail("dailyCleanup() must not call the no-argument resetEverything(); the sensor clears its own totals")
+    index_after(
+        cleanup_code,
+        "SensorManager::instance().activeSensor()->resetTotals(ResetPeriod::Daily);",
+        index_after(cleanup_code, "CurrentReadings::resetEverything(false);", -1, "central daily reset"),
+        "sensor daily reset after the central one",
+    )
     if len(publish_calls) != 1:
         fail("handleReportingState() must contain exactly one publishData() call per report")
     publish_pos = report_publish.start()
@@ -200,7 +221,7 @@ def verify_source_shape() -> None:
     if last_report_stamp < daily_cleanup:
         fail("lastReport must not be stamped by the daily boundary block")
     if not (publish_pos < daily_cleanup < last_report_stamp < hourly_reset):
-        fail("report publish, daily cleanup, lastReport stamp, and hourlyCount reset ordering is wrong")
+        fail("report publish, daily cleanup, lastReport stamp, and the hourly count reset ordering is wrong")
     if any(token in handle_code[:daily_cleanup] for token in ("getYear()", "getMonth()", "getDay()")):
         fail("daily boundary logic must not compare calendar Y/M/D fields")
 
