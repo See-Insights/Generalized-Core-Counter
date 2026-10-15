@@ -127,6 +127,25 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
    - **Mechanism:** a teardown over 10 s marks the modem unstable and suppresses standby (`MODEM_UNSTABLE_SLOW_TEARDOWN_MS`, `State_Sleep.cpp:31`, `:887`). Recovery needs a teardown under 5 s (`MODEM_UNSTABLE_RECOVERY_TEARDOWN_MS`, `:32`, `:136`). With standby suppressed, every teardown is a full modem-off, so on a modem that takes about 19 s to power off the device never recovers until a reboot (RAM flag).
    - **Field case:** Dev-09 was latched from 2026-10-08 12:19 (after its breadcrumb-28 watchdog) through all 56 sleeps that day, and again on 2026-10-09 after a failed dial at 13:49.
    - **Cost:** every connection is a cold registration.
+   - **Finding: on PCKL1 the latch re-trips within minutes, so v42's daily clear can't help it** (architect, 2026-10-15; PCKL1 daily-clear check, result: not evidenced).
+     - **Re-trip after the reboot** (source: S3 `Ubidots-Sensor-Hook-v1/e00fce6865fe7770b80a014e/`, 2026-10-14 from 21:30Z and 2026-10-15 to 10:57Z, field `connecttime`):
+       - warm before: 1 s at stamps 22:00:02Z and 22:10:51Z;
+       - then 211 s (22:23:43Z) and 0 s (22:24:10Z);
+       - then the breadcrumb-28 sleep watchdog (S3 `watchdog`, published 2026-10-14 23:00:48Z: `osReason 60, bc 28, stage sleep`; status 23:00:49Z: `watchdogResetCount 28`);
+       - **warm, 2 s, at 23:00:33Z, the first connection after the reboot;**
+       - **cold from 23:07:15Z** (13 s), then 11–17 s on every connection through 10:45:35Z on 15 Oct.
+     - **Through the close:** the close report (stamp 01:59:59Z) took 12 s and the first report after the open (stamp 10:00:44Z) took 12 s. There were no `status` or `watchdog` events on 15 Oct up to 10:57Z, so no overnight reboot.
+     - **INF:** the daily clear at the 02:00Z close re-allowed standby, if it ran; the first teardown after it re-tripped the latch. The data can't tell this apart from the clear not running: US devices have no serial. It also assumes the latch is what makes connections cold, and the 211 s connection at 22:23:43Z isn't explained.
+     - **The contrast:** Court1, Court3 and MAFC-1 went from cold on v40 (100 %, 100 % and 56 % of connections ≥ 10 s) to warm (about 1 s) straight after the v42 OTA reboot, and stayed warm. Source: the v42 fleet health check (PR #102, `docs/work-orders/2026-10-15-v42-fleet-health-check-report.md`), window from each OTA (14 Oct 10:01–10:03Z) to 15 Oct 02:03Z; not checked since.
+   - **A trigger seen on Dev-14, 15 Oct** (source: S3 `serialLog/e00fce688e592afaf23ac4fb/`, 06:11:39–06:11:42Z, v42, the first sleep after its failsafe reboot):
+     - `06:11:39 0000031407 SLEEP: disconnect/modem-off exceeded budget (30001 ms, cloud=0 radioOn=0 standby=0) - raising alert 15` (`State_Sleep.cpp:838`);
+     - then `06:11:40 MODEM_HEALTH: unstable reason=slow_teardown elapsed=30010` (`:112`);
+     - then `06:11:42 MODEM_POLICY: standby temporarily disabled reason=unstable_modem` (`:124`).
+     - **The context is the modem-off sleep loop** under "Observations to watch". Registration was failing at the time, so this teardown may not be typical of a healthy device.
+   - **Queued investigation** (read-only, later; no code changes now):
+     1. **Per device, how often modem-off overruns its budget.** Count `exceeded budget` and `MODEM_HEALTH: unstable` lines per device and per day from serial (Dev-09, Dev-14). US devices have no serial, so for them look for a connect-time proxy: warm-to-cold steps in the webhook `connecttime`.
+     2. **Whether the budget is realistic.** Compare `disconnectBudgetMs` (`computeDisconnectBudgetMs()`, `State_Sleep.cpp:764`; bounds `DISCONNECT_BUDGET_MIN_SEC`/`MAX_SEC`, `:740–747`) and the 10 s slow-teardown threshold (`MODEM_UNSTABLE_SLOW_TEARDOWN_MS`, `:31`) with measured `modem-off complete elapsed=` times (verbose serial only), including the about 19 s power-off noted above.
+     3. **Whether PCKL1's breadcrumb-28 sleep watchdogs coincide with slow modem teardown.** For example, the 211 s connection just before the 14 Oct 23:00Z watchdog. Line up `watchdog` events (`bc 28, stage sleep`) with the `connecttime` steps around them, across the fleet's breadcrumb-28 cases (PCKL1 14 Oct, PCKL2 12 Oct, MAFC-1 13 Oct; PR #102).
 4. **WO 3a: publish a trusted battery value** (architect, 2026-10-10). In v41 if it's ready.
    - **Change:** when `socTrust` ≠ Trusted, the webhook `battery` field and both ledgers' `battery.soc` publish the voltage-based estimate the tier already uses, not the raw gauge SOC.
    - **Budget:** ≤ +10 expected.
