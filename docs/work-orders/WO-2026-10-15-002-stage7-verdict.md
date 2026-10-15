@@ -5,7 +5,7 @@
 
 | # | Verdict | Evidence |
 |---|---|---|
-| 1 | **PASS** | Daily recorded, connected and disconnected: `lastCountTime`, `resetCount`, `hourlyCount`, `dailyCount`, `occupied`, `lastOccupancyEvent`, `occupancyStartTime`, `totalOccupiedSeconds`, with HEAD’s values and order. Hourly recorded `[hourlyCount]` in COUNTING and `[]` in OCCUPANCY and an added scratch MEASUREMENT probe. This matches [MyPersistentData.cpp:695](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/d85bec8a-671e-48d3-9139-ab71c8426e9b/scratchpad/wo-2b6/src/MyPersistentData.cpp:695), [PIRSensor.cpp:14](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/d85bec8a-671e-48d3-9139-ab71c8426e9b/scratchpad/wo-2b6/src/sensors/PIRSensor.cpp:14), and [State_Report.cpp:100](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/d85bec8a-671e-48d3-9139-ab71c8426e9b/scratchpad/wo-2b6/src/state/State_Report.cpp:100). |
+| 1 | **PASS** | Daily recorded, connected and disconnected: `lastCountTime`, `resetCount`, `hourlyCount`, `dailyCount`, `occupied`, `lastOccupancyEvent`, `occupancyStartTime`, `totalOccupiedSeconds`, with HEAD’s values and order. Hourly recorded `[hourlyCount]` in COUNTING and `[]` in OCCUPANCY and an added scratch MEASUREMENT probe. This matches [MyPersistentData.cpp:695](src/MyPersistentData.cpp:695), [PIRSensor.cpp:14](src/sensors/PIRSensor.cpp:14), and [State_Report.cpp:100](src/state/State_Report.cpp:100). |
 | 2 | **PASS** | `initialize()` calls the no-argument form at `MyPersistentData.cpp:773`, producing `true`; defaults occur only in `MyPersistentData.h:636` and `CurrentReadings.h:39`; the definition has no default and the wrapper forwards the flag. Production caller search found only `initialize()` and `dailyCleanup()`. |
 | 3 | **PASS** | `handleReportingState()` remains publish at line 69 → cleanup at 77 → occupancy restart at 78–80. The `dailyCleanup()` diff changes only its final reset operation. A scratch order swap failed `daily_cleanup_boundary_test.py` at its ordered-token check. |
 | 4 | **PASS** | With `_sensor == nullptr`, recorded Daily and Hourly calls reached PIR for configured PIR and an unimplemented type. `activeSensor()` returns `_sensor`, a factory singleton, or the PIR singleton; `SensorFactory` uses no allocation. |
@@ -17,7 +17,7 @@
 ## Finding
 
 - **P2 — test-harness uniqueness blind spot.**
-  - **Observation:** [reset_wiring_test.sh:15](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/d85bec8a-671e-48d3-9139-ab71c8426e9b/scratchpad/wo-2b6/tests/reset_wiring_test.sh:15) counts complete regex-region matches, not each boundary marker. The hourly regex at line 26 silently absorbs a duplicated start marker. The extraction table at lines 24–30 omits `PIRSensor`; line 44 compiles its complete source instead.
+  - **Observation:** [reset_wiring_test.sh:15](tests/reset_wiring_test.sh:15) counts complete regex-region matches, not each boundary marker. The hourly regex at line 26 silently absorbs a duplicated start marker. The extraction table at lines 24–30 omits `PIRSensor`; line 44 compiles its complete source instead.
   - **Inference:** Production reset behavior is independently supported, but the binding Stage 7 marker requirement is unmet and the harness can silently accept ambiguous extraction. This mandatory failed check prevents a VERIFIED verdict.
 
 ## ELF attribution
