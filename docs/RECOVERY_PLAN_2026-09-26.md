@@ -93,7 +93,7 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 
 **Upstream reports.**
 - **AB1805_RK library.** Five defects, not yet written down elsewhere: the three wrong Osc. Status constants XTCAL, LKO2 and OMODE (fixed in the vendored copy by PR #41, `ab2e0fe`, "to be filed upstream"); `deepPowerDown()` sets PWGT in `REG_OSC_CTRL` without writing the configuration key first, so it never takes effect (`AB1805_RK.cpp:562`); and `resetConfig()` does the same for `REG_OSC_CTRL` and `REG_TRICKLE` (`:156–157`). Add a sixth: SLST is never cleared (`:186`).
-- **Particle Device OS:** the `SystemSleepConfiguration` move-assignment leak (draft: `WO-2026-10-02-003-particle-bug-report-draft.md`). Issue link: not yet filed.
+- **Particle Device OS:** the `SystemSleepConfiguration` move-assignment leak (`WO-2026-10-02-003-particle-bug-report-draft.md`). **Filed: Particle forum thread 72797; fixed upstream in Device OS 6.6.0 (PR #2968).** Our fresh-local workaround stays (WO-2026-10-15-004 Step 0).
 
 **Connectivity** (deferred from the 1 Oct investigation: `2026-10-01-connectivity-investigation-codex-report.md`, recorded in WO-2026-10-01-001's non-goals).
 - **Connection attempts** (report #2): every Nth retry a full 11-minute attempt (Particle's guidance), and drop the "above 50% means always long" rule.

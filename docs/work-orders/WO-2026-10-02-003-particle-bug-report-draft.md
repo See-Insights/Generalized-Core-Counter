@@ -1,6 +1,12 @@
-# DRAFT (not filed): `SystemSleepConfiguration` move assignment leaks the existing wake-source list
+# `SystemSleepConfiguration` move assignment leaks the existing wake-source list
 
-*Draft prepared 2026-10-02 for WO-2026-10-02-003. Chip decides whether and where to file it.*
+**Filed: Particle forum thread 72797; fixed upstream in Device OS 6.6.0 (PR #2968).**
+- **Posted** by Chip on 2026-10-07 23:57Z: <https://community.particle.io/t/72797>.
+- **Confirmed as a bug** by rickkas7 on 2026-10-08, who said the fresh-local workaround "will work now and in the future as well".
+- **Fixed in 6.6.0** via PR #2968 (rickkas7, 2026-10-14).
+- **Recorded** in WO-2026-10-15-004 Step 0 (2026-10-16).
+
+*Draft prepared 2026-10-02 for WO-2026-10-02-003. The text below is the draft as prepared.*
 
 ---
 
