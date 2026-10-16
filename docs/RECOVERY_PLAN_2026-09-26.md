@@ -168,6 +168,12 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
    - **Pre-existing:** the accrual in `State_Common.h` is unchanged from `ff1715c` to `71e346f` (v42 to v43). It doesn't hold v43. v42 simply had no after-close activity in its window.
    - **Not yet decided:** whether time after the boundary should be credited to the new day on purpose (it is the new day's occupancy) or whether the report path should split the session at the boundary. Step 0 is history first.
 
+11. **A timer slot that falls inside a running connect attempt produces no report** (architect, 2026-10-16; found in the v43 Dev-14 soak, PR #106).
+   - **Behavior:** a scheduled report is a stateless clock check, not a queued slot (`reportDueThisInterval()`, `State_Common.h:38-42`), and it runs only from Sleep and Idle (`State_Sleep.cpp:1766-1776`, `State_Idle.cpp:204`, `:217`). While the state machine is in Connect nothing checks it. When the connect times out (alert 31, radio off, `State_Connect.cpp:666-667`) the device sleeps to the next boundary (`State_Sleep.cpp:1075-1085`), so the slot is never revisited.
+   - **Never built, not built-and-lost:** `publishData` is called only from `State_Report.cpp:69`, so no report exists for that slot. The queue library's eviction code was not read; no code that drops a queued report by slot was found.
+   - **Field cases:** Dev-14 on v43, 16 Oct: Connect from 06:22:20Z, no 06:30Z report; the 07:00Z report was sent. Dev-14 on v42, 14 Oct: no 22:30Z report during the boot stall. No counts are lost (the occupancy total accrues regardless), only the slot's report.
+   - **Not a v43 change.** Decide only if a missed slot matters to a customer; the cheap fix would be an overdue check on leaving Connect. Step 0 is history first.
+
 **Rollout and follow-ups** (not WOs).
 - **v40 release step: repeat the 1c migration check.** Before releasing v40, read the resolved `sensor.type` for every device: the `default-settings` and every `device-settings` instance. Any value other than 1 would now be rejected at config apply, and a value already stored would stop that device counting after its next reboot. On 2026-10-08 the default was 1 and no device overrode it (WO-2026-10-08-002 Step 0 report, appendix).
 - **Trail02 stays locked to v38** until the v40 fleet rollout, then joins it (architect, 2026-10-10).

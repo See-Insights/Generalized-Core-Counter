@@ -30,7 +30,7 @@ Chip uploads the PR head's `.bin` as product v43 (Particle's size and sha256 mus
 5. **Hourly reset:** only runs in COUNTING mode, and both bench devices run OCCUPANCY, so it isn't exercised here (host-tested in 2b-6). Checked before the soak, in §1.
 6. **Standard:** no unexpected resets; `watchdogResetCount` unchanged; heap (`fh`, serial `heap=`) in the v42 range; no alerts except the known post-boot 44; no `GateFail`; one daily config wait per device per day.
 
-Any breadcrumb-28 watchdog, a payload difference or a missing report is a FINDING and holds the fleet rollout.
+Any breadcrumb-28 watchdog, a payload difference or a report missing that v42 would have sent is a FINDING and holds the fleet rollout. *(Rule corrected by the architect, 2026-10-16: the original wording, "a missing report", also caught a timer slot that falls inside a running connect attempt, which v42 skips the same way; see the Dev-14 ruling in the Result.)*
 
 ## 3. Grading
 
@@ -43,6 +43,8 @@ PASS or FINDING per device, with log lines, ≤ 60 lines in chat; every number n
 3. Run the usual fleet health check about 24 h after the default changes.
 
 ## Result
+
+**Overall verdict: PASS on both devices (architect, 2026-10-16).** Dev-09 PASS (final); Dev-14 PASS after the ruling below. v43 behaves like v42 on Dev-09 and Dev-14. The fleet steps in §4 are Chip's.
 
 ### Boron-Dev-09 (graded 2026-10-16, about 07:30Z)
 
@@ -75,7 +77,7 @@ PASS or FINDING per device, with log lines, ≤ 60 lines in chat; every number n
 ### Boron-Dev-14 (graded 2026-10-16, about 12:15Z)
 
 **Grader:** Sonnet 5.5 subagent (`claude-sonnet-5-5`), medium effort, read-only; the controller (Claude Code, Opus) re-read S3 for the one open slot.
-**Verdict: FINDING by the WO's letter, one item, for the architect to rule.** S3 has no report for the 06:30Z (14:30 SGT) timer slot of 16 Oct. It has an exact twin in the v42 baseline (22:30Z, 14 Oct). Both fall inside a Singtel 660 s Connect stall, so the grader read it as not caused by v43. No breadcrumb-28 watchdog, no payload difference, no other missing slot.
+**Grader's verdict: FINDING by the WO's original letter, one item. Architect's ruling: PASS (see the ruling at the end of this section).** S3 has no report for the 06:30Z (14:30 SGT) timer slot of 16 Oct. It has an exact twin in the v42 baseline (22:30Z, 14 Oct). Both fall inside a Singtel 660 s Connect stall, so the grader read it as not caused by v43. No breadcrumb-28 watchdog, no payload difference, no other missing slot.
 
 **Sources and windows (UTC).** S3 14–16 Oct: `Ubidots-Sensor-Hook-v1` (158 reports), `status` (6), `hibernate_wake` (2), `watchdog` (0 files), `serialLog` (2249 lines, very sparse).
 - **v43 window:** 15 Oct 11:43:38Z (S3 status, reset 70) to 16 Oct 11:43:38Z; 70 reports by `timestamp`. Serial puts the real v43 boot at about 11:42:58Z; the status was queued.
@@ -96,4 +98,19 @@ PASS or FINDING per device, with log lines, ≤ 60 lines in chat; every number n
    - **Connectivity** (S3 `connecttime`): v43 has 19 reports of 10 s or more (13 at 660) against 5 in v42, during the 05:41–07:31Z and 08:00–12:08Z stalls on 16 Oct. Treated as Singtel; no code link found.
    - **Config wait:** unmeasured (serial shows only `ConfigHold: ended reason=timeout elapsed=10009` on the OTA boot), accepted per the Dev-09 rulings. Battery 79.12 at the 15 Oct close, 79.61 at 16 Oct 06:00Z (S3 hook), stable.
 
-**For the architect:** rule on the 06:30Z slot. Dev-14's v42 baseline has the same gap during the same kind of stall, so it looks like a slot that passes while a Connect is running rather than a v43 change, but the WO counts a missing report as a FINDING and holds the fleet rollout. Also note the baseline is about 21.5 h, not 24 h.
+**Question put to the architect (ruled below):** rule on the 06:30Z slot. Dev-14's v42 baseline has the same gap during the same kind of stall, so it looks like a slot that passes while a Connect is running rather than a v43 change, but the WO counts a missing report as a FINDING and holds the fleet rollout. Also note the baseline is about 21.5 h, not 24 h.
+
+**Architect's ruling on Dev-14 (2026-10-16):** the 06:30Z gap is not a v43 finding. v42 has a twin at 22:30Z on 14 Oct under the same Singtel stall, and no counts were lost. The WO's rule is corrected to "a report missing that v42 would have sent". **v43: PASS on both devices.**
+
+**Code check (Sonnet 5.5 subagent, medium, read-only; citations re-verified by the controller against `origin/main` 71e346f): the report is never built.**
+- "Report due" is a stateless clock check, not a queued slot: `reportDueThisInterval()` (`State_Common.h:38-42`) in Sleep and Idle (`State_Sleep.cpp:1766-1776`, `State_Idle.cpp:204`, `:217`). Nothing in `State_Connect.cpp` calls it.
+- `publishData` is called only from `State_Report.cpp:69` and `lastReport` is stamped at `:96`, so no report exists for a slot that passed in Connect.
+- After the 660 s budget runs out, Connect raises alert 31, turns the radio off (`State_Connect.cpp:666-667`) and goes to Sleep ("connect-timeout"), which sleeps to the next interval boundary (`State_Sleep.cpp:1075-1085`: about 07:00:01Z from 06:32Z). The missed slot is never revisited.
+- **Not read:** the PublishQueuePosixRK eviction code. "Built and lost" is ruled out by the call path only, and no code that drops a queued report by slot was found.
+
+**Accepted grading limits (architect):**
+- Dev-14's v42 baseline is about 21.5 h, not 24 h (v41 until 06:01Z on 14 Oct).
+- Serial is sparse, so per-wake PIR proof and the 20 s limit during a stalled connect are unverified on both devices.
+- The one-config-wait-per-day check is unmeasured (v41 proved it; the code is unchanged).
+- The S3 `fw_version` label on queued v42-built reports published 11:43Z on 15 Oct is wrong; reports are classed by `timestamp`.
+- Dev-09's `dailyoccupancy` 8 after the close is pre-existing (recovery plan item 10).
