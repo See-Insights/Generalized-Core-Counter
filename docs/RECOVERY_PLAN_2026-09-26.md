@@ -127,6 +127,25 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
    - **Mechanism:** a teardown over 10 s marks the modem unstable and suppresses standby (`MODEM_UNSTABLE_SLOW_TEARDOWN_MS`, `State_Sleep.cpp:31`, `:887`). Recovery needs a teardown under 5 s (`MODEM_UNSTABLE_RECOVERY_TEARDOWN_MS`, `:32`, `:136`). With standby suppressed, every teardown is a full modem-off, so on a modem that takes about 19 s to power off the device never recovers until a reboot (RAM flag).
    - **Field case:** Dev-09 was latched from 2026-10-08 12:19 (after its breadcrumb-28 watchdog) through all 56 sleeps that day, and again on 2026-10-09 after a failed dial at 13:49.
    - **Cost:** every connection is a cold registration.
+   - **Finding: on PCKL1 the latch re-trips within minutes, so v42's daily clear can't help it** (architect, 2026-10-15; PCKL1 daily-clear check, result: not evidenced).
+     - **Re-trip after the reboot** (source: S3 `Ubidots-Sensor-Hook-v1/e00fce6865fe7770b80a014e/`, 2026-10-14 from 21:30Z and 2026-10-15 to 10:57Z, field `connecttime`):
+       - warm before: 1 s at stamps 22:00:02Z and 22:10:51Z;
+       - then 211 s (22:23:43Z) and 0 s (22:24:10Z);
+       - then the breadcrumb-28 sleep watchdog (S3 `watchdog`, published 2026-10-14 23:00:48Z: `osReason 60, bc 28, stage sleep`; status 23:00:49Z: `watchdogResetCount 28`);
+       - **warm, 2 s, at 23:00:33Z, the first connection after the reboot;**
+       - **cold from 23:07:15Z** (13 s), then 11–17 s on every connection through 10:45:35Z on 15 Oct.
+     - **Through the close:** the close report (stamp 01:59:59Z) took 12 s and the first report after the open (stamp 10:00:44Z) took 12 s. There were no `status` or `watchdog` events on 15 Oct up to 10:57Z, so no overnight reboot.
+     - **INF:** the daily clear at the 02:00Z close re-allowed standby, if it ran; the first teardown after it re-tripped the latch. The data can't tell this apart from the clear not running: US devices have no serial. It also assumes the latch is what makes connections cold, and the 211 s connection at 22:23:43Z isn't explained.
+     - **The contrast:** Court1, Court3 and MAFC-1 went from cold on v40 (100 %, 100 % and 56 % of connections ≥ 10 s) to warm (about 1 s) straight after the v42 OTA reboot, and stayed warm. Source: the v42 fleet health check (PR #102, `docs/work-orders/2026-10-15-v42-fleet-health-check-report.md`), window from each OTA (14 Oct 10:01–10:03Z) to 15 Oct 02:03Z; not checked since.
+   - **A trigger seen on Dev-14, 15 Oct** (source: S3 `serialLog/e00fce688e592afaf23ac4fb/`, 06:11:39–06:11:42Z, v42, the first sleep after its failsafe reboot):
+     - `06:11:39 0000031407 SLEEP: disconnect/modem-off exceeded budget (30001 ms, cloud=0 radioOn=0 standby=0) - raising alert 15` (`State_Sleep.cpp:838`);
+     - then `06:11:40 MODEM_HEALTH: unstable reason=slow_teardown elapsed=30010` (`:112`);
+     - then `06:11:42 MODEM_POLICY: standby temporarily disabled reason=unstable_modem` (`:124`).
+     - **The context is the modem-off sleep loop** under "Observations to watch". Registration was failing at the time, so this teardown may not be typical of a healthy device.
+   - **Queued investigation** (read-only, later; no code changes now):
+     1. **Per device, how often modem-off overruns its budget.** Count `exceeded budget` and `MODEM_HEALTH: unstable` lines per device and per day from serial (Dev-09, Dev-14). US devices have no serial, so for them look for a connect-time proxy: warm-to-cold steps in the webhook `connecttime`.
+     2. **Whether the budget is realistic.** Compare `disconnectBudgetMs` (`computeDisconnectBudgetMs()`, `State_Sleep.cpp:764`; bounds `DISCONNECT_BUDGET_MIN_SEC`/`MAX_SEC`, `:740–747`) and the 10 s slow-teardown threshold (`MODEM_UNSTABLE_SLOW_TEARDOWN_MS`, `:31`) with measured `modem-off complete elapsed=` times (verbose serial only), including the about 19 s power-off noted above.
+     3. **Whether PCKL1's breadcrumb-28 sleep watchdogs coincide with slow modem teardown.** For example, the 211 s connection just before the 14 Oct 23:00Z watchdog. Line up `watchdog` events (`bc 28, stage sleep`) with the `connecttime` steps around them, across the fleet's breadcrumb-28 cases (PCKL1 14 Oct, PCKL2 12 Oct, MAFC-1 13 Oct; PR #102).
 4. **WO 3a: publish a trusted battery value** (architect, 2026-10-10). In v41 if it's ready.
    - **Change:** when `socTrust` ≠ Trusted, the webhook `battery` field and both ledgers' `battery.soc` publish the voltage-based estimate the tier already uses, not the raw gauge SOC.
    - **Budget:** ≤ +10 expected.
@@ -190,6 +209,65 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 - **Duplicate deliveries:** with the fleet-ops agent (handover document, WO-2026-09-25-004). Moved here from the Phase 4 list.
 - **A false alert 44 after a boot clock step** (Dev-14, PR #72 build, 2026-10-08). `ClockResync: sync advanced` at `0005171470`, then `GateFail: reason=ledger timeout=70000` and `raising alert 44` at `0005240897`–`0005240899`. The `LedgerSleepTimeout` line shows `pendingData=0 pendingStatus=0`, with `dataUpd=414217309 > dataSync=414210391` and `statusSync > statusUpd`. Log: `2026-10-07 17-12-25 Boron CDC Mode #1.log`. Cause not yet traced. **Not** the stale gate-timer cause fixed in WO-2026-10-07-004: that gate waited the full 70 s (`0005170895` → `0005240897`). The lead remains `dataUpd > dataSync` after the boot clock step.
   - **Related gate-timer gap (pre-existing):** the CONNECTED+open sleep abort (`State_Sleep.cpp:406-409`, from 2026-01 and 2026-06) leaves for Idle without resetting `cloudSyncStartMs`. If the mode in use becomes CONNECTED during a gate wait, a later sleep's gate starts with a stale timer and can time out at once, tearing down before its queued work drains. Found by WO-2026-10-07-004 Stage 7 round 2 (a CONCERN; deliberately not folded into that WO). The fix would be the same one line as WO-004's controller edit (`cloudSyncStartMs = 0;` before the transition). Not the Dev-14 alert-44 cause above.
+- **A modem-off sleep loop after a restart** (Dev-14, v42, KEEP_ALIVE, 2026-10-15; architect, 2026-10-15). For 18.5 min after a restart at about 06:11:08Z, the device never slept.
+  - **Source:** S3 `serialLog` for `e00fce688e592afaf23ac4fb`, 15 Oct 06:11:07–06:30:28Z (forwarded USB serial; timestamps are the forwarder's).
+  - **The restart:** `06:11:07 0029423332 ConnSummary: fail elapsed=660002 last=CELLULAR_ACQUIRE … sig=na`. Then the serial port dropped, and the next line shows uptime restarted at `06:11:39 0000031407`. It was the connectivity failsafe: the queued status, published 11:43:20.824Z, reads `resetReason 140, resetReasonData 2, watchdogResetCount 126` (next bullet).
+  - **The loop, 38 times, about every 30 s** (the first pass is `06:11:39`–`06:11:53`, uptime `0000031407`–`0000031431`; every later pass repeats it):
+    - **First pass only:** the 30 s budget was missed and the modem was marked unstable: `MODEM_HEALTH: unstable reason=slow_teardown elapsed=30010` (`State_Sleep.cpp:112`). Standby was then suppressed: `MODEM_POLICY: standby temporarily disabled reason=unstable_modem` (`:124`).
+    - **Gate blocked:** `SLEEP: pre-sleep gate blocked (cloud=0 radioOn=1 standby=0) - requesting modem off` (`:936`).
+    - **Budget missed and alert 15 raised:** `SLEEP: disconnect/modem-off exceeded budget (30001 ms, cloud=0 radioOn=0 standby=0) - raising alert 15` (`:838`), then `Sleep->Error reason=sleep-disconnect-timeout`.
+    - **The alert cleared again:** `Low-power mode: clearing alert 15 to avoid reset loop` (`State_Error.cpp:130`), then `Entering ERROR_STATE with alert=0, resetCount=1, resolution=0`.
+    - **Back to sleep:** `Error->Idle reason=error-no-recovery` (`State_Error.cpp:150`), `Low-power idle: offline with 7 queued event(s) - sleeping` (`State_Idle.cpp:261`), then `Idle->Sleep`.
+    - **How it ended:** the 38th budget miss was at `06:30:10 0001142210`. The scheduled report took over at `06:30:20` (`Idle->Report reason=report interval`), and its connection attempt failed at `06:41:11`. Normal 30 min sleeps followed: the next wake was at `07:11:14`, with uptime continuing.
+  - **INF:** the budget line reports `radioOn=0`, but the non-standby gate waits for `Cellular.isOff()` (`State_Sleep.cpp:729`). The modem appears to have been in Device OS's in-between state, neither on nor off (the case WO-2026-10-04-001 item A2 describes), for the whole loop. That would keep `stillOn` true (`:836`). Unproved: no line logs `Cellular.isOff()` directly.
+  - **Why it matters:**
+    - in INTERMITTENT/KEEP_ALIVE, alert 15 is raised and cleared on every pass, so nothing escalates and nothing recovers the modem;
+    - the device stays awake and drawing power until the next scheduled report;
+    - each pass also asks for a full disconnect and radio-off again (`State_Error.cpp:124`).
+  - **Same code in v43.**
+    - **What Step 6 changed:** `State_Sleep.cpp` only from `:1091` on (the COUNTING defer and the wake-source setup), `State_Idle.cpp` only at `:252`, and nothing in `State_Error.cpp` (`git diff ff1715c 71e346f`).
+    - **What it didn't:** the gate, the budget and the alert-15 lines cited here.
+    - **Line numbers:** at main `71e346f`.
+- **Firmware modem resets didn't recover registration; a power cycle did** (Dev-14, v42, KEEP_ALIVE, Singtel, 2026-10-15; architect, 2026-10-15).
+  - **Sources:**
+    - S3 `serialLog` for `e00fce688e592afaf23ac4fb`, 15 Oct 02:30–11:43:39Z (forwarded USB serial; the forwarder's timestamps);
+    - S3 `status` for the same device, 15 Oct, published 11:43:20–11:43:38Z.
+  - **The last good connection:** `02:30:09 0016165198 ConnSummary: ok elapsed=1418 … sig=80/25`.
+  - **15 failed attempts in a row,** `03:41:07` to `11:14:17`. Each one was the same:
+    - Device OS reset the modem at about 600 s (`[ncp.client] WARN: Resetting the modem due to the network registration timeout`, 15 times, 03:30–11:33Z);
+    - then the 660 s budget ran out: `ConnSummary: fail elapsed=66000x last=CELLULAR_ACQUIRE cellMs=66000x … cloudRecoverStage=0 … sig=na`, with `q` rising to 16.
+    - The first is `03:41:07 0020423078`; the last is `11:14:17 0018188559 … q=16`.
+  - **A failsafe reset in the middle:** at about 06:11:08Z, after the 06:11:07 failure (uptime `0029423332`). Its queued status, published `11:43:20.824Z`, reads `resetReason 140, resetReasonData 2, appBreadcrumb 10, appBreadcrumbMs 29423342, watchdogResetCount 126`.
+    - That is the connectivity failsafe (140/2), not a watchdog. `lastWatchdogBreadcrumb 28` / `lastWatchdogUptimeMs 1687188` are left over from an earlier watchdog, and the count is unchanged at 126.
+    - **The reboot didn't recover registration either:** 9 more attempts failed after it, from 06:41:11 on.
+  - **The power cycle and the recovery:**
+    - **Chip power-cycled it at about 11:33Z** (an attempt starting `11:31:14` was cut off). The status published `11:43:36.744Z` reads `resetReason 40` (power down).
+    - **Uptime restarted:** `11:33:41 0000004472 Using internal SIM card`.
+    - **The first attempt after the power cycle registered at about 516 s:** `11:42:14 0000517819 CloudRecover: stage=1 action=particle-reconnect phaseElapsed=516526`, then `11:42:27 0000522351 ConnSummary: ok elapsed=520556 … cellMs=516526 … cloudMs=4030 … sig=78/33 q=18`, then `Failsafe: cleared reason=cloud-ok`.
+    - **The v43 OTA followed at once.** The post-OTA boot registered in 6.8 s (`11:43:08 0000010749 ConnSummary: ok elapsed=9870 … cellMs=6812 … sig=80/33`).
+  - **INF, unproved:** the modem or SIM was stuck in a state that a power-off clears and that neither Device OS's modem reset nor a `System.reset()` cleared (the failsafe reboot didn't help).
+    - **Against it:** registration took 516 s even after the power cycle, so a network-side recovery at about 11:40Z can't be ruled out with this one case.
+    - **What would help:** a second case, or a carrier-side check.
+  - **Why it matters:** no firmware path short of a power cycle (for example a hard modem power-off via the PMIC or the modem's power pin) is known to clear this. That would be a recovery-plan item under Connectivity if it recurs.
+  - **The connectivity-failsafe ladder** (architect, 2026-10-15; code at main `71e346f`, `Generalized-Core-Counter.cpp:2598–2685`):
+    - **When it checks:** only in open hours (`:2599`); once the age since `max(openedAt, lastConnection)` reaches `CONNECTIVITY_FAILSAFE_STALE_SEC` = 3 h (`ConnectivityPolicy.h:114`); and never during a connect attempt still within budget (`:2648`).
+    - **Stage 1 is retired** (`:2621–2625`). The first action is **stage 2**, a `System.reset(RESET_CAUSE_CONNECTIVITY_FAILSAFE)`: reset 140, data 2, breadcrumb 10 (`:2671–2677`).
+    - **Stage 3, an AB1805 deep power-down** (`ab1805.deepPowerDown()`, `:2681–2684`), follows only after `CONNECTIVITY_FAILSAFE_COOLDOWN_SEC` = 6 h (`ConnectivityPolicy.h:115`) plus a per-device, per-stage jitter of 0–30 min (`CONNECTIVITY_FAILSAFE_JITTER_MAX_SEC`, `:116`; a hash of the device ID, `Generalized-Core-Counter.cpp:384–398`).
+    - **Stage 2 and 3 are deferred** on battery when a downgrade is active or the tier is SURVIVAL (`:2654–2668`).
+  - **On Dev-14, 15 Oct:**
+    - **Stage 2 fired at about 06:11:08Z,** straight after the `06:11:07` failed attempt. The status published 11:43:20.824Z reads `resetReason 140, resetReasonData 2, appBreadcrumb 10`.
+      - **INF:** the age base was the 03:00Z connection (the Particle API reads last heard 03:00:29Z), so the 3 h threshold passed at about 06:00Z during the attempt that started at about 05:55Z, and the stage fired when that attempt ended.
+    - **Stage 2 didn't recover registration:** 9 more attempts failed, 06:41–11:14Z.
+    - **Stage 3 would have come no earlier than 12:14:09Z:** 06:11:08Z + 6 h + Dev-14's stage-3 jitter of 181 s, computed from the hash at `:384–398`.
+      - In practice it would have come at the first check after that, outside a connect attempt (so, with about 41 min cycles, by about 12:55Z), and only if Dev-14 was still in open hours and not deferred for battery.
+    - **Chip's manual power cycle at about 11:33Z came first.** It was followed by registration at 11:42:27Z (see above), and `Failsafe: cleared reason=cloud-ok` at `11:42:28`.
+  - **Queued check** (read-only, later): **the fleet recovery rate within 1 h** after stage-2 resets and after stage-3 deep power-downs.
+    - **Source:** the S3 `status` history.
+      - Stage 2 is `resetReason 140, resetReasonData 2`.
+      - Stage 3 is identified from `failsafeStage 3` on the next status, together with its reset reason. Confirm which reason a deep power-down wake gives before counting.
+    - **"Recovered":** a webhook report or a `status` with a fresh connection within 1 h of the reset.
+    - **Per device and fleet-wide,** with the window stated.
+  - **The decision it feeds** (no code now): **shorten the stage-3 delay, or skip stage 2.** On this evidence a power-off recovered registration and a reset didn't, but that is one case.
 - **Inbound ledger config and INTERMITTENT:**
   - **Decided 2026-10-07 (Chip):** no per-connection dwell for inbound ledger syncs. The cost would be paid on every connect, and inbound config changes are rare.
   - **INTERMITTENT devices get one config wait per day:** the first connection after open hour, plus the boot connection. The gate holds a few seconds after outbound syncs, ending early on an input `onSync`.
