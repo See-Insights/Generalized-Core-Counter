@@ -8,7 +8,7 @@ This repository includes key documentation files that contributors and AI coding
 
 # Generalized-Core-Counter
 
-**Version:** v43-SensorShape | **Latest:** Step 6 restructuring: no intended behavior change
+**Version:** v44-DeviceOS660 | **Latest:** Device OS 6.4.1 to 6.6.0; no application change
 
 Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v14 release packages cloud recovery tuning and release-safe logging cleanup without changing the existing production power, sleep, connectivity, watchdog, ledger, or PMIC behavior.
 
@@ -21,9 +21,9 @@ Generalized-Core-Counter is a Particle firmware core for low-power outdoor senso
 
 ## Supported Platforms
 
-- Particle Boron, Device OS `6.4.1`
-- Particle Photon 2 / P2, Device OS `6.4.1`
-- Particle Argon, Device OS `6.4.1`
+- Particle Boron, Device OS `6.6.0`
+- Particle Photon 2 / P2, Device OS `6.4.1` (does not currently build; see Build And Validation)
+- Particle Argon, Device OS `6.4.1` (does not currently build; see Build And Validation)
 
 The firmware is written to keep platform-specific power behavior behind platform guards. Cellular-only behaviors such as modem standby and AB1805 deep power-down apply only where the hardware supports them.
 
@@ -187,15 +187,15 @@ Timezone values must be POSIX timezone strings, not IANA names.
 
 ## Build And Validation
 
-The repository is build-validated on Boron, Photon 2, and Argon using Device OS `6.4.1`.
+The repository is build-validated on Boron using Device OS `6.6.0` (v44). Photon 2 / P2 and Argon do not currently build: `src/power/PmicFaultMonitor.cpp` fails with `invalid use of incomplete type 'class PMIC'` (8 errors on v43 with Device OS 6.4.1 and on v44 with 6.6.0 alike; found 2026-10-17, not caused by v44).
 
 Typical local compile pattern:
 
 ```bash
-DEVICE_OS_PATH="/Users/chipmc/.particle/toolchains/deviceOS/6.4.1" \
+DEVICE_OS_PATH="/Users/chipmc/.particle/toolchains/deviceOS/6.6.0" \
 APPDIR="$PWD" \
 PLATFORM="boron" \
-DEVICE_OS_VERSION="6.4.1" \
+DEVICE_OS_VERSION="6.6.0" \
 GCC_ARM_PATH="/Users/chipmc/.particle/toolchains/gcc-arm/10.2.1/bin/" \
 PATH="$PATH:/Users/chipmc/.particle/toolchains/gcc-arm/10.2.1/bin" \
 make -f '/Users/chipmc/.particle/toolchains/buildscripts/1.17.2/Makefile' compile-user -s

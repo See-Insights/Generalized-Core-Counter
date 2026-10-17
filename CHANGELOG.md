@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v44-DeviceOS660] - 2026-10-17
+
+### Changed
+
+- **Device OS 6.4.1 → 6.6.0. No application change:** v44 is v43's application code built for 6.6.0 (the `src/` tree is identical to v43's except `FirmwareVersion.h`). It picks up the sleep-configuration leak fix we reported (forum 72797, PR #2968), cellular recovery and ledger fixes. **One-way:** devices can't return to 6.4.1 over the air.
+
 ## [v43-SensorShape] - 2026-10-15
 
 ### Changed
