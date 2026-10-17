@@ -58,3 +58,10 @@ Grok's items 1–3 are done (`src/time/` owns post-wake clock state; `MyPersiste
 ## Budget
 
 Step 0: 0 `src/` lines. The eventual WOs: stated per WO when the architect accepts the sequence.
+
+## Architect's ruling (2026-10-17)
+
+- **Accepted:** the six-WO cut from the Step 0 report's closing table, named **P-1 to P-6** (P-1 observability, P-2 connectivity failsafe, P-3 report/webhook/diagnostic publication to `cloud/`, P-4 clock and hibernate helpers to `time/`, P-5 modem-health helpers and latch writers in `power/Connectivity`, P-6 source codes and masks, delete 6c/6d).
+- **`dailyCleanup` moves with P-3** (`Generalized-Core-Counter.cpp:2697`, about 23 lines; the publish-then-cleanup order at `State_Report.cpp:69–82` stays).
+- **Ships:** the six moves together as **v45**.
+- **Recovery plan:** the connection-mode tug-of-war is marked fixed in v39 and the spacing allowance fixed in v40. Leftovers, each its own WO: the sleep gate and teardown (own Step 0 after P-6), the modem behavior fix (after measured traces), and Boron versus M-SoM (with the Muon bring-up). Recorded in PR #107.
