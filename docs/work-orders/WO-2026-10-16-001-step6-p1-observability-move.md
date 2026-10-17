@@ -67,3 +67,14 @@ Budget versus actual (non-move `src/`, moved lines, main `wc -l`, tests), ELF de
 - **External callers** of the moved functions are in `SensorManager.cpp:198`, `State_Connect.cpp`, `State_Idle.cpp` and `State_Sleep.cpp`, all through the existing declarations above.
 - **Build base:** this WO builds on Device OS 6.4.1 (main today). The v44 release (6.6.0) isn't merged yet; the P-moves rebuild on 6.6.0 once it is (see the v44 WO §1).
 
+
+## Stage 6 result and architect's ruling (2026-10-17)
+
+**Stage 6 STOPPED on the retained-layout check, and the controller reproduced it** (two fresh 6.4.1 Boron builds, `HEAD` against the working tree): four retained symbols moved, `bootStormCount` `0x2003f424 → 0x2003f41c`, `bootStormWindowStart` `0x2003f428 → 0x2003f420`, `appBreadcrumb` `0x2003f41c → 0x2003f428`, `appBreadcrumbMs` `0x2003f420 → 0x2003f42c`; the signature word stayed at `0x2003f494`, so the shifted values would be read as valid on the first boot after an OTA. v42 and v43 have identical retained layouts, so no earlier OTA was affected.
+
+**Ruling: STOP confirmed; pin the layout first.**
+- **P-0** (WO-2026-10-17-001) puts the unvalidated retained variables in main in one struct with a magic and a version, checked at the start of `setup()`.
+- **This branch is left as is.** Copilot's diff is saved as a patch, 6 files, 1104 lines (`src/Generalized-Core-Counter.cpp`, new `src/observability/LoopForensics.{h,cpp}`, three tests), outside the repository in the ignored `build-tmp/saved-patches/wo-2026-10-16-001-p1-observability-move.patch` (`diff -ruN before/ after/`, apply with `patch -p1` from the repo root after stripping the `before/`, `after/` prefixes), sha256 prefix `259a0d33a9dc6029`. The working tree on this branch still carries the same uncommitted diff.
+- **After P-0 merges,** re-apply the patch on main under the new rule: **the P-0 struct and every unvalidated retained symbol stay put; validated ones may move.** Re-run the `nm` comparison for the whole `.backup` section.
+- **Deviations accepted by the architect:** (1) `AppBreadcrumb` and `AwakeWatchdogSleepStrategy` live in `LoopForensics.h`; (2) the `= true` default of `noteLoopStageDuration` moved to the header declaration; (3) external linkage for `awakeWatchdogSleepStrategy` and both handlers, because `setup()` uses them (`:920`, `:929`, `:940`, `:949`); (4) text +280 B (151396 → 151676), caused by the strategy variable now being external, so the compiler can't fold away the manual-stop branch (`pauseAwakeWatchdogForSleep` +92 B).
+- **Other figures kept from the Stage 6 report:** net non-move `src/` +16 against the +20 limit; moved lines about 436 gross (346 function lines); main 2719 → 2279 lines; suite 81/81 before and 82/82 after; one new file pair, not two.
