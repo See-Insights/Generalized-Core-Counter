@@ -16,6 +16,7 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP = os.path.join(REPO, "src", "Generalized-Core-Counter.cpp")
 SRC = os.path.join(REPO, "src")
+BREADCRUMB_HDR = os.path.join(SRC, "observability", "LoopForensics.h")
 FS_TEST_CPP = os.path.join(REPO, "src", "diagnostics", "ConnectivityFailsafeTest.cpp")
 FS_TEST_H = os.path.join(REPO, "src", "diagnostics", "ConnectivityFailsafeTest.h")
 
@@ -115,7 +116,7 @@ def main():
     check(not hits,
           "BREADCRUMB_CONNECTIVITY_FAILSAFE (9) is gone from src/ (found: %s)" % ", ".join(hits))
 
-    app_text = open(APP).read()
+    app_text = open(BREADCRUMB_HDR).read()
     check("BREADCRUMB_CONNECTIVITY_FAILSAFE_HARD = 10" in app_text,
           "breadcrumb 10 (CONN_FAILSAFE_HARD) is unchanged")
     check("BREADCRUMB_APP_WATCHDOG_RESET = 8" in app_text,

@@ -116,6 +116,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MAIN_SRC = REPO_ROOT / "src" / "Generalized-Core-Counter.cpp"
+LOOP_SRC = REPO_ROOT / "src" / "observability" / "LoopForensics.cpp"
 SLEEP_SRC = REPO_ROOT / "src" / "state" / "State_Sleep.cpp"
 COMMON_HDR = REPO_ROOT / "src" / "state" / "State_Common.h"
 
@@ -168,14 +169,16 @@ def brace_depths(body_lines):
 def main() -> None:
     main_text = MAIN_SRC.read_text()
     main_lines = main_text.splitlines()
+    loop_text = LOOP_SRC.read_text()
+    loop_lines = loop_text.splitlines()
     sleep_text = SLEEP_SRC.read_text()
     sleep_lines = sleep_text.splitlines()
     common_text = COMMON_HDR.read_text()
 
     # ---- Check: thresholds themselves are unchanged. ----
-    if "constexpr unsigned long kLoopStageWarnThresholdMs = 2000UL;" not in main_text:
+    if "constexpr unsigned long kLoopStageWarnThresholdMs = 2000UL;" not in loop_text:
         fail("kLoopStageWarnThresholdMs changed or missing (expected 2000UL)")
-    if "constexpr unsigned long kLoopStageErrorThresholdMs = 10000UL;" not in main_text:
+    if "constexpr unsigned long kLoopStageErrorThresholdMs = 10000UL;" not in loop_text:
         fail("kLoopStageErrorThresholdMs changed or missing (expected 10000UL)")
     print("PASS: kLoopStageWarnThresholdMs=2000UL / kLoopStageErrorThresholdMs=10000UL unchanged")
 
@@ -190,7 +193,7 @@ def main() -> None:
           '"state/SleepPrepSpanTiming.h"')
 
     # ---- Discover the shared logging helper's name up front. ----
-    helper_match = re.search(r"void\s+(\w+)\s*\(\s*LogLevel\s+level", main_text)
+    helper_match = re.search(r"void\s+(\w+)\s*\(\s*LogLevel\s+level", loop_text)
     if not helper_match:
         fail("no shared LogLevel-taking logging helper function found "
              "(expected a helper like logLoopStageLine(LogLevel level, ...))")
@@ -199,7 +202,7 @@ def main() -> None:
     # ---- Check: noteLoopStageDuration() still bare-early-returns for
     # SLEEP_PREP, no logging call of any kind (direct or via the shared
     # helper), before the WARN/ERROR threshold comparisons. Unchanged. ----
-    (_, _, note_body), = find_function_body(main_lines, "void noteLoopStageDuration(")
+    (_, _, note_body), = find_function_body(loop_lines, "void noteLoopStageDuration(")
     note_body_text = "\n".join(note_body)
 
     sleep_prep_branch_idx = next(
@@ -246,7 +249,7 @@ def main() -> None:
     # ---- Check: setLoopStage() is fully reverted to its simple original
     # form - same-stage early-return guard, then unconditional overwrite.
     # NO SLEEP_PREP-specific branch/capture/logging of any kind. ----
-    (_, _, set_body), = find_function_body(main_lines, "void setLoopStage(LoopStage stage)")
+    (_, _, set_body), = find_function_body(loop_lines, "void setLoopStage(LoopStage stage)")
     set_body_text = "\n".join(set_body)
 
     if "SLEEP_PREP" in set_body_text:
@@ -298,7 +301,7 @@ def main() -> None:
         fail("RetainedLoopForensics struct missing pre-existing stageStartMillis field "
              "(must be kept, unused for this purpose)")
 
-    version_match = re.search(r"constexpr uint8_t kLoopForensicsVersion = (\d+);", main_text)
+    version_match = re.search(r"constexpr uint8_t kLoopForensicsVersion = (\d+);", loop_text)
     if not version_match:
         fail("kLoopForensicsVersion constant not found")
     if int(version_match.group(1)) < 2:
