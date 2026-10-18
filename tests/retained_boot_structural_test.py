@@ -20,6 +20,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC = REPO_ROOT / "src"
 MAIN = SRC / "Generalized-Core-Counter.cpp"
 HEADER = SRC / "persist" / "RetainedBoot.h"
+# WO-2026-10-16-001: the only two other files allowed to use the struct, and only through the pinned binding.
+LOOP_H = SRC / "observability" / "LoopForensics.h"
+LOOP_CPP = SRC / "observability" / "LoopForensics.cpp"
 
 NINE = [
     "bootStormCount", "bootInProgress", "bootStormWindowStart", "bootStormLastResetReason",
@@ -89,11 +92,27 @@ def main() -> None:
         fail("setup() no longer calls ensureRetainedLoopForensicsInitialized()")
 
     for path in sorted(SRC.rglob("*")):
-        if path.suffix in (".cpp", ".h") and path.is_file() and path not in (MAIN, HEADER):
+        if path.suffix in (".cpp", ".h") and path.is_file() and path not in (MAIN, HEADER, LOOP_H, LOOP_CPP):
             code = strip_comments(path.read_text())
             for name in NINE + ["retainedBoot", "RetainedBoot"]:
                 if re.search(rf"\b{name}\b", code):
                     fail(f"{path.relative_to(REPO_ROOT)} uses {name}")
+
+    for path, required in (
+        (LOOP_H, ['#include "../persist/RetainedBoot.h"', "extern retained RetainedBoot retainedBoot;"]),
+        (LOOP_CPP, ["static uint8_t &appBreadcrumb = retainedBoot.appBreadcrumb;",
+                    "static uint32_t &appBreadcrumbMs = retainedBoot.appBreadcrumbMs;"]),
+    ):
+        code = strip_comments(path.read_text())
+        for line in required:
+            if code.count(line) != 1:
+                fail(f"{path.relative_to(REPO_ROOT)} must contain exactly once: {line!r}")
+            code = code.replace(line, "")
+        for name in ["retainedBoot", "RetainedBoot"] + [n for n in NINE if n not in ("appBreadcrumb", "appBreadcrumbMs")]:
+            if re.search(rf"\b{name}\b", code):
+                fail(f"{path.relative_to(REPO_ROOT)} uses {name} beyond the pinned binding")
+        if re.search(r"\bretained\s+[\w:]+\s+(appBreadcrumb|appBreadcrumbMs)\b", code):
+            fail(f"{path.relative_to(REPO_ROOT)} defines a separate retained breadcrumb variable")
 
     # Lines mirrored by tests/retained_boot_test.cpp (bootStormTrips).
     for line in (
