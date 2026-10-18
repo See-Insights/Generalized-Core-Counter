@@ -58,6 +58,7 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 
 // Persistent data and configuration
 #include "persist/CurrentReadings.h"
+#include "persist/RetainedBoot.h"
 #include "persist/PowerConfig.h"
 #include "persist/RecoveryState.h"
 #include "persist/SystemConfig.h"
@@ -488,15 +489,14 @@ constexpr unsigned long kLoopForensicsSnapshotIntervalMs = 1000UL;
 
 // Boot-storm guard retained state protects against repeated resets that occur
 // before setup completes and therefore bypass ERROR_STATE protections.
-retained uint8_t bootStormCount = 0;
-retained bool bootInProgress = false;
-retained time_t bootStormWindowStart = 0;
-retained uint8_t bootStormLastResetReason = 0;
-retained uint32_t bootStormLastResetReasonData = 0;
-retained uint8_t bootStormTripCount = 0;
-retained bool bootStormAlertPending = false;
-retained uint8_t appBreadcrumb = BREADCRUMB_NONE;
-retained uint32_t appBreadcrumbMs = 0;
+// One struct with a magic and version (checked first in setup()) pins their layout.
+retained RetainedBoot retainedBoot = {};
+static_assert(BREADCRUMB_NONE == 0, "validateRetainedBoot() resets to zero");
+static uint8_t &bootStormCount = retainedBoot.bootStormCount, &bootStormLastResetReason = retainedBoot.bootStormLastResetReason,
+               &bootStormTripCount = retainedBoot.bootStormTripCount, &appBreadcrumb = retainedBoot.appBreadcrumb;
+static bool &bootInProgress = retainedBoot.bootInProgress, &bootStormAlertPending = retainedBoot.bootStormAlertPending;
+static time_t &bootStormWindowStart = retainedBoot.bootStormWindowStart;
+static uint32_t &bootStormLastResetReasonData = retainedBoot.bootStormLastResetReasonData, &appBreadcrumbMs = retainedBoot.appBreadcrumbMs;
 retained RetainedLoopForensics retainedLoopForensics = {};
 // WO-2026-09-16 Step 2: the hibernate-cycle retained fields formerly
 // declared here (retainedHibernateRtcBefore/WakeTime/RequestedSleep/Count/
@@ -783,6 +783,7 @@ static void waitForDebugSerialIfConnected() {
  * @see docs/architecture/startup-sequence.md for detailed initialization phases
  */
 void setup() {
+  validateRetainedBoot(retainedBoot);
   waitForDebugSerialIfConnected();
 
   ensureRetainedLoopForensicsInitialized();
