@@ -94,3 +94,20 @@ P-0 round 1 is accepted (WO-2026-10-17-001). The rule for re-applying this patch
 
 **Check under the narrowed rule:** `nm` the whole `.backup` section, before (main `363b064`) and after. The `retainedBoot` struct must stay at `0x2003f420` and the signature word must not move; no decision-bearing retained symbol may move. List every move and classify it (report-only or not). Moving code out of main may reorder report-only diagnostics; those are recorded, with "first post-OTA values invalid".
 
+
+## Stage 6/7 result (re-apply on P-0 main) and closing record (2026-10-19)
+
+**Stage 6, round 2** (Copilot, Sonnet 5.5, medium; resumed once to exempt the two P-1 files in P-0's structural test, the conflict having come from the dispatch wording). **Controller reproduction** (Claude Code, 6.4.1 Boron, `HEAD` = main `363b064` against the working tree, fresh `BUILD_PATH_BASE`s): suite 84/84 (sh via zsh, py via python3); the whole `.backup` section identical; text 151468 → 151756. **Stage 7** (Codex `gpt-5.6-sol`, medium): **VERIFIED**, retained outcome **A**, checks 1–8 PASS, no findings (`WO-2026-10-16-001-stage7-verdict.md`). **Architect approved Stage 8 on 19 Oct.**
+
+| Item | Budget | Actual |
+|---|---|---|
+| `src/` net | ≤ +20, hard | **+18** (`+459/−441`): new `src/observability/LoopForensics.cpp` +400 and `.h` +58; `Generalized-Core-Counter.cpp` +1/−441 |
+| Moved lines | about 346 | **346 function lines, byte-identical** (17 definitions); 441 lines removed from main overall |
+| Main `wc -l` | about 346 fewer | **2720 → 2280** (−440) |
+| Tests | guideline +100 | **+96/−8** (net +88): new `loop_forensics_move_structural_test.py` +65; `retained_boot_structural_test.py` +20/−1; `loop_stage_sleep_prep_exclusion_test.py` +9/−6; `connectivity_failsafe_stage1_retired_test.py` +2/−1 |
+| Suite | baseline 83 | **84/84** (sh via zsh, py via python3); golden payload test 186 vectors, fixture unchanged |
+
+- **Retained outcome A:** the whole `.backup` section (24 symbols, `0x2003f400`–`0x2003f498`) is identical before and after. `retainedBoot` stays at `0x2003f420` (32 B), the signature word at `0x2003f494`; no decision-bearing and no report-only symbol moved, so no "first post-OTA values invalid" note is needed.
+- **ELF (6.4.1 Boron):** text **151468 → 151756 (+288)**, data 1094, bss **2212 → 2220 (+8)**. Named text +212 B: `pauseAwakeWatchdogForSleep` +92; `hal_watchdog_stop` +12 and `WatchdogClass::stop` +8 (newly linked); `appBreadcrumbName` and `awakeWatchdogSleepStrategyName` no longer inlined +52; `restoreAwakeWatchdogAfterWake` +16; `serviceAwakeWatchdog` +12; `setup` +12; recompilation of `resetRetainedLoopForensics`, `refreshRetainedLoopForensics` and `setAppBreadcrumb` net +8; switch-table renumbering nets to zero; about +76 B is alignment and literal-pool padding from the added translation unit. Bss: the strategy variable and the started flag can no longer be folded away (+2 B named) plus 6 B padding. Cause: the accepted external `awakeWatchdogSleepStrategy` keeps the manual-stop branch and its two Device OS helpers.
+- **Deviations:** the four accepted on 17 Oct (enums in the header; the `= true` default in the declaration; external linkage for the strategy variable, the watchdog flags and both handlers; +280 B text, now +288) and the **fifth, forced by P-0** (`LoopForensics.h` includes `RetainedBoot.h` and declares `extern retained RetainedBoot retainedBoot;`; `LoopForensics.cpp` binds `appBreadcrumb` and `appBreadcrumbMs` as static references into it). `retained_boot_structural_test.py` exempts exactly `LoopForensics.h` and `LoopForensics.cpp` and pins the lines they may use.
+- **Rounds:** Stage 6 round 1 (17 Oct) stopped on the retained check; P-0 fixed the layout; this is the second Stage 6 round.
