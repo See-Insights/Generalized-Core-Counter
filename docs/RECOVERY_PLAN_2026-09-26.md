@@ -45,15 +45,26 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 **Phase 3: clarity (Step 5.5).** Pilot: the reporting state in four plain steps (always report → daily cleanup if closing → already connected? → connect now or later), about 20 lines, with the details in named owners (`DailyBoundary`, `Connectivity::shouldConnectNow`) and the response wait restored explicitly. Then `setup()` as named phases, then the other states.
 
 **Step 6: the power-owner split.** Items deferred to it so far: *(Citations checked against main `e78d59d`, v37 merged, on 2026-10-07.)*
-- **Duplicated power-source codes and PMIC fault masks** (WO-2026-09-29-002).
-- **Boron versus M-SoM build selection** (WO-2026-09-29-002).
-- **Connection-mode tug-of-war** (2026-10-03, found while explaining Trail02's 2-hour delivery spacing on v34):
+- **Duplicated power-source codes and PMIC fault masks** (WO-2026-09-29-002). Now **P-6** below.
+- **Boron versus M-SoM build selection** (WO-2026-09-29-002). **Leftover:** goes with the Muon bring-up, split into capability, battery sampling, charging and PMIC WOs with actual target builds (WO-2026-10-15-003 Step 0 open points).
+- **Connection-mode tug-of-war: FIXED in v39** (architect, 2026-10-17). *Original entry, kept for history:* (2026-10-03, found while explaining Trail02's 2-hour delivery spacing on v34):
   - `ConfigApply.cpp:445–455` restores keep-alive on every config apply;
   - `BatteryAuthorityCommand.cpp:80–84` re-applies intermittent in CONSERVING or worse;
   - the mode flips, and is persisted, on every connection.
 
   **Fix:** separate the configured mode from the battery downgrade. The effective mode is derived, and neither overwrites the other.
-- **The failsafe's allowance for deliberate spacing.** Its only allowance today is the low-battery block (`Generalized-Core-Counter.cpp:2657–2672`), which works only because the tug-of-war above sets the low-battery flag. **Goal:** the failsafe counts only the time when the device was expected to connect.
+- **The failsafe's allowance for deliberate spacing: FIXED in v40** (architect, 2026-10-17). *Original entry, kept for history:* Its only allowance today is the low-battery block (`Generalized-Core-Counter.cpp:2657–2672`), which works only because the tug-of-war above sets the low-battery flag. **Goal:** the failsafe counts only the time when the device was expected to connect.
+- **The power-split cut: P-0 to P-6** (architect ruling, 2026-10-17; from the WO-2026-10-15-003 Step 0 report's closing table, cited at `71e346f`). Each WO has a hard ≤ +20 net `src/` lines budget and keeps the 2b golden payload byte-identical. **P-0 and the six moves ship together as v45.**
+  - **P-0 (WO-2026-10-17-001): pin the retained layout first** (architect, 2026-10-17). P-1's Stage 6 stopped on the retained-address check: moving code out of main reordered `bootStormCount`, `bootStormWindowStart`, `appBreadcrumb` and `appBreadcrumbMs`, because GCC lays retained variables out by first use. Device OS keeps retained RAM across an application OTA and checks only one signature word (`wiring/src/user.cpp:202–204`, same in 6.6.0), so the shifted values would be read as valid on the first boot after the update.
+    - **Change:** one `retained` struct for the nine unvalidated retained variables in main (`Generalized-Core-Counter.cpp:491–499`), with a magic and a version first, checked as the first statement of `setup()` (before `ensureRetainedLoopForensicsInitialized()` at `:788`); a wrong magic or version resets them to today's initial values. Budget ≤ +20.
+    - **Rule for P-1 to P-6:** decision-bearing retained values must be validated (magic and version, sentinel, or guarded) or stay put; report-only diagnostics (the ThrashGuard trio, the PMIC-anomaly fields) may shift, and each release records "first post-OTA values invalid" for them (architect, 2026-10-18; P-0 round 1 moved the ThrashGuard trio +4). P-1's saved patch is re-applied after P-0 merges (WO-2026-10-16-001).
+  - **P-1:** move loop forensics and the awake watchdog to `observability/` (about 346 main lines; WO-2026-10-16-001).
+  - **P-2:** move the connectivity failsafe to `power/ConnectivityFailsafe` (about 274).
+  - **P-3:** move report, webhook and diagnostic publication to `cloud/` (about 262). **`dailyCleanup` moves with P-3** (`Generalized-Core-Counter.cpp:2697`, about 23 lines; the publish-then-cleanup order at `State_Report.cpp:69–82` stays).
+  - **P-4:** move the clock and hibernate helpers to `time/` (85 Sleep and 93 main lines).
+  - **P-5:** centralize the modem-health helpers and every latch writer in `power/Connectivity` (0 to +12).
+  - **P-6:** centralize the source codes and PMIC masks, and delete 6c/6d (about −52).
+  - **Leftovers, each its own WO:** the sleep gate and modem teardown extraction (its own Step 0 after P-6; they share cross-pass statics at `State_Sleep.cpp:335–349`, `:397`, `:428–448`); the modem behavior fix (after measured teardown traces settle the modem-off completion contract, before alert 15 or the latch change); Boron versus M-SoM portability (with the Muon bring-up).
 - **Battery trust and tier.** The gauge is compared with a resting-voltage table (`kOcvKnots`, `BatteryHealth.cpp:19–32`) using a voltage sampled while awake, so healthy devices were marked untrusted and dropped to CRITICAL: Court3 at 82%, PCKL1 at 77% (the 4 Oct Codex report's ledger snapshot: 79.8% and 76.5%, both Untrusted/CRITICAL), and Dev-14 showing CRITICAL at 65%. Decide only after a week of v37's `vc` data (WO-2026-10-04-001 item D). If that isn't enough, add the fuller battery-decision snapshot proposed in the 4 Oct Codex report §D (raw and accepted SOC, vcell, charge state, radio state, sample age, source, resulting tier).
 - **WO 3 (battery): which sensor modes a low tier downgrades.**
   - **Today's rule:** the connection-mode downgrade applies only to OCCUPANCY devices configured for KEEP_ALIVE (`PowerManager::downgradeActive()` from v39; the `:83` write on v38). A COUNTING device in a low tier stays in its configured mode.

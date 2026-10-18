@@ -37,6 +37,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC = REPO_ROOT / "src" / "Generalized-Core-Counter.cpp"
 SETTLE_HELPER_CALL = "waitForDebugSerialIfConnected();"
 SETTLE_HELPER_DEF = "static void waitForDebugSerialIfConnected() {"
+RETAINED_BOOT_CHECK = "validateRetainedBoot(retainedBoot);"
 SETTLE_DELAY = "delay(ConnectivityPolicy::DEBUG_SERIAL_POST_CONNECT_DELAY_MS);"
 
 
@@ -97,6 +98,14 @@ def main() -> None:
     helper_call_line = first_non_comment_statement_line(lines, setup_start + 1, setup_end)
     if helper_call_line is None:
         fail("could not find any executable statement inside setup()")
+    # WO-2026-10-17-001: the silent retained-boot magic/version check is the one
+    # statement allowed ahead of the serial settle (it must precede every read).
+    retained_check_line = None
+    if lines[helper_call_line].strip() == RETAINED_BOOT_CHECK:
+        retained_check_line = helper_call_line
+        helper_call_line = first_non_comment_statement_line(lines, helper_call_line + 1, setup_end)
+        if helper_call_line is None:
+            fail("could not find the serial-settle statement after the retained-boot check")
     if lines[helper_call_line].strip() != SETTLE_HELPER_CALL:
         fail(f"first executable statement in setup() must be exactly '{SETTLE_HELPER_CALL}', "
              f"found: {lines[helper_call_line].strip()}")
@@ -108,7 +117,8 @@ def main() -> None:
     # Confirm no other statement (aside from comments/blank lines) sits between
     # 'void setup() {' and the helper call - serial settle must be the very
     # first thing setup() does.
-    before_helper = non_comment_statements(lines[setup_start + 1:helper_call_line])
+    before_helper = non_comment_statements(
+        lines[(retained_check_line + 1 if retained_check_line is not None else setup_start + 1):helper_call_line])
     if before_helper:
         fail(f"expected only comments/blank lines before {SETTLE_HELPER_CALL}, found: {before_helper}")
     print("PASS: no application log line or other statement precedes the serial-settle helper call")
