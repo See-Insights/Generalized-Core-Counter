@@ -62,3 +62,26 @@ Budget versus actual; the struct's address; ELF delta by symbol.
 - Today the nine variables span `0x2003f41c–0x2003f43b` (32 B, between `retainedLoopForensics` at `0x2003f400` and `thrashTripCount` at `0x2003f43c`). A struct with a 4-byte magic and a 1-byte version has about 28 B of members but 8-byte alignment (`time_t`), so it may start at `0x2003f420` and **shift every later retained symbol by a few bytes**, including `__backup_sram_signature` (`0x2003f494` today). That is acceptable for the later symbols (report-only counters, guarded or sentinel-checked values), but report it, with a classification of each moved symbol. If the signature word moves, Device OS itself re-initializes all retained RAM on the first boot after this OTA, which is a clean one-time reset. The magic is still needed so that later moves, which don't change the total size, can't shift the nine unseen.
 - Stage 7's check "no other retained symbol moved" cannot hold if the struct's size changes the span; if it does, the report must say which symbols moved and why that is safe. A member order that keeps the span at 32 B from `0x2003f41c` is worth trying, but it needs 8-byte alignment for `time_t`, so don't force it.
 
+
+## Stage 6/7 result and architect's ruling (2026-10-18)
+
+**Stage 6** (Copilot, Sonnet 5.5, high): one round. **Controller reproduction** (Claude Code, two fresh 6.4.1 Boron builds, `HEAD` against the working tree): suite 83/83 (sh via zsh, py via python3); text 151396 → 151468; `retainedBoot` one `.backup` symbol; the same figures as Copilot's and Codex's. **Stage 7** (Codex `gpt-5.6-sol`, high): **NOT VERIFIED, outcome B-report-only** (`WO-2026-10-17-001-stage7-verdict.md`): checks 1–4, 6 and 7 PASS; check 5 FAIL on the rule as then written (the signature word stays while the three ThrashGuard counters move +4); check 8 CONCERN on the test size.
+
+**Architect's ruling: round 1 accepted, with a narrowed rule.**
+- **The rule (replaces "every unvalidated retained symbol stays put"):** *a decision-bearing retained value must be validated or stay put. Report-only diagnostics (the ThrashGuard trio, the PMIC-anomaly fields) may shift,* and each release that shifts one records "first post-OTA values invalid" for it.
+- **Tests:** +227 lines accepted against the +175 new-harness guideline.
+- **The v45 record:** the first post-OTA readings of `thrashTripCount`, `lastThrashReason` and `thrashResetCount` are invalid (the first reads the old `thrashResetCount`; the other two read old padding). Nothing selects a tier, alert, sleep or reset from them (Codex, `ThrashGuard.cpp:112–113`, `:151`, `cloud/Particle_Functions.cpp:52–53`). **v45's CHANGELOG and fleet notes must carry this line.**
+
+## Closing record
+
+| Item | Budget | Actual |
+|---|---|---|
+| `src/` net | ≤ +20, hard | **+19** (`Generalized-Core-Counter.cpp` +10/−9; new `src/persist/RetainedBoot.h` +18) |
+| Tests | guideline +100 (+175 for a new harness, accepted) | **+227/−1**: three new files (216 lines) and `serial_settle_test.py` +11/−1 |
+| Text | explained by symbol | **151396 → 151468 (+72)**: `setup` +0x3c, `setAppBreadcrumb` +4, `refreshRetainedLoopForensics` +4, 4 B image alignment; same-size `CSWTCH` renames; data/bss unchanged (1094/2212) |
+| Suite | baseline 81 | **83/83** (51 sh via zsh, 32 py via python3) |
+
+- **Struct:** `RetainedBoot`, one `.backup` symbol at **`0x2003f420`**, size 32: `magic` u32 @0, `version` u8 @4, then the counters, `bootStormWindowStart` (`time_t`) @8, `bootStormLastResetReasonData` @16, `appBreadcrumbMs` @20, `appBreadcrumb` @24, `bootInProgress` @25, `bootStormAlertPending` @26, 5 B tail padding. `validateRetainedBoot(retainedBoot);` is the first statement of `setup()` (`Generalized-Core-Counter.cpp:786`), ahead of `ensureRetainedLoopForensicsInitialized()`.
+- **Outcome (Codex check 5): B-report-only.** `.backup` stays 0x98 bytes and `__backup_sram_signature` stays at `0x2003f494`. Moved: `thrashTripCount` `0x43c → 0x440`, `lastThrashReason` `0x43e → 0x442`, `thrashResetCount` `0x440 → 0x444`. Unchanged: `retainedLoopForensics` (`0x400`), `ledOffTime`, `lastTrend*`, the PMIC-anomaly fields, the hibernate fields. The nine boot-storm and breadcrumb values are now pinned for every later move.
+- **First post-OTA boot:** the magic is absent, so the nine values reset once (`appBreadcrumb` 0, boot-storm counters 0, no boot-storm alert or holdoff: Codex traced all 256 reset reasons with the clock trusted or not).
+- **Rule for P-1 to P-6:** the narrowed rule above. P-1's saved patch is re-applied **after P-0 merges**, and the `nm` comparison covers the whole `.backup` section.
