@@ -83,3 +83,14 @@ Budget versus actual (non-move `src/`, moved lines, main `wc -l`, tests), ELF de
 
 P-0 round 1 is accepted (WO-2026-10-17-001). The rule for re-applying this patch is **narrowed**: *a decision-bearing retained value must be validated or stay put; report-only diagnostics (the ThrashGuard trio, the PMIC-anomaly fields) may shift,* with "first post-OTA values invalid" recorded for the release. This replaces the 17 Oct wording "every unvalidated retained symbol stays put". After P-0 merges, re-apply the saved patch on main and compare the whole `.backup` section by `nm`: the P-0 struct (`retainedBoot`, `0x2003f420`), `retainedLoopForensics`, `ledOffTime`, `lastTrend*` and the hibernate fields must not move unless validated; any other move is listed and classified in the closing record. The four deviations accepted on 17 Oct stand.
 
+## Re-apply on P-0 main (2026-10-18)
+
+**Base:** main `363b064` (P-0 merged, #110). The saved Stage 6 diff (`wip/p1-observability-move`, `f1397b4`) was applied with a 3-way `git cherry-pick -n`: it merged cleanly into `Generalized-Core-Counter.cpp` (2720 → 2280 lines), and nothing is committed. `main` (the "before" build, 6.4.1 Boron) builds; the "after" build **fails**: `LoopForensics.h` declares `extern retained uint8_t appBreadcrumb;` and `extern retained uint32_t appBreadcrumbMs;`, but P-0 made both `static` references into `retainedBoot` (`Generalized-Core-Counter.cpp:357–361`), so the declarations conflict (`error: conflicting declaration 'uint8_t& appBreadcrumb'`, `:358` and `:361`).
+
+**The one adaptation this needs (a fifth deviation, forced by P-0; the four accepted ones stand):**
+- `LoopForensics.h`: replace the two `extern` lines with `#include "../persist/RetainedBoot.h"` and `extern retained RetainedBoot retainedBoot;`.
+- `LoopForensics.cpp`: after the includes, `static uint8_t &appBreadcrumb = retainedBoot.appBreadcrumb;` and `static uint32_t &appBreadcrumbMs = retainedBoot.appBreadcrumbMs;`, the same technique as main, so the moved bodies stay byte-for-byte.
+- **`retainedBoot` stays defined in main** (`:355`), and the struct stays at `0x2003f420`.
+
+**Check under the narrowed rule:** `nm` the whole `.backup` section, before (main `363b064`) and after. The `retainedBoot` struct must stay at `0x2003f420` and the signature word must not move; no decision-bearing retained symbol may move. List every move and classify it (report-only or not). Moving code out of main may reorder report-only diagnostics; those are recorded, with "first post-OTA values invalid".
+
