@@ -13,6 +13,7 @@ clang++ -std=c++17 -Wall -Wextra -pedantic \
 # --- Part 2: fidelity checks against the real source ---
 persistent_src="$repo_root/src/MyPersistentData.cpp"
 app_src="$repo_root/src/Generalized-Core-Counter.cpp"
+report_src="$repo_root/src/cloud/ReportPublisher.cpp"
 
 check_file() {
   local file="$1"
@@ -54,7 +55,7 @@ fi
 
 # WO-2026-10-06-001: code 19 MUST appear in isAutoClearAfterReportAlert()'s
 # case list (reported once, then cleared). Before, it was excluded (sticky).
-autoclear_body=$(awk '/static bool isAutoClearAfterReportAlert/,/^}/' "$app_src")
+autoclear_body=$(awk '/static bool isAutoClearAfterReportAlert/,/^}/' "$report_src")
 if ! echo "$autoclear_body" | grep -q "case 19:"; then
   echo "FIDELITY CHECK FAILED: alert code 19 must be in isAutoClearAfterReportAlert()" >&2
   exit 1
@@ -66,9 +67,9 @@ check_file "$app_src" "RecoveryState::raiseAlert(19) call site present" "Recover
 
 # The webhook payload's "alerts" field must be fed directly from
 # current.get_alertCode() (confirms no new plumbing needed, per the WO).
-check_file "$app_src" "reportedAlertCode sourced from RecoveryState::get_alertCode()" "const int8_t reportedAlertCode = RecoveryState::get_alertCode();"
-check_file "$app_src" "\"alerts\" key present in the payload (key name is a publishData() argument since WO-2026-10-14-003)" "occupancyMode ? \"alerts\" : \"resets\""
-check_file "$app_src" "\"alerts\" value is reportedAlertCode in the OCCUPANCY payload" "occupancyMode ? reportedAlertCode :"
+check_file "$report_src" "reportedAlertCode sourced from RecoveryState::get_alertCode()" "const int8_t reportedAlertCode = RecoveryState::get_alertCode();"
+check_file "$report_src" "\"alerts\" key present in the payload (key name is a publishData() argument since WO-2026-10-14-003)" "occupancyMode ? \"alerts\" : \"resets\""
+check_file "$report_src" "\"alerts\" value is reportedAlertCode in the OCCUPANCY payload" "occupancyMode ? reportedAlertCode :"
 
 echo "Fidelity checks passed: alert-code 19 severity/auto-clear mirror matches real source"
 echo "Watchdog alert-code test suite passed"

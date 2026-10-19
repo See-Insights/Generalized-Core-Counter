@@ -17,7 +17,6 @@ def one(text, rx, what, flags=0):
     if len(m) != 1: sys.exit(f"EXTRACT_FAILED: {len(m)} matches for {what}")
     return m[0].group(0)
 
-main = open(f"{src}/Generalized-Core-Counter.cpp").read()
 pers = open(f"{src}/MyPersistentData.cpp").read()
 report = open(f"{src}/state/State_Report.cpp").read()
 mgr = open(f"{src}/sensors/SensorManager.cpp").read()
@@ -25,14 +24,14 @@ def marker(text, lit, what, kind="start"):  # a boundary line must start exactly
     n = len(re.findall("^" + re.escape(lit), text, re.M))
     if n != 1: sys.exit(f"EXTRACT_FAILED: {kind} marker for {what} found {n} times (expected 1): '{lit}'")
 
-marker(main, "void dailyCleanup() {", "dailyCleanup()")
+marker(report, "void dailyCleanup() {", "dailyCleanup()")
 marker(report, "  // After each hourly report, reset the hourly counter so", "hourly block")
 marker(report, "  // Long-term webhook supervision", "hourly block", "end")
 marker(pers, "void currentStatusData::resetEverything(bool includeSensorTotals) {", "central resetEverything(bool)")
 marker(pers, "void resetEverything(bool includeSensorTotals)", "CurrentReadings wrapper")
 marker(mgr, "ISensor* SensorManager::activeSensor() {", "activeSensor()")
 pieces = {
-    "gen_daily_cleanup.inc": one(main, r"void dailyCleanup\(\) \{.*?\n\}\n", "dailyCleanup()", re.S),
+    "gen_daily_cleanup.inc": one(report, r"void dailyCleanup\(\) \{.*?\n\}\n", "dailyCleanup()", re.S),
     "gen_hourly_block.inc": one(report, r"  // After each hourly report, reset the hourly counter so.*?\n(?=\n  // Long-term webhook supervision)", "hourly block", re.S),
     "gen_central_reset.inc": one(pers, r"void currentStatusData::resetEverything\(bool includeSensorTotals\) \{.*?\n\}\n", "central resetEverything(bool)", re.S),
     "gen_wrapper.inc": one(pers, r"void resetEverything\(bool includeSensorTotals\)[^\n]*\n", "CurrentReadings wrapper"),
@@ -65,9 +64,9 @@ mutant() {  # $1 label, $2 expected failing text, then (file under src/, old, ne
   echo "mutant caught: $label (FAIL: $want...)"
 }
 mutant "dailyCleanup() calls resetEverything() with no argument (double reset)" "daily (not connected, PIR)" \
-  Generalized-Core-Counter.cpp "CurrentReadings::resetEverything(false);" "CurrentReadings::resetEverything();"
+  state/State_Report.cpp "CurrentReadings::resetEverything(false);" "CurrentReadings::resetEverything();"
 mutant "dailyCleanup() drops the sensor's Daily hook" "daily (not connected, PIR)" \
-  Generalized-Core-Counter.cpp "  SensorManager::instance().activeSensor()->resetTotals(ResetPeriod::Daily);
+  state/State_Report.cpp "  SensorManager::instance().activeSensor()->resetTotals(ResetPeriod::Daily);
 " ""
 mutant "hourly hook moved outside the COUNTING guard" "hourly OCCUPANCY clears nothing" \
   state/State_Report.cpp "  if (SystemConfig::get_sensorMode() == SystemConfig::COUNTING) {

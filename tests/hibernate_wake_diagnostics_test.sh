@@ -18,6 +18,7 @@ clang++ -std=c++17 -Wall -Wextra -pedantic \
 # while Generalized-Core-Counter.cpp only consumes its WakeVerdict now -
 # so this Part 2 checks both. ---
 gcc_src="$repo_root/src/Generalized-Core-Counter.cpp"
+rp_src="$repo_root/src/cloud/ReportPublisher.cpp"
 hc_src="$repo_root/src/time/HibernateCycle.cpp"
 
 check() {
@@ -85,10 +86,10 @@ check "eventFields are built via the shared, host-tested buildEventFields(), not
 # was not touched.
 check "publishHibernateWakeForensics() forwards its fields parameter into buildEventPayload(), not a reconstructed/literal EventFields" \
   "const int written = HibernateWakeDiagnostics::buildEventPayload(payload, sizeof(payload), fields);" \
-  "$gcc_src"
+  "$rp_src"
 check "new forensic event is queued via PublishQueuePosix, mirroring publishWatchdogForensics" \
   "PublishQueuePosix::instance().publish(\"hibernate_wake\", payload, PRIVATE | WITH_ACK))" \
-  "$gcc_src"
+  "$rp_src"
 
 # Requirement: no preceding hibernate -> no event. The publish call must be
 # textually inside the `if (wakeVerdict.hibernateGateEvaluated)` block, i.e.

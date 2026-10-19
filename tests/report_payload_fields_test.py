@@ -17,7 +17,7 @@ import re
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-APP = os.path.join(REPO, "src", "Generalized-Core-Counter.cpp")
+APP = os.path.join(REPO, "src", "cloud", "ReportPublisher.cpp")
 PIR = os.path.join(REPO, "src", "sensors", "PIRSensor.cpp")
 
 NEW_KEYS = ("fh", "lfb", "cyc", "slp")
