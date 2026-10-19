@@ -115,6 +115,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 APP_SRC = REPO_ROOT / "src" / "Generalized-Core-Counter.cpp"
+REPORT_SRC = REPO_ROOT / "src" / "state" / "State_Report.cpp"
+PUBLISHER_SRC = REPO_ROOT / "src" / "cloud" / "ReportPublisher.cpp"
 STATUS_SRC = REPO_ROOT / "src" / "cloud" / "DeviceStatusPublisher.cpp"
 COMMON_HDR = REPO_ROOT / "src" / "state" / "State_Common.h"
 AB1805_CPP = REPO_ROOT / "lib" / "AB1805_RK" / "src" / "AB1805_RK.cpp"
@@ -164,6 +166,8 @@ def strip_line_comments(text: str) -> str:
 
 def main() -> None:
     app_text = APP_SRC.read_text()
+    report_text = REPORT_SRC.read_text()
+    publisher_text = PUBLISHER_SRC.read_text()
     status_text = STATUS_SRC.read_text()
     common_text = COMMON_HDR.read_text()
     ab1805_text = AB1805_CPP.read_text()
@@ -447,7 +451,7 @@ def main() -> None:
 
     # --- dailyCleanup() must no longer stamp lastTimeSync at request time. ---
     daily_fn = extract_function(
-        app_text, r"void\s+dailyCleanup\s*\(\s*\)\s*\{", "dailyCleanup"
+        report_text, r"void\s+dailyCleanup\s*\(\s*\)\s*\{", "dailyCleanup", REPORT_SRC.name
     )
     daily_code_lines = [
         line for line in daily_fn.splitlines() if not line.strip().startswith("//")
@@ -679,8 +683,8 @@ def main() -> None:
             "boot-storm alert (bootStormAlertPending)",
         ),
         (
-            app_text,
-            APP_SRC.name,
+            publisher_text,
+            PUBLISHER_SRC.name,
             "SystemConfig::set_lastHookResponse(Time.now());",
             "webhook response handler",
         ),

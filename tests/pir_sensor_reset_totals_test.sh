@@ -29,7 +29,7 @@ PY
   # and the only callers are the daily close and the hourly COUNTING reset.
   local callers
   callers="$(grep -rn "resetTotals(" "$s" | grep -v -E "virtual void resetTotals\(ResetPeriod\)|void resetTotals\(ResetPeriod period\) override|PIRSensor::resetTotals\(ResetPeriod period\)" | sed -E 's/^[^:]*\/([^\/:]+):[0-9]+:[[:space:]]*/\1: /' | sort)"
-  local expected="Generalized-Core-Counter.cpp: SensorManager::instance().activeSensor()->resetTotals(ResetPeriod::Daily);
+  local expected="State_Report.cpp: SensorManager::instance().activeSensor()->resetTotals(ResetPeriod::Daily);
 State_Report.cpp: SensorManager::instance().activeSensor()->resetTotals(ResetPeriod::Hourly);"
   if [[ "$callers" != "$expected" ]]; then
     echo "FAIL: callers of resetTotals( in src/ are not exactly the daily and hourly sites:"

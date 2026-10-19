@@ -133,7 +133,7 @@ CPP
       completed += closes
       if (completed == 2 && depth == 0) exit
     }
-  ' "$repo_root/src/Generalized-Core-Counter.cpp"
+  ' "$repo_root/src/cloud/ReportPublisher.cpp"
   cat <<'CPP'
   return {battState, stateOfCharge};
 }

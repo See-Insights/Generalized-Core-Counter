@@ -299,3 +299,35 @@ void handleReportingState() {
     Log.info("Alert 40 active after report - continuing normal state flow (no immediate ERROR_STATE)");
   }
 }
+
+/**
+ * @brief Cleanup function that is run at the beginning of the day.
+ *
+ * @details Called from REPORTING_STATE once per local day. If connected, it
+ *          requests a time sync (completion is recorded by
+ *          `checkClockResync()`, not here - see WO-2026-08-29-002 Finding 1),
+ *          then resets daily counters and related housekeeping state.
+ */
+void dailyCleanup() {
+  if (Particle.connected()) {
+    publishDiagnosticSafe("Daily Cleanup", "Running", PRIVATE);
+    
+    // Opportunistic extra time sync request once per day, on top of the
+    // monotonic-gated resync in checkClockResync() (WO-2026-08-29-002 item
+    // 6), which is the primary defense against clock drift now - it isn't
+    // gated on this daily wall-clock schedule, so a wrong clock can't move
+    // or skip its own corrective sync (Finding 1's second defect). This call
+    // is routed through requestClockResync() so completion (RTC write-back
+    // + persisted lastTimeSync stamp) is recorded once, uniformly, by
+    // checkClockResync() - never at request time, which would use the very
+    // clock under suspicion (Finding 1's first defect; previously this
+    // function called SystemConfig::set_lastTimeSync(Time.now()) immediately
+    // after Particle.syncTime(), before the request had even completed).
+    requestClockResync("daily-cleanup");
+  }
+  
+  Log.info("Running Daily Cleanup");
+  
+  CurrentReadings::resetEverything(false); // lastCountTime and resetCount; the sensor clears its own totals
+  SensorManager::instance().activeSensor()->resetTotals(ResetPeriod::Daily);
+}

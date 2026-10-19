@@ -6,13 +6,13 @@
 #
 # Behavioural test: the REAL getAlertSeverity() and raiseAlert()
 # (src/MyPersistentData.cpp), isAutoClearAfterReportAlert() and publishData()'s
-# clear-after-report block (src/Generalized-Core-Counter.cpp) are extracted
+# clear-after-report block (src/cloud/ReportPublisher.cpp) are extracted
 # verbatim from the sources and driven against fakes.
 set -euo pipefail
 
 repo_root="${0:A:h:h}"
 persistent_src="$repo_root/src/MyPersistentData.cpp"
-app_src="$repo_root/src/Generalized-Core-Counter.cpp"
+app_src="$repo_root/src/cloud/ReportPublisher.cpp"
 generated="${TMPDIR:-/tmp}/alert19_clears_after_report_test.cpp"
 binary="${TMPDIR:-/tmp}/alert19_clears_after_report_test"
 
@@ -77,7 +77,7 @@ CPP
     | sed '1s/currentStatusData::raiseAlert/raiseAlert/'
 
   echo ""
-  echo "// ===== Extracted verbatim from src/Generalized-Core-Counter.cpp ====="
+  echo "// ===== Extracted verbatim from src/cloud/ReportPublisher.cpp ====="
   extract_braced_block "$app_src" "static bool isAutoClearAfterReportAlert(int alertCode) {"
   echo ""
   echo "// publishData()'s alert handling, around its extracted clear block."

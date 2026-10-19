@@ -11,7 +11,7 @@ DAILY_BOUNDARY_H = REPO_ROOT / "src" / "time" / "DailyBoundary.h"
 DAILY_BOUNDARY_CPP = REPO_ROOT / "src" / "time" / "DailyBoundary.cpp"
 STATE_COMMON = REPO_ROOT / "src" / "state" / "State_Common.h"
 STATE_MACHINE = REPO_ROOT / "src" / "state" / "StateMachine.h"
-APP_MAIN = REPO_ROOT / "src" / "Generalized-Core-Counter.cpp"
+REPORT_PUBLISHER = REPO_ROOT / "src" / "cloud" / "ReportPublisher.cpp"
 
 SECONDS_PER_DAY = 86400
 
@@ -82,7 +82,7 @@ def verify_source_shape() -> None:
     boundary_text = DAILY_BOUNDARY_CPP.read_text()
     common_text = STATE_COMMON.read_text()
     machine_text = STATE_MACHINE.read_text()
-    app_text = APP_MAIN.read_text()
+    publisher_text = REPORT_PUBLISHER.read_text()
     report_code = strip_comment_lines(report_text)
     boundary_code = strip_comment_lines(boundary_text)
 
@@ -174,7 +174,7 @@ def verify_source_shape() -> None:
     ):
         fail("the hourly resetTotals(Hourly) call must be the only statement inside the COUNTING guard")
     cleanup_code = strip_comment_lines(
-        extract_function(app_text, r"void\s+dailyCleanup\s*\(\s*\)\s*\{", "dailyCleanup")
+        extract_function(report_text, r"void\s+dailyCleanup\s*\(\s*\)\s*\{", "dailyCleanup")
     )
     if re.search(r"resetEverything\s*\(\s*\)", cleanup_code):
         fail("dailyCleanup() must not call the no-argument resetEverything(); the sensor clears its own totals")
@@ -240,17 +240,17 @@ def verify_source_shape() -> None:
 
     default_declarations = sum(
         text.count("publishData(time_t stampOverride = 0)")
-        for text in (common_text, machine_text, app_text)
+        for text in (common_text, machine_text, publisher_text)
     )
     if default_declarations != 1 or "publishData(time_t stampOverride = 0)" not in common_text:
         fail("publishData() default argument must appear exactly once, in State_Common.h")
     if "void publishData(time_t stampOverride);" not in machine_text:
         fail("StateMachine.h must declare publishData(time_t stampOverride) without a default argument")
-    if "void publishData(time_t stampOverride);" not in app_text:
-        fail("Generalized-Core-Counter.cpp forward declaration must omit the default argument")
+    if "void publishData(time_t stampOverride) {" not in publisher_text:
+        fail("ReportPublisher.cpp definition must omit the default argument")
 
     publish_impl = extract_function(
-        app_text, r"void\s+publishData\s*\(\s*time_t\s+\w+\s*\)\s*\{", "publishData"
+        publisher_text, r"void\s+publishData\s*\(\s*time_t\s+\w+\s*\)\s*\{", "publishData"
     )
     if "stampOverride != 0 ? (unsigned long)stampOverride : nowStampSec" not in publish_impl:
         fail("publishData() must apply a nonzero stamp override to the occupancy payload timestamp")
