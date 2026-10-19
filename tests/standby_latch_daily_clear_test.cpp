@@ -1,10 +1,11 @@
 // WO-2026-10-09-003: the modem standby latch clears once a day.
 //
 // The real daily-close block of State_Report.cpp (the `if (due) { ... }` that
-// follows the occupancy flag take), the real markModemUnstable() /
-// maybeClearModemUnstable() functions and the real teardown trip check of
-// State_Sleep.cpp are extracted byte-for-byte by the .sh wrapper into the
-// .inc files included below. Only the Particle/SystemConfig surface is stubbed.
+// follows the occupancy flag take), the real latch owner power/ModemHealth.{h,cpp}
+// (markModemUnstable(), maybeClearModemUnstable(), clearAtDailyClose(), the
+// thresholds) and the real teardown trip check of State_Sleep.cpp are
+// extracted byte-for-byte by the .sh wrapper into the .inc files included
+// below. Only the Particle/SystemConfig surface is stubbed.
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>

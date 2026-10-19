@@ -69,3 +69,25 @@ Budget versus actual (`src/`, moved lines, Sleep/Connect/Report `wc -l`, tests),
 
 **Budget note:** a new `power/ModemHealth.{h,cpp}` (no such file exists; the `MODEM_HEALTH` tag is only a log string). Leave the three labels and `logTeardownContext` in Sleep: they are logging helpers the latch functions do not use, and moving them needs more declarations; say so in the report. The equivalence harness is a new host harness, so the test guideline is +175.
 
+
+## Stage 6/7 result, architect's rulings and closing record (2026-10-19)
+
+**Stage 6** (Copilot, Sonnet 5.5, high): one implementation round plus one test-only follow-up. **Controller reproduction** (Claude Code, 6.4.1 Boron, fresh `BUILD_PATH_BASE`; the "before" is the P-4 tree, whose `src/` equals main `db9e9e1`): suite **89/89** (sh via zsh, py via python3, serial); text/data/bss `151764/1094/2228 → 151748/1094/2228`; the whole `.backup` section identical; static-init stubs 22 before and after. **Stage 7** (Codex `gpt-5.6-sol`, high): **VERIFIED WITH CONCERNS**, retained outcome A; checks 1–3, 5–8 PASS, checks 4 and 9 CONCERN (`WO-2026-10-19-004-stage7-verdict.md`).
+
+**Findings and the architect's rulings (19 Oct):**
+- **F2 (test volume above the +175 guideline): accepted.** The harness pins behaviour that had no tests at `HEAD`: the connect-timeout threshold (2) and the 5000 ms recovery limit, which pass the existing latch tests when changed (checked on the unmoved code).
+- **F1 (the equivalence test needed commit `db9e9e1` through `git show`): freeze the output, not the code.** The 176-case old-code transcript was generated once from `db9e9e1fc63c33c7f7774f864a6a0a681d8aacc4` and committed as `tests/fixtures/modem_health_transcript.txt` (a `# ` header with the full hash, the case count and the body's sha256; body 257 lines ending `CASES 176`). `modem_health_equivalence_test.sh` now builds the real `ModemHealth.cpp` and diffs its transcript against the fixture body; it has no git dependency and no old source (the structural test fails on the tokens `git`, `MODEM_HEALTH_BASE`, `MH_OLD` or a header without a 40-hex hash). **Checked by the controller:** the fixture body's sha256 `23c67545a76899405bcdf96b1edaddd51403396a9108616daecf367fccf2bb76` equals an independent regeneration from `db9e9e1` made before the follow-up (byte-identical); the equivalence and structural tests pass in a copy of the tree with no `.git`; the connect-timeout threshold 3, the recovery limit 6000, the dropped daily-close call and an injected latch write in `State_Connect.cpp` each fail a named test; a `retained` probe in the `.cpp` and in the `.h` each fail; the `src/` hash `032117a1ef2785a8` equals the tree Codex reviewed.
+
+## Closing record
+
+| Item | Budget | Actual |
+|---|---|---|
+| `src/` net | ≤ +20, hard | **+12**: `+101/−89` (new `ModemHealth.h` 16 and `.cpp` 79; `State_Sleep.cpp` 1725 → 1670, `State_Connect.cpp` 754 → 731, `State_Report.cpp` 333 → 328); 56 lines moved byte-for-byte (54 substantive) |
+| Tests | guideline +175 (new harness) | about **+308 plus a 266-line frozen fixture**: new `modem_health_equivalence_test.{sh,cpp}` (66 + 78), `modem_health_owner_structural_test.py` (109), host stubs (41), and `standby_latch_daily_clear_test.{sh,cpp}` re-pointed (+41/−27); over the guideline, accepted (F2) |
+| Suite | baseline 87 | **89/89** (sh via zsh, py via python3, serial); golden fixture sha256 `07de1e1980e4a44e03420540e6c721a93a61b5d6392539219928420c048f0637` unchanged |
+
+- **ELF (6.4.1 Boron):** text **151764 → 151748 (−16)**, data 1094, bss 2228. By symbol (Codex): new owner symbols +248 B (`clearAtDailyClose` 36, `markModemUnstable` 92, `noteConnectSuccess` 16, `noteConnectTimeout` 32, `maybeClearModemUnstable` 72); removed or shrunk −260 B (the old anonymous-namespace `markModemUnstable` clone 72, `handleSleepingState` 7048 → 6968, `handleConnectingState` 2412 → 2320, `handleReportingState` 992 → 976); subtotal −12; fill −4. No new static-initialization stub (22 before and after).
+- **Retained outcome A:** the whole `.backup` section (24 symbols, 0x98 bytes) identical; `retainedBoot` `0x2003f420`, hibernate fields `0x2003f480/488/48c/490`, signature `0x2003f494`. No `retained` keyword in the two new files.
+- **Equivalence:** 176 cases (30 connect-timeout, 6 success, 24 daily-close, 36 mark, 80 maybe-clear); the old and new transcripts are identical, and all six log lines are exercised. The moved bodies, thresholds (10000 ms, 5000 ms, 2) and enum are byte-identical to `db9e9e1` (Codex check 1). One owner: the four fields are written only in `ModemHealth.cpp`; the reads in Connect and Report stay.
+- **Deviations:** the labels and `logTeardownContext` stay in Sleep (the WO allowed it); the daily-close body now sits inside `clearAtDailyClose()` (two spaces shallower; the statements and the log line are unchanged); `markModemUnstable` and `maybeClearModemUnstable` are now external (they were in Sleep's anonymous namespace).
+- **Rounds:** Stage 6 one round plus one test-only follow-up; Stage 7 once (VERIFIED WITH CONCERNS, both rulings applied).

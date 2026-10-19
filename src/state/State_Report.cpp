@@ -4,6 +4,7 @@
 #include "cloud/Cloud.h"
 #include "power/BatteryAuthority.h"
 #include "power/ConnectivityPolicy.h"
+#include "power/ModemHealth.h"
 #include "power/PowerManager.h"
 #include "LocalTimeRK.h"
 #include "persist/CurrentReadings.h"
@@ -82,13 +83,7 @@ void handleReportingState() {
     SystemConfig::set_lastDailyCleanup(now);
     // The night's full modem-off is the verdict: a still-slow modem re-trips
     // through the existing teardown check in State_Sleep.cpp.
-    if (session.modemUnstable) {
-      session.modemUnstable = false;
-      session.modemStandbySuppressed = false;
-      session.modemUnstableReason = 0;
-      session.modemConnectTimeoutCount = 0;
-      Log.info("MODEM_POLICY: standby re-allowed at daily close; night modem-off decides");
-    }
+    clearAtDailyClose();
   }
 
   // This timestamp is the authoritative application-report generation time.

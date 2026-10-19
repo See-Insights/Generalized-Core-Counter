@@ -1,0 +1,266 @@
+# Frozen output of the pre-change modem latch code: WO-2026-10-19-004 (Step 6 P-5).
+# Base commit: db9e9e1fc63c33c7f7774f864a6a0a681d8aacc4
+# This is the output of the pre-change latch code (Sleep markModemUnstable/maybeClearModemUnstable, Connect markModemUnstableFromConnectTimeout and success reset, Report daily-close block) run on the 176 cases of tests/modem_health_equivalence_test.cpp.
+# Cases: 176 (the last body line is "CASES 176")
+# Body lines (non-comment lines): 257
+# Body sha256: 23c67545a76899405bcdf96b1edaddd51403396a9108616daecf367fccf2bb76
+# Generated once by extracting those pieces from db9e9e1 (git show db9e9e1:src/state/State_{Sleep,Connect,Report}.cpp),
+# building the harness's old-code variant against the host stubs in tests/stubs/modem_health, and running it.
+# Do not regenerate this file to make a test pass: regenerating requires the old code from a commit before the ModemHealth change.
+connectTimeout 0 0 0 0 -> unstable=0 suppressed=0 reason=0 count=1
+connectTimeout 0 0 1 0 -> unstable=0 suppressed=1 reason=0 count=1
+connectTimeout 0 2 0 0 -> unstable=1 suppressed=0 reason=2 count=1
+connectTimeout 0 2 1 0 -> unstable=1 suppressed=1 reason=2 count=1
+connectTimeout 0 1 0 0 -> unstable=1 suppressed=0 reason=1 count=1
+connectTimeout 0 1 1 0 -> unstable=1 suppressed=1 reason=1 count=1
+connectTimeout 1 0 0 0 -> unstable=1 suppressed=1 reason=2 count=2
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=2
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+connectTimeout 1 0 1 0 -> unstable=1 suppressed=1 reason=2 count=2
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=2
+connectTimeout 1 2 0 0 -> unstable=1 suppressed=1 reason=2 count=2
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+connectTimeout 1 2 1 0 -> unstable=1 suppressed=1 reason=2 count=2
+connectTimeout 1 1 0 0 -> unstable=1 suppressed=1 reason=2 count=2
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=2
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+connectTimeout 1 1 1 0 -> unstable=1 suppressed=1 reason=2 count=2
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=2
+connectTimeout 2 0 0 0 -> unstable=1 suppressed=1 reason=2 count=3
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=3
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+connectTimeout 2 0 1 0 -> unstable=1 suppressed=1 reason=2 count=3
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=3
+connectTimeout 2 2 0 0 -> unstable=1 suppressed=1 reason=2 count=3
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+connectTimeout 2 2 1 0 -> unstable=1 suppressed=1 reason=2 count=3
+connectTimeout 2 1 0 0 -> unstable=1 suppressed=1 reason=2 count=3
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=3
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+connectTimeout 2 1 1 0 -> unstable=1 suppressed=1 reason=2 count=3
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=3
+connectTimeout 3 0 0 0 -> unstable=1 suppressed=1 reason=2 count=4
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=4
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+connectTimeout 3 0 1 0 -> unstable=1 suppressed=1 reason=2 count=4
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=4
+connectTimeout 3 2 0 0 -> unstable=1 suppressed=1 reason=2 count=4
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+connectTimeout 3 2 1 0 -> unstable=1 suppressed=1 reason=2 count=4
+connectTimeout 3 1 0 0 -> unstable=1 suppressed=1 reason=2 count=4
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=4
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+connectTimeout 3 1 1 0 -> unstable=1 suppressed=1 reason=2 count=4
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=4
+connectTimeout 255 0 0 0 -> unstable=1 suppressed=1 reason=2 count=255
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=255
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+connectTimeout 255 0 1 0 -> unstable=1 suppressed=1 reason=2 count=255
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=255
+connectTimeout 255 2 0 0 -> unstable=1 suppressed=1 reason=2 count=255
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+connectTimeout 255 2 1 0 -> unstable=1 suppressed=1 reason=2 count=255
+connectTimeout 255 1 0 0 -> unstable=1 suppressed=1 reason=2 count=255
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=255
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+connectTimeout 255 1 1 0 -> unstable=1 suppressed=1 reason=2 count=255
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=255
+connectSuccess 0 0 0 0 -> unstable=0 suppressed=0 reason=0 count=0
+connectSuccess 0 1 0 0 -> unstable=1 suppressed=1 reason=1 count=0
+connectSuccess 1 0 0 0 -> unstable=0 suppressed=0 reason=0 count=0
+connectSuccess 1 1 0 0 -> unstable=1 suppressed=1 reason=1 count=0
+connectSuccess 255 0 0 0 -> unstable=0 suppressed=0 reason=0 count=0
+connectSuccess 255 1 0 0 -> unstable=1 suppressed=1 reason=1 count=0
+dailyClose 0 0 0 0 -> unstable=0 suppressed=0 reason=0 count=0
+dailyClose 0 0 0 2 -> unstable=0 suppressed=0 reason=0 count=2
+dailyClose 0 0 1 0 -> unstable=0 suppressed=0 reason=1 count=0
+dailyClose 0 0 1 2 -> unstable=0 suppressed=0 reason=1 count=2
+dailyClose 0 0 2 0 -> unstable=0 suppressed=0 reason=2 count=0
+dailyClose 0 0 2 2 -> unstable=0 suppressed=0 reason=2 count=2
+dailyClose 0 1 0 0 -> unstable=0 suppressed=1 reason=0 count=0
+dailyClose 0 1 0 2 -> unstable=0 suppressed=1 reason=0 count=2
+dailyClose 0 1 1 0 -> unstable=0 suppressed=1 reason=1 count=0
+dailyClose 0 1 1 2 -> unstable=0 suppressed=1 reason=1 count=2
+dailyClose 0 1 2 0 -> unstable=0 suppressed=1 reason=2 count=0
+dailyClose 0 1 2 2 -> unstable=0 suppressed=1 reason=2 count=2
+dailyClose 1 0 0 0 -> unstable=0 suppressed=0 reason=0 count=0
+  LOG INFO MODEM_POLICY: standby re-allowed at daily close; night modem-off decides
+dailyClose 1 0 0 2 -> unstable=0 suppressed=0 reason=0 count=0
+  LOG INFO MODEM_POLICY: standby re-allowed at daily close; night modem-off decides
+dailyClose 1 0 1 0 -> unstable=0 suppressed=0 reason=0 count=0
+  LOG INFO MODEM_POLICY: standby re-allowed at daily close; night modem-off decides
+dailyClose 1 0 1 2 -> unstable=0 suppressed=0 reason=0 count=0
+  LOG INFO MODEM_POLICY: standby re-allowed at daily close; night modem-off decides
+dailyClose 1 0 2 0 -> unstable=0 suppressed=0 reason=0 count=0
+  LOG INFO MODEM_POLICY: standby re-allowed at daily close; night modem-off decides
+dailyClose 1 0 2 2 -> unstable=0 suppressed=0 reason=0 count=0
+  LOG INFO MODEM_POLICY: standby re-allowed at daily close; night modem-off decides
+dailyClose 1 1 0 0 -> unstable=0 suppressed=0 reason=0 count=0
+  LOG INFO MODEM_POLICY: standby re-allowed at daily close; night modem-off decides
+dailyClose 1 1 0 2 -> unstable=0 suppressed=0 reason=0 count=0
+  LOG INFO MODEM_POLICY: standby re-allowed at daily close; night modem-off decides
+dailyClose 1 1 1 0 -> unstable=0 suppressed=0 reason=0 count=0
+  LOG INFO MODEM_POLICY: standby re-allowed at daily close; night modem-off decides
+dailyClose 1 1 1 2 -> unstable=0 suppressed=0 reason=0 count=0
+  LOG INFO MODEM_POLICY: standby re-allowed at daily close; night modem-off decides
+dailyClose 1 1 2 0 -> unstable=0 suppressed=0 reason=0 count=0
+  LOG INFO MODEM_POLICY: standby re-allowed at daily close; night modem-off decides
+dailyClose 1 1 2 2 -> unstable=0 suppressed=0 reason=0 count=0
+  LOG INFO MODEM_POLICY: standby re-allowed at daily close; night modem-off decides
+mark 0 0 0 0 -> unstable=1 suppressed=1 reason=0 count=0
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 0 0 0 3 -> unstable=1 suppressed=1 reason=0 count=3
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 0 0 1 0 -> unstable=1 suppressed=1 reason=0 count=0
+mark 0 0 1 3 -> unstable=1 suppressed=1 reason=0 count=3
+mark 0 1 0 0 -> unstable=1 suppressed=1 reason=0 count=0
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 0 1 0 3 -> unstable=1 suppressed=1 reason=0 count=3
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 0 1 1 0 -> unstable=1 suppressed=1 reason=0 count=0
+mark 0 1 1 3 -> unstable=1 suppressed=1 reason=0 count=3
+mark 0 2 0 0 -> unstable=1 suppressed=1 reason=0 count=0
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 0 2 0 3 -> unstable=1 suppressed=1 reason=0 count=3
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 0 2 1 0 -> unstable=1 suppressed=1 reason=0 count=0
+mark 0 2 1 3 -> unstable=1 suppressed=1 reason=0 count=3
+mark 1 0 0 0 -> unstable=1 suppressed=1 reason=1 count=0
+  LOG WARN MODEM_HEALTH: unstable reason=slow_teardown elapsed=12345
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 1 0 0 3 -> unstable=1 suppressed=1 reason=1 count=3
+  LOG WARN MODEM_HEALTH: unstable reason=slow_teardown elapsed=12345
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 1 0 1 0 -> unstable=1 suppressed=1 reason=1 count=0
+  LOG WARN MODEM_HEALTH: unstable reason=slow_teardown elapsed=12345
+mark 1 0 1 3 -> unstable=1 suppressed=1 reason=1 count=3
+  LOG WARN MODEM_HEALTH: unstable reason=slow_teardown elapsed=12345
+mark 1 1 0 0 -> unstable=1 suppressed=1 reason=1 count=0
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 1 1 0 3 -> unstable=1 suppressed=1 reason=1 count=3
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 1 1 1 0 -> unstable=1 suppressed=1 reason=1 count=0
+mark 1 1 1 3 -> unstable=1 suppressed=1 reason=1 count=3
+mark 1 2 0 0 -> unstable=1 suppressed=1 reason=1 count=0
+  LOG WARN MODEM_HEALTH: unstable reason=slow_teardown elapsed=12345
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 1 2 0 3 -> unstable=1 suppressed=1 reason=1 count=3
+  LOG WARN MODEM_HEALTH: unstable reason=slow_teardown elapsed=12345
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 1 2 1 0 -> unstable=1 suppressed=1 reason=1 count=0
+  LOG WARN MODEM_HEALTH: unstable reason=slow_teardown elapsed=12345
+mark 1 2 1 3 -> unstable=1 suppressed=1 reason=1 count=3
+  LOG WARN MODEM_HEALTH: unstable reason=slow_teardown elapsed=12345
+mark 2 0 0 0 -> unstable=1 suppressed=1 reason=2 count=0
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=0
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 2 0 0 3 -> unstable=1 suppressed=1 reason=2 count=3
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=3
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 2 0 1 0 -> unstable=1 suppressed=1 reason=2 count=0
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=0
+mark 2 0 1 3 -> unstable=1 suppressed=1 reason=2 count=3
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=3
+mark 2 1 0 0 -> unstable=1 suppressed=1 reason=2 count=0
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 2 1 0 3 -> unstable=1 suppressed=1 reason=2 count=3
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 2 1 1 0 -> unstable=1 suppressed=1 reason=2 count=0
+mark 2 1 1 3 -> unstable=1 suppressed=1 reason=2 count=3
+mark 2 2 0 0 -> unstable=1 suppressed=1 reason=2 count=0
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=0
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 2 2 0 3 -> unstable=1 suppressed=1 reason=2 count=3
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=3
+  LOG WARN MODEM_POLICY: standby temporarily disabled reason=unstable_modem
+mark 2 2 1 0 -> unstable=1 suppressed=1 reason=2 count=0
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=0
+mark 2 2 1 3 -> unstable=1 suppressed=1 reason=2 count=3
+  LOG WARN MODEM_HEALTH: unstable reason=connect_timeout count=3
+maybeClear 0 -1 999 4 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 -1 0 5 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 -1 1 5 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 -1 0 10 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 -1 1 10 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 0 999 4 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 0 0 5 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 0 1 5 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 0 0 10 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 0 1 10 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 1 999 4 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 1 0 5 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 1 1 5 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 1 0 10 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 1 1 10 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 2 999 4 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 2 0 5 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 2 1 5 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 2 0 10 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 0 2 1 10 -> unstable=0 suppressed=0 reason=1 count=2
+maybeClear 1 -1 999 4 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 -1 0 5 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 -1 1 5 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 -1 0 10 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 -1 1 10 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 0 999 4 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 0 0 5 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 0 1 5 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 0 0 10 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 0 1 10 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 1 999 4 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 1 0 5 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 1 1 5 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 1 0 10 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 1 1 10 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 2 999 4 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 2 0 5 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 2 1 5 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 2 0 10 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 1 2 1 10 -> unstable=0 suppressed=1 reason=1 count=2
+maybeClear 2 -1 999 4 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 -1 0 5 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 -1 1 5 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 -1 0 10 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 -1 1 10 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 0 999 4 -> unstable=0 suppressed=0 reason=0 count=0
+  LOG INFO MODEM_HEALTH: recovered
+maybeClear 2 0 0 5 -> unstable=0 suppressed=0 reason=0 count=0
+  LOG INFO MODEM_HEALTH: recovered
+maybeClear 2 0 1 5 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 0 0 10 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 0 1 10 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 1 999 4 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 1 0 5 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 1 1 5 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 1 0 10 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 1 1 10 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 2 999 4 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 2 0 5 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 2 1 5 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 2 0 10 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 2 2 1 10 -> unstable=1 suppressed=0 reason=1 count=2
+maybeClear 3 -1 999 4 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 -1 0 5 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 -1 1 5 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 -1 0 10 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 -1 1 10 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 0 999 4 -> unstable=0 suppressed=0 reason=0 count=0
+  LOG INFO MODEM_HEALTH: recovered
+  LOG INFO MODEM_POLICY: standby restored
+maybeClear 3 0 0 5 -> unstable=0 suppressed=0 reason=0 count=0
+  LOG INFO MODEM_HEALTH: recovered
+  LOG INFO MODEM_POLICY: standby restored
+maybeClear 3 0 1 5 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 0 0 10 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 0 1 10 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 1 999 4 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 1 0 5 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 1 1 5 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 1 0 10 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 1 1 10 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 2 999 4 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 2 0 5 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 2 1 5 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 2 0 10 -> unstable=1 suppressed=1 reason=1 count=2
+maybeClear 3 2 1 10 -> unstable=1 suppressed=1 reason=1 count=2
+CASES 176

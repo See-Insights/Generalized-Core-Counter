@@ -3,11 +3,13 @@ set -euo pipefail
 
 # WO-2026-10-09-003: the modem standby latch clears once a day.
 #
-# The real daily-close block (State_Report.cpp), the real latch functions and
-# the real teardown trip check (State_Sleep.cpp) are extracted byte-for-byte
+# The real daily-close block (State_Report.cpp), the real latch owner
+# (power/ModemHealth.{h,cpp}: thresholds, enum, latch functions and
+# clearAtDailyClose) and the real teardown trip check (State_Sleep.cpp) are
+# extracted byte-for-byte
 # and compiled into standby_latch_daily_clear_test.cpp. A separate step re-reads
 # src/ and fails with COPY_MISMATCH if any extracted piece differs from it.
-# Mutants are built from private copies of the two sources (in the temp dir,
+# Mutants are built from private copies of the sources (in the temp dir,
 # never in the worktree) and each must make its own targeted check FAIL at run
 # time; a mutant that does not compile is a broken mutation, not a caught one.
 # Set STANDBY_LATCH_SRC_ROOT to test another src/ root.
@@ -28,6 +30,8 @@ import sys
 root, out = sys.argv[1], sys.argv[2]
 report = open(f"{root}/state/State_Report.cpp").read()
 sleep = open(f"{root}/state/State_Sleep.cpp").read()
+mh_h = open(f"{root}/power/ModemHealth.h").read()
+mh_cpp = open(f"{root}/power/ModemHealth.cpp").read()
 
 
 def die(msg):
@@ -51,9 +55,9 @@ pieces = {
         sleep, "    if (teardownElapsedMs > MODEM_UNSTABLE_SLOW_TEARDOWN_MS) {",
         "    Observability::cycleStats().markTeardownEnd(millis());", "trip check"),
 }
-defs = (between(sleep, "constexpr unsigned long MODEM_UNSTABLE_SLOW_TEARDOWN_MS",
-                "const char *connectionModeLabel", "constants")
-        + between(sleep, "void markModemUnstable(", "unsigned long computeCloudSyncTimeoutMs", "latch functions"))
+defs = (between(mh_h, "constexpr unsigned long MODEM_UNSTABLE_SLOW_TEARDOWN_MS",
+                "void markModemUnstable(", "constants and enum")
+        + mh_cpp[mh_cpp.index("constexpr unsigned long MODEM_UNSTABLE_RECOVERY_TEARDOWN_MS"):])
 pieces["gen_sleep_defs.inc"] = defs
 
 for name, body in pieces.items():
@@ -71,16 +75,17 @@ import sys
 root, d = sys.argv[1], sys.argv[2]
 report = open(f"{root}/state/State_Report.cpp").read()
 sleep = open(f"{root}/state/State_Sleep.cpp").read()
+owner = open(f"{root}/power/ModemHealth.h").read() + open(f"{root}/power/ModemHealth.cpp").read()
 for name, src in (("gen_report_block.inc", report), ("gen_trip_check.inc", sleep)):
     if open(f"{d}/{name}").read().rstrip("\n") not in src:
         sys.exit(f"COPY_MISMATCH: {name}")
 defs = open(f"{d}/gen_sleep_defs.inc").read()
 for part in ("constexpr unsigned long MODEM_UNSTABLE_SLOW_TEARDOWN_MS",
-             "void markModemUnstable(", "void maybeClearModemUnstable("):
-    if part not in defs or part not in sleep:
+             "void markModemUnstable(", "void maybeClearModemUnstable(", "void clearAtDailyClose("):
+    if part not in defs or part not in owner:
         sys.exit("COPY_MISMATCH: gen_sleep_defs.inc " + part)
 for line in defs.splitlines():
-    if line.strip() and line not in sleep:
+    if line.strip() and line not in owner:
         sys.exit("COPY_MISMATCH: gen_sleep_defs.inc line: " + line)
 PY
 }
@@ -94,9 +99,10 @@ mutate_and_expect_failure() {
   # $1 = label, $2 = expected failing check prefix, $3 = file, $4 = old, $5 = new
   local label="$1" expect="$2" file="$3" old="$4" new="$5"
   local m="$work/mut_${label// /_}"
-  mkdir -p "$m/src/state"
+  mkdir -p "$m/src/state" "$m/src/power"
   cp "$src_root/state/State_Report.cpp" "$src_root/state/State_Sleep.cpp" "$m/src/state/"
-  python3 - "$m/src/state/$file" "$old" "$new" <<'PY'
+  cp "$src_root/power/ModemHealth.cpp" "$src_root/power/ModemHealth.h" "$m/src/power/"
+  python3 - "$m/src/$file" "$old" "$new" <<'PY'
 import sys
 
 path, old, new = sys.argv[1:4]
@@ -116,25 +122,32 @@ PY
   echo "caught: $label ($(grep -c '^FAIL' "$m/run.log") check(s), incl. $expect)"
 }
 
-mutate_and_expect_failure "clear outside if due" "notdue:" "State_Report.cpp" \
+mutate_and_expect_failure "clear outside if due" "notdue:" "state/State_Report.cpp" \
   "    SystemConfig::set_lastDailyCleanup(now);
 " "    SystemConfig::set_lastDailyCleanup(now);
   }
   {
 "
-mutate_and_expect_failure "modemUnstable not cleared" "latched:modemUnstable" "State_Report.cpp" \
-  "      session.modemUnstable = false;
+mutate_and_expect_failure "clear call dropped" "latched:modemUnstable" "state/State_Report.cpp" \
+  "    clearAtDailyClose();
 " ""
-mutate_and_expect_failure "standbySuppressed not cleared" "latched:standbySuppressed" "State_Report.cpp" \
-  "      session.modemStandbySuppressed = false;
+mutate_and_expect_failure "modemUnstable not cleared" "latched:modemUnstable" "power/ModemHealth.cpp" \
+  "    session.modemUnstable = false;
 " ""
-mutate_and_expect_failure "reason not cleared" "latched:reason" "State_Report.cpp" \
-  "      session.modemUnstableReason = 0;
+mutate_and_expect_failure "standbySuppressed not cleared" "latched:standbySuppressed" "power/ModemHealth.cpp" \
+  "    session.modemStandbySuppressed = false;
+    session.modemUnstableReason = 0;
+" "    session.modemUnstableReason = 0;
+"
+mutate_and_expect_failure "reason not cleared" "latched:reason" "power/ModemHealth.cpp" \
+  "    session.modemUnstableReason = 0;
 " ""
-mutate_and_expect_failure "timeout count not cleared" "latched:timeoutCount" "State_Report.cpp" \
-  "      session.modemConnectTimeoutCount = 0;
-" ""
-mutate_and_expect_failure "clear unconditional" "unlatched:" "State_Report.cpp" \
-  "    if (session.modemUnstable) {" "    {"
+mutate_and_expect_failure "timeout count not cleared" "latched:timeoutCount" "power/ModemHealth.cpp" \
+  "    session.modemUnstableReason = 0;
+    session.modemConnectTimeoutCount = 0;
+" "    session.modemUnstableReason = 0;
+"
+mutate_and_expect_failure "clear unconditional" "unlatched:" "power/ModemHealth.cpp" \
+  "  if (session.modemUnstable) {" "  {"
 
 echo "standby_latch_daily_clear_test: clean run passed and all mutations detected"
