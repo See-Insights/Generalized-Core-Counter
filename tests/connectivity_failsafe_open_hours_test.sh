@@ -15,7 +15,7 @@ set -euo pipefail
 repo_root="${0:A:h:h}"
 binary="$TMPDIR/connectivity_failsafe_open_hours_test"
 policy_src="$repo_root/src/power/ConnectivityPolicy.h"
-app_src="$repo_root/src/Generalized-Core-Counter.cpp"
+app_src="$repo_root/src/power/ConnectivityFailsafe.cpp"
 
 extract_supervisor() {
   python3 - "$app_src" <<'PY'

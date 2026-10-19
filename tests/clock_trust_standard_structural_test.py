@@ -41,6 +41,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_ROOT = REPO_ROOT / "src"
 APP_SRC = SRC_ROOT / "Generalized-Core-Counter.cpp"
+FAILSAFE_SRC = SRC_ROOT / "power" / "ConnectivityFailsafe.cpp"
 STATE_COMMON = SRC_ROOT / "state" / "State_Common.h"
 STATE_ERROR = SRC_ROOT / "state" / "State_Error.cpp"
 STATE_IDLE = SRC_ROOT / "state" / "State_Idle.cpp"
@@ -56,6 +57,11 @@ DAILY_BOUNDARY = SRC_ROOT / "time" / "DailyBoundary.cpp"
 ALLOWED_ISTIMEVALID_LINES = {
     "if (!Clock::isTimeValid() || neverConfirmedSyncEver) {",
     'transitionTo(CONNECTING_STATE, !Clock::isTimeValid() ? "time invalid" : "no confirmed time sync ever (Finding 3)");',
+    "if (!Clock::isTimeValid()) {",
+}
+# The third line lives in the connectivity failsafe supervisor (moved out of
+# Generalized-Core-Counter.cpp by WO-2026-10-19-001); the first two stay in main.
+ISTIMEVALID_LINES_IN_FAILSAFE = {
     "if (!Clock::isTimeValid()) {",
 }
 
@@ -100,7 +106,7 @@ def strip_comments(code: str) -> str:
 
 def main() -> None:
     texts = {}
-    for path in {APP_SRC, STATE_COMMON, STATE_ERROR, STATE_IDLE, STATE_REPORT, STATE_SLEEP, DAILY_BOUNDARY}:
+    for path in {APP_SRC, FAILSAFE_SRC, STATE_COMMON, STATE_ERROR, STATE_IDLE, STATE_REPORT, STATE_SLEEP, DAILY_BOUNDARY}:
         if not path.is_file():
             fail(f"{path} does not exist")
         texts[path] = strip_comments(path.read_text())
@@ -124,10 +130,12 @@ def main() -> None:
     # --- Invariant 2 (positive control): the allowlisted lines are still present. ---
     all_text = "\n".join(texts[APP_SRC].splitlines())
     present_lines = {line.strip() for line in all_text.splitlines()}
-    missing = ALLOWED_ISTIMEVALID_LINES - present_lines
+    missing = (ALLOWED_ISTIMEVALID_LINES - ISTIMEVALID_LINES_IN_FAILSAFE) - present_lines
+    failsafe_lines = {line.strip() for line in texts[FAILSAFE_SRC].splitlines()}
+    missing |= ISTIMEVALID_LINES_IN_FAILSAFE - failsafe_lines
     if missing:
         fail(
-            f"{APP_SRC.name} is missing expected allowlisted Clock::isTimeValid() "
+            f"{APP_SRC.name}/{FAILSAFE_SRC.name} is missing expected allowlisted Clock::isTimeValid() "
             f"line(s): {missing} - update this test if these were deliberately "
             "rephrased, or investigate if they were accidentally removed"
         )

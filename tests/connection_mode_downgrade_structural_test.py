@@ -53,7 +53,8 @@ EFFECTIVE_READERS = {
     "state/State_Error.cpp": 1,
     "state/State_Common.h": 1,
     "state/State_Modes.cpp": 0,
-    "Generalized-Core-Counter.cpp": 1,
+    "Generalized-Core-Counter.cpp": 0,
+    "power/ConnectivityFailsafe.cpp": 1,
     "diagnostics/ConnectivityFailsafeTest.cpp": 2,
 }
 EFFECTIVE_CALL = "PowerManager::instance().effectiveConnectionMode()"
@@ -120,7 +121,7 @@ else:
 # setup gate and post-wake gates keep the raw flag.
 RAW = "PowerConfig::get_lowBatteryMode()"
 DERIVED = "PowerManager::instance().downgradeActive()"
-for rel in ("Generalized-Core-Counter.cpp", "diagnostics/ConnectivityFailsafeTest.cpp"):
+for rel in ("power/ConnectivityFailsafe.cpp", "diagnostics/ConnectivityFailsafeTest.cpp"):
     text = sources.get(rel, "")
     m = re.search(r"lowBatteryHardActionBlocked\s*=([^;]*);", text)
     if not m:

@@ -66,3 +66,28 @@ Budget versus actual (non-move `src/`, moved lines, main `wc -l`, tests), ELF by
 - **Tests that anchor on text in `Generalized-Core-Counter.cpp`** and must be re-pointed, not weakened (a bare-name search finds): `connectivity_failsafe_open_hours_test.sh`, `failsafe_cadence_rule_test.sh`, `connectivity_failsafe_stage1_retired_test.py`, `power_consumer_regression_test.sh` (extracts `currentBatteryTierForFailsafe`), `battery_authority_commit_sites_structural_test.py`, `clock_trust_standard_structural_test.py`, `loop_stage_sleep_prep_exclusion_test.py`, and whatever else a search for the moved names turns up.
 - `diagnostics/ConnectivityFailsafeTest.cpp` (rule 4) has its own `...Local()` helpers and `batteryTierShortNameLocal` (`:46`, `:61`, `:72`) and calls `failsafeDeferReasonName` and `claimFailsafeDeferLog` through `State_Common.h`; it stays untouched.
 
+
+## Stage 6/7 result, architect's rulings and closing record (2026-10-19)
+
+**Stage 6** (Copilot, Sonnet 5.5, medium): one implementation round, plus one narrow follow-up after Stage 7 (below). **Controller reproduction** (Claude Code, 6.4.1 Boron, fresh `BUILD_PATH_BASE`s; the release "before" is the P-1 tree, whose `src/` equals main `3975e9c`): suite 85/85 (sh via zsh, py via python3); release text/data/bss 151756/1094/2220 before and after; bench (`CONNECTIVITY_FAILSAFE_TEST_MODE=1`) 153260/1094/2220 before and after; no symbol appeared, vanished or changed size apart from compiler `CSWTCH` renumbering; the whole `.backup` section identical. **Stage 7** (Codex `gpt-5.6-sol`, high): **NOT VERIFIED on test strength only**; checks 1–5, 7 and 8 PASS (`WO-2026-10-19-001-stage7-verdict.md`): the 11 moved definitions byte-identical including every test-mode arm, the supervisor's branches and call sites intact, both builds and the retained layout identical (outcome A), protected files unchanged.
+
+**The two Stage 7 findings, both P2:**
+1. **A `retained` variable added to the new file was not rejected** by `connectivity_failsafe_move_structural_test.py` (its regex matched only `retainedBoot` and `retainedLoopForensics`). Fixed by a narrow test-only follow-up (+11 lines): after stripping comments and string literals, the test fails if the keyword `retained` appears at all in `ConnectivityFailsafe.h` or `.cpp`. **Checked by the controller:** a retained probe in the `.cpp` fails with "ConnectivityFailsafe.cpp must not use the 'retained' keyword", the same probe in the `.h` fails with the matching `.h` message, the unmodified test passes, and the suite is 85/85.
+2. **The test-mode jitter arm is unpinned.** A one-second change to `jitterSec(stage)` in the `CONNECTIVITY_FAILSAFE_TEST_MODE` arm passes all seven re-pointed tests and the new one. **This is pre-existing:** the same mutation on the unmoved code at `HEAD` is caught by 0 of 8 related tests (`connectivity_failsafe_open_hours`, `failsafe_cadence_rule`, `power_consumer_regression`, `connection_mode_downgrade`, `connectivity_failsafe_stage1_retired`, `connection_mode_downgrade_structural`, `clock_trust_standard_structural`, `battery_authority_commit_sites_structural`). Not a P-2 defect; recorded in the recovery plan.
+
+**Architect's rulings (19 Oct):** the controller's reproduction suffices (the follow-up is test-only and the `src/` tree matches Codex's candidate; checked: the `src/` hash is `045125728886ce35`, equal to the reviewed tree's). Stage 8 pre-approved on those conditions, all met. **The "no `retained` in the new files" negative check becomes standard in P-3 to P-6.** The unpinned test-mode arms go into the recovery plan; pin them when the failsafe is next touched.
+
+## Closing record
+
+| Item | Budget | Actual |
+|---|---|---|
+| `src/` non-move | ≤ +20, hard | **+15**: new header 3 + new-file include and namespace lines 13 + 1 include in main − 2 removed forward declarations (`+318/−303` physical) |
+| Moved lines | about 274 | **260 function lines** (289 content lines, 301 physical with blanks), byte-identical |
+| Main `wc -l` | about 274 fewer | **2280 → 1978** (−302) |
+| Tests | guideline +100 | **+96/−11** (net +85), including the +11 follow-up |
+| Suite | baseline 84 | **85/85** (51 sh via zsh, 34 py via python3); golden payload test 186 vectors, fixture unchanged |
+
+- **Builds (6.4.1 Boron):** release text 151756 → 151756, bench 153260 → 153260, data 1094 and bss 2220 unchanged in both; zero text delta by symbol (only same-sized `CSWTCH` renames).
+- **Retained outcome A:** the whole `.backup` section (24 symbols) identical; `retainedBoot` at `0x2003f420`, the signature word at `0x2003f494`. The failsafe's state is persisted (`RecoveryState`, `SystemConfig::flushNow()`), not retained.
+- **Deviations from the WO:** `batteryTierShortName` moved with the failsafe (no header declaration, only user is the supervisor); two tests the WO did not name were re-pointed (`connection_mode_downgrade_structural_test.py`, `connection_mode_downgrade_test.sh`); `clock_trust_standard_structural_test.py` now scans the new file and is stricter than before. `diagnostics/ConnectivityFailsafeTest.cpp`, `State_Common.h`, `State_Connect.cpp`, `State_Sleep.cpp` and `BuildProfile.h` are byte-identical to `HEAD`.
+- **Rounds:** Stage 6 round 1, Stage 7 (NOT VERIFIED on tests), one test-only follow-up, accepted by the architect without a second Codex run.
