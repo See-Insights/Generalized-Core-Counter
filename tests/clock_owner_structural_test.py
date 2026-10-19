@@ -56,6 +56,9 @@ CLOCK_H = SRC_ROOT / "time" / "Clock.h"
 CLOCK_CPP = SRC_ROOT / "time" / "Clock.cpp"
 APP_SRC = SRC_ROOT / "Generalized-Core-Counter.cpp"
 STATE_SLEEP = SRC_ROOT / "state" / "State_Sleep.cpp"
+# WO-2026-10-19-003: logTimeDiag() and shouldUseBoronRtcAlarmHibernate() moved here.
+CLOCK_DIAG_CPP = SRC_ROOT / "time" / "ClockDiagnostics.cpp"
+HIBERNATE_ELIGIBILITY_CPP = SRC_ROOT / "time" / "HibernateEligibility.cpp"
 MY_PERSISTENT_DATA_CPP = SRC_ROOT / "MyPersistentData.cpp"
 
 # Formatting/telemetry-only Time.isValid() call sites explicitly permitted
@@ -142,11 +145,13 @@ def main() -> None:
     if "bool isPlausibleEpoch(time_t epoch) {" not in clock_cpp_text:
         fail(f"Clock::isPlausibleEpoch() must be defined in {CLOCK_CPP.name}")
     plausible_epoch_callers = len(
-        re.findall(r"Clock::isPlausibleEpoch\s*\(", strip_comments(STATE_SLEEP.read_text()))
+        re.findall(r"Clock::isPlausibleEpoch\s*\(", strip_comments(HIBERNATE_ELIGIBILITY_CPP.read_text()))
     )
+    if re.search(r"Clock::isPlausibleEpoch\s*\(", strip_comments(STATE_SLEEP.read_text())):
+        fail(f"{STATE_SLEEP.name} must not call Clock::isPlausibleEpoch(...) directly")
     if plausible_epoch_callers != 1:
         fail(
-            f"{STATE_SLEEP.name} must call Clock::isPlausibleEpoch(...) exactly "
+            f"{HIBERNATE_ELIGIBILITY_CPP.name} must call Clock::isPlausibleEpoch(...) exactly "
             f"once (shouldUseBoronRtcAlarmHibernate()'s RTC-plausibility check), "
             f"found {plausible_epoch_callers}"
         )
@@ -172,7 +177,8 @@ def main() -> None:
     # --- Generalized-Core-Counter.cpp is on the formatting/telemetry     ---
     # --- allowlist - not a decision site.                                ---
     offending_lines = []
-    for line in app_text.splitlines():
+    telemetry_text = app_text + "\n" + strip_comments(CLOCK_DIAG_CPP.read_text())
+    for line in telemetry_text.splitlines():
         if "Time.isValid()" in line and line.strip() not in ALLOWED_APP_SRC_TIME_ISVALID_LINES:
             offending_lines.append(line.strip())
     if offending_lines:
@@ -186,7 +192,7 @@ def main() -> None:
     # Positive control: every allowlisted line must actually still be
     # present - otherwise this allowlist could silently go stale (e.g. a
     # rename that happens to also satisfy invariant 4 vacuously).
-    present_lines = {line.strip() for line in app_text.splitlines()}
+    present_lines = {line.strip() for line in telemetry_text.splitlines()}
     missing_allowed = ALLOWED_APP_SRC_TIME_ISVALID_LINES - present_lines
     if missing_allowed:
         fail(

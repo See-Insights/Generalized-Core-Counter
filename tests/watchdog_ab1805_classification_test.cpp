@@ -90,7 +90,7 @@ struct FakeAb1805 {
   WakeReason getWakeReason() const { return wakeReason; }
 };
 
-// Mirrors ab1805WakeReasonName() (Generalized-Core-Counter.cpp).
+// Mirrors ab1805WakeReasonName() (time/ClockDiagnostics.cpp).
 const char *wakeReasonName(WakeReason reason) {
   switch (reason) {
   case WakeReason::WATCHDOG:

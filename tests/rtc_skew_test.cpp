@@ -29,7 +29,7 @@
 //      constant (-48456s) and IS satisfiable (but not vacuously true) at
 //      the REVISED constant (-28800s) - verified by computation across
 //      the real [kMinHibernateSleepSec, kMaxHibernateSleepSec] range from
-//      src/state/State_Sleep.cpp, not merely asserted in prose.
+//      src/time/HibernateEligibility.cpp, not merely asserted in prose.
 //   6. A.6 gap 3: models the full correction -> hibernate -> fresh-boot
 //      sequence end to end, proving the fixed one-shot guard does NOT
 //      re-fire on the acceptance wake and that bench step 6's condition is
@@ -63,7 +63,7 @@
 
 namespace {
 
-// Mirrors the real bounds from src/state/State_Sleep.cpp's
+// Mirrors the real bounds from src/time/HibernateEligibility.cpp's
 // shouldUseBoronRtcAlarmHibernate() (kMinHibernateSleepSec=900,
 // kMaxHibernateSleepSec=36000). This test file only needs the bounds to
 // sweep actualSleepSec, not to reproduce isPlausibleEpoch()
