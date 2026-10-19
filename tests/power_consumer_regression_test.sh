@@ -111,7 +111,7 @@ CPP
 
   extract_braced_block "$repo_root/src/state/State_Connect.cpp" "struct ConnectBudgetContext"
   extract_braced_block "$repo_root/src/state/State_Connect.cpp" "ConnectBudgetContext evaluateConnectBudget()"
-  extract_braced_block "$repo_root/src/Generalized-Core-Counter.cpp" "BatteryTier currentBatteryTierForFailsafe()"
+  extract_braced_block "$repo_root/src/power/ConnectivityFailsafe.cpp" "BatteryTier currentBatteryTierForFailsafe()"
   extract_braced_block "$repo_root/src/diagnostics/ConnectivityFailsafeTest.cpp" "BatteryTier currentBatteryTierForFailsafeLocal()"
 
   cat <<'CPP'

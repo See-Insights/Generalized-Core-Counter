@@ -170,7 +170,7 @@ structural_mutation() {
   fi
   echo "OK (mutation): '$name' correctly detected"
 }
-structural_mutation "failsafe reads the raw flag" "Generalized-Core-Counter.cpp" \
+structural_mutation "failsafe reads the raw flag" "power/ConnectivityFailsafe.cpp" \
   "PowerManager::instance().downgradeActive() || tier == TIER_SURVIVAL" \
   "PowerConfig::get_lowBatteryMode() || tier == TIER_SURVIVAL" m5
 structural_mutation "diagnostic failsafe mirror reads the raw flag" "diagnostics/ConnectivityFailsafeTest.cpp" \

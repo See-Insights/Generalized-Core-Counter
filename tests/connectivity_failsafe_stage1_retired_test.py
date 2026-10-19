@@ -14,7 +14,7 @@ import re
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-APP = os.path.join(REPO, "src", "Generalized-Core-Counter.cpp")
+APP = os.path.join(REPO, "src", "power", "ConnectivityFailsafe.cpp")
 SRC = os.path.join(REPO, "src")
 BREADCRUMB_HDR = os.path.join(SRC, "observability", "LoopForensics.h")
 FS_TEST_CPP = os.path.join(REPO, "src", "diagnostics", "ConnectivityFailsafeTest.cpp")

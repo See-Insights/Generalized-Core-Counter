@@ -33,7 +33,7 @@ extract() {
 import re, sys
 
 src_root, work = sys.argv[1], sys.argv[2]
-path = src_root + "/Generalized-Core-Counter.cpp"
+path = src_root + "/power/ConnectivityFailsafe.cpp"
 app = open(path).read()
 policy = open(src_root + "/power/ConnectivityPolicy.h").read()
 
@@ -126,7 +126,7 @@ plant() {
   local dir="$work/mut_${name// /_}"
   mkdir -p "$dir"
   cp -R "$repo_root/src" "$dir/src"
-  python3 - "$dir/src/Generalized-Core-Counter.cpp" "$@" <<'PY'
+  python3 - "$dir/src/power/ConnectivityFailsafe.cpp" "$@" <<'PY'
 import sys
 path, pairs = sys.argv[1], sys.argv[2:]
 text = open(path).read()
