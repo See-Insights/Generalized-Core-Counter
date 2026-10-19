@@ -212,6 +212,10 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
    - **Gap:** changing `setAppBreadcrumb(BREADCRUMB_REPORT_LEDGER_DONE)` in `publishData` (now `src/cloud/ReportPublisher.cpp:173`; one occurrence in `Generalized-Core-Counter.cpp` at `dd90842`) to another valid constant passes all 11 tests that anchor on the report path at `HEAD`, and the whole suite (86/86) after the move. The breadcrumb is forensic: it is what a watchdog reset reports as the last stage.
    - **Not a P-3 defect:** the move is byte-identical; the gap was there before.
    - **When:** pin the `BREADCRUMB_REPORT_*` sequence in `publishData` when the report path is next touched.
+12b. **The AB1805 stale-alarm clear is unpinned** (architect, 2026-10-19; found by Codex's Stage 7 of P-4, WO-2026-10-19-003, PR #118).
+   - **Gap:** inserting `return true;` at the top of `clearAb1805StaleAlarmInterrupts()` (now `src/time/HibernateEligibility.cpp:24–51`; formerly `State_Sleep.cpp:239–267`) bypasses the AB1805 status clear, the interrupt-mask clear and the timer-repeat disable, and the whole host suite still passes (86/86 at `HEAD` before the move, 87/87 after).
+   - **Not a P-4 defect:** the move is byte-identical; the gap was there before. A future regression that leaves stale AB1805 alarm state uncleared before a Boron RTC-alarm hibernate would not be detected by the host suite.
+   - **When:** pin the three register writes (and their order) when the hibernate path is next touched.
 13. **Standard negative check for P-3 to P-6** (architect, 2026-10-19; from P-2 Stage 7). Every pure move's structural test must fail if the `retained` keyword appears in the new files (after stripping comments and string literals). P-2's `connectivity_failsafe_move_structural_test.py` is the pattern: Codex's probe (`retained uint8_t …Probe;` in the new `.cpp` and in the `.h`) must fail with a named message, and the Stage 6 dispatch and Stage 7 checks for P-3 to P-6 ask for it.
 
 **Rollout and follow-ups** (not WOs).
