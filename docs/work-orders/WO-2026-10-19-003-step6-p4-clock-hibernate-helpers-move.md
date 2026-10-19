@@ -67,3 +67,29 @@ Budget versus actual (non-move `src/`, moved lines, main and Sleep `wc -l`, test
 - **Tests that name the moved functions** (a bare-name search finds): `clock_owner_structural_test.py`, `clock_trust_standard_structural_test.py`, `sleep_duration_consumes_openness_test.py`, `clock_resync_wiring_test.py`, `idle_timediag_on_change_test.cpp`, `hibernate_wake_diagnostics_test.cpp`, `rtc_skew_test.cpp`, `watchdog_ab1805_classification_test.cpp` and the shell drivers that extract from or compile against them; re-point, don't weaken.
 - **`src/` budget:** two new file pairs plus a guarded declaration block; if the non-move count passes +20, stop and report it.
 
+
+## Stage 6/7 result, architect's rulings and closing record (2026-10-19)
+
+**Stage 6** (Copilot, Sonnet 5.5, medium): one round. **Controller reproduction** (Claude Code, 6.4.1 Boron, fresh `BUILD_PATH_BASE`; the "before" is the P-3 tree, whose `src/` equals main `768c3c0`): suite **87/87** (sh via zsh, py via python3; **run serially**: an early run with three suites at once showed 86/87 from shared-temp-file collisions, and `conn_phase_modem_off_test.sh` passes alone); text/data/bss `151820/1094/2228 → 151764/1094/2228`; the whole `.backup` section identical. **Stage 7** (Codex `gpt-5.6-sol`, medium): **VERIFIED WITH CONCERNS**; checks 1–4, 6, 7 PASS, check 5 CONCERN (`WO-2026-10-19-003-stage7-verdict.md`).
+
+**Architect's rulings (19 Oct):**
+- **The `logTimeDiag` mutation was mislocated in this WO.** `logTimeDiag()` has no on-change suppression; the v41 flood guard is its caller's condition `if (enteredIdle || timeDiagKey != lastTimeDiagKey)` at `State_Idle.cpp:132`, pinned by `idle_timediag_on_change_test.sh` (mutating it fails that test, at `HEAD` and now). Future WOs name the caller condition.
+- **The AB1805 stale-alarm clear is unpinned** (an early `return true;` in `clearAb1805StaleAlarmInterrupts()` passes 86/86 at `HEAD` and 87/87 after the move); recovery-plan item 12b.
+- **Budget:** +20 passes (Codex counts 19 in the new files plus 1 include in `State_Sleep.cpp` = 20, exactly the limit; 21 would fail). **The −56 B un-inlining is accepted.**
+- **Standing rule: run suites serially.**
+
+## Closing record
+
+| Item | Budget | Actual |
+|---|---|---|
+| `src/` non-move | ≤ +20, hard | **+20** (Codex's count: 19 in `ClockDiagnostics.{h,cpp}` and `HibernateEligibility.{h,cpp}`, 1 include in `State_Sleep.cpp`; both of us ignore blank lines and count includes, pragmas, namespace braces, declarations and header-guard lines) |
+| Moved lines | about 93 + 85 | **93 (main) + 85 (`State_Sleep.cpp`) = 178**, byte-identical (SHA-256 comparisons by Codex) |
+| `wc -l` | about 93 and 85 fewer | main **1596 → 1492**; `State_Sleep.cpp` **1814 → 1725** |
+| Tests | guideline +100 | new `clock_hibernate_helpers_move_structural_test.py` (+100); `clock_owner_structural_test.py`, `clock_resync_wiring_test.py`, and path comments in `rtc_skew_test.cpp` and `watchdog_ab1805_classification_test.cpp`: +16/−8 |
+| Suite | baseline 86 | **87/87**; golden payload test 186 vectors, fixture sha256 `07de1e1980e4a44e03420540e6c721a93a61b5d6392539219928420c048f0637` unchanged |
+
+- **ELF (6.4.1 Boron):** text **151820 → 151764 (−56)**, data 1094, bss 2228. Itemized by symbol (Codex): `isDeviceOsAtLeast6400` +104, `clearAb1805StaleAlarmInterrupts` +96 and `shouldUseBoronRtcAlarmHibernate` +184 (inlined before, now out of line), `handleSleepingState` 7340 → 7048 (−292), `logTimeDiag` 464 → 504 (+40), `setup` 3096 → 3136 (+40), a 220-byte `LocalTimePosixTimezone::operator=` clone no longer emitted (−220), alignment and unnamed gaps −8: total −56. No new static-initialization stub; `CSWTCH` and `__tcf_1` size multisets are identical (an earlier same-name pairing showed false changes).
+- **Retained outcome A:** the whole `.backup` section (24 symbols, 0x98 bytes) identical. `retainedBoot` `0x2003f420`; hibernate fields `retainedHibernateRtcBefore` `0x2003f480`, `…RequestedSleep` `0x2003f488`, `…Count` `0x2003f48c`, `…Pending` `0x2003f490`; signature `0x2003f494`. `time/HibernateCycle.cpp` is byte-identical to `HEAD`. No `retained` keyword in any of the four new files; a probe in each failed with a named message.
+- **`git diff --check`:** clean, no hits to waive.
+- **Deviations:** the Boron guard moved with the three Sleep helpers into `HibernateEligibility.{h,cpp}` (the WO's re-check anticipated it); `HibernateCycle.cpp` needed no include (it already declares the wrapper's `extern`), so it is untouched; `clock_owner_structural_test.py` is stricter (the `isPlausibleEpoch` caller check reads `HibernateEligibility.cpp` and asserts `State_Sleep.cpp` has none).
+- **Rounds:** Stage 6 one round; Stage 7 once (VERIFIED WITH CONCERNS, both concerns pre-existing or WO-wording).

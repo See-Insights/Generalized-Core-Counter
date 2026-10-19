@@ -122,6 +122,7 @@ COMMON_HDR = REPO_ROOT / "src" / "state" / "State_Common.h"
 AB1805_CPP = REPO_ROOT / "lib" / "AB1805_RK" / "src" / "AB1805_RK.cpp"
 MODES_SRC = REPO_ROOT / "src" / "state" / "State_Modes.cpp"
 CLOCK_SRC = REPO_ROOT / "src" / "time" / "Clock.cpp"
+CLOCK_DIAG_SRC = REPO_ROOT / "src" / "time" / "ClockDiagnostics.cpp"  # WO-2026-10-19-003: logTimeDiag()
 
 
 def fail(msg: str) -> None:
@@ -550,7 +551,8 @@ def main() -> None:
 
     # --- item 9: TimeDiag line carries the trust verdict + sync recency. ---
     time_diag_fn = extract_function(
-        app_text, r"void\s+logTimeDiag\s*\(bool\s+isOpen\)\s*\{", "logTimeDiag"
+        CLOCK_DIAG_SRC.read_text(), r"void\s+logTimeDiag\s*\(bool\s+isOpen\)\s*\{", "logTimeDiag",
+        CLOCK_DIAG_SRC.name,
     )
     if "trusted=%d" not in time_diag_fn or "syncAgeMs=%lu" not in time_diag_fn:
         fail("logTimeDiag()'s TimeDiag: line must report trusted=/syncAgeMs= (item 9)")
