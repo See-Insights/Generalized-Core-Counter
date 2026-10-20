@@ -35,6 +35,21 @@ extract_braced_block() {
   ' "$file"
 }
 
+# Order of the guard, the cloud-operations gate and SleepTeardown::run( inside
+# handleSleepingState(), read from the real source (first non-comment match each).
+sleep_order="$(awk '
+  /^void handleSleepingState\(\) \{/ { inside = 1; next }
+  inside && /^}/ { exit }
+  inside && /^[ \t]*\/\// { next }
+  inside && !g && index($0, "if (!SleepTeardown::disconnectRequested() && firmwareUpdateInProgress) {") { print NR, "guard"; g = 1 }
+  inside && !c && index($0, "if (Particle.connected() && !SleepTeardown::disconnectRequested()) {") { print NR, "gate"; c = 1 }
+  inside && !t && index($0, "SleepTeardown::run(") { print NR, "teardown"; t = 1 }
+' "$repo_root/src/state/State_Sleep.cpp" | sort -n | awk '{ print $2 }')"
+if [[ "$(print -r -- "$sleep_order" | wc -l | tr -d ' ')" != 3 ]]; then
+  echo "FAIL: could not locate guard, cloud gate and SleepTeardown::run( in handleSleepingState()" >&2
+  exit 1
+fi
+
 {
   cat <<'CPP'
 #include <cassert>
@@ -147,13 +162,17 @@ CPP
     "void firmwareUpdateHandler(system_event_t event, int param) {"
   echo
   echo "// ===== Sleep-gate check extracted verbatim from src/state/State_Sleep.cpp ====="
-  echo "// Wrapped in the surrounding order of handleSleepingState(): the check runs"
-  echo "// first, then the cloud-operations gate (which returns while it blocks), then"
-  echo "// the first teardown request."
+  echo "// Wrapped in the order the guard, the cloud-operations gate and the teardown"
+  echo "// call (SleepTeardown::run) have in handleSleepingState() in the real source."
   echo "void sleepGatePass() {"
-  extract_braced_block "$repo_root/src/state/State_Sleep.cpp" \
-    "if (!SleepTeardown::disconnectRequested() && firmwareUpdateInProgress) {"
-  cat <<'CPP'
+  for piece in ${(f)sleep_order}; do
+    case "$piece" in
+      guard)
+        extract_braced_block "$repo_root/src/state/State_Sleep.cpp" \
+          "if (!SleepTeardown::disconnectRequested() && firmwareUpdateInProgress) {"
+        ;;
+      gate)
+        cat <<'CPP'
   if (Particle.connected() && !disconnectRequested) {
     if (cloudSyncStartMs == 0) {
       cloudSyncStartMs = millis();
@@ -163,13 +182,19 @@ CPP
     }
     cloudSyncStartMs = 0;
   }
+CPP
+        ;;
+      teardown)
+        cat <<'CPP'
   if (!disconnectRequested) {
-    teardownRequests++;   // Connectivity::requestFullDisconnectAndRadioOff()
+    teardownRequests++;   // SleepTeardown::run(): disconnect / radio-off request
     disconnectRequested = true;
   }
-}
 CPP
-
+        ;;
+    esac
+  done
+  echo "}"
   echo
   echo "// ===== Extracted verbatim from src/state/State_Connect.cpp ====="
   extract_braced_block "$repo_root/src/state/State_Connect.cpp" \

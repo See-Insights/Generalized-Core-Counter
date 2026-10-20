@@ -13,7 +13,7 @@ with it:
   2. Round 1's loop-level begin transition and its flags are gone: the loop
      owns no firmware-update transition any more.
   3. The sleep gate's firmware-update check sits inside `handleSleepingState()`
-     and textually *before* the first teardown request in that function, so a
+     and textually *before* `SleepTeardown::run(` and any direct teardown request in that function, so a
      download in flight is never lost to a cloud disconnect or radio-off.
   4. `handleFirmwareUpdateState()` carries the flag-clear exit and the
      no-progress exit, and none of the removed exits - the
@@ -140,16 +140,21 @@ def main() -> None:
     if "return;" not in guard_block:
         fail("the sleep-gate firmware-update check does not return after transitioning")
 
-    teardown_positions = [
-        sleeping.index(call) for call in TEARDOWN_CALLS if call in sleeping
+    # Teardown now lives in SleepTeardown::run(); direct requests are kept as
+    # boundaries too, and the earliest of them is the point of no return.
+    boundaries = [
+        sleeping.index(call)
+        for call in ("SleepTeardown::run(",) + TEARDOWN_CALLS
+        if call in sleeping
     ]
-    if not teardown_positions:
-        fail("handleSleepingState() has no teardown request to order the check against")
-    first_teardown = min(teardown_positions)
+    if "SleepTeardown::run(" not in sleeping:
+        fail("handleSleepingState() has no SleepTeardown::run( call to order the check against")
+    first_teardown = min(boundaries)
     if guard.start() > first_teardown:
         fail(
-            "the sleep-gate firmware-update check comes AFTER the first teardown request "
-            "in handleSleepingState(); by then the download is already lost"
+            "the sleep-gate firmware-update check comes AFTER SleepTeardown::run( (or a "
+            "direct teardown request) in handleSleepingState(); by then the download is "
+            "already lost"
         )
 
     # --- 4. The dwell state's exits ------------------------------------------
