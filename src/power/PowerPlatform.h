@@ -2,6 +2,14 @@
 
 #include "power/PowerManager.h"
 
+// System.powerSource() codes; defined once here for every power module.
+constexpr int kPowerSourceUnknown = 0;
+constexpr int kPowerSourceVin = 1;
+constexpr int kPowerSourceUsbHost = 2;
+constexpr int kPowerSourceUsbAdapter = 3;
+constexpr int kPowerSourceUsbOtg = 4;
+constexpr int kPowerSourceBattery = 5;
+
 namespace PowerPlatform {
 
 /**

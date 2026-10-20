@@ -46,7 +46,7 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
 
 **Step 6: the power-owner split.** Items deferred to it so far: *(Citations checked against main `e78d59d`, v37 merged, on 2026-10-07.)*
 - **Duplicated power-source codes and PMIC fault masks** (WO-2026-09-29-002). Now **P-6** below.
-- **Boron versus M-SoM build selection** (WO-2026-09-29-002). **Leftover:** goes with the Muon bring-up, split into capability, battery sampling, charging and PMIC WOs with actual target builds (WO-2026-10-15-003 Step 0 open points).
+- **Boron versus M-SoM build selection** (WO-2026-09-29-002). **Leftover:** goes with the Muon bring-up, split into capability, battery sampling, charging and PMIC WOs with actual target builds (WO-2026-10-15-003 Step 0 open points). **`PowerCapabilities::hasFuelGauge`** was deleted in P-6 (WO-2026-10-20-001) because nothing read it; it was declared at `PowerManager.h:62` and set at `PowerPlatform.cpp:123` and `:131` (at main `db98ba6`), and it returns with its first reader in the P2/M-SoM portability work (Chip, 20 Oct).
 - **Connection-mode tug-of-war: FIXED in v39** (architect, 2026-10-17). *Original entry, kept for history:* (2026-10-03, found while explaining Trail02's 2-hour delivery spacing on v34):
   - `ConfigApply.cpp:445–455` restores keep-alive on every config apply;
   - `BatteryAuthorityCommand.cpp:80–84` re-applies intermittent in CONSERVING or worse;
@@ -63,7 +63,7 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
   - **P-3:** move report, webhook and diagnostic publication to `cloud/` (about 262). **`dailyCleanup` moves with P-3** (`Generalized-Core-Counter.cpp:2697`, about 23 lines; the publish-then-cleanup order at `State_Report.cpp:69–82` stays).
   - **P-4:** move the clock and hibernate helpers to `time/` (85 Sleep and 93 main lines).
   - **P-5:** centralize the modem-health helpers and every latch writer in `power/Connectivity` (0 to +12).
-  - **P-6:** centralize the source codes and PMIC masks, and delete 6c/6d (about −52).
+  - **P-6:** centralize the source codes and PMIC masks, and delete 6c/6d (about −52). **Done in WO-2026-10-20-001** (net `src/` −61; Stage 7 VERIFIED WITH CONCERNS).
   - **Leftovers, each its own WO:** the sleep gate and modem teardown extraction (its own Step 0 after P-6; they share cross-pass statics at `State_Sleep.cpp:335–349`, `:397`, `:428–448`); the modem behavior fix (after measured teardown traces settle the modem-off completion contract, before alert 15 or the latch change); Boron versus M-SoM portability (with the Muon bring-up).
 - **Battery trust and tier.** The gauge is compared with a resting-voltage table (`kOcvKnots`, `BatteryHealth.cpp:19–32`) using a voltage sampled while awake, so healthy devices were marked untrusted and dropped to CRITICAL: Court3 at 82%, PCKL1 at 77% (the 4 Oct Codex report's ledger snapshot: 79.8% and 76.5%, both Untrusted/CRITICAL), and Dev-14 showing CRITICAL at 65%. Decide only after a week of v37's `vc` data (WO-2026-10-04-001 item D). If that isn't enough, add the fuller battery-decision snapshot proposed in the 4 Oct Codex report §D (raw and accepted SOC, vcell, charge state, radio state, sample age, source, resulting tier).
 - **WO 3 (battery): which sensor modes a low tier downgrades.**

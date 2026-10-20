@@ -66,3 +66,29 @@ Budget versus actual (net `src/`, tests), the dead-code searches, ELF by symbol,
 - **`hasFuelGauge` (Chip, 20 Oct):** it will be needed again for P2 support. Delete it anyway, since it is unread today, but **record in the closing record and in the recovery plan's Boron/M-SoM portability item where it was** (`PowerManager.h:62`, set at `PowerPlatform.cpp:123` and `:131`) **and that it returns with its first reader in the P2/M-SoM portability work.**
 - **Budget:** expected about −50 `src/` lines; the stub edits and the new constant-pinning test are test lines (guideline +100).
 
+
+
+## Stage 6/7 result, rulings and closing record (2026-10-20)
+
+**Stage 6** (Copilot, Sonnet 5.5, medium): one implementation round plus one test-only follow-up. **Controller reproduction** (Claude Code, 6.4.1 Boron, fresh `BUILD_PATH_BASE` per build, `-frandom-seed=p6`; "before" is `git archive HEAD`, whose `src/` equals main `db98ba6`): suite **91/91** (sh via zsh, py via python3, serial; baseline 89); text/data/bss release `151748/1094/2228 → 151724/1094/2228` (−24), `-DENABLE_DIAGNOSTICS_PUBLISH_MODE=1` `152864/1094/2476 → 152848/1094/2476` (−16), `-DENABLE_PMIC_FORENSICS=0` `150844/1062/2228 → 150812/1062/2228` (−32); five mutations each caught by a named test. **Stage 7** (Codex `gpt-5.6-sol`, medium): **VERIFIED WITH CONCERNS**, retained outcome A; checks 1, 2, 4, 6, 7 PASS, checks 3 and 5 CONCERN (`WO-2026-10-20-001-stage7-verdict.md`, restored from the Codex session log because `-o` overwrote the file).
+
+**Findings and rulings (Chip, 20 Oct):**
+- **F1 (the test mirror `PowerSourceCodes.h` could drift: `kPowerSourceUsbOtg = 44` survived 91/91) and F2 (its comment named a nonexistent test).** Ruling: delete the mirror and have the stubs include the real header, else keep it with a `static_assert` cross-check. Copilot's follow-up tried the real header by explicit path and it failed to compile (`redefinition of 'PowerSourceSnapshot'` and `'PowerConfigurationApplyResult'`: the real header declares what the stubs declare), so the **fallback** was taken: `power_constants_values_test.cpp` now `static_assert`s each mirror code against the real header (+13 lines), and the comment names the right file. Reproduced: the 44 mutation in the mirror and in the real header each fail `power_constants_values_test.sh`. Tests-only; `src/` unchanged.
+- **F3 (the tracked Doxygen pages under `docs/html/` still list `availabilityLabel`, `batteryContextLabel` and `hasFuelGauge`): left for the next Doxygen regeneration.** The pages are generated and not compiled; they are stale until then.
+
+## Closing record
+
+| Item | Budget | Actual |
+|---|---|---|
+| `src/` net | ≤ 0 (hard ≤ +20) | **−61**: `+14/−75` over 9 files (`PowerPlatform.h` +8, `PmicFaultMonitor.h` +4; `PowerDiagnostics.cpp` −45, `PowerPlatform.cpp` −9, `PowerManager.cpp` −7, `SensorManager.cpp` −6, `PmicFaultMonitor.cpp` −3, `PowerDiagnostics.h` −2, `PowerManager.h` −1) |
+| Tests | guideline +100 | about **+103** after the follow-up (+90 at Stage 7, +13 for the cross-check): new `power_constants_structural_test.py` (54), `power_constants_values_test.{cpp,sh}` (35 with the cross-check, 13), `PowerSourceCodes.h` (about 12); one include line in each of the four `PowerPlatform.h` stubs; the dead label copies out of five `PowerDiagnostics.h` stubs; `power_source_override_test.cpp` −6 |
+| Suite | baseline 89 | **91/91** (sh via zsh, py via python3, serial); golden fixture sha256 `07de1e1980e4a44e03420540e6c721a93a61b5d6392539219928420c048f0637` unchanged |
+
+- **Candidate pinned:** the `src/` tree hash (`find src -type f | sort | shasum -a 256 | shasum -a 256`) is `da6ae1317803daf9db53c0dd95feb66cc8bb834474f2cc61d25bc8d0d017ac7d` at Codex's review and after the follow-up.
+- **Decisions:** the codes are at global scope in `PowerPlatform.h` and the masks at global scope in `PmicFaultMonitor.h` (outside the `PmicFaultMonitor` namespace, because the use sites in `PmicFaultMonitor.cpp` are in a global anonymous namespace), so no use line changed except the two mask names in `SensorManager.cpp`. The stubs share one include, `tests/stubs/power/PowerSourceCodes.h`, instead of four copies of the constants.
+- **The dead-item searches** (Copilot's, Claude Code's at the citation re-check, and Codex's own): `availabilityLabel`, `batteryContextLabel`, `hasFuelGauge`: no caller, no qualified form, no address-of, no macro, in `src/`, `tests/` or `lib/`; all three absent from the release ELF. Nothing kept.
+- **`hasFuelGauge` (Chip, 20 Oct):** deleted although it will be needed again. **It was declared at `PowerManager.h:62` and set at `PowerPlatform.cpp:123` and `:131` (main `db98ba6`); it returns with its first reader in the P2/M-SoM portability work.** Recorded in the recovery plan's Boron versus M-SoM item.
+- **ELF (6.4.1 Boron):** text −24 / −16 / −32 for the three builds, data and bss unchanged. By symbol (release, Codex): `PowerManager::PowerManager()` 92 → 84, `refreshInputProfile()` 572 → 564, `setup()` 46 → 40, `detectCapabilities()` 22 → 20, `hasPmic()` 4 → 18 (inlining), `readPowerSource()` 152 → 168; unnamed literal and alignment fill −30 B accounts for the rest. Static-init stubs 22 / 23 / 22 before and after.
+- **Retained outcome A:** the whole `.backup` section (`0x98` bytes at `0x2003f400`, byte-identical, SHA-256 `adfe530f…b7`) and every symbol unchanged (`retainedBoot` `0x2003f420`, hibernate fields `0x2003f480/488/48c/490`, signature `0x2003f494`); only its flash load address moved (`0xd9448 → 0xd9430`). No `retained` keyword added.
+- **Deviations:** the stubs include a shared mirror header and not the real header (F1 fallback, above); the masks are at global scope.
+- **Rounds:** Stage 6 one round plus one test-only follow-up; Stage 7 once (VERIFIED WITH CONCERNS, rulings applied). Net `src/` is negative and the power half of Step 6 is code-complete; v45 (P-0 to P-6) follows on Device OS 6.6.0 once v44 is the default.

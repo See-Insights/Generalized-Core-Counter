@@ -1,6 +1,7 @@
 #pragma once
 
 #include "power/PowerManager.h"
+#include "../../power/PowerSourceCodes.h"
 
 // Mutable host-side stand-in for PowerPlatform, letting tests control
 // detectCapabilities()/readPowerSource()/applyInputProfile() return values

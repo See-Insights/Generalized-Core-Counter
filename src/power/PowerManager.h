@@ -59,7 +59,6 @@ enum class PowerProfileSelectionReason : uint8_t {
  * @brief Hardware power-management capabilities detected at runtime.
  */
 struct PowerCapabilities {
-  bool hasFuelGauge = false;
   bool hasPmic = false;
   bool hasSoc = false;
   bool hasBatteryVoltage = false;
