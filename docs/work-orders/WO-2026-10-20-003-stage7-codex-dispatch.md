@@ -1,0 +1,20 @@
+AGENT: Codex · MODEL: gpt-5.6-sol (standard tier; probed 2026-10-20, §5) · REASONING: high
+AUTHORIZATION SCOPE:
+
+**Authorized:** review the uncommitted diff in this worktree (branch `wo/2026-10-20-003-sleep-s1-teardown`; main `0c565fa`); run the host suite and tests **one suite at a time**; local ARM builds in scratch copies; temporary files under `build-tmp/wo20261020-003-stage7/` or `$TMPDIR`, removing only what you create; mutate only in scratch copies (use `git worktree add --detach` copies: some structural tests and the transcript's base check need real history); write your verdict to `docs/work-orders/WO-2026-10-20-003-stage7-verdict.md` **and also give the full verdict as your final message** (the `-o` file is overwritten by the final message).
+**Not authorized:** changes outside scratch and the verdict file; commits, pushes, stash, reset, checkout, restore; device, network or AWS access.
+
+# Stage 7 dispatch: WO-2026-10-20-003 (Sleep S-1: teardown extraction)
+
+**Spec:** `docs/work-orders/WO-2026-10-20-003-sleep-s1-teardown.md` (design, equivalence rules, budget, the citation re-check and the Stage 6 result with Claude Code's reproduction). Treat every claim there as unverified. **Checks (PASS / FAIL / CONCERN, with evidence):**
+1. **Transcript provenance and coverage:** the fixture header's base hash; regenerate it yourself from the base (`--regenerate` in a scratch copy) and compare; does the scenario table reach every budget edge (disconnect budget, modem-off wait, precondition wait, the 5000/10000 ms slow-teardown edges), cellular and Wi-Fi, in-between modem states, standby requested and effective, a pending `forceModemOffAfterStandbyFailure`? Is the harness real (the base block extracted by marker text, not mirrored)? Run two mutations of your own.
+2. **Moved ranges byte-identical** against the base, apart from field access and the call boundary: the block (`State_Sleep.cpp:577–843` at the base), the lambdas, the three labels (not `logWakeSummary`), the safety reset. List every difference.
+3. **One owner for the nine fields**, and for `disconnectRequested` the read-only query used at the three readers (base `:342`, `:353`, `:360`); no other writer; `ModemHealth` still the only writer of the latch fields.
+4. **Same returns and transitions at the call site:** WAIT / READY / ERROR handled exactly as the inline code, including the two `transitionTo(ERROR_STATE, ...)` reasons and the watchdog and `Particle.process()` calls.
+5. **The entry-reset change:** base `:216–219` and `:308–317` became one `SleepTeardown::enter()` (all nine fields reset before the CONNECTED+OPEN abort path, where two were). Is it unobservable? Show it, or say what it changes.
+6. **The dead branch:** is the precondition-timeout branch (base `:810–832`, alert 15, `sleep-precondition-timeout`) really unreachable? Under what interleaving could it run? Does the move change that?
+7. **ELF and retained:** text −192 by symbol; no new static-init stub; the whole `.backup` section before and after (outcome A/B/C); no `retained` keyword in the new files.
+8. **Re-pointed tests are not weakened** (diff each: `connection_mode_downgrade_structural_test`, `firmware_update_dwell_test`, `firmware_update_wiring_structural_test`, `occupancy_report_by_mode_test`, `sleep_gate_modem_off_test`, `standby_latch_daily_clear_test`, `loop_stage_sleep_prep_exclusion_test`, `sleep_breadcrumb_sequence_test`).
+9. **Budget and suite:** non-move `src/` net ≤ +20 (hard): count independently and state the rule (Claude Code: +20 with blank lines, +18 non-blank); tests about +793 against the +175 guideline and a 4,753-line fixture: flag, don't fail; `git diff --check`; full suite `N/N (sh via zsh, py via python3)`, serial; golden payload fixture unchanged.
+
+**Verdict:** header VERIFIED / VERIFIED WITH CONCERNS / NOT VERIFIED, model and reasoning, interpreter line; a table of checks 1–9; **the retained outcome on its own line**; findings with file:line and severity (observation vs inference); budget versus actual; confirmations (tree unchanged, only your scratch removed). ≤ 150 lines.
