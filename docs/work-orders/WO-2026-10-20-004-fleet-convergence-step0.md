@@ -40,3 +40,20 @@ Find what stands between today's GCC and running both, and propose the shortest 
 ## Budget
 
 Step 0: 0 `src/` lines in either repo.
+
+## Architect's rulings on the Step 0 report (20 Oct)
+
+The report (`WO-2026-10-20-004-step0-report.md`, citations checked in both trees by Claude Code) is **accepted in principle.**
+
+**Decided:**
+- **Car counters: `sensor.type=0`**, sharing the existing interrupt-sensor machinery (not a setting on the PIR type).
+- **Battery tiers: GCC's tiers for all types** (the 75/70, 55/50, 35/30 hysteresis tiers with 1×/2×/4×/12× intervals), so C-7 (COUNTING-only 65/50/30 parity) is not needed as a firmware row.
+- **Sequence C-0 to C-10 accepted**, with the stated parallelism: C-1 to C-4 (and C-9 if wanted) alongside S-1 to S-5; **C-5 after S-6; C-6 and C-10 after the sleep split.**
+
+**Open, pending Chip's product decisions** (C-0 must close each before the dependent rows are issued):
+1. **`maxmin`:** v50 publishes it every report and GCC has no such field. Does the back end (Ubidots variables, dashboards, alerts) need it? If yes, it needs a persisted GCC field and an unsized back-end question, which is the WO's stop rule (item 8).
+2. **The PIR 500 ms filter in COUNTING:** keep it, or bypass it for COUNTING so that closely spaced trail pulses count as v50 counts them (C-3).
+3. **Daily rollover:** v50 clears daily and hourly totals at the opening-hour report; GCC reports the final value at close and clears after. Which boundary do visitation customers get (C-6)?
+4. **The closing report:** v50 sends it only when the hourly count is nonzero; GCC sends the due close-boundary report even at zero. Is an extra zero report acceptable to Ubidots (C-6/C-8)?
+
+Also still unknown from the trees (C-0): the legacy fleet's Particle product(s), each device's current settings (readable from the VC Particle variables while online), and the Ubidots/webhook contract (the hook name `Ubidots-Counter-Hook-v1` may need no firmware change).
