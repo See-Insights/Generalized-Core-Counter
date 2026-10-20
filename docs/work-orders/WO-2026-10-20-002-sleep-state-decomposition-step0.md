@@ -57,3 +57,6 @@ Round 1 (`WO-2026-10-20-002-step0-report.md`) and round 2 (`WO-2026-10-20-002-st
 6. **Release order:** **v45 (P-0 to P-6) is cut before any sleep move merges; the sleep moves ship as v46.** The sleep WOs may be built and reviewed meanwhile; their PRs say "do not merge until v45 is cut".
 
 S-1 is `WO-2026-10-20-003-sleep-s1-teardown`.
+
+7. **One harness for the series (architect, 20 Oct, from S-1):** S-1 (`WO-2026-10-20-003`) builds the transcript harness (the scenario runner, the fakes under `tests/stubs/sleep_teardown/`, the committed fixture, the structural test). **S-2 to S-6 extend that harness** (new scenarios and fixtures on the same runner and fakes, regenerated from their own base commit) and **do not build new ones**; each later WO says so. S-1's test volume (about +793 lines and a 4,753-line fixture) is accepted.
+
