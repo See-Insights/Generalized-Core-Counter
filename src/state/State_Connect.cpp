@@ -10,6 +10,7 @@
 #include "sensors/SensorDefinitions.h"
 #include "power/ConnectivityPolicy.h"
 #include "power/Connectivity.h"
+#include "power/ModemHealth.h"
 #include "power/PowerDiagnostics.h"
 #include "power/PowerManager.h"
 #include "observability/WakeCycleStats.h"
@@ -20,8 +21,6 @@
 // No behavioral changes were made.
 
 namespace {
-
-constexpr uint8_t MODEM_UNSTABLE_CONNECT_TIMEOUT_THRESHOLD = 2;
 
 enum class ConnAcquirePhase : uint8_t {
   CELLULAR_ACQUIRE = 0,
@@ -145,26 +144,6 @@ void armActiveConnectAttempt(unsigned long budgetMs) {
 void clearActiveConnectAttempt() {
   session.connectAttemptActive = false;
   session.connectAttemptBudgetMs = 0;
-}
-
-void markModemUnstableFromConnectTimeout() {
-  if (session.modemConnectTimeoutCount < 0xFF) {
-    session.modemConnectTimeoutCount++;
-  }
-
-  if (session.modemConnectTimeoutCount >= MODEM_UNSTABLE_CONNECT_TIMEOUT_THRESHOLD) {
-    const bool reasonChanged = !session.modemUnstable || session.modemUnstableReason != 2;
-    session.modemUnstable = true;
-    session.modemUnstableReason = 2;
-    if (reasonChanged) {
-      Log.warn("MODEM_HEALTH: unstable reason=connect_timeout count=%u",
-               (unsigned)session.modemConnectTimeoutCount);
-    }
-    if (!session.modemStandbySuppressed) {
-      Log.warn("MODEM_POLICY: standby temporarily disabled reason=unstable_modem");
-      session.modemStandbySuppressed = true;
-    }
-  }
 }
 
 } // namespace
@@ -608,9 +587,7 @@ void handleConnectingState() {
 
       postConnectDone = true;
 
-      if (session.modemConnectTimeoutCount != 0) {
-        session.modemConnectTimeoutCount = 0;
-      }
+      noteConnectSuccess();
     }
 
     thrashGuard.markProgress("OTA_CHECKED");
@@ -661,7 +638,7 @@ void handleConnectingState() {
     // Observability: connect attempt timed out.
     Observability::cycleStats().markConnectTimeout((uint32_t)elapsedMs);
 
-    markModemUnstableFromConnectTimeout();
+    noteConnectTimeout();
 
     RecoveryState::raiseAlert(31);
     Connectivity::requestFullDisconnectAndRadioOff();
