@@ -23,42 +23,13 @@
 #include "observability/WakeCycleStats.h"
 #include "ThrashGuard.h"
 #include "state/SleepPrepSpanTiming.h"
+#include "state/SleepTeardown.h"
 #include "time/HibernateCycle.h"
 #include "time/HibernateEligibility.h"
 #include "time/Clock.h"
 #include "time/DailyBoundary.h"
 
 namespace {
-
-const char *connectionModeLabel(SystemConfig::ConnectionMode mode) {
-  switch (mode) {
-  case SystemConfig::CONNECTED:
-    return "CONN";
-  case SystemConfig::INTERMITTENT:
-    return "INT";
-  case SystemConfig::DISCONNECTED:
-    return "DISC";
-  case SystemConfig::INTERMITTENT_KEEP_ALIVE:
-    return "IKA";
-  default:
-    return "?";
-  }
-}
-
-const char *batteryTierLabel(uint8_t tier) {
-  switch (tier) {
-  case TIER_HEALTHY:
-    return "H";
-  case TIER_CONSERVING:
-    return "C";
-  case TIER_CRITICAL:
-    return "CR";
-  case TIER_SURVIVAL:
-    return "S";
-  default:
-    return "?";
-  }
-}
 
 void logWakeSummary(const char *reason) {
   Log.info("Wake: reason=%s open=%d ready=%d occ=%d led=%lus",
@@ -67,22 +38,6 @@ void logWakeSummary(const char *reason) {
            SensorManager::instance().isSensorReady() ? 1 : 0,
            CurrentReadings::get_occupied() ? 1 : 0,
            (unsigned long)(signalLEDTimeRemaining() / 1000UL));
-}
-
-void logTeardownContext(const char *prefix,
-                       bool standbyRequested,
-                       bool standbyEffective) {
-  if (!SystemConfig::get_verboseMode()) {
-    return;
-  }
-
-  Log.info("%s mode=%s standby=%d/%d tier=%s occ=%d",
-           prefix,
-           connectionModeLabel(static_cast<SystemConfig::ConnectionMode>(PowerManager::instance().effectiveConnectionMode())),
-           standbyRequested ? 1 : 0,
-           standbyEffective ? 1 : 0,
-           batteryTierLabel(PowerConfig::get_currentBatteryTier()),
-           CurrentReadings::get_occupied() ? 1 : 0);
 }
 
 // Drain USB CDC serial buffer before sleep to prevent split log lines (bench testing only)
@@ -194,14 +149,12 @@ void handleSleepingState() {
   static uint8_t lastGateBlockerMask = kGateBlockerUninitialized;
   static uint8_t lastGateBlockerBeforeRelease = 0;
   static bool gateReleaseReasonKnown = false;
-  static bool cloudDisconnectCompleteLogged = false;
 #if HAL_PLATFORM_CELLULAR
   static bool preserveStandbyAfterNormalReturn = false;
   static bool forceModemOffAfterStandbyFailure = false;
   static int standbySleepFailureError = SYSTEM_ERROR_NONE;
-#endif
-#if Wiring_Cellular
-  static bool radioOffCompleteLogged = false;
+#else
+  bool forceModemOffAfterStandbyFailure = false; int standbySleepFailureError = SYSTEM_ERROR_NONE;
 #endif
 
   if (enteredState) {
@@ -213,10 +166,7 @@ void handleSleepingState() {
     lastGateBlockerMask = kGateBlockerUninitialized;
     lastGateBlockerBeforeRelease = 0;
     gateReleaseReasonKnown = false;
-    cloudDisconnectCompleteLogged = false;
-  #if Wiring_Cellular
-    radioOffCompleteLogged = false;
-  #endif
+    SleepTeardown::enter();
   }
 
   // Determine if we will use *effective* network standby for the upcoming sleep.
@@ -290,13 +240,6 @@ void handleSleepingState() {
   // Particle.disconnect() has been requested. Here, we keep application
   // logic minimal: request cloud disconnect and radio-off once, then wait
   // (bounded) until both cloud and modem are actually off before sleeping.
-  static bool disconnectRequested = false;
-  static unsigned long disconnectRequestStartMs = 0;
-  static unsigned long cloudDisconnectStartMs = 0;
-  static unsigned long cloudDisconnectElapsedMs = 0;
-  static unsigned long modemOffElapsedMs = 0;
-  static unsigned long lastDisconnectProgressMs = 0;
-  static unsigned long lastGateProgressMs = 0;
 #if Wiring_WiFi
   static bool wifiOffGuardActive = false;
   static unsigned long wifiOffGuardStartMs = 0;
@@ -305,16 +248,9 @@ void handleSleepingState() {
 #endif
 
   if (enteredState) {
-    disconnectRequested = false;
-    disconnectRequestStartMs = 0;
-    cloudDisconnectStartMs = 0;
-    cloudDisconnectElapsedMs = 0;
-    modemOffElapsedMs = 0;
     cloudSyncBudgetMs = 0;
     cloudSyncMaxQueueDepth = 0;
     lastQueueDepth = 0xFFFF;
-    lastDisconnectProgressMs = 0;
-    lastGateProgressMs = 0;
 #if Wiring_WiFi
     wifiOffGuardActive = false;
     wifiOffGuardStartMs = 0;
@@ -323,23 +259,14 @@ void handleSleepingState() {
 #endif
   }
 
-  // Safety: if disconnectRequested was latched but the timestamp got lost
-  // (for example, due to an unexpected state-machine re-entry), reset so we
-  // can actually issue the request instead of waiting forever.
-  if (disconnectRequested && disconnectRequestStartMs == 0) {
-    Log.warn("SLEEP: disconnectRequested latched without timestamp - resetting");
-    disconnectRequested = false;
-    cloudDisconnectStartMs = 0;
-    cloudDisconnectElapsedMs = 0;
-    modemOffElapsedMs = 0;
-  }
+  SleepTeardown::guardLostTimestamp();
 
   // Particle's reference pattern (STATE_SLEEP's first check): a firmware
   // download in flight outranks sleep. Sit here on every pass until no
   // teardown has been requested, so a `begin` delivered between loop passes is
   // caught before the cloud disconnect / radio-off requests below, not after
   // the transfer has already been lost (WO-2026-10-01-001 item A).
-  if (!disconnectRequested && firmwareUpdateInProgress) {
+  if (!SleepTeardown::disconnectRequested() && firmwareUpdateInProgress) {
     cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
     transitionTo(FIRMWARE_UPDATE_STATE, "firmware update in progress");
     return;
@@ -350,14 +277,14 @@ void handleSleepingState() {
   // sleep-or-suppress decision below can commit to sleep. Once this span has
   // requested teardown it stays latched and reports on the first pass after
   // the wake, so Report/Connect never starts while the disconnect is in flight.
-  if (session.occupancyChangeTriggered && !disconnectRequested) {
+  if (session.occupancyChangeTriggered && !SleepTeardown::disconnectRequested()) {
     cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
     transitionTo(REPORTING_STATE, "occupancy change pending");
     return;
   }
 
   // Only wait for cloud operations *before* requesting disconnect.
-  if (Particle.connected() && !disconnectRequested) {
+  if (Particle.connected() && !SleepTeardown::disconnectRequested()) {
     // Initialize timer on first check
     if (cloudSyncStartMs == 0) {
       cloudSyncStartMs = millis();
@@ -574,273 +501,7 @@ void handleSleepingState() {
     gateReleaseReasonKnown = false;
   }
 
-  // If we're going to sleep with cellular network standby, do NOT wait for radio-off.
-  // We only need to tear down the cloud session (quickly) before sleeping.
-  bool stillOn;
-#if Wiring_Cellular
-  // WO-2026-10-04-001 item A2: Device OS has in-between modem states where
-  // both isOn() and isOff() are false. System.sleep() then blocks up to 120 s
-  // waiting for the modem, which is longer than the 60 s MCU watchdog, so the
-  // non-standby gate tests !Cellular.isOff() instead of isOn().
-  stillOn = useNetworkStandbyEffective ? Particle.connected() : (Particle.connected() || !Cellular.isOff());
-#else
-  // On WiFi platforms, waiting for WiFi.isOn() to flip false can take a long
-  // time and is not required for safe low-power sleep. Only gate on cloud.
-  stillOn = Particle.connected();
-#endif
-
-  // Compute disconnect budget once per loop to avoid duplicated logic.
-  auto computeDisconnectBudgetMs = [&]() -> unsigned long {
-    // Use ledger-configured budgets when available, with conservative defaults.
-    uint16_t cloudBudgetSec = SystemConfig::get_cloudDisconnectBudgetSec();
-    if (cloudBudgetSec < ConnectivityPolicy::DISCONNECT_BUDGET_MIN_SEC ||
-        cloudBudgetSec > ConnectivityPolicy::DISCONNECT_BUDGET_MAX_SEC) {
-      cloudBudgetSec = ConnectivityPolicy::DISCONNECT_CLOUD_DEFAULT_SEC;
-    }
-
-    uint16_t modemBudgetSec = SystemConfig::get_modemOffBudgetSec();
-    if (modemBudgetSec < ConnectivityPolicy::DISCONNECT_BUDGET_MIN_SEC ||
-        modemBudgetSec > ConnectivityPolicy::DISCONNECT_BUDGET_MAX_SEC) {
-      modemBudgetSec = ConnectivityPolicy::DISCONNECT_MODEM_DEFAULT_SEC;
-    }
-
-    unsigned long budgetMs = (unsigned long)((modemBudgetSec > cloudBudgetSec) ? modemBudgetSec : cloudBudgetSec) * 1000UL;
-
-    // When using network standby, shorten the disconnect grace period: we don't
-    // want to burn connection budget waiting for a perfect teardown.
-    if (useNetworkStandbyEffective) {
-      budgetMs = (unsigned long)cloudBudgetSec * 1000UL;
-      if (budgetMs > ConnectivityPolicy::DISCONNECT_STANDBY_MAX_MS) {
-        budgetMs = ConnectivityPolicy::DISCONNECT_STANDBY_MAX_MS;
-      }
-    }
-    return budgetMs;
-  };
-
-  unsigned long disconnectBudgetMs = computeDisconnectBudgetMs();
-
-  // If cloud is already offline but the radio is still on (common after a transient
-  // cloud drop), power down the radio before sleeping (unless using standby).
-#if Wiring_Cellular
-  if (!disconnectRequested && !useNetworkStandbyEffective && !Particle.connected() && Connectivity::isRadioPoweredOn()) {
-    unsigned long requestMs = millis();
-    cloudDisconnectCompleteLogged = true;
-    cloudDisconnectElapsedMs = 0;
-    if (SystemConfig::get_verboseMode()) {
-      Log.info("SLEEP: cloud disconnect complete elapsed=0 ms");
-    }
-  #if HAL_PLATFORM_CELLULAR
-    if (forceModemOffAfterStandbyFailure) {
-      Log.warn("SLEEP: standby sleep failed; forcing modem-off reason=sleep_error err=%d",
-               standbySleepFailureError);
-      forceModemOffAfterStandbyFailure = false;
-      standbySleepFailureError = SYSTEM_ERROR_NONE;
-    }
-  #endif
-    logTeardownContext("SLEEP: modem-off start", useNetworkStandbyRequested, useNetworkStandbyEffective);
-    Connectivity::requestRadioPowerOff();
-    disconnectRequested = true;
-    disconnectRequestStartMs = requestMs;
-    Observability::cycleStats().markTeardownStart((uint32_t)disconnectRequestStartMs, useNetworkStandbyEffective);
-    return;
-  }
-#endif
-
-  // Once cloud operations are satisfied (or timed out), initiate disconnect exactly once.
-  if (Particle.connected() && !disconnectRequested) {
-    unsigned long requestMs = millis();
-    logTeardownContext("SLEEP: cloud disconnect start", useNetworkStandbyRequested, useNetworkStandbyEffective);
-    cloudDisconnectStartMs = requestMs;
-    cloudDisconnectElapsedMs = 0;
-    if (useNetworkStandbyEffective) {
-      Connectivity::requestCloudDisconnectOnly();
-    } else {
-      logTeardownContext("SLEEP: modem-off start", useNetworkStandbyRequested, useNetworkStandbyEffective);
-      modemOffElapsedMs = 0;
-      Connectivity::requestFullDisconnectAndRadioOff();
-    }
-    disconnectRequested = true;
-    disconnectRequestStartMs = requestMs;
-
-    // Observability: teardown window start.
-    Observability::cycleStats().markTeardownStart((uint32_t)disconnectRequestStartMs, useNetworkStandbyEffective);
-
-    return;
-  }
-
-  // If disconnect was requested, wait (bounded) for it to take effect before sleeping.
-  if (disconnectRequested && !cloudDisconnectCompleteLogged && !Particle.connected()) {
-    cloudDisconnectElapsedMs = (cloudDisconnectStartMs == 0) ? 0UL : (millis() - cloudDisconnectStartMs);
-    if (SystemConfig::get_verboseMode()) {
-      Log.info("SLEEP: cloud disconnect complete elapsed=%lu ms standby=%d",
-               cloudDisconnectElapsedMs,
-               useNetworkStandbyEffective ? 1 : 0);
-    }
-    cloudDisconnectCompleteLogged = true;
-  }
-#if Wiring_Cellular
-  if (disconnectRequested && !useNetworkStandbyEffective &&
-      !radioOffCompleteLogged && Cellular.isOff()) {
-    modemOffElapsedMs = (disconnectRequestStartMs == 0) ? 0UL : (millis() - disconnectRequestStartMs);
-    if (SystemConfig::get_verboseMode()) {
-      Log.info("SLEEP: modem-off complete elapsed=%lu ms", modemOffElapsedMs);
-    }
-    radioOffCompleteLogged = true;
-  }
-#endif
-
-  if (disconnectRequested && stillOn) {
-    if (disconnectRequestStartMs != 0 && (millis() - disconnectRequestStartMs) > disconnectBudgetMs) {
-      Log.warn("SLEEP: disconnect/modem-off exceeded budget (%lu ms, cloud=%d radioOn=%d standby=%d) - raising alert 15",
-               (unsigned long)(millis() - disconnectRequestStartMs),
-               (int)Particle.connected(),
-               (int)Connectivity::isRadioPoweredOn(),
-               useNetworkStandbyEffective ? 1 : 0);
-      markModemUnstable(MODEM_UNSTABLE_REASON_SLOW_TEARDOWN,
-                        (unsigned long)(millis() - disconnectRequestStartMs));
-      RecoveryState::raiseAlert(15);
-      transitionTo(ERROR_STATE, "sleep-disconnect-timeout");
-      disconnectRequested = false;
-      disconnectRequestStartMs = 0;
-      cloudDisconnectStartMs = 0;
-      cloudDisconnectElapsedMs = 0;
-      modemOffElapsedMs = 0;
-      cloudDisconnectCompleteLogged = false;
-    #if Wiring_Cellular
-      radioOffCompleteLogged = false;
-    #endif
-      return;
-    }
-
-    // Help DeviceOS make progress on the disconnect.
-    // Throttle progress markers to avoid noisy per-loop updates.
-    unsigned long nowMs = millis();
-    if ((nowMs - lastDisconnectProgressMs) > 1000UL) {
-      thrashGuard.markProgress("DISCONNECT_WAIT");
-      lastDisconnectProgressMs = nowMs;
-    }
-    serviceAwakeWatchdog();
-    Particle.process();
-    return;
-  }
-
-  // Observability: teardown completed (bounded wait finished and we are proceeding to sleep).
-  if (disconnectRequested && !stillOn) {
-    const unsigned long teardownElapsedMs =
-        (disconnectRequestStartMs == 0) ? 0UL : (millis() - disconnectRequestStartMs);
-    Log.info("Sleep: td=%lums cloud=%lums modem=%lums standby=%d/%d mode=%s tier=%s occ=%d",
-             teardownElapsedMs,
-             cloudDisconnectElapsedMs,
-             modemOffElapsedMs,
-             useNetworkStandbyRequested ? 1 : 0,
-             useNetworkStandbyEffective ? 1 : 0,
-         connectionModeLabel(static_cast<SystemConfig::ConnectionMode>(PowerManager::instance().effectiveConnectionMode())),
-             batteryTierLabel(PowerConfig::get_currentBatteryTier()),
-             CurrentReadings::get_occupied() ? 1 : 0);
-    session.lastCloudDisconnectElapsedMs = cloudDisconnectElapsedMs;
-    session.lastModemOffElapsedMs = modemOffElapsedMs;
-    session.lastTotalTeardownElapsedMs = teardownElapsedMs;
-    session.lastTeardownEndMs = millis();
-    if (teardownElapsedMs > MODEM_UNSTABLE_SLOW_TEARDOWN_MS) {
-      markModemUnstable(MODEM_UNSTABLE_REASON_SLOW_TEARDOWN, teardownElapsedMs);
-    } else {
-      maybeClearModemUnstable(teardownElapsedMs);
-    }
-    Observability::cycleStats().markTeardownEnd(millis());
-    disconnectRequested = false;
-    disconnectRequestStartMs = 0;
-    cloudDisconnectStartMs = 0;
-    cloudDisconnectElapsedMs = 0;
-    modemOffElapsedMs = 0;
-  }
-
-  setAppBreadcrumb(22); // BREADCRUMB_SLEEP_GATE_START (was stale literal 18, colliding with BREADCRUMB_PUBLISH_QUEUE_EXIT)
-
-  // Enforce sleep preconditions before any final sleep call in this state.
-  // Non-standby cellular sleep requires both cloud disconnect and radio/modem off.
-  // Standby sleep requires cloud disconnect only.
-  auto sleepPreconditionsSatisfied = [&]() -> bool {
-#if Wiring_Cellular
-    if (!useNetworkStandbyEffective) {
-      return !Particle.connected() && Cellular.isOff();
-    }
-#endif
-    return !Particle.connected();
-  };
-
-  if (!sleepPreconditionsSatisfied()) {
-    bool cloudConnected = Particle.connected();
-
-    // Request teardown exactly once, then wait with existing budget handling.
-    if (!disconnectRequested) {
-      if (useNetworkStandbyEffective) {
-        Log.warn("SLEEP: pre-sleep gate blocked (cloud=%d standby=1) - requesting disconnect",
-                 (int)cloudConnected);
-        logTeardownContext("SLEEP: cloud disconnect start", useNetworkStandbyRequested, useNetworkStandbyEffective);
-        cloudDisconnectStartMs = millis();
-        cloudDisconnectElapsedMs = 0;
-        Connectivity::requestCloudDisconnectOnly();
-      } else if (cloudConnected) {
-        Log.warn("SLEEP: pre-sleep gate blocked (cloud=1 standby=0) - requesting disconnect + modem off");
-        logTeardownContext("SLEEP: cloud disconnect start", useNetworkStandbyRequested, useNetworkStandbyEffective);
-        logTeardownContext("SLEEP: modem-off start", useNetworkStandbyRequested, useNetworkStandbyEffective);
-        cloudDisconnectStartMs = millis();
-        cloudDisconnectElapsedMs = 0;
-        modemOffElapsedMs = 0;
-        Connectivity::requestFullDisconnectAndRadioOff();
-      } else {
-        Log.warn("SLEEP: pre-sleep gate blocked (cloud=0 radioOn=1 standby=0) - requesting modem off");
-        cloudDisconnectCompleteLogged = true;
-        cloudDisconnectElapsedMs = 0;
-        if (SystemConfig::get_verboseMode()) {
-          Log.info("SLEEP: cloud disconnect complete elapsed=0 ms");
-        }
-        logTeardownContext("SLEEP: modem-off start", useNetworkStandbyRequested, useNetworkStandbyEffective);
-        modemOffElapsedMs = 0;
-        Connectivity::requestRadioPowerOff();
-      }
-
-      disconnectRequested = true;
-      disconnectRequestStartMs = millis();
-      Observability::cycleStats().markTeardownStart((uint32_t)disconnectRequestStartMs, useNetworkStandbyEffective);
-      return;
-    }
-
-    if (disconnectRequestStartMs == 0) {
-      disconnectRequestStartMs = millis();
-    }
-
-    unsigned long elapsedMs = millis() - disconnectRequestStartMs;
-    if (elapsedMs > disconnectBudgetMs) {
-      Log.warn("SLEEP: pre-sleep teardown exceeded budget (%lu ms, cloud=%d radioOn=%d standby=%d) - raising alert 15",
-               elapsedMs,
-               (int)Particle.connected(),
-               (int)Connectivity::isRadioPoweredOn(),
-               useNetworkStandbyEffective ? 1 : 0);
-      markModemUnstable(MODEM_UNSTABLE_REASON_SLOW_TEARDOWN, elapsedMs);
-      RecoveryState::raiseAlert(15);
-      transitionTo(ERROR_STATE, "sleep-precondition-timeout");
-      disconnectRequested = false;
-      disconnectRequestStartMs = 0;
-      cloudDisconnectStartMs = 0;
-      cloudDisconnectElapsedMs = 0;
-      modemOffElapsedMs = 0;
-      cloudDisconnectCompleteLogged = false;
-    #if Wiring_Cellular
-      radioOffCompleteLogged = false;
-    #endif
-      return;
-    }
-
-    unsigned long nowMs = millis();
-    if ((nowMs - lastGateProgressMs) > 1000UL) {
-      thrashGuard.markProgress("DISCONNECT_WAIT");
-      lastGateProgressMs = nowMs;
-    }
-    serviceAwakeWatchdog();
-    Particle.process();
-    return;
-  }
+  if (SleepTeardown::run(useNetworkStandbyRequested, useNetworkStandbyEffective, forceModemOffAfterStandbyFailure, standbySleepFailureError) != SleepTeardown::Result::READY) { return; }
 
   setAppBreadcrumb(23); // BREADCRUMB_SLEEP_GATE_DONE (was stale literal 19, colliding with BREADCRUMB_REPORT_POST_LEDGER)
 

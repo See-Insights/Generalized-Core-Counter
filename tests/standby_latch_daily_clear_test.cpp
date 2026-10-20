@@ -3,7 +3,7 @@
 // The real daily-close block of State_Report.cpp (the `if (due) { ... }` that
 // follows the occupancy flag take), the real latch owner power/ModemHealth.{h,cpp}
 // (markModemUnstable(), maybeClearModemUnstable(), clearAtDailyClose(), the
-// thresholds) and the real teardown trip check of State_Sleep.cpp are
+// thresholds) and the real teardown trip check of SleepTeardown.cpp are
 // extracted byte-for-byte by the .sh wrapper into the .inc files included
 // below. Only the Particle/SystemConfig surface is stubbed.
 #include <cstdarg>

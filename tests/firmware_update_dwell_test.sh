@@ -132,6 +132,7 @@ typedef int system_event_t;
 // ----- Sleep-gate surrounding state (mirrors State_Sleep.cpp's statics) ------
 
 bool disconnectRequested = false;
+namespace SleepTeardown { bool disconnectRequested() { return ::disconnectRequested; } }
 unsigned long cloudSyncStartMs = 0;
 int teardownRequests = 0;   // any cloud-disconnect / radio-off request
 bool cloudGateWaiting = false; // the cloud-operations gate is still blocking
@@ -151,7 +152,7 @@ CPP
   echo "// the first teardown request."
   echo "void sleepGatePass() {"
   extract_braced_block "$repo_root/src/state/State_Sleep.cpp" \
-    "if (!disconnectRequested && firmwareUpdateInProgress) {"
+    "if (!SleepTeardown::disconnectRequested() && firmwareUpdateInProgress) {"
   cat <<'CPP'
   if (Particle.connected() && !disconnectRequested) {
     if (cloudSyncStartMs == 0) {

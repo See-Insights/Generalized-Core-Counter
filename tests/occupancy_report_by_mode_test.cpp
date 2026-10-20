@@ -141,6 +141,7 @@ WakeKind wakeKind = WAKE_TIMER;
 bool reportDue = false;
 bool reportDueThisInterval() { return reportDue; }
 bool disconnectRequested = false;
+namespace SleepTeardown { bool disconnectRequested() { return ::disconnectRequested; } }
 bool teardownWanted = false;
 bool sleepReached = false;
 bool wakeFellThrough = false;
@@ -590,8 +591,8 @@ int main() {
   // The sites as found in the real sources (set by the .sh).
   CHECK(SLEEP_CONSUMER_PRESENT == 1, "sleep prep has the pending-change check");
   CHECK(SLEEP_CONSUMER_BELOW_RESET == 1,
-        "the sleep check sits below the disconnectRequested declaration and its entry reset");
-  CHECK(SLEEP_CONSUMER_GATED == 1, "the sleep check is gated on !disconnectRequested");
+        "the sleep check sits below the entry reset and the lost-timestamp guard");
+  CHECK(SLEEP_CONSUMER_GATED == 1, "the sleep check is gated on !SleepTeardown::disconnectRequested()");
   CHECK(SLEEP_CONSUMER_BEFORE_SLEEP_DECISIONS == 1,
         "the sleep check sits before System.sleep() and every sleep-or-suppress decision");
   CHECK(IDLE_CONSUMER_PRESENT == 1, "Idle has the pending-change consumer");

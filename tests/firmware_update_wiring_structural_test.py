@@ -124,11 +124,11 @@ def main() -> None:
         sleep_src, r"\bvoid\s+handleSleepingState\s*\(\s*\)\s*\{", "handleSleepingState()"
     )
     guard = re.search(
-        r"if\s*\(\s*!\s*disconnectRequested\s*&&\s*firmwareUpdateInProgress\s*\)", sleeping
+        r"if\s*\(\s*!\s*SleepTeardown::disconnectRequested\(\)\s*&&\s*firmwareUpdateInProgress\s*\)", sleeping
     )
     if not guard:
         fail(
-            "handleSleepingState() has no `if (!disconnectRequested && "
+            "handleSleepingState() has no `if (!SleepTeardown::disconnectRequested() && "
             "firmwareUpdateInProgress)` check; a download in flight would be slept through"
         )
     guard_block = sleeping[guard.start() : guard.start() + 500]

@@ -11,14 +11,15 @@
 # (AWAKE_WATCHDOG_TIMEOUT_MS). That is the sleep-stage reset reason 60.
 #
 # Behavioural test. The three REAL gate decisions are extracted verbatim from
-# src/state/State_Sleep.cpp and driven against a fake Device OS modem that can
+# src/state/SleepTeardown.cpp and driven against a fake Device OS modem that can
 # be put in the in-between state. No new timer, state or breadcrumb is
 # involved: the existing teardown wait and its alert-15 timeout are what the
 # blocked gate falls through to, and that is asserted here too.
 set -euo pipefail
 
 repo_root="${0:A:h:h}"
-sleep_src="$repo_root/src/state/State_Sleep.cpp"
+sleep_src="$repo_root/src/state/SleepTeardown.cpp"
+sleep_handler_src="$repo_root/src/state/State_Sleep.cpp"
 generated="${TMPDIR:-/tmp}/sleep_gate_modem_off_test.cpp"
 binary="${TMPDIR:-/tmp}/sleep_gate_modem_off_test"
 
@@ -62,7 +63,7 @@ for forbidden in \
   "!radioOffCompleteLogged && !Connectivity::isRadioPoweredOn()) {" \
   "return !Particle.connected() && !Connectivity::isRadioPoweredOn();"
 do
-  if grep -qF -- "$forbidden" "$sleep_src"; then
+  if grep -qF -- "$forbidden" "$sleep_src" "$sleep_handler_src"; then
     print -u2 "FAILED: a non-standby gate still decides on isOn(): $forbidden"
     exit 1
   fi
@@ -70,7 +71,7 @@ done
 
 # Standby sleep keeps the modem on by design, so it must NOT have gained a
 # modem-off condition.
-grep -qF 'ulpConfig.network(' "$sleep_src" || {
+grep -qF 'ulpConfig.network(' "$sleep_handler_src" || {
   print -u2 "FAILED: the standby sleep configuration went missing"; exit 1; }
 
 # The existing bounded wait and its timeout are the fallback path.
@@ -118,13 +119,13 @@ inline bool isRadioPoweredOn() { return Cellular.isOn(); }
 
 bool useNetworkStandbyEffective = false;
 
-// ----- The three real gate decisions, extracted from State_Sleep.cpp ---------
+// ----- The three real gate decisions, extracted from SleepTeardown.cpp ---------
 
 bool evalStillOn() {
   bool stillOn;
 CPP
 
-  echo "// ===== verbatim from src/state/State_Sleep.cpp ====="
+  echo "// ===== verbatim from src/state/SleepTeardown.cpp ====="
   print -r -- "$still_on_line"
 
   cat <<'CPP'
@@ -132,7 +133,7 @@ CPP
 }
 
 bool evalModemOffCompleteWouldLog(bool disconnectRequested, bool radioOffCompleteLogged) {
-  // ===== verbatim condition from src/state/State_Sleep.cpp =====
+  // ===== verbatim condition from src/state/SleepTeardown.cpp =====
 CPP
   print -r -- "  if (disconnectRequested && !useNetworkStandbyEffective &&"
   print -r -- "$modem_off_logged_line"
@@ -143,7 +144,7 @@ CPP
 }
 
 bool evalSleepPreconditions() {
-  // ===== verbatim from src/state/State_Sleep.cpp =====
+  // ===== verbatim from src/state/SleepTeardown.cpp =====
 CPP
   print -r -- "$preconditions"
   cat <<'CPP'

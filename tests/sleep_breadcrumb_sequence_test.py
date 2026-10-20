@@ -33,6 +33,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC = REPO_ROOT / "src" / "state" / "State_Sleep.cpp"
+TEARDOWN_SRC = REPO_ROOT / "src" / "state" / "SleepTeardown.cpp"
 
 BREADCRUMB_NAMES = {
     22: "SLEEP_GATE_START",
@@ -56,19 +57,23 @@ def main() -> None:
 
     # ---- Check 1: stale literals 18/19/20/21 must not appear as
     # setAppBreadcrumb() arguments anywhere in the sleep path anymore. ----
-    stale_calls = re.findall(r"setAppBreadcrumb\((1[89]|2[01])\)", text)
+    teardown_text = TEARDOWN_SRC.read_text()
+    stale_calls = re.findall(r"setAppBreadcrumb\((1[89]|2[01])\)", text + teardown_text)
     if stale_calls:
         fail(f"stale breadcrumb literals still present: {stale_calls}")
-    print("PASS: no stale 18/19/20/21 breadcrumb literals remain in State_Sleep.cpp")
+    print("PASS: no stale 18/19/20/21 breadcrumb literals remain in State_Sleep.cpp or SleepTeardown.cpp")
 
     # ---- Check 2: the shared sleep-gate pair (22 -> 23) appears exactly
     # once each, and 22 precedes 23 textually. ----
-    gate_start_lines = [i for i, l in enumerate(lines) if "setAppBreadcrumb(22)" in l]
+    # WO-2026-10-20-003: 22 is set inside SleepTeardown::run(); State_Sleep.cpp sets 23 right
+    # after that call returns READY, so 22 precedes 23 when the run() call precedes the 23 line.
+    gate_start_lines = [i for i, l in enumerate(teardown_text.splitlines()) if "setAppBreadcrumb(22)" in l]
     gate_done_lines = [i for i, l in enumerate(lines) if "setAppBreadcrumb(23)" in l]
-    if len(gate_start_lines) != 1 or len(gate_done_lines) != 1:
-        fail(f"expected exactly one SLEEP_GATE_START/DONE each, got "
-             f"{len(gate_start_lines)}/{len(gate_done_lines)}")
-    if gate_start_lines[0] >= gate_done_lines[0]:
+    gate_run_lines = [i for i, l in enumerate(lines) if "SleepTeardown::run(" in l]
+    if len(gate_start_lines) != 1 or len(gate_done_lines) != 1 or len(gate_run_lines) != 1:
+        fail(f"expected exactly one SLEEP_GATE_START/DONE each and one SleepTeardown::run call, got "
+             f"{len(gate_start_lines)}/{len(gate_done_lines)}/{len(gate_run_lines)}")
+    if gate_run_lines[0] >= gate_done_lines[0]:
         fail("SLEEP_GATE_START must textually precede SLEEP_GATE_DONE")
     print("PASS: SLEEP_GATE_START(22) precedes SLEEP_GATE_DONE(23), each exactly once")
 
