@@ -4,7 +4,7 @@ The device holds **one** alert code at a time. It's the current code, not a coun
 
 The code is persisted in `/usr/current.dat` (`MyPersistentData.h:684`), so it survives reboots and hibernate. `raiseAlert()` replaces it only with a **more severe** code (`MyPersistentData.cpp:895–902`) and ignores values ≤ 0 (`:896`). A code that never clears therefore hides every lower one.
 
-**Source:** firmware `main` at `2c477e8` (v38 merged). Every file:line below is at that commit and was checked against the source on 2026-10-07. Earlier citations: `e78d59d` (v37) and `7a2b026` (v36).
+**Source:** firmware `main` at `2c477e8` (v38 merged). Every file:line below is at that commit and was checked against the source on 2026-10-07, **except the `P:` citations (`power/PmicFaultMonitor.cpp`), which were re-cited to main `a3e012d` on 2026-10-20 after Step 6 P-6 removed the three mask definitions at `:19–21` (every `P:` line moved by −3; each re-checked by statement content). Other citations may have moved with the 31 `src/` commits since `2c477e8`; they have not been re-checked.** Earlier citations: `e78d59d` (v37) and `7a2b026` (v36).
 
 **Abbreviations:**
 - **G** `Generalized-Core-Counter.cpp`;
@@ -33,10 +33,10 @@ The code is persisted in `/usr/current.dat` (`MyPersistentData.h:684`), so it su
 | 17 | boot storm | Boot-storm holdoff pending at boot (G:1031). Written with `set_alertCode(17)`, **bypassing severity**: it overwrites any active code, including 19. | 3 (:863) | v3.29 (`8843d41`, via `raiseAlert`); direct write since v4.05 (`98d98d8`) | condition | After a connection with config applied and ledger published OK (C:581–583) |
 | 18 | state-machine thrash | ThrashGuard tier 2 (T:141); tier 3, then an immediate reset (T:150) | 3 (:864) | v4.05 (`98d98d8`) | event | **Clears: never (planned fix with ThrashGuard persistence).** No clear site, in any version. It's raised just before the tier-3 reset, so it may not be saved. Once the ThrashGuard/persistence work saves state before a deliberate reset, 18 becomes report-once like 19 and 42. A stuck 18 is a known limitation, not an ongoing fault. |
 | 19 | watchdog reset | Boot classified as a Device OS watchdog or an AB1805-confirmed pin reset (G:1317) | **4, the highest** (:876–877) | committed `75ad0a8`; first released in v22-Diag-Soak (`3b9b39f`) | event | **Report once, then clear, since v38** (`isAutoClearAfterReportAlert()`; raise-site comment G:1310–1316). **Before v38: never** (deliberately excluded), so a device on older firmware keeps 19 and it hides every lower alert. |
-| 20 | PMIC thermal | NTC fault (P:192); charge fault 0x02, thermal shutdown (P:211) | 3 (:865) | v3.20 (`3f29873`) | condition | Charging resumed, codes 20–23 (P:369–371) |
-| 21 | PMIC charge timeout / stuck | Input fault persisting after a reset (P:206); safety timer expired (P:216); other charge fault persisting after a reset (P:221); fast charging 6 h+ with no material gain (P:523) | 3 (:866) | v3.20 | condition | Charge fault cleared (P:169–171); P:369–371; charge status ≠ 2 after recovery (P:378–380) |
-| 22 | — | Not raised; not in the severity table | 1 (default, :890–891) | — | — | Within P:369–371's 20–23 range |
-| 23 | PMIC battery fault | Other charge fault (P:224); BAT_FAULT overvoltage (P:390) | 2 (:879) | v3.20 | condition | P:169–171; P:369–371 |
+| 20 | PMIC thermal | NTC fault (P:189); charge fault 0x02, thermal shutdown (P:208) | 3 (:865) | v3.20 (`3f29873`) | condition | Charging resumed, codes 20–23 (P:366–368) |
+| 21 | PMIC charge timeout / stuck | Input fault persisting after a reset (P:203); safety timer expired (P:213); other charge fault persisting after a reset (P:218); fast charging 6 h+ with no material gain (P:520) | 3 (:866) | v3.20 | condition | Charge fault cleared (P:166–168); P:366–368; charge status ≠ 2 after recovery (P:375–377) |
+| 22 | — | Not raised; not in the severity table | 1 (default, :890–891) | — | — | Within P:366–368's 20–23 range |
+| 23 | PMIC battery fault | Other charge fault (P:221); BAT_FAULT overvoltage (P:387) | 2 (:879) | v3.20 | condition | P:166–168; P:366–368 |
 | 30 | connectivity timeout with radio up | Not raised | 2 (:880) | — | — | — |
 | 31 | failed to connect to cloud | Connection attempt exceeded its budget (C:666) | 2 (:881) | v3.09 | event | Report; a successful connection (C:539–540); E:128–130 |
 | 32 | connect taking too long | Not raised | 2 (:882) | — | — | — |
