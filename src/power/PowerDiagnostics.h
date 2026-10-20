@@ -4,8 +4,6 @@
 
 namespace PowerDiagnostics {
 
-const char *availabilityLabel(PowerAvailability availability);
-const char *batteryContextLabel(PowerBatteryContext context);
 const char *inputProfileLabel(PowerInputProfile profile);
 const char *powerSourceLabel(int powerSource);
 const char *profileSelectionReasonLabel(PowerProfileSelectionReason reason);

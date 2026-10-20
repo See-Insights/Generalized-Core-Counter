@@ -16,9 +16,6 @@ extern unsigned long currentWakeAwakeMs();
 
 namespace {
 
-constexpr uint8_t kPmicChargeFaultMask = 0x30; // REG09 bits 5:4
-constexpr uint8_t kPmicBatFaultMask = 0x08;    // REG09 bit 3
-constexpr uint8_t kPmicNtcFaultMask = 0x07;    // REG09 bits 2:0
 constexpr unsigned long kChargeSummaryIntervalMs = 15UL * 60UL * 1000UL;
 
 uint8_t pmicChargeFaultCode(uint8_t faultReg) { return (faultReg & kPmicChargeFaultMask) >> 4; }

@@ -66,12 +66,6 @@ PowerPlatform::TestPowerPlatformState PowerPlatform::testPowerPlatformState;
 
 namespace {
 
-// Mirrors the anonymous-namespace power-source constants in
-// src/power/PowerManager.cpp (not directly reachable from this test file).
-constexpr int kPowerSourceUnknown = 0;
-constexpr int kPowerSourceVin = 1;
-constexpr int kPowerSourceUsbHost = 2;
-
 // Bit values matching PowerManager.cpp's override condition:
 // usbEnumerated = (USBADDR & 0x7F) != 0
 // usbVbusPresent = (USBREGSTATUS & 0x01)

@@ -7,13 +7,6 @@ namespace PowerPlatform {
 
 namespace {
 
-constexpr int kPowerSourceUnknown = 0;
-constexpr int kPowerSourceVin = 1;
-constexpr int kPowerSourceUsbHost = 2;
-constexpr int kPowerSourceUsbAdapter = 3;
-constexpr int kPowerSourceUsbOtg = 4;
-constexpr int kPowerSourceBattery = 5;
-
 bool isRecognizedPowerSource(int source) {
   switch (source) {
   case kPowerSourceUnknown:
@@ -120,7 +113,6 @@ PowerCapabilities detectCapabilities() {
   PowerCapabilities capabilities;
 
 #if HAL_PLATFORM_CELLULAR
-  capabilities.hasFuelGauge = true;
   capabilities.hasSoc = true;
   capabilities.hasBatteryVoltage = true;
   capabilities.hasBatteryContext = true;
@@ -128,7 +120,6 @@ PowerCapabilities detectCapabilities() {
 #endif
 
 #if PLATFORM_ID == PLATFORM_ARGON
-  capabilities.hasFuelGauge = true;
   capabilities.hasSoc = true;
   capabilities.hasBatteryVoltage = true;
   capabilities.hasBatteryContext = true;

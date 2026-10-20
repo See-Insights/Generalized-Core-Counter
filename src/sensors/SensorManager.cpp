@@ -71,12 +71,6 @@ namespace {
 constexpr uint8_t PMIC_ANOMALY_CONSECUTIVE_LIMIT = 3;
 #endif
 
-// BQ24195 PMIC REG09 fault register bit masks
-// REG09[5:4] = CHRG_FAULT (charge fault status)
-// REG09[3] = BAT_FAULT (battery fault status)
-constexpr uint8_t PMIC_CHRG_FAULT_MASK = 0x30;  // Bits 5:4
-constexpr uint8_t PMIC_BAT_FAULT_MASK = 0x08;   // Bit 3
-
 #if HAL_PLATFORM_CELLULAR || PLATFORM_ID == PLATFORM_ARGON
 bool batterySocIsValid(float soc) {
   return (soc == soc) && soc >= 0.0f && soc <= 100.0f;
@@ -152,7 +146,7 @@ bool shouldLogBatterySample(BatterySampleContext sampleContext) {
 #endif
 #if HAL_PLATFORM_CELLULAR && (PLATFORM_ID != PLATFORM_MSOM)
 uint8_t batteryStateFromPmicStatus(uint8_t chargeStatus, byte faultReg) {
-  if (faultReg & (PMIC_CHRG_FAULT_MASK | PMIC_BAT_FAULT_MASK)) {
+  if (faultReg & (kPmicChargeFaultMask | kPmicBatFaultMask)) {
     return (uint8_t)PowerBatteryContext::Fault;
   }
 
@@ -169,7 +163,7 @@ uint8_t batteryStateFromPmicStatus(uint8_t chargeStatus, byte faultReg) {
 }
 
 const char *compactPmicChargeLabel(uint8_t chargeStatus, byte faultReg) {
-  if (faultReg & (PMIC_CHRG_FAULT_MASK | PMIC_BAT_FAULT_MASK)) {
+  if (faultReg & (kPmicChargeFaultMask | kPmicBatFaultMask)) {
     return "FAULT";
   }
 

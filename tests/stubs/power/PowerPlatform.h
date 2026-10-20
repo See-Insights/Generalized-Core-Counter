@@ -1,6 +1,7 @@
 #pragma once
 
 #include "power/PowerManager.h"
+#include "PowerSourceCodes.h"
 
 namespace PowerPlatform {
 

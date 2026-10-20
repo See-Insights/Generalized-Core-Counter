@@ -9,13 +9,6 @@
 
 namespace {
 
-[[maybe_unused]] constexpr int kPowerSourceUnknown = 0;
-constexpr int kPowerSourceVin = 1;
-constexpr int kPowerSourceUsbHost = 2;
-constexpr int kPowerSourceUsbAdapter = 3;
-constexpr int kPowerSourceUsbOtg = 4;
-constexpr int kPowerSourceBattery = 5;
-
 PowerInputProfile configuredFallbackProfile() {
 #if defined(FIELD_BUILD) && FIELD_BUILD
   return PowerConfig::get_solarPowerMode() ? PowerInputProfile::Solar35W
