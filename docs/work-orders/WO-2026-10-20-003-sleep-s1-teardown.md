@@ -85,3 +85,12 @@ Budget versus actual (non-move `src/`, moved lines, sleep `wc -l`, tests), the t
 - **Build:** text/data/bss `151724/1094/2228 → 151532/1094/2228` (−192); the nine function-static symbols are replaced by one 28-byte struct; `handleSleepingState` 6968 → 5552; static-init stubs 22 before and after; **`.backup` unchanged** (size `0x98`, 25 retained symbols at the same addresses; only the flash load address moved, `0xd9430 → 0xd9370`): retained outcome A.
 - **Mutations I ran:** budget +1 s, alert 15 dropped on the primary timeout, and the final `Cellular.isOff()` skipped each fail the transcript; a teardown-field write in `State_Sleep.cpp` and a `retained` probe each fail the structural test. **Dropping alert 15 on the precondition timeout survives, and the harness says so ("unpinned (dead branch)")**: after the primary block and the completion reset, `disconnectRequested` is false on arrival at the precondition block, so its timeout branch (`SleepTeardown.cpp:321–322`) can only run if the radio state flips between two reads in one pass. This is dead code in the base, not a gap in the transcript.
 - **Deviation to check in Stage 7:** the two old entry resets (`State_Sleep.cpp:216–219` before the CONNECTED+OPEN abort, and `:308–317` after it) became one `SleepTeardown::enter()`, so on the abort path all nine fields now reset where two did. Nothing reads them there and the next entry resets them again, but the transcript cannot see this path.
+
+## Architect's rulings on Stage 6 (20 Oct)
+
+- **Review from the WIP branch:** the implementation is pushed as `658b7cf` on `wip/s1-sleep-teardown` (no PR); Codex reviews it there. Stage 8 brings it to this branch by fast-forward.
+- **The precondition-timeout branch stays in S-1** (alert 15, `sleep-precondition-timeout`; dead in practice, `SleepTeardown.cpp:321–322`). It is a **removal candidate for the post-split simplify series** (recovery plan item 17).
+- **The consolidated entry reset is accepted if Codex confirms** that none of the seven newly reset fields is read on the CONNECTED+OPEN abort path before its next reset; **otherwise STOP.**
+- **Test volume (about +793 lines and the 4,753-line fixture) is accepted for S-1.** **S-2 to S-6 extend this harness** (new scenarios and fixtures on the same runner) and do not build new ones; each later WO says so.
+- **Stage 8 is pre-approved** on VERIFIED with net `src/` ≤ +20; the PR is marked **"do not merge until v45 is cut"**.
+
