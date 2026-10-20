@@ -32,7 +32,7 @@
 
 ## Standing rulings that carry over
 
-- The PIR-wake block stays in `State_Sleep.cpp` (14 Oct) unless you show a clear reason to move it. **Q9 reopens this ruling for the architect's decision; until the architect rules, treat it as standing.**
+- ~~The PIR-wake block stays in `State_Sleep.cpp` (14 Oct) unless you show a clear reason to move it.~~ **Reversed by the architect on 20 Oct (ruling 2 below).**
 - No behavior fixes in this series: the latch, the sleep stall and the post-failsafe loop get their own WOs **after** the split, each with evidence.
 - `ModemHealth` (P-5) stays the only writer of the latch fields.
 
@@ -44,3 +44,16 @@
 ## Budget
 
 Step 0: 0 `src/` lines. The eventual WOs: stated per WO when the architect accepts the sequence.
+
+## Architect's rulings on the Step 0 reports (20 Oct)
+
+Round 1 (`WO-2026-10-20-002-step0-report.md`) and round 2 (`WO-2026-10-20-002-step0-addendum-report.md`), citations checked by Claude Code, are the basis.
+
+1. **The six-move sequence is accepted** (teardown, execution, cloud gate, plan, preflight, wake and occupancy), each behavior-neutral and ≤ +20 net non-move `src/` lines.
+2. **The 14 Oct ruling is reversed.** The occupancy wake processing moves out of `State_Sleep.cpp` to `State_Modes.cpp`, **called synchronously** (a wake context passed in before any transition; no hop through Idle, which would add logs, ThrashGuard progress and a dwell). **If WO 6 is over +20 it splits into 6a and 6b.**
+3. **No NAP/NIGHT.** One top-level state with phase modules (round 2, Q10).
+4. **Simplify only after the split, with evidence.** The v45 soak counts the occurrences of STOP-fallback use, heap-guard trips and hibernate bypass, which are the evidence for any later removal WO (hibernate and the heap guard at `State_Sleep.cpp:978–1072`, the STOP fallbacks at `:1309–1373`, at `a3e012d`). No removal inside the split.
+5. **Recovery-plan item added:** no motion re-check after teardown, unlike v50's motion-before-sleep guard (recovery plan item 16).
+6. **Release order:** **v45 (P-0 to P-6) is cut before any sleep move merges; the sleep moves ship as v46.** The sleep WOs may be built and reviewed meanwhile; their PRs say "do not merge until v45 is cut".
+
+S-1 is `WO-2026-10-20-003-sleep-s1-teardown`.
