@@ -124,3 +124,45 @@ None. Ships in v46 with S-1 and S-3 to S-6.
 - ELF by symbol.
 - The retained outcome.
 - The ruling-8 table.
+
+## Architect's ruling on Step 0 (21 Oct): option D (Chip approved)
+
+Step 0 (`02514d5`) found that every new module carries a fixed cost of about 35 non-move lines. Its counts were S-2 at +65 and S-2a at +59. Across S-2 to S-6, that is roughly +150 to +200 lines of wiring. **That cost is not accepted.** The split exists to give readable phases and per-phase transcripts, and neither needs a file per phase.
+
+**This ruling supersedes:**
+- Design items 1–3;
+- the `state/SleepExecution.{h,cpp}` file;
+- the pre-ruled S-2a/S-2b split.
+
+**Option D:**
+
+1. **No new file or header.** The phases become file-local functions in `State_Sleep.cpp`'s anonymous namespace: the effective-standby policy (`:181–201`, per Step 0's adjustment), the hibernate attempt and sleep-and-resume. Sleep-and-resume returns the four-field `WakeContext`, plus "handled" for the all-attempts-failed path. Add at most three functions and that struct.
+2. **The three standby-return fields** become one file-static struct in the same anonymous namespace. Only those functions and the policy write the fields, and a structural test checks that.
+3. **S-1's interface is unchanged.** `SleepTeardown` keeps its by-reference parameters, and `drainSerialBeforeSleep` stays where it is.
+4. **The transcript plan is unchanged** (it extends the S-1 harness). The harness extracts the new functions verbatim by marker, with `COPY_MISMATCH` on any drift (§13 (g)).
+5. **Ruling-8 table.** Re-run it on the D prototype and re-anchor whatever fails. `clock_owner_structural_test.py` is widened to scan all of `src/` in this WO, as a test-only change, because it is the same silent-weakening risk as S-1's F1.
+
+**Budget: at most +20 net non-move `src/` lines, hard.**
+
+**Step 0 addendum (Claude Code):**
+- Prototype D and count it the way the first prototype was counted.
+- **≤ +20:** dispatch Stage 6 (Copilot, Sonnet, high) without coming back to the architect.
+- **Over +20:** stop and report.
+
+Stage 7 and the Stage 8 pre-approval are unchanged.
+
+**S-3 to S-6:** these use the same pattern, in-file functions with no new module. Each Step 0 prototypes and counts the change before dispatch. Round 1's estimates are not used.
+
+## Chip's direction for after the split (21 Oct)
+
+Once S-6 lands, the simplify series starts with a **necessity review of every check on the sleep path**. That covers each safe-to-sleep check, guard, fallback, wait and retry, and asks the same questions of each:
+- What does it protect against?
+- Is there evidence it fires (v45/v46 soak and fleet counts, incidents)?
+- Is it an edge case?
+- What does it cost in lines?
+- Should it be kept, simplified or removed?
+
+**The goal is a measurable reduction in `src/` lines**, in small removal WOs, each with evidence. The candidates already named:
+- the dead precondition-timeout arm (recovery plan item 17);
+- the duplicate `drainSerialBeforeSleep()`;
+- hibernate, the heap guard and the STOP fallbacks, judged against the v45 counts (ruling 4).
