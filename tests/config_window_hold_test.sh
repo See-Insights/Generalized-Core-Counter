@@ -9,7 +9,7 @@ set -euo pipefail
 # config_window_hold_test.cpp. Each behaviour case runs in its own process,
 # because the function keeps its state in function-local statics.
 # Part 2 checks the structure of the CONNECTED+open abort in State_Sleep.cpp
-# (it resets cloudSyncStartMs, declared before the abort).
+# (it resets cloudGate.cloudSyncStartMs, a field of the cloudGate struct declared before the abort).
 # Part 3 plants mutations on COPIES of the two files; each must be caught by a
 # run-time or structure check, not by a compile error.
 #
@@ -72,14 +72,17 @@ structural_abort() {
   python3 - "$sleep_src" <<'PY'
 import re, sys
 text = open(sys.argv[1]).read()
-decl = text.find("static unsigned long cloudSyncStartMs = 0;")
+decl = -1
+sm = re.search(r'struct \{[^{}]*?\bunsigned long cloudSyncStartMs = 0;[^{}]*?\} cloudGate;', text, re.S)
+if sm:
+    decl = sm.start()
 m = re.search(r'ensureSensorEnabled\("SLEEP abort: CONNECTED\+OPEN"\);\n(.*?)transitionTo\(IDLE_STATE, "sleep-abort-open-hours"\);', text, re.S)
 if not m:
     sys.exit("the CONNECTED+open abort was not found")
-if "cloudSyncStartMs = 0;" not in m.group(1):
-    sys.exit("the CONNECTED+open abort does not reset cloudSyncStartMs")
+if "cloudGate.cloudSyncStartMs = 0;" not in m.group(1):
+    sys.exit("the CONNECTED+open abort does not reset cloudGate.cloudSyncStartMs")
 if decl < 0 or decl > m.start():
-    sys.exit("cloudSyncStartMs is not declared before the CONNECTED+open abort")
+    sys.exit("cloudSyncStartMs is not declared in the cloudGate struct before the CONNECTED+open abort")
 PY
 }
 
@@ -162,7 +165,7 @@ plant "F2: done stored as a zero epoch" ledger \
   "holdDoneEpoch = currentConnectionEpoch;"
 plant "remove the CONNECTED+open abort reset" sleep \
   "    ensureSensorEnabled(\"SLEEP abort: CONNECTED+OPEN\");
-    cloudSyncStartMs = 0;" \
+    cloudGate.cloudSyncStartMs = 0;" \
   "    ensureSensorEnabled(\"SLEEP abort: CONNECTED+OPEN\");"
 
 echo ""

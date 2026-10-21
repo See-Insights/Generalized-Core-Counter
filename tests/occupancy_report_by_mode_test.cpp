@@ -164,18 +164,18 @@ void modelSleep() { sleepReached = true; }
 // requesting disconnect"). Like the real gate it starts its timer on the first
 // pass, waits while under budget, and gives up (resetting the timer) once the
 // budget has elapsed.
-unsigned long cloudSyncStartMs = 0;
+struct { unsigned long cloudSyncStartMs = 0; } cloudGate;
 bool gateWanted = false;
 bool gateTimedOut = false;
 unsigned long gateElapsedMs = 0;
 const unsigned long kGateBudgetMs = 30000;
 bool modelGate() {
   if (!gateWanted || disconnectRequested) return true;
-  if (cloudSyncStartMs == 0) cloudSyncStartMs = millis();
-  gateElapsedMs = millis() - cloudSyncStartMs;
+  if (cloudGate.cloudSyncStartMs == 0) cloudGate.cloudSyncStartMs = millis();
+  gateElapsedMs = millis() - cloudGate.cloudSyncStartMs;
   if (gateElapsedMs < kGateBudgetMs) return false;
   gateTimedOut = true;
-  cloudSyncStartMs = 0;
+  cloudGate.cloudSyncStartMs = 0;
   return true;
 }
 
@@ -271,7 +271,7 @@ void arm(const ModeCase &m) {
   reportDue = false;
   disconnectRequested = false;
   teardownWanted = false;
-  cloudSyncStartMs = 0;
+  cloudGate.cloudSyncStartMs = 0;
   gateWanted = false;
   gateTimedOut = false;
   gateElapsedMs = 0;
@@ -457,14 +457,14 @@ void testPendingMidGateResetsGateTimer() {
     gateWanted = true;
     wakeKind = WAKE_OTHER;
     sleepPass();  // pass 1: the gate starts its timer and waits
-    CHECK_MODE(m, cloudSyncStartMs != 0 && !sleepReached && state == SLEEPING_STATE,
+    CHECK_MODE(m, cloudGate.cloudSyncStartMs != 0 && !sleepReached && state == SLEEPING_STATE,
                "midgate: the first pass starts the gate and waits");
     millisValue += 20000;
     session.occupancyChangeTriggered = true;  // the main-loop tail latches a change mid-gate
     sleepPass();  // pass 2: the pending check leaves for REPORTING
     CHECK_MODE(m, state == REPORTING_STATE && wentTo("occupancy change pending"),
                "midgate: the pending change goes to REPORTING");
-    CHECK_MODE(m, cloudSyncStartMs == 0, "midgate: leaving mid-gate resets the gate timer");
+    CHECK_MODE(m, cloudGate.cloudSyncStartMs == 0, "midgate: leaving mid-gate resets the gate timer");
 
     // Report and Connect run; a later sleep span starts its own gate.
     session.occupancyChangeTriggered = false;
@@ -595,6 +595,8 @@ int main() {
   CHECK(SLEEP_CONSUMER_GATED == 1, "the sleep check is gated on !SleepTeardown::disconnectRequested()");
   CHECK(SLEEP_CONSUMER_BEFORE_SLEEP_DECISIONS == 1,
         "the sleep check sits before System.sleep() and every sleep-or-suppress decision");
+  CHECK(SLEEP_CONSUMER_BEFORE_CLOUD_GATE == 1,
+        "the sleep check sits before the handler's cloudGatePass( call (the cloud gate wait)");
   CHECK(IDLE_CONSUMER_PRESENT == 1, "Idle has the pending-change consumer");
   CHECK(IDLE_CONSUMER_AFTER_OCCUPANCY_BLOCK == 1,
         "the Idle consumer follows the occupancy block and precedes the park-closed sleep");
