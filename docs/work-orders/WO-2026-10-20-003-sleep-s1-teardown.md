@@ -126,3 +126,5 @@ Budget versus actual (non-move `src/`, moved lines, sleep `wc -l`, tests), the t
 - **Proceeding to Stage 8 on VERIFIED WITH CONCERNS was correct.** PR #128 stays open until v45 is cut.
 - **C1 (the dwell test's comment skipping, `firmware_update_dwell_test.sh:40–47`): left as it is.** If S-2 touches `firmware_update_dwell_test.sh`, it makes the test skip comments there (block and trailing comments, not only full-line `//`).
 - **`wip/s1-sleep-teardown` is deleted** (the same commits are on this branch).
+
+- **Test-complexity numbers (WO-2026-10-20-002 ruling 9, backfilled 21 Oct), against main `0c565fa`:** `src/` 22,306 → 22,326 (**+20**); test lines excluding fixtures 28,893 → 29,732 (**+839**); fixture lines 834 → 5,587 (**+4,753**); suite 91 → 93 (**+2**).
