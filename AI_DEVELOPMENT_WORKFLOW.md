@@ -102,12 +102,12 @@ be verified against a binary that does not correspond to the source.
   so `make` sees nothing to rebuild and silently links the previous build's
   objects. Found 2026-09-28 in WO-2026-09-28-001, when the first bench builds
   with `-DENABLE_DIAGNOSTICS_PUBLISH_MODE=1` reused the release objects. In
-  this Device OS tree (6.4.1):
+  this Device OS tree (6.6.0):
   - **Agents:** use a fresh `BUILD_PATH_BASE` for every build type, in a
     directory that doesn't exist yet, for example
     `build-tmp/<wo>-stage7/obj-release` and `…/obj-bench`.
   - **Reusing a path** (for example, Chip in a terminal): run `make clean` in
-    `deviceOS/6.4.1/main` with the same `PLATFORM`, `APPDIR` and
+    `deviceOS/6.6.0/main` with the same `PLATFORM`, `APPDIR` and
     `BUILD_PATH_BASE` arguments as the build.
 
   Workbench's `make clean-user` (from `buildscripts/<ver>/Makefile`) only runs
@@ -427,9 +427,9 @@ by relative path (`"../Config.h"`) precisely to avoid this; a bare include is
 resolution-order dependent and may work only by accident.
 
     export PATH=~/.particle/toolchains/buildtools/1.1.1/bin:~/.particle/toolchains/gcc-arm/10.2.1/bin:$PATH
-    cd ~/.particle/toolchains/deviceOS/6.4.1/main
+    cd ~/.particle/toolchains/deviceOS/6.6.0/main
     make -s PLATFORM=boron APPDIR=<copy-of-tree> TARGET_DIR=<copy>/localbuild \
-         DEVICE_OS_PATH=~/.particle/toolchains/deviceOS/6.4.1 \
+         DEVICE_OS_PATH=~/.particle/toolchains/deviceOS/6.6.0 \
          BUILD_PATH_BASE=<fresh scratch dir that doesn't exist yet>
 
 This is also the build that produces the symbolised ELF the linkage check above
