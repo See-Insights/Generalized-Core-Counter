@@ -62,3 +62,19 @@ S-1 is `WO-2026-10-20-003-sleep-s1-teardown`.
 
 8. **Tests anchored on text or line order (architect, 20 Oct, from S-1 Stage 7 finding F1):** moving code can silently weaken a test that orders or extracts it by text. **Each Step 0 for S-2 to S-6 lists every test anchored on text or line order in the file being moved** (the tests that read `State_Sleep.cpp` or the moved code by marker, regex or position), **and the WO either re-anchors each or shows that it still binds** (§13 (c) extended to tests). The evidence is a mutation that the re-anchored test fails: a mutation that breaks the property the test guards (for S-1: moving the firmware-update guard below `SleepTeardown::run(` survived 93/93 until re-anchored).
 
+9. **Test complexity (Chip, 21 Oct):** the sleep split and the simplify series must not leave more test than they found.
+   - **From S-1 on, every sleep and simplify-series closing record states three numbers against the pre-S-1 main baseline** (main `0c565fa`, whose `src/` equals `a3e012d`): **total test lines** (everything under `tests/` except `tests/fixtures/`, stubs included), **fixture lines** (`tests/fixtures/`), and the **suite count**; plus `src/` lines, so the two trends can be read together.
+   - **Each removal WO deletes the tests and transcript cases for the code it removes.**
+   - **When the simplify series ends, the transcripts shrink to the remaining behaviors or are retired in favour of plain behavior tests.**
+   - **At that checkpoint both `src/` and test lines must be below the baseline, or the approach is revisited.**
+
+   **Baseline and backfill** (counted by line over `git archive` trees; `src/` is all of `src/`):
+
+   | Point | `src/` lines | Test lines (excl. fixtures) | Fixture lines | Suite |
+   |---|---:|---:|---:|---:|
+   | **Baseline: main `0c565fa`** | 22,306 | 28,893 | 834 | 91 |
+   | S-1 tip `0cb5622` | 22,326 (**+20**) | 29,732 (**+839**) | 5,587 (**+4,753**) | 93 (**+2**) |
+   | S-2 tip `8d9695e` | 22,343 (**+37**) | 30,606 (**+1,713**) | 11,397 (**+10,563**) | 95 (**+4**) |
+
+   Deltas are cumulative against the baseline (S-2 alone: `src/` +17, tests +874, fixtures +5,810, suite +2). The series so far is **above the baseline on every measure**; the checkpoint test is what ends that. S-3 and later add their row.
+
