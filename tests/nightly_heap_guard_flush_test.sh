@@ -72,9 +72,7 @@ bool isRadioPoweredOn() { return false; }
 
 CPP
 
-    echo "void nightlyHeapGuardCheck(bool overnightFallbackSleep) {"
-    extract_braced_block "$repo_root/src/state/State_Sleep.cpp" "Before a long overnight"
-    echo "}"
+    extract_braced_block "$repo_root/src/state/State_Sleep.cpp" "bool nightlyHeapGuard(bool overnightFallbackSleep) {"
 
     cat <<'CPP'
 
@@ -84,9 +82,11 @@ int main() {
   // flushDiagBatch() to run before System.reset() so accumulated
   // PowerDiag/ChargeDiag/stale-SOC-resync entries from this cycle are not
   // silently dropped by the reset.
+  // WO-2026-10-21-003: the guard is nightlyHeapGuard(), extracted whole; it
+  // returns true exactly on the reset path and false otherwise.
   callOrder.clear();
   System.freeMemoryValue = ConnectivityPolicy::NIGHTLY_HEAP_RESET_THRESHOLD_BYTES - 1;
-  nightlyHeapGuardCheck(/*overnightFallbackSleep=*/true);
+  assert(nightlyHeapGuard(/*overnightFallbackSleep=*/true));
 
 CPP
 
@@ -114,14 +114,20 @@ CPP
   // Heap above both thresholds: neither flush nor reset should fire.
   callOrder.clear();
   System.freeMemoryValue = ConnectivityPolicy::NIGHTLY_HEAP_WARN_THRESHOLD_BYTES + 1;
-  nightlyHeapGuardCheck(/*overnightFallbackSleep=*/true);
+  assert(!nightlyHeapGuard(/*overnightFallbackSleep=*/true));
+  assert(callOrder.empty());
+
+  // At the warn threshold (above reset): monitoring only, no reset, returns false.
+  callOrder.clear();
+  System.freeMemoryValue = ConnectivityPolicy::NIGHTLY_HEAP_WARN_THRESHOLD_BYTES;
+  assert(!nightlyHeapGuard(/*overnightFallbackSleep=*/true));
   assert(callOrder.empty());
 
   // Not an overnight-fallback cycle at all: guard must not fire regardless
   // of heap level.
   callOrder.clear();
   System.freeMemoryValue = 0;
-  nightlyHeapGuardCheck(/*overnightFallbackSleep=*/false);
+  assert(!nightlyHeapGuard(/*overnightFallbackSleep=*/false));
   assert(callOrder.empty());
 
   return 0;

@@ -635,15 +635,22 @@ def main() -> None:
     # dead/unreachable line after the second System.reset() with it: 15 here, 1 there.
     (_, _, sr_body), = find_function_body(sleep_lines, "bool sleepAndResume(")
     transition_calls_in_sr = re.findall(r"\btransitionTo\s*\(", "\n".join(sr_body))
-    EXPECTED_TRANSITION_CALLS = 15  # 17 real exit points minus the 2 in SleepTeardown.cpp
+    # WO-2026-10-21-003 moved the sleep plan into sleepPlan() (2 transitions: close due, LED defer) and
+    # the nightly heap guard into nightlyHeapGuard(): 13 here, 2 there, 1 in sleepAndResume(), 2 in SleepTeardown.cpp.
+    (_, _, sp_body), = find_function_body(sleep_lines, "bool sleepPlan(")
+    transition_calls_in_sp = re.findall(r"\btransitionTo\s*\(", "\n".join(sp_body))
+    EXPECTED_TRANSITION_CALLS = 13  # 17 real exit points minus the 2 in SleepTeardown.cpp and the 2 in sleepPlan()
     if len(transition_calls_in_hs) != EXPECTED_TRANSITION_CALLS:
         fail(f"expected exactly {EXPECTED_TRANSITION_CALLS} transitionTo( calls inside "
-             f"handleSleepingState() (17 real exit points minus the 2 in SleepTeardown.cpp), found "
+             f"handleSleepingState() (17 real exit points minus 2 in SleepTeardown.cpp and 2 in sleepPlan()), found "
              f"{len(transition_calls_in_hs)}")
+    if len(transition_calls_in_sp) != 2:
+        fail(f"expected exactly 2 transitionTo( calls inside sleepPlan() (close due, COUNTING LED defer), "
+             f"found {len(transition_calls_in_sp)}")
     if len(transition_calls_in_sr) != 1:
         fail(f"expected exactly 1 transitionTo( call inside sleepAndResume() (the dead line after the "
              f"second System.reset()), found {len(transition_calls_in_sr)}")
-    print(f"PASS: all 17 real exit points (15 inside handleSleepingState(), 2 in SleepTeardown.cpp) are plain transitionTo(...) "
+    print(f"PASS: all 17 real exit points (13 inside handleSleepingState(), 2 inside sleepPlan(), 2 in SleepTeardown.cpp) are plain transitionTo(...) "
           "calls again (exitSleepingState() removed), plus the 1 dead/unreachable line, unchanged")
 
     # ---- Check: the two System.reset() paths' purpose-built diagnostics
@@ -654,12 +661,14 @@ def main() -> None:
     # intact and the reset call count is unchanged. ----
     # WO-2026-10-01-001 item C made each reset name itself:
     # `System.reset(RESET_CAUSE_...)`. Match the call, not the bare form.
-    reset_line_indices = [i for i, l in enumerate(hs_body) if "System.reset(" in l]
+    # WO-2026-10-21-003: the heap-guard reset now lives in nightlyHeapGuard(), not the handler.
+    (_, _, hg_body), = find_function_body(sleep_lines, "bool nightlyHeapGuard(")
+    reset_line_indices = [i for i, l in enumerate(hg_body) if "System.reset(" in l]
     sr_resets = [l for l in sr_body if "System.reset(" in l]
-    if len(reset_line_indices) != 1 or len(sr_resets) != 1:
-        fail(f"expected exactly 1 System.reset() call inside handleSleepingState() (heap guard) and 1 "
-             f"inside sleepAndResume() (all attempts failed), "
-             f"found {len(reset_line_indices)} and {len(sr_resets)}")
+    if len(reset_line_indices) != 1 or len(sr_resets) != 1 or any("System.reset(" in l for l in hs_body):
+        fail(f"expected exactly 1 System.reset() call inside nightlyHeapGuard() (heap guard), 0 inside "
+             f"handleSleepingState() and 1 inside sleepAndResume() (all attempts failed), "
+             f"found {len(reset_line_indices)}, {sum('System.reset(' in l for l in hs_body)} and {len(sr_resets)}")
     if "Nightly heap guard: freeHeap=%lu <= %lu before overnight ULTRA_LOW_POWER fallback - resetting" not in sleep_text:
         fail("nightly heap-guard reset's purpose-built Log.warn(...) diagnostic is missing/changed")
     if "All sleep attempts failed err=%d - immediate reset required" not in sleep_text:
