@@ -202,3 +202,5 @@ Once S-6 lands, the simplify series starts with a **necessity review of every ch
 - **Argon: waived by the architect: pre-existing on the parent** (above).
 - **Deviations:** additive edits to three `sleep_teardown` stub headers; some test edits made by script; five `git diff --check` trailing-whitespace hits, all on lines carried byte-for-byte from the base (waived).
 - **Rounds:** Stage 6 one round; Stage 7 once (NOT VERIFIED on a pre-existing Argon failure, waived). Ships in v46 with S-1 and S-3 to S-6. **The PR is marked "do not merge until v45 is cut and #128 is merged".**
+
+- **Test-complexity numbers (WO-2026-10-20-002 ruling 9, backfilled 21 Oct), against main `0c565fa` (cumulative with S-1):** `src/` 22,306 → 22,343 (**+37**; S-2 alone +17); test lines excluding fixtures 28,893 → 30,606 (**+1,713**; S-2 alone +874); fixture lines 834 → 11,397 (**+10,563**; S-2 alone +5,810); suite 91 → 95 (**+4**; S-2 alone +2).
