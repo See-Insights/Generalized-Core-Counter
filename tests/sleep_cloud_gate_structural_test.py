@@ -35,6 +35,10 @@ HANDLER_WRITES = {
 }
 NAMES = "|".join(FIELDS)
 CALL = "  if (cloudGatePass(useNetworkStandbyEffective)) return;\n"
+# WO-2026-10-21-004 (Sleep S-5): the handler head's only other allowed differences are the removal of the four
+# Wi-Fi guard statics and their entry resets naming the file-level wifiGuard struct's fields.
+WIFI_STATICS = ("#if Wiring_WiFi\n  static bool wifiOffGuardActive = false;\n  static unsigned long wifiOffGuardStartMs = 0;\n"
+                "  static unsigned long wifiOffGuardLastRetryMs = 0;\n  static uint8_t wifiOffGuardRetries = 0;\n#endif\n")
 WRITE = re.compile(rf"\bcloudGate\s*\.\s*(?:{NAMES})\b\s*(?:=(?!=)|\+\+|--|[-+*/|&^%]=|<<=|>>=)"
                    rf"|(?:\+\+|--)\s*cloudGate\s*\.\s*(?:{NAMES})\b|&\s*cloudGate\s*\.\s*(?:{NAMES})\b")
 
@@ -132,7 +136,7 @@ def normalized_block(code):
     head = handler[handler.index("  bool enteredState = (state != oldState);\n"):handler.index("  if (SleepTeardown::run(")]
     if head.count(CALL) != 1:
         return None, None
-    return gate, head.replace(CALL, "@@GATE@@").replace("cloudGate.", "")
+    return gate, head.replace(CALL, "@@GATE@@").replace("cloudGate.", "").replace("wifiGuard.", "")
 
 
 def base_pieces(base_text):
@@ -147,7 +151,9 @@ def base_pieces(base_text):
         if len(decl) != 1:
             return None, None
         head = head.replace(decl[0], "", 1)
-    return block, head
+    if head.count(WIFI_STATICS) != 1:
+        return None, None
+    return block, head.replace(WIFI_STATICS, "", 1)
 
 
 # ---- probes: every check fires on a text that breaks it -------------------------------------------------

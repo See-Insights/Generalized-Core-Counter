@@ -1,0 +1,927 @@
+# Frozen output of the pre-change pre-sleep cycle summary and Wi-Fi radio-off guard (handler summary block, guard block, guard statics, entry resets): WO-2026-10-21-004 (Sleep S-5).
+# Base commit: e9475d7
+# Scenarios: 86 (release 59 + DEV_BUILD matrix 7 + Wiring_WiFi matrix 20); passes: 122
+# Per-build summary (scenarios passes WAIT CONTINUE distinct-events): release 59 59 0 59 10; DEV_BUILD 7 7 0 7 5; Wiring_WiFi 20 56 42 14 11
+# Body sha256: e65eabcb9511eb085a3f34685c7052a8a18b9733d7446a43c51bf18bbc3216b4
+# Generated once by extracting the blocks by marker text from e9475d7:src/state/State_Sleep.cpp (git show),
+# wrapping them in tests/sleep_preflight_equivalence_test.cpp against tests/stubs/sleep_teardown, and running mode a.
+BUILD release
+S0 standby=0 cloud=0 radio=0
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S1 standby=0 cloud=0 radio=1
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=1 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S2 standby=0 cloud=1 radio=0
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=1 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=1 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=1 radioOn=0 (standby=0)
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S3 standby=0 cloud=1 radio=1
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=1 radio=1 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=1 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=1 radioOn=1 (standby=0)
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S4 standby=1 cloud=0 radio=0
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=1 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S5 standby=1 cloud=0 radio=1
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=1 cloud=0 radio=1 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S6 standby=1 cloud=1 radio=0
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=1 cloud=1 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=1 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud still connected (standby=1)
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S7 standby=1 cloud=1 radio=1
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=1 cloud=1 radio=1 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=1 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud still connected (standby=1)
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S8 quiet standby=0 all off
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S9 quiet standby=0 cloud on radio on
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=1 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=1 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=1 radioOn=1 (standby=0)
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S10 awake=ceiling-30001
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=1060999 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=1060999 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=1059999 soc=875 chg=0 guard n/a
+S11 awake=ceiling-30000
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=1061000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=1061000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=1060000 soc=875 chg=0 guard n/a
+S12 awake=ceiling-29999
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=1061001 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=1061001 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=1060001 soc=875 chg=0 guard n/a
+S13 awake=ceiling-1
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=1090999 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=1090999 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=1089999 soc=875 chg=0 guard n/a
+S14 awake=ceiling+0
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=1091000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=1091000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=1090000 soc=875 chg=0 guard n/a
+S15 awake=ceiling+1
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=1091001 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=1091001 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: awake_ms=1090001 > ceiling_ms=1090000
+  OUT CONTINUE awake=1090001 soc=875 chg=0 guard n/a
+S16 awake=ceiling+30000
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=1121000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=1121000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: awake_ms=1120000 > ceiling_ms=1090000
+  OUT CONTINUE awake=1120000 soc=875 chg=0 guard n/a
+S17 awake=0
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=1000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=1000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=0 soc=875 chg=0 guard n/a
+S18 wake start 0 keeps the preset awake time
+  stats wake=0 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: awake_ms=4000000 > ceiling_ms=1090000
+    LOG INFO CYCLE end awake=4000000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=4000000 soc=875 chg=0 guard n/a
+S19 over the ceiling and verbose
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=1091001 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=1091001 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: awake_ms=1090001 > ceiling_ms=1090000
+    LOG INFO CYCLE end awake=1090001ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=1090001 soc=875 chg=0 guard n/a
+S20 connect attempt=0 budget=30000 dur=30999
+  stats wake=1000 budget=30000 conn=30999 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S21 connect attempt=0 budget=30000 dur=31000
+  stats wake=1000 budget=30000 conn=31000 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S22 connect attempt=0 budget=30000 dur=31001
+  stats wake=1000 budget=30000 conn=31001 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S23 connect attempt=1 budget=30000 dur=30999
+  stats wake=1000 budget=30000 conn=30999 svc=2500 td=3100 attempt=1 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S24 connect attempt=1 budget=30000 dur=31000
+  stats wake=1000 budget=30000 conn=31000 svc=2500 td=3100 attempt=1 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S25 connect attempt=1 budget=30000 dur=31001
+  stats wake=1000 budget=30000 conn=31001 svc=2500 td=3100 attempt=1 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: connect_ms=31001 > budget_ms=30000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S26 connect attempt=2 budget=30000 dur=30999
+  stats wake=1000 budget=30000 conn=30999 svc=2500 td=3100 attempt=2 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S27 connect attempt=2 budget=30000 dur=31000
+  stats wake=1000 budget=30000 conn=31000 svc=2500 td=3100 attempt=2 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S28 connect attempt=2 budget=30000 dur=31001
+  stats wake=1000 budget=30000 conn=31001 svc=2500 td=3100 attempt=2 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: connect_ms=31001 > budget_ms=30000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S29 connect budget 0 with a long duration
+  stats wake=1000 budget=0 conn=900000 svc=2500 td=3100 attempt=2 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S30 connect none with a long duration
+  stats wake=1000 budget=30000 conn=900000 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S31 connect timeout, verbose
+  stats wake=1000 budget=20000 conn=25000 svc=2500 td=3100 attempt=2 result=3 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: connect_ms=25000 > budget_ms=20000
+    LOG INFO CYCLE end awake=60000ms conn=deep/timeout/25000ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S32 connect aborted, verbose
+  stats wake=1000 budget=20000 conn=100 svc=2500 td=3100 attempt=1 result=4 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=normal/aborted/100ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S33 connect all warnings together
+  stats wake=1000 budget=100 conn=5000 svc=2500 td=3100 attempt=1 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=1091001 standby=0 cloud=1 radio=1 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=1091001 cloud=1 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: awake_ms=1090001 > ceiling_ms=1090000
+    LOG WARN INV: entering sleep with cloud=1 radioOn=1 (standby=0)
+    LOG WARN INV: connect_ms=5000 > budget_ms=100
+    LOG INFO CYCLE end awake=1090001ms conn=normal/ok/5000ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=1090001 soc=875 chg=0 guard n/a
+S34 soc=-0.100000
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=-0.10 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=65535 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=-1.0% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=65535 chg=0 guard n/a
+S35 soc=0.000000
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=0.00 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=0 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=0.0% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=0 chg=0 guard n/a
+S36 soc=0.040000
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=0.04 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=0 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=0.0% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=0 chg=0 guard n/a
+S37 soc=0.050000
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=0.05 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=1 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=0.1% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=1 chg=0 guard n/a
+S38 soc=12.340000
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=12.34 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=123 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=12.3% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=123 chg=0 guard n/a
+S39 soc=12.350000
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=12.35 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=124 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=12.4% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=124 chg=0 guard n/a
+S40 soc=12.360000
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=12.36 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=124 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=12.4% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=124 chg=0 guard n/a
+S41 soc=99.949997
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=99.95 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=1000 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=100.0% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=1000 chg=0 guard n/a
+S42 soc=100.000000
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=100.00 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=1000 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=100.0% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=1000 chg=0 guard n/a
+S43 soc=100.040001
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=100.04 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=65535 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=-1.0% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=65535 chg=0 guard n/a
+S44 soc=100.099998
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=100.10 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=65535 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=-1.0% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=65535 chg=0 guard n/a
+S45 soc=nan
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=nan batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=65535 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=-1.0% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=65535 chg=0 guard n/a
+S46 battState=0
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=0 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=255 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=-1 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=255 guard n/a
+S47 battState=1
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S48 battState=2
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=2 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=1 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=1 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=1 guard n/a
+S49 battState=3
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=3 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S50 battState=255
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=255 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S51 queue now=0
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=0 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=0 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/0 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S52 queue now=65534
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=65534 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=65534 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/65534 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S53 queue now=65535
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=65535 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=65535 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/-1 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S54 queue now=65536
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=65536 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=0 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/0 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S55 queue now=70000
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=70000 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=4464 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/4464 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S56 depth sentinels before/after connect
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=65535/65535 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=-1/-1/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S57 last connection 0 keeps the preset
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=0 preLast=1699999999
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=0
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1699999999
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S58 last connection 0 and none preset
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=0 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=0
+    LOG INFO CYCLE end awake=60000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=0
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+SCENARIOS 59 PASSES 59 WAIT 0 CONTINUE 59 DISTINCT_EVENTS 10
+EVENT FINALIZE now=# cloud=# radio=# q=# soc=# chg=# last=#
+EVENT LOG INFO CYCLE end awake=#ms conn=deep/timeout/#ms svc=#ms td=#ms q=#/#/# soc=#% chg=# lastOk=#
+EVENT LOG INFO CYCLE end awake=#ms conn=none/ok/#ms svc=#ms td=#ms q=#/#/# soc=#% chg=# lastOk=#
+EVENT LOG INFO CYCLE end awake=#ms conn=normal/aborted/#ms svc=#ms td=#ms q=#/#/# soc=#% chg=# lastOk=#
+EVENT LOG INFO CYCLE end awake=#ms conn=normal/ok/#ms svc=#ms td=#ms q=#/#/# soc=#% chg=# lastOk=#
+EVENT LOG WARN INV: awake_ms=# > ceiling_ms=#
+EVENT LOG WARN INV: connect_ms=# > budget_ms=#
+EVENT LOG WARN INV: entering sleep with cloud still connected (standby=#)
+EVENT LOG WARN INV: entering sleep with cloud=# radioOn=# (standby=#)
+EVENT MEASURE batteryState #
+BUILD devbuild
+S0 dev awake=ceiling-1
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=1090999 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=1090999 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=1089999 soc=875 chg=0 guard n/a
+S1 dev awake=ceiling+0
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=1091000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=1091000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=1090000 soc=875 chg=0 guard n/a
+S2 dev awake=ceiling+1
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=1091001 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=1091001 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=1090001 soc=875 chg=0 guard n/a
+S3 dev awake=ceiling+30000
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=1121000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=1121000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=1120000 soc=875 chg=0 guard n/a
+S4 dev standby=0 cloud and radio on, over the ceiling
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=1091005 standby=0 cloud=1 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=1091005 cloud=1 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=1 radioOn=1 (standby=0)
+  OUT CONTINUE awake=1090005 soc=875 chg=0 guard n/a
+S5 dev connect over budget
+  stats wake=1000 budget=1000 conn=2001 svc=2500 td=3100 attempt=2 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=61000 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=61000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: connect_ms=2001 > budget_ms=1000
+  OUT CONTINUE awake=60000 soc=875 chg=0 guard n/a
+S6 dev verbose line over the ceiling
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=1091005 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=1091005 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=1090005ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=1090005 soc=875 chg=0 guard n/a
+SCENARIOS 7 PASSES 7 WAIT 0 CONTINUE 7 DISTINCT_EVENTS 5
+EVENT FINALIZE now=# cloud=# radio=# q=# soc=# chg=# last=#
+EVENT LOG INFO CYCLE end awake=#ms conn=none/ok/#ms svc=#ms td=#ms q=#/#/# soc=#% chg=# lastOk=#
+EVENT LOG WARN INV: connect_ms=# > budget_ms=#
+EVENT LOG WARN INV: entering sleep with cloud=# radioOn=# (standby=#)
+EVENT MEASURE batteryState #
+BUILD wifi
+S0 wifi radio already off
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=0 radio=0 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=4000 soc=875 chg=0 guard active=0 start=0 last=0 retries=0
+S1 wifi radio already off, cloud on
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=1 radio=0 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=1 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=1 radioOn=0 (standby=0)
+    CALL Connectivity::requestCloudDisconnectOnly
+  OUT CONTINUE awake=4000 soc=875 chg=0 guard active=0 start=0 last=0 retries=0
+S2 wifi standby skips the guard
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=1 cloud=1 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=1 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud still connected (standby=1)
+  OUT CONTINUE awake=4000 soc=875 chg=0 guard active=0 start=0 last=0 retries=0
+S3 wifi radio on at first pass
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=0 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4000 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+S4 wifi radio on then off, quiet
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=0 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4000 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P1 in now=5100 standby=0 cloud=0 radio=0 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=5100 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+  OUT CONTINUE awake=4100 soc=875 chg=0 guard active=0 start=0 last=0 retries=0
+S5 wifi radio on then off, verbose
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=0 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4000 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P1 in now=5100 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=5100 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=4100ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+    LOG INFO SLEEP: WiFi radio powered off before sleep (100 ms)
+  OUT CONTINUE awake=4100 soc=875 chg=0 guard active=0 start=0 last=0 retries=0
+S6 wifi radio on, cloud on, two passes
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=1 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=1 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=1 radioOn=1 (standby=0)
+    CALL Connectivity::requestCloudDisconnectOnly
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4000 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P1 in now=5100 standby=0 cloud=1 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=5100 cloud=1 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=1 radioOn=1 (standby=0)
+    CALL Connectivity::requestCloudDisconnectOnly
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4100 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+S7 wifi retry just under the interval
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=0 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4000 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P1 in now=5399 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=5399 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4399 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P2 in now=5799 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=5799 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4799 soc=875 chg=0 guard active=1 start=5000 last=5799 retries=2
+S8 wifi retry at the interval
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=0 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4000 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P1 in now=5399 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=5399 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4399 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P2 in now=5400 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=5400 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4400 soc=875 chg=0 guard active=1 start=5000 last=5400 retries=2
+  P3 in now=5799 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=5799 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4799 soc=875 chg=0 guard active=1 start=5000 last=5400 retries=2
+  P4 in now=5800 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=5800 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4800 soc=875 chg=0 guard active=1 start=5000 last=5800 retries=3
+S9 wifi retry over the interval
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=0 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4000 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P1 in now=5401 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=5401 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4401 soc=875 chg=0 guard active=1 start=5000 last=5401 retries=2
+  P2 in now=5802 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=5802 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4802 soc=875 chg=0 guard active=1 start=5000 last=5802 retries=3
+S10 wifi last wait pass at the limit, then give-up
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=0 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4000 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P1 in now=5400 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=5400 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4400 soc=875 chg=0 guard active=1 start=5000 last=5400 retries=2
+  P2 in now=5800 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=5800 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4800 soc=875 chg=0 guard active=1 start=5000 last=5800 retries=3
+  P3 in now=6200 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=6200 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=5200 soc=875 chg=0 guard active=1 start=5000 last=6200 retries=4
+  P4 in now=6600 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=6600 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=5600 soc=875 chg=0 guard active=1 start=5000 last=6600 retries=5
+  P5 in now=7000 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=7000 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=6000 soc=875 chg=0 guard active=1 start=5000 last=7000 retries=6
+  P6 in now=7001 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=7001 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG WARN SLEEP: WiFi radio remained on after 2001 ms (6 retries) - proceeding to sleep
+  OUT CONTINUE awake=6001 soc=875 chg=0 guard active=0 start=0 last=0 retries=0
+  P7 in now=7002 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=7002 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=6002 soc=875 chg=0 guard active=1 start=7002 last=7002 retries=1
+S11 wifi give-up one past the limit
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=0 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4000 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P1 in now=7001 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=7001 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    LOG WARN SLEEP: WiFi radio remained on after 2001 ms (2 retries) - proceeding to sleep
+  OUT CONTINUE awake=6001 soc=875 chg=0 guard active=0 start=0 last=0 retries=0
+  P2 in now=7001 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=7001 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=6001ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=6001 soc=875 chg=0 guard active=0 start=0 last=0 retries=0
+S12 wifi give-up with cloud on
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=1 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=1 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=1 radioOn=1 (standby=0)
+    CALL Connectivity::requestCloudDisconnectOnly
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4000 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P1 in now=7001 standby=0 cloud=1 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=7001 cloud=1 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=1 radioOn=1 (standby=0)
+    CALL Connectivity::requestCloudDisconnectOnly
+    CALL Connectivity::requestRadioPowerOff
+    LOG WARN SLEEP: WiFi radio remained on after 2001 ms (2 retries) - proceeding to sleep
+  OUT CONTINUE awake=6001 soc=875 chg=0 guard active=0 start=0 last=0 retries=0
+S13 wifi radio off after give-up restarts the guard
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=0 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4000 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P1 in now=7001 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=7001 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    LOG WARN SLEEP: WiFi radio remained on after 2001 ms (2 retries) - proceeding to sleep
+  OUT CONTINUE awake=6001 soc=875 chg=0 guard active=0 start=0 last=0 retries=0
+  P2 in now=7100 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=7100 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=6100 soc=875 chg=0 guard active=1 start=7100 last=7100 retries=1
+  P3 in now=7200 standby=0 cloud=0 radio=0 verbose=1 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=7200 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=6200ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+    LOG INFO SLEEP: WiFi radio powered off before sleep (100 ms)
+  OUT CONTINUE awake=6200 soc=875 chg=0 guard active=0 start=0 last=0 retries=0
+S14 wifi start at millis 0 retries every pass
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=0 standby=0 cloud=0 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=0 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=0 soc=875 chg=0 guard active=1 start=0 last=0 retries=1
+  P1 in now=100 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=100 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=0 soc=875 chg=0 guard active=1 start=0 last=100 retries=2
+  P2 in now=200 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=200 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=0 soc=875 chg=0 guard active=1 start=0 last=100 retries=2
+S15 wifi entered again mid-guard resets it
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=0 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4000 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P1 in now=5100 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=5100 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4100 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P2 in now=5200 standby=0 cloud=0 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5200 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4200 soc=875 chg=0 guard active=1 start=5200 last=5200 retries=1
+  P3 in now=5300 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=5300 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4300 soc=875 chg=0 guard active=1 start=5200 last=5200 retries=1
+S16 wifi radio off with the guard idle and verbose
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=0 radio=0 verbose=1 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=0 radio=0 q=5 soc=875 chg=0 last=1700000000
+    LOG INFO CYCLE end awake=4000ms conn=none/ok/0ms svc=2500ms td=3100ms q=2/3/5 soc=87.5% chg=0 lastOk=1700000000
+  OUT CONTINUE awake=4000 soc=875 chg=0 guard active=0 start=0 last=0 retries=0
+S17 wifi retry counter saturates at 255
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=0 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4000 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P1 in now=5400 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    seed retries=254
+    MEASURE batteryState 2
+    FINALIZE now=5400 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4400 soc=875 chg=0 guard active=1 start=5000 last=5400 retries=255
+  P2 in now=5800 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=5800 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4800 soc=875 chg=0 guard active=1 start=5000 last=5800 retries=255
+  P3 in now=6200 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=6200 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=5200 soc=875 chg=0 guard active=1 start=5000 last=6200 retries=255
+S18 wifi retry counter at 255 then give-up
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=0 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4000 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P1 in now=5400 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    seed retries=255
+    MEASURE batteryState 2
+    FINALIZE now=5400 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4400 soc=875 chg=0 guard active=1 start=5000 last=5400 retries=255
+  P2 in now=7001 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=7001 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    LOG WARN SLEEP: WiFi radio remained on after 2001 ms (255 retries) - proceeding to sleep
+  OUT CONTINUE awake=6001 soc=875 chg=0 guard active=0 start=0 last=0 retries=0
+S19 wifi retry counter 253 then give-up
+  stats wake=1000 budget=0 conn=0 svc=2500 td=3100 attempt=0 result=1 q=2/3 qNow=5 soc=87.50 batt=1 last=1700000000 preLast=0
+  P0 in now=5000 standby=0 cloud=0 radio=1 verbose=0 entered=1
+    MEASURE batteryState 2
+    FINALIZE now=5000 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    LOG INFO SLEEP: WiFi still on - starting bounded radio-off guard
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4000 soc=875 chg=0 guard active=1 start=5000 last=5000 retries=1
+  P1 in now=5400 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    seed retries=253
+    MEASURE batteryState 2
+    FINALIZE now=5400 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    PROGRESS WIFI_OFF_GUARD
+  OUT WAIT awake=4400 soc=875 chg=0 guard active=1 start=5000 last=5400 retries=254
+  P2 in now=7001 standby=0 cloud=0 radio=1 verbose=0 entered=0
+    MEASURE batteryState 2
+    FINALIZE now=7001 cloud=0 radio=1 q=5 soc=875 chg=0 last=1700000000
+    LOG WARN INV: entering sleep with cloud=0 radioOn=1 (standby=0)
+    CALL Connectivity::requestRadioPowerOff
+    LOG WARN SLEEP: WiFi radio remained on after 2001 ms (255 retries) - proceeding to sleep
+  OUT CONTINUE awake=6001 soc=875 chg=0 guard active=0 start=0 last=0 retries=0
+SCENARIOS 20 PASSES 56 WAIT 42 CONTINUE 14 DISTINCT_EVENTS 11
+EVENT CALL Connectivity::requestCloudDisconnectOnly
+EVENT CALL Connectivity::requestRadioPowerOff
+EVENT FINALIZE now=# cloud=# radio=# q=# soc=# chg=# last=#
+EVENT LOG INFO CYCLE end awake=#ms conn=none/ok/#ms svc=#ms td=#ms q=#/#/# soc=#% chg=# lastOk=#
+EVENT LOG INFO SLEEP: WiFi radio powered off before sleep (# ms)
+EVENT LOG INFO SLEEP: WiFi still on # starting bounded radio#off guard
+EVENT LOG WARN INV: entering sleep with cloud still connected (standby=#)
+EVENT LOG WARN INV: entering sleep with cloud=# radioOn=# (standby=#)
+EVENT LOG WARN SLEEP: WiFi radio remained on after # ms (# retries) # proceeding to sleep
+EVENT MEASURE batteryState #
+EVENT PROGRESS WIFI_OFF_GUARD

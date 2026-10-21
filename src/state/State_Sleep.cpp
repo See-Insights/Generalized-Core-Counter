@@ -352,6 +352,140 @@ bool cloudGatePass(bool useNetworkStandbyEffective) {
   return false;
 }
 
+
+void endOfCycleSummary(bool useNetworkStandby) {
+    measure.batteryState(BatterySampleContext::PreSleep);
+    const uint16_t qDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
+    const float soc = PowerManager::instance().soc();
+    const uint16_t socTenths = (soc >= 0.0f && soc <= 100.0f) ? (uint16_t)(soc * 10.0f + 0.5f) : 0xFFFF;
+    const uint8_t battState = PowerManager::instance().batteryState();
+    const uint8_t isCharging = (battState == 0) ? 0xFF : ((battState == 2) ? 1 : 0); // 0=Unknown, 2=Charging
+
+    Observability::cycleStats().finalizeBeforeSleep(
+        millis(),
+        Particle.connected(),
+        Connectivity::isRadioPoweredOn(),
+        qDepth,
+        socTenths,
+        isCharging,
+        SystemConfig::get_lastConnection());
+
+    // Invariants (log-only): detect regressions without affecting behavior.
+    // Ceiling is derived from existing budgets and includes firmware update time.
+    const unsigned long awakeCeilingMs =
+        (unsigned long)ConnectivityPolicy::CONNECT_BUDGET_DEEP_MS +
+        (unsigned long)ConnectivityPolicy::FIRMWARE_UPDATE_MAX_MS +
+      (unsigned long)ConnectivityPolicy::OUTPUT_LEDGER_SYNC_TIMEOUT_MS +
+        (unsigned long)ConnectivityPolicy::DISCONNECT_MODEM_DEFAULT_SEC * 1000UL +
+        30000UL; // slack
+
+    // Debug builds may intentionally stay awake longer for diagnostics.
+    const bool allowCeilingOver = (DEV_BUILD != 0);
+    if (!allowCeilingOver && Observability::cycleStats().total_awake_ms > awakeCeilingMs) {
+      Log.warn("INV: awake_ms=%lu > ceiling_ms=%lu", (unsigned long)Observability::cycleStats().total_awake_ms,
+               (unsigned long)awakeCeilingMs);
+    }
+
+    if (!useNetworkStandby) {
+      if (Particle.connected() || Connectivity::isRadioPoweredOn()) {
+        Log.warn("INV: entering sleep with cloud=%d radioOn=%d (standby=0)",
+                 (int)Particle.connected(), (int)Connectivity::isRadioPoweredOn());
+      }
+    } else {
+      if (Particle.connected()) {
+        Log.warn("INV: entering sleep with cloud still connected (standby=1)");
+      }
+    }
+
+    // Connect duration should be within the selected budget when an attempt was made.
+    if (Observability::cycleStats().connect_attempt_type != Observability::WakeCycleStats::ConnectAttemptType::NONE &&
+        Observability::cycleStats().connect_budget_ms > 0 &&
+        Observability::cycleStats().connect_duration_ms > (Observability::cycleStats().connect_budget_ms + 1000UL)) {
+      Log.warn("INV: connect_ms=%lu > budget_ms=%lu", (unsigned long)Observability::cycleStats().connect_duration_ms,
+               (unsigned long)Observability::cycleStats().connect_budget_ms);
+    }
+
+    // One compact line for field parsing.
+    if (SystemConfig::get_verboseMode()) {
+      Log.info(
+        "CYCLE end awake=%lums conn=%s/%s/%lums svc=%lums td=%lums q=%d/%d/%d soc=%.1f%% chg=%d lastOk=%ld",
+          (unsigned long)Observability::cycleStats().total_awake_ms,
+          Observability::toString(Observability::cycleStats().connect_attempt_type),
+          Observability::toString(Observability::cycleStats().connect_result),
+          (unsigned long)Observability::cycleStats().connect_duration_ms,
+          (unsigned long)Observability::cycleStats().service_duration_ms,
+          (unsigned long)Observability::cycleStats().teardown_duration_ms,
+        (int)(Observability::cycleStats().publish_queue_depth_before_connect == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_before_connect),
+        (int)(Observability::cycleStats().publish_queue_depth_after_connect == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_after_connect),
+        (int)(Observability::cycleStats().publish_queue_depth_before_sleep == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_before_sleep),
+          (double)(Observability::cycleStats().battery_soc_tenths == 0xFFFF ? -1.0 : ((double)Observability::cycleStats().battery_soc_tenths / 10.0)),
+        (int)(Observability::cycleStats().is_charging == 0xFF ? -1 : (int)Observability::cycleStats().is_charging),
+          (long)Observability::cycleStats().last_success_epoch);
+    }
+}
+
+#if Wiring_WiFi
+struct {
+  bool wifiOffGuardActive = false;
+  unsigned long wifiOffGuardStartMs = 0;
+  unsigned long wifiOffGuardLastRetryMs = 0;
+  uint8_t wifiOffGuardRetries = 0;
+} wifiGuard;
+
+bool wifiOffGuardPass(bool useNetworkStandby) {
+  if (!useNetworkStandby) {
+    if (Particle.connected()) {
+      Connectivity::requestCloudDisconnectOnly();
+    }
+    if (WiFi.isOn()) {
+      constexpr unsigned long WIFI_OFF_GUARD_MAX_MS = 2000UL;
+      constexpr unsigned long WIFI_OFF_GUARD_RETRY_MS = 400UL;
+      const unsigned long nowMs = millis();
+
+      if (!wifiGuard.wifiOffGuardActive) {
+        wifiGuard.wifiOffGuardActive = true;
+        wifiGuard.wifiOffGuardStartMs = nowMs;
+        wifiGuard.wifiOffGuardLastRetryMs = 0;
+        wifiGuard.wifiOffGuardRetries = 0;
+        Log.info("SLEEP: WiFi still on - starting bounded radio-off guard");
+      }
+
+      if (wifiGuard.wifiOffGuardLastRetryMs == 0 || (nowMs - wifiGuard.wifiOffGuardLastRetryMs) >= WIFI_OFF_GUARD_RETRY_MS) {
+        Connectivity::requestRadioPowerOff();
+        wifiGuard.wifiOffGuardLastRetryMs = nowMs;
+        if (wifiGuard.wifiOffGuardRetries < 255) {
+          wifiGuard.wifiOffGuardRetries++;
+        }
+      }
+
+      unsigned long guardElapsedMs = nowMs - wifiGuard.wifiOffGuardStartMs;
+      if (guardElapsedMs <= WIFI_OFF_GUARD_MAX_MS) {
+        thrashGuard.markProgress("WIFI_OFF_GUARD");
+        Particle.process();
+        return true;
+      }
+
+      Log.warn("SLEEP: WiFi radio remained on after %lu ms (%u retries) - proceeding to sleep",
+               guardElapsedMs,
+               wifiGuard.wifiOffGuardRetries);
+      wifiGuard.wifiOffGuardActive = false;
+      wifiGuard.wifiOffGuardStartMs = 0;
+      wifiGuard.wifiOffGuardLastRetryMs = 0;
+      wifiGuard.wifiOffGuardRetries = 0;
+    } else if (wifiGuard.wifiOffGuardActive) {
+      unsigned long guardElapsedMs = millis() - wifiGuard.wifiOffGuardStartMs;
+      if (SystemConfig::get_verboseMode()) {
+        Log.info("SLEEP: WiFi radio powered off before sleep (%lu ms)", guardElapsedMs);
+      }
+      wifiGuard.wifiOffGuardActive = false;
+      wifiGuard.wifiOffGuardStartMs = 0;
+      wifiGuard.wifiOffGuardLastRetryMs = 0;
+      wifiGuard.wifiOffGuardRetries = 0;
+    }
+  }
+  return false;
+}
+#endif
 struct SleepPlan { int wakeInSeconds; const char *sleepReason; bool overnightFallbackSleep; };
 
 bool sleepPlan(SleepPlan &plan) {
@@ -942,22 +1076,16 @@ void handleSleepingState() {
   // Particle.disconnect() has been requested. Here, we keep application
   // logic minimal: request cloud disconnect and radio-off once, then wait
   // (bounded) until both cloud and modem are actually off before sleeping.
-#if Wiring_WiFi
-  static bool wifiOffGuardActive = false;
-  static unsigned long wifiOffGuardStartMs = 0;
-  static unsigned long wifiOffGuardLastRetryMs = 0;
-  static uint8_t wifiOffGuardRetries = 0;
-#endif
 
   if (enteredState) {
     cloudGate.cloudSyncBudgetMs = 0;
     cloudGate.cloudSyncMaxQueueDepth = 0;
     cloudGate.lastQueueDepth = 0xFFFF;
 #if Wiring_WiFi
-    wifiOffGuardActive = false;
-    wifiOffGuardStartMs = 0;
-    wifiOffGuardLastRetryMs = 0;
-    wifiOffGuardRetries = 0;
+    wifiGuard.wifiOffGuardActive = false;
+    wifiGuard.wifiOffGuardStartMs = 0;
+    wifiGuard.wifiOffGuardLastRetryMs = 0;
+    wifiGuard.wifiOffGuardRetries = 0;
 #endif
   }
 
@@ -1018,131 +1146,13 @@ void handleSleepingState() {
   // -----------------------------------------------------------------------
   // Minimal end-of-cycle observability (one compact line per wake cycle)
   // -----------------------------------------------------------------------
-  {
-    measure.batteryState(BatterySampleContext::PreSleep);
-    const uint16_t qDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
-    const float soc = PowerManager::instance().soc();
-    const uint16_t socTenths = (soc >= 0.0f && soc <= 100.0f) ? (uint16_t)(soc * 10.0f + 0.5f) : 0xFFFF;
-    const uint8_t battState = PowerManager::instance().batteryState();
-    const uint8_t isCharging = (battState == 0) ? 0xFF : ((battState == 2) ? 1 : 0); // 0=Unknown, 2=Charging
-
-    Observability::cycleStats().finalizeBeforeSleep(
-        millis(),
-        Particle.connected(),
-        Connectivity::isRadioPoweredOn(),
-        qDepth,
-        socTenths,
-        isCharging,
-        SystemConfig::get_lastConnection());
-
-    // Invariants (log-only): detect regressions without affecting behavior.
-    // Ceiling is derived from existing budgets and includes firmware update time.
-    const unsigned long awakeCeilingMs =
-        (unsigned long)ConnectivityPolicy::CONNECT_BUDGET_DEEP_MS +
-        (unsigned long)ConnectivityPolicy::FIRMWARE_UPDATE_MAX_MS +
-      (unsigned long)ConnectivityPolicy::OUTPUT_LEDGER_SYNC_TIMEOUT_MS +
-        (unsigned long)ConnectivityPolicy::DISCONNECT_MODEM_DEFAULT_SEC * 1000UL +
-        30000UL; // slack
-
-    // Debug builds may intentionally stay awake longer for diagnostics.
-    const bool allowCeilingOver = (DEV_BUILD != 0);
-    if (!allowCeilingOver && Observability::cycleStats().total_awake_ms > awakeCeilingMs) {
-      Log.warn("INV: awake_ms=%lu > ceiling_ms=%lu", (unsigned long)Observability::cycleStats().total_awake_ms,
-               (unsigned long)awakeCeilingMs);
-    }
-
-    if (!useNetworkStandby) {
-      if (Particle.connected() || Connectivity::isRadioPoweredOn()) {
-        Log.warn("INV: entering sleep with cloud=%d radioOn=%d (standby=0)",
-                 (int)Particle.connected(), (int)Connectivity::isRadioPoweredOn());
-      }
-    } else {
-      if (Particle.connected()) {
-        Log.warn("INV: entering sleep with cloud still connected (standby=1)");
-      }
-    }
-
-    // Connect duration should be within the selected budget when an attempt was made.
-    if (Observability::cycleStats().connect_attempt_type != Observability::WakeCycleStats::ConnectAttemptType::NONE &&
-        Observability::cycleStats().connect_budget_ms > 0 &&
-        Observability::cycleStats().connect_duration_ms > (Observability::cycleStats().connect_budget_ms + 1000UL)) {
-      Log.warn("INV: connect_ms=%lu > budget_ms=%lu", (unsigned long)Observability::cycleStats().connect_duration_ms,
-               (unsigned long)Observability::cycleStats().connect_budget_ms);
-    }
-
-    // One compact line for field parsing.
-    if (SystemConfig::get_verboseMode()) {
-      Log.info(
-        "CYCLE end awake=%lums conn=%s/%s/%lums svc=%lums td=%lums q=%d/%d/%d soc=%.1f%% chg=%d lastOk=%ld",
-          (unsigned long)Observability::cycleStats().total_awake_ms,
-          Observability::toString(Observability::cycleStats().connect_attempt_type),
-          Observability::toString(Observability::cycleStats().connect_result),
-          (unsigned long)Observability::cycleStats().connect_duration_ms,
-          (unsigned long)Observability::cycleStats().service_duration_ms,
-          (unsigned long)Observability::cycleStats().teardown_duration_ms,
-        (int)(Observability::cycleStats().publish_queue_depth_before_connect == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_before_connect),
-        (int)(Observability::cycleStats().publish_queue_depth_after_connect == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_after_connect),
-        (int)(Observability::cycleStats().publish_queue_depth_before_sleep == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_before_sleep),
-          (double)(Observability::cycleStats().battery_soc_tenths == 0xFFFF ? -1.0 : ((double)Observability::cycleStats().battery_soc_tenths / 10.0)),
-        (int)(Observability::cycleStats().is_charging == 0xFF ? -1 : (int)Observability::cycleStats().is_charging),
-          (long)Observability::cycleStats().last_success_epoch);
-    }
-  }
+  endOfCycleSummary(useNetworkStandby);
 
   // On WiFi platforms, ensure the radio is actually OFF before entering
   // ULTRA_LOW_POWER. If the cloud/radio was left on, the device can flash
   // green briefly on wake as WiFi attempts to reconnect.
 #if Wiring_WiFi
-  if (!useNetworkStandby) {
-    if (Particle.connected()) {
-      Connectivity::requestCloudDisconnectOnly();
-    }
-    if (WiFi.isOn()) {
-      constexpr unsigned long WIFI_OFF_GUARD_MAX_MS = 2000UL;
-      constexpr unsigned long WIFI_OFF_GUARD_RETRY_MS = 400UL;
-      const unsigned long nowMs = millis();
-
-      if (!wifiOffGuardActive) {
-        wifiOffGuardActive = true;
-        wifiOffGuardStartMs = nowMs;
-        wifiOffGuardLastRetryMs = 0;
-        wifiOffGuardRetries = 0;
-        Log.info("SLEEP: WiFi still on - starting bounded radio-off guard");
-      }
-
-      if (wifiOffGuardLastRetryMs == 0 || (nowMs - wifiOffGuardLastRetryMs) >= WIFI_OFF_GUARD_RETRY_MS) {
-        Connectivity::requestRadioPowerOff();
-        wifiOffGuardLastRetryMs = nowMs;
-        if (wifiOffGuardRetries < 255) {
-          wifiOffGuardRetries++;
-        }
-      }
-
-      unsigned long guardElapsedMs = nowMs - wifiOffGuardStartMs;
-      if (guardElapsedMs <= WIFI_OFF_GUARD_MAX_MS) {
-        thrashGuard.markProgress("WIFI_OFF_GUARD");
-        Particle.process();
-        return;
-      }
-
-      Log.warn("SLEEP: WiFi radio remained on after %lu ms (%u retries) - proceeding to sleep",
-               guardElapsedMs,
-               wifiOffGuardRetries);
-      wifiOffGuardActive = false;
-      wifiOffGuardStartMs = 0;
-      wifiOffGuardLastRetryMs = 0;
-      wifiOffGuardRetries = 0;
-    } else if (wifiOffGuardActive) {
-      unsigned long guardElapsedMs = millis() - wifiOffGuardStartMs;
-      if (SystemConfig::get_verboseMode()) {
-        Log.info("SLEEP: WiFi radio powered off before sleep (%lu ms)", guardElapsedMs);
-      }
-      wifiOffGuardActive = false;
-      wifiOffGuardStartMs = 0;
-      wifiOffGuardLastRetryMs = 0;
-      wifiOffGuardRetries = 0;
-    }
-  }
+  if (wifiOffGuardPass(useNetworkStandby)) return;
 #endif
   
   WakeContext wake;
