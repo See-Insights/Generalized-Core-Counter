@@ -101,3 +101,13 @@ Move the cloud-operations gate (the bounded wait for the publish queue, ledgers,
 - ELF by symbol.
 - The retained outcome.
 - The ruling-8 table.
+
+## Stage 6 result and controller reproduction (21 Oct)
+
+**Stage 6** (Copilot, Sonnet 5.5, medium; implementation commit `58c59c0` on `wip/s3-sleep-cloud-gate`, no PR): option D as designed. `State_Sleep.cpp` 1,348 → 1,356 (**net +8**, within +20); only that file changed in `src/` (tree hash `1a27b3d9…` → `ef585a79946cf8d0f389681aedc396b83e40cba9128943b779e8af98e966c395`). The file differs from Claude Code's pre-dispatch prototype in one blank line.
+**Test complexity (WO-2026-10-20-002 ruling 9), against main `0c565fa`:** `src/` 22,306 → 22,351 (**+45**; S-3 alone +8); test lines excluding fixtures 28,893 → 31,545 (**+2,652**; S-3 alone +939); fixture lines 834 → 16,868 (**+16,034**; S-3 alone +5,471); suite 91 → 97 (**+6**; S-3 alone +2). **Flag:** the fixture is 5,471 lines against the Step 0 estimate of 1,500–2,500 (about 2.2×), because the harness records every scenario in both a gate-trace-on and a gate-trace-off build (78 + 78 scenarios, 952 passes); test code is about +939 against the +100 guideline.
+**Controller reproduction** (Claude Code, Device OS 6.4.1 Boron, fresh `BUILD_PATH_BASE`, `-frandom-seed=p6`, "before" is `git archive HEAD`):
+- **Fixture:** `--regenerate` from the base (`9578709`) is **byte-identical** to the committed `tests/fixtures/sleep_cloud_gate_transcript.txt`; the normal run matches in both builds; the `COPY_MISMATCH` demonstration fires; the S-1 and S-2 fixtures are byte-identical to `HEAD`.
+- **Suite 97/97** (sh via zsh, py via python3, serial; baseline 95); golden fixture unchanged; `git diff --check` clean (no whitespace hits at all), new test files clean.
+- **Build (Boron):** text/data/bss `151484/1094/2236 → 151348/1114/2212` (**−136 text, +20 data, −24 bss**): the ten function-local statics are replaced by one 24-byte `(anonymous namespace)::cloudGate`, which lands wholly in `.data` because two fields start non-zero (`lastGateBlockerMask`, `lastQueueDepth`); total RAM −4 B. `handleSleepingState` `0x1580` → `0x14f4`; `cloudGatePass` is inlined; static-init stubs 22 before and after. **`.backup` unchanged** (`0x98` bytes, 25 retained symbols at the same addresses; only the flash load address moved, `0xd9340` → `0xd92cc`): retained outcome A.
+- **Mutations (git-backed copy):** alert 44 before 43, the budget edge off by one (`<=`), the `lastQueueDepth` update skipped, the occupancy-exit `cloudSyncStartMs` reset dropped and a stray gate-field write each fail the transcript and the structural test; a `retained` probe fails the structural test.
