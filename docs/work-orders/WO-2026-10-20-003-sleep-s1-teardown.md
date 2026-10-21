@@ -120,3 +120,9 @@ Budget versus actual (non-move `src/`, moved lines, sleep `wc -l`, tests), the t
 - **Deviations:** the two old entry resets became one `SleepTeardown::enter()`; non-cellular builds get three dummy locals at `State_Sleep.cpp:156–158` for the by-reference standby-return parameters; `logWakeSummary` stays in `State_Sleep.cpp` (S-6).
 - **Rounds:** Stage 6 one round plus one test-only follow-up; Stage 7 twice (NOT VERIFIED on F1, then VERIFIED WITH CONCERNS), no third round.
 - **Release:** ships in v46 with S-2 to S-6. **The PR is marked "do not merge until v45 is cut."**
+
+## Architect's rulings after Stage 8 (21 Oct)
+
+- **Proceeding to Stage 8 on VERIFIED WITH CONCERNS was correct.** PR #128 stays open until v45 is cut.
+- **C1 (the dwell test's comment skipping, `firmware_update_dwell_test.sh:40–47`): left as it is.** If S-2 touches `firmware_update_dwell_test.sh`, it makes the test skip comments there (block and trailing comments, not only full-line `//`).
+- **`wip/s1-sleep-teardown` is deleted** (the same commits are on this branch).
