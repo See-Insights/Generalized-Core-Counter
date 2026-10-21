@@ -57,3 +57,14 @@ The report (`WO-2026-10-20-004-step0-report.md`, citations checked in both trees
 4. **The closing report:** v50 sends it only when the hourly count is nonzero; GCC sends the due close-boundary report even at zero. Is an extra zero report acceptable to Ubidots (C-6/C-8)?
 
 Also still unknown from the trees (C-0): the legacy fleet's Particle product(s), each device's current settings (readable from the VC Particle variables while online), and the Ubidots/webhook contract (the hook name `Ubidots-Counter-Hook-v1` may need no firmware change).
+
+## Chip's convergence decisions (21 Oct) — these close the four open items above
+
+1. **`maxmin` is dropped.** It is removed from the 12529 webhook template at go-live. (No persisted GCC field and no firmware change; this clears the Step 0 stop rule, item 8.)
+2. **The PIR filter becomes a ledger setting** (the 500 ms filter in COUNTING, C-3): settable per product or device through the ledgers, so trail counters can be set to count closely spaced pulses as v50 does.
+3. **Car counters use `sensor.type=0`.**
+4. **COUNTING matches v50** for counting, **rollover** (daily and hourly totals cleared at the opening-hour report, before the report is sent) and **the closing report** (sent only when the hourly count is nonzero). This is the architect's "must match" outcome for C-6, COUNTING only; the occupancy boundary behavior is unchanged.
+5. **Settings come from Chip's Google Sheet:** the common values go into the **12529 `default-settings`** ledger, and `device-settings` is used **only for the roughly 5 % outliers**. (This answers the Step 0 item 4 field-values question; the per-device read from the VC Particle variables is then a cross-check, not the source.)
+6. **Cutover:** the OTA lands at each device's first connection after opening, so **the day of the update is wholly GCC** (no partial day under v50).
+
+**Consequences for the sequence (architect to confirm):** C-3 becomes a ledger-setting WO, not a COUNTING-only bypass; C-6 implements the v50 boundary and closing-report rules for COUNTING; C-7 is dropped (GCC battery tiers for all types, already ruled); C-8 reduces to removing `maxmin` from the 12529 template at go-live; C-0 still has to confirm the webhook/Ubidots contract for the remaining fields (the added diagnostic fields and the GCC timestamp semantics). Still open from the Step 0 report: the product inventory (12529 is now the named product) and each device's current settings for the outliers.
