@@ -116,3 +116,13 @@ The guard's four statics go into one file-level struct. **No behavior change:** 
 - ELF by symbol, and any layout difference.
 - The retained outcome.
 - The ruling-8 table.
+
+## Stage 6 result and controller reproduction (21 Oct)
+
+**Stage 6** (Copilot, Sonnet 5.5, medium; implementation commit `a06b09a` on `wip/s5-sleep-preflight`, no PR): option D as designed. `State_Sleep.cpp` 1,373 → 1,383 (**net +10**, within +20; +7 non-blank); only that file changed in `src/` (tree hash `2a96daf20a659b79cfbc5dc582ef1cc4e5e2f2c9bf79589dcc23166d76b9393c` → `88d823dedca396b814aa170c10928de40ead36fe2f44dffcc1eb78668bcab298`). The file is **identical** to Claude Code's pre-dispatch prototype (zero differing lines).
+**Test complexity (WO-2026-10-20-002 ruling 9), against main `0c565fa` (Claude Code's count over all of `src/` and `tests/`):** `src/` 22,306 → 22,378 (**+72**; S-5 alone +10); test lines excluding fixtures 28,893 → 33,083 (**+4,190**; S-5 alone +871); fixture lines 834 → 18,890 (**+18,056**; S-5 alone +927); suite 91 → 101 (**+10**; S-5 alone +2). (Copilot counted `src/` as 22,366; its `find` differs from the method used for S-1 to S-4, so the recorded figure is Claude Code's.) The fixture is 927 lines against the Step 0 estimate of 450–700 (about 1.3–2.1×): 86 scenarios (59 release, 7 `DEV_BUILD`, 20 `Wiring_WiFi` with multi-pass guard coverage; 122 passes); test code +871 against the +100 guideline (Step 0 expected +600–850).
+**Controller reproduction** (Claude Code, Device OS 6.4.1 Boron, fresh `BUILD_PATH_BASE`, `-frandom-seed=p6`, "before" is `git archive HEAD`):
+- **Fixture:** `--regenerate` from the base (`e9475d7`) is **byte-identical** to the committed `tests/fixtures/sleep_preflight_transcript.txt`; the normal run matches in all three builds; the `COPY_MISMATCH` demonstration fires; the S-1 to S-4 fixtures are byte-identical to `HEAD`.
+- **Suite 101/101** (sh via zsh, py via python3, serial; baseline 99); golden fixture unchanged; `git diff --check` has no hits; new test files clean.
+- **Builds (Boron):** release `151348/1114/2212` and `-DDEV_BUILD=1` `151276/1114/2212`, both identical before and after, with **`.text` byte-identical** (the Wi-Fi guard compiles out on Boron and the summary inlines identically), identical symbol sets, static-init stubs 22/22, **`.backup` unchanged** (retained outcome A).
+- **Mutations (git-backed copy):** the 30 s ceiling slack dropped, the standby branches of the radio invariant swapped, the Wi-Fi guard retried one interval late, the give-up reset dropped and the `+ 0.5f` rounding dropped each fail the transcript and the structural test; a stray write to a guard field fails the structural test (the transcript does not execute it); a `retained` probe fails the structural test.
