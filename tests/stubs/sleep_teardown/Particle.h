@@ -68,6 +68,7 @@ struct LogStub {
   }
   void info(const char *fmt, ...) { va_list ap; va_start(ap, fmt); add("INFO", fmt, ap); va_end(ap); }
   void warn(const char *fmt, ...) { va_list ap; va_start(ap, fmt); add("WARN", fmt, ap); va_end(ap); }
+  void error(const char *fmt, ...) { va_list ap; va_start(ap, fmt); add("ERROR", fmt, ap); va_end(ap); }
 };
 inline LogStub Log;
 
