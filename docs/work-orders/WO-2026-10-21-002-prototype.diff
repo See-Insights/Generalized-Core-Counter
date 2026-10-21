@@ -1,0 +1,554 @@
+diff --git src/state/State_Sleep.cpp tmp/s3_proto.cpp
+index 9d160b3..c846945 100644
+--- src/state/State_Sleep.cpp
++++ tmp/s3_proto.cpp
+@@ -118,6 +118,240 @@ const char *gateBlockerReasonLabel(uint8_t blockerMask) {
+   }
+ }
+ 
++
++struct {
++  bool operationsCompleteLogged = false;  // Track if we've logged completion message
++  bool gateWasBlocking = false;
++  unsigned long lastGateStatusLogMs = 0;
++  uint8_t lastGateBlockerMask = kGateBlockerUninitialized;
++  uint8_t lastGateBlockerBeforeRelease = 0;
++  bool gateReleaseReasonKnown = false;
++  unsigned long cloudSyncStartMs = 0;
++  unsigned long cloudSyncBudgetMs = 0;
++  uint16_t cloudSyncMaxQueueDepth = 0;
++  uint16_t lastQueueDepth = 0xFFFF;
++} cloudGate;
++
++bool cloudGatePass(bool useNetworkStandbyEffective) {
++  // Only wait for cloud operations *before* requesting disconnect.
++  if (Particle.connected() && !SleepTeardown::disconnectRequested()) {
++    // Initialize timer on first check
++    if (cloudGate.cloudSyncStartMs == 0) {
++      cloudGate.cloudSyncStartMs = millis();
++    }
++    // Check prerequisite completion
++    bool queueEmpty = PublishQueuePosix::instance().getCanSleep();
++    bool configLedgersSynced = Cloud::instance().areLedgersSynced();
++    bool outputLedgersSynced = !Cloud::instance().hasPendingOutputLedgerSync();
++    Cloud::LedgerSyncDiagnostics ledgerDiagnostics = Cloud::instance().ledgerSyncDiagnostics();
++  #if !ENABLE_GATE_TRACE
++    (void)ledgerDiagnostics;
++  #endif
++    bool ledgersSynced = configLedgersSynced && outputLedgersSynced;
++    bool updatesChecked = !System.updatesPending();
++    bool webhookConfirmed = !session.awaitingWebhookResponse;
++    uint16_t queueDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
++    if (queueDepth > cloudGate.cloudSyncMaxQueueDepth) {
++      cloudGate.cloudSyncMaxQueueDepth = queueDepth;
++    }
++    unsigned long queueAwareBudgetMs = computeCloudSyncTimeoutMs(cloudGate.cloudSyncMaxQueueDepth);
++    if (queueAwareBudgetMs > cloudGate.cloudSyncBudgetMs) {
++      cloudGate.cloudSyncBudgetMs = queueAwareBudgetMs;
++    }
++    if (!outputLedgersSynced &&
++        ConnectivityPolicy::OUTPUT_LEDGER_SYNC_TIMEOUT_MS > cloudGate.cloudSyncBudgetMs) {
++      cloudGate.cloudSyncBudgetMs = ConnectivityPolicy::OUTPUT_LEDGER_SYNC_TIMEOUT_MS;
++    }
++
++    {
++      if (cloudGate.lastQueueDepth != 0xFFFF && queueDepth < cloudGate.lastQueueDepth) {
++        thrashGuard.markProgress("QUEUE_DRAIN");
++      }
++      cloudGate.lastQueueDepth = queueDepth;
++    }
++
++    bool allComplete = queueEmpty && ledgersSynced && updatesChecked && webhookConfirmed;
++
++    if (!allComplete) {
++      unsigned long elapsedMs = millis() - cloudGate.cloudSyncStartMs;
++      const int queuePending = queueEmpty ? 0 : 1;
++      const int ledgerPending = ledgersSynced ? 0 : 1;
++      const int webhookPending = webhookConfirmed ? 0 : 1;
++      const int updatePending = updatesChecked ? 0 : 1;
++      uint8_t blockerMask = 0;
++      if (queuePending) {
++        blockerMask |= kGateBlockerQueue;
++      }
++      if (ledgerPending) {
++        blockerMask |= kGateBlockerLedger;
++      }
++      if (webhookPending) {
++        blockerMask |= kGateBlockerWebhook;
++      }
++      if (updatePending) {
++        blockerMask |= kGateBlockerUpdate;
++      }
++      if (blockerMask != 0) {
++        cloudGate.lastGateBlockerBeforeRelease = blockerMask;
++        cloudGate.gateReleaseReasonKnown = true;
++      }
++
++      if (elapsedMs > kGateBlockLogThresholdMs &&
++          cloudGate.lastGateBlockerMask != blockerMask) {
++        if (ledgerPending) {
++#if ENABLE_GATE_TRACE
++          Log.info("GateDetail: wait=%lu ledger=%d pending=%u syncing=%d inflight=%d reason=%s",
++                   elapsedMs,
++                   ledgerPending,
++                   ledgerDiagnostics.pendingCount,
++                   ledgerDiagnostics.syncing ? 1 : 0,
++                   ledgerDiagnostics.inflight ? 1 : 0,
++                   gateBlockerReasonLabel(blockerMask));
++          Log.info("GateDetailState: config=%d output=%d queued=%d statusSync=%d dataSync=%d statusInflight=%d dataInflight=%d",
++                   configLedgersSynced ? 1 : 0,
++                   outputLedgersSynced ? 1 : 0,
++                   ledgerDiagnostics.pendingStatusPublish ? 1 : 0,
++                   ledgerDiagnostics.pendingDeviceStatusSync ? 1 : 0,
++                   ledgerDiagnostics.pendingDeviceDataSync ? 1 : 0,
++                   ledgerDiagnostics.statusInflight ? 1 : 0,
++                   ledgerDiagnostics.dataInflight ? 1 : 0);
++#endif
++        }
++#if ENABLE_GATE_TRACE
++        Log.info("GateBlock: wait=%lu reason=%s q=%d ledger=%d webhook=%d update=%d",
++                 elapsedMs,
++                 gateBlockerReasonLabel(blockerMask),
++                 (int)queueDepth,
++                 ledgerPending,
++                 webhookPending,
++                 updatePending);
++#endif
++        cloudGate.lastGateBlockerMask = blockerMask;
++      }
++
++      if (elapsedMs < cloudGate.cloudSyncBudgetMs) {
++        if (!cloudGate.gateWasBlocking ||
++            (millis() - cloudGate.lastGateStatusLogMs) >= ConnectivityPolicy::CLOUD_OPS_STATUS_LOG_INTERVAL_MS) {
++#if ENABLE_GATE_TRACE
++          Log.info("Gate: q=%d ledger=%d webhook=%d update=%d wait=%lu/%lu",
++                   (int)queueDepth,
++                   ledgerPending,
++                   webhookPending,
++                   updatePending,
++                   elapsedMs,
++                   cloudGate.cloudSyncBudgetMs);
++#endif
++          cloudGate.gateWasBlocking = true;
++          cloudGate.lastGateStatusLogMs = millis();
++        }
++        // Mark progress to prevent ThrashGuard timeout during legitimate cloud operations wait
++        thrashGuard.markProgress("CLOUD_OPS_WAIT");
++        serviceAwakeWatchdog();
++        Particle.process(); // Keep connection alive
++        return true; // Stay in SLEEPING_STATE until complete or timeout
++      }
++
++      // Budget exceeded - log incomplete operations and raise ONE alert (priority order)
++       const char *gateFailReason = !queueEmpty ? "queue" :
++        (!ledgersSynced ? "ledger" : (!webhookConfirmed ? "webhook" : "update"));
++       Log.warn("GateFail: reason=%s timeout=%lu q=%d ledger=%d webhook=%d update=%d",
++          gateFailReason,
++          cloudGate.cloudSyncBudgetMs,
++          (int)queueDepth,
++          ledgerPending,
++          webhookPending,
++          updatePending);
++       cloudGate.gateWasBlocking = false;
++       cloudGate.lastGateStatusLogMs = 0;
++       cloudGate.lastGateBlockerMask = kGateBlockerUninitialized;
++       cloudGate.lastGateBlockerBeforeRelease = 0;
++       cloudGate.gateReleaseReasonKnown = false;
++
++      // Only raise one alert - check in priority order (queue > ledger > updates > webhook)
++      if (!queueEmpty) {
++        Log.warn("SLEEP: Publish queue not empty - raising alert 43");
++        RecoveryState::raiseAlert(43); // Queue drainage failure (highest priority)
++      } else if (!ledgersSynced) {
++        Log.warn("SLEEP: ledger sync incomplete after %lu ms (budget=%lu ms) - raising alert 44",
++                 elapsedMs,
++                 cloudGate.cloudSyncBudgetMs);
++        Cloud::instance().logLedgerSleepTimeoutState();
++        RecoveryState::raiseAlert(44); // Ledger sync timeout before sleep (minor - config already applied)
++      } else if (!updatesChecked) {
++        Log.warn("SLEEP: OTA updates pending - raising alert 42");
++        RecoveryState::raiseAlert(42); // OTA updates pending
++      } else if (!webhookConfirmed) {
++        Log.warn("SLEEP: Webhook response not received - raising alert 40");
++        RecoveryState::raiseAlert(40); // Webhook response timeout
++      }
++
++      // Proceed with disconnect despite incomplete operations
++      cloudGate.cloudSyncStartMs = 0;
++      cloudGate.cloudSyncBudgetMs = 0;
++      cloudGate.cloudSyncMaxQueueDepth = 0;
++    } else {
++      unsigned long gateWaitMs = millis() - cloudGate.cloudSyncStartMs;
++      if (gateWaitMs > kGateBlockLogThresholdMs && cloudGate.lastGateBlockerMask != 0) {
++#if ENABLE_GATE_TRACE
++        Log.info("GateBlock: wait=%lu reason=none q=%u ledger=0 webhook=0 update=0",
++                 gateWaitMs, (unsigned)PublishQueuePosix::instance().getNumEvents());
++#endif
++        cloudGate.lastGateBlockerMask = 0;
++      }
++      if (cloudGate.gateWasBlocking) {
++        Cloud::LedgerSyncDiagnostics ledgerDiagnosticsRelease = Cloud::instance().ledgerSyncDiagnostics();
++#if ENABLE_GATE_TRACE
++        Log.info("GateReleaseDetail: wait=%lu pending=%u syncing=%d inflight=%d reason=%s",
++                 gateWaitMs,
++                 ledgerDiagnosticsRelease.pendingCount,
++                 ledgerDiagnosticsRelease.syncing ? 1 : 0,
++                 ledgerDiagnosticsRelease.inflight ? 1 : 0,
++                 cloudGate.gateReleaseReasonKnown
++                     ? gateBlockerReasonLabel(cloudGate.lastGateBlockerBeforeRelease)
++                     : "unknown");
++#endif
++        (void)ledgerDiagnosticsRelease;
++        Log.info("GateRelease: wait=%lu reason=%s",
++                 gateWaitMs,
++                 cloudGate.gateReleaseReasonKnown
++                     ? gateBlockerReasonLabel(cloudGate.lastGateBlockerBeforeRelease)
++                     : "unknown");
++        Log.info("Gate: ok wait=%lu", gateWaitMs);
++      }
++      cloudGate.gateWasBlocking = false;
++      cloudGate.lastGateStatusLogMs = 0;
++      cloudGate.lastGateBlockerMask = kGateBlockerUninitialized;
++      cloudGate.lastGateBlockerBeforeRelease = 0;
++      cloudGate.gateReleaseReasonKnown = false;
++      // All operations complete - reset timer and proceed
++      cloudGate.cloudSyncStartMs = 0;
++      cloudGate.cloudSyncBudgetMs = 0;
++      cloudGate.cloudSyncMaxQueueDepth = 0;
++    }
++
++    if (!cloudGate.operationsCompleteLogged) {
++      if (SystemConfig::get_verboseMode()) {
++        Log.info("SLEEP: Cloud operations gate passed - ready to disconnect");
++        Log.info("SLEEP: disconnect context connected=%d radioOn=%d standbyEffective=%d occupied=%d",
++                 Particle.connected(), Connectivity::isRadioPoweredOn(), useNetworkStandbyEffective, CurrentReadings::get_occupied());
++      }
++
++      // Observability: end of service window (ledger sync + queue drain + OTA check + webhook).
++      Observability::cycleStats().markServiceEnd(millis());
++
++      cloudGate.operationsCompleteLogged = true;
++    }
++  } else {
++    // Not connected - reset timer
++    cloudGate.cloudSyncStartMs = 0;
++    cloudGate.cloudSyncBudgetMs = 0;
++    cloudGate.cloudSyncMaxQueueDepth = 0;
++    cloudGate.lastGateBlockerMask = kGateBlockerUninitialized;
++    cloudGate.lastGateBlockerBeforeRelease = 0;
++    cloudGate.gateReleaseReasonKnown = false;
++  }
++  return false;
++}
+ struct WakeContext { bool pirWake, buttonWake, timerWake; const char *wakeReasonLabel; };
+ struct { bool preserveAfterNormalReturn = false; bool forceModemOff = false; int error = SYSTEM_ERROR_NONE; } standbyReturn;
+ 
+@@ -480,22 +714,16 @@ void handleSleepingState() {
+   maybeStartSleepPrepSpan(retainedLoopForensics.sleepPrepSpanStartMillis, millis());
+ 
+   bool enteredState = (state != oldState);
+-  static bool operationsCompleteLogged = false;  // Track if we've logged completion message
+-  static bool gateWasBlocking = false;
+-  static unsigned long lastGateStatusLogMs = 0;
+-  static uint8_t lastGateBlockerMask = kGateBlockerUninitialized;
+-  static uint8_t lastGateBlockerBeforeRelease = 0;
+-  static bool gateReleaseReasonKnown = false;
+ 
+   if (enteredState) {
+     setAppBreadcrumb(3);
+     publishStateTransition();
+-    operationsCompleteLogged = false;  // Reset flag on state entry
+-    gateWasBlocking = false;
+-    lastGateStatusLogMs = 0;
+-    lastGateBlockerMask = kGateBlockerUninitialized;
+-    lastGateBlockerBeforeRelease = 0;
+-    gateReleaseReasonKnown = false;
++    cloudGate.operationsCompleteLogged = false;  // Reset flag on state entry
++    cloudGate.gateWasBlocking = false;
++    cloudGate.lastGateStatusLogMs = 0;
++    cloudGate.lastGateBlockerMask = kGateBlockerUninitialized;
++    cloudGate.lastGateBlockerBeforeRelease = 0;
++    cloudGate.gateReleaseReasonKnown = false;
+     SleepTeardown::enter();
+   }
+ 
+@@ -510,7 +738,6 @@ void handleSleepingState() {
+       isWithinOpenHours();
+   bool useNetworkStandbyEffective = effectiveStandby(useNetworkStandbyRequested);
+ 
+-  static unsigned long cloudSyncStartMs = 0;
+   // If a ledger update (or time progression) moves the park into OPEN hours
+   // while we are in SLEEPING_STATE, abort sleeping immediately in CONNECTED
+   // mode so we stay awake/connected and resume counting.
+@@ -522,7 +749,7 @@ void handleSleepingState() {
+   // than committing to a sleep the device can't actually justify.
+   if (PowerManager::instance().effectiveConnectionMode() == SystemConfig::CONNECTED && Clock::openness() != Clock::Openness::Closed) {
+     ensureSensorEnabled("SLEEP abort: CONNECTED+OPEN");
+-    cloudSyncStartMs = 0;
++    cloudGate.cloudSyncStartMs = 0;
+     transitionTo(IDLE_STATE, "sleep-abort-open-hours");
+     return;
+   }
+@@ -541,9 +768,6 @@ void handleSleepingState() {
+   // Use a timeout budget to prevent battery drain if operations hang.
+   // NOTE: This code is non-blocking at application level (Particle.process() called)
+   // but blocks state transition until prerequisites complete or timeout.
+-  static unsigned long cloudSyncBudgetMs = 0;
+-  static uint16_t cloudSyncMaxQueueDepth = 0;
+-  static uint16_t lastQueueDepth = 0xFFFF;
+ 
+   // ********** Non-blocking disconnect + modem power-down **********
+   // Device OS already manages the asynchronous cloud session teardown once
+@@ -558,9 +782,9 @@ void handleSleepingState() {
+ #endif
+ 
+   if (enteredState) {
+-    cloudSyncBudgetMs = 0;
+-    cloudSyncMaxQueueDepth = 0;
+-    lastQueueDepth = 0xFFFF;
++    cloudGate.cloudSyncBudgetMs = 0;
++    cloudGate.cloudSyncMaxQueueDepth = 0;
++    cloudGate.lastQueueDepth = 0xFFFF;
+ #if Wiring_WiFi
+     wifiOffGuardActive = false;
+     wifiOffGuardStartMs = 0;
+@@ -577,7 +801,7 @@ void handleSleepingState() {
+   // caught before the cloud disconnect / radio-off requests below, not after
+   // the transfer has already been lost (WO-2026-10-01-001 item A).
+   if (!SleepTeardown::disconnectRequested() && firmwareUpdateInProgress) {
+-    cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
++    cloudGate.cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
+     transitionTo(FIRMWARE_UPDATE_STATE, "firmware update in progress");
+     return;
+   }
+@@ -588,228 +812,12 @@ void handleSleepingState() {
+   // requested teardown it stays latched and reports on the first pass after
+   // the wake, so Report/Connect never starts while the disconnect is in flight.
+   if (session.occupancyChangeTriggered && !SleepTeardown::disconnectRequested()) {
+-    cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
++    cloudGate.cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
+     transitionTo(REPORTING_STATE, "occupancy change pending");
+     return;
+   }
+ 
+-  // Only wait for cloud operations *before* requesting disconnect.
+-  if (Particle.connected() && !SleepTeardown::disconnectRequested()) {
+-    // Initialize timer on first check
+-    if (cloudSyncStartMs == 0) {
+-      cloudSyncStartMs = millis();
+-    }
+-    // Check prerequisite completion
+-    bool queueEmpty = PublishQueuePosix::instance().getCanSleep();
+-    bool configLedgersSynced = Cloud::instance().areLedgersSynced();
+-    bool outputLedgersSynced = !Cloud::instance().hasPendingOutputLedgerSync();
+-    Cloud::LedgerSyncDiagnostics ledgerDiagnostics = Cloud::instance().ledgerSyncDiagnostics();
+-  #if !ENABLE_GATE_TRACE
+-    (void)ledgerDiagnostics;
+-  #endif
+-    bool ledgersSynced = configLedgersSynced && outputLedgersSynced;
+-    bool updatesChecked = !System.updatesPending();
+-    bool webhookConfirmed = !session.awaitingWebhookResponse;
+-    uint16_t queueDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
+-    if (queueDepth > cloudSyncMaxQueueDepth) {
+-      cloudSyncMaxQueueDepth = queueDepth;
+-    }
+-    unsigned long queueAwareBudgetMs = computeCloudSyncTimeoutMs(cloudSyncMaxQueueDepth);
+-    if (queueAwareBudgetMs > cloudSyncBudgetMs) {
+-      cloudSyncBudgetMs = queueAwareBudgetMs;
+-    }
+-    if (!outputLedgersSynced &&
+-        ConnectivityPolicy::OUTPUT_LEDGER_SYNC_TIMEOUT_MS > cloudSyncBudgetMs) {
+-      cloudSyncBudgetMs = ConnectivityPolicy::OUTPUT_LEDGER_SYNC_TIMEOUT_MS;
+-    }
+-
+-    {
+-      if (lastQueueDepth != 0xFFFF && queueDepth < lastQueueDepth) {
+-        thrashGuard.markProgress("QUEUE_DRAIN");
+-      }
+-      lastQueueDepth = queueDepth;
+-    }
+-
+-    bool allComplete = queueEmpty && ledgersSynced && updatesChecked && webhookConfirmed;
+-
+-    if (!allComplete) {
+-      unsigned long elapsedMs = millis() - cloudSyncStartMs;
+-      const int queuePending = queueEmpty ? 0 : 1;
+-      const int ledgerPending = ledgersSynced ? 0 : 1;
+-      const int webhookPending = webhookConfirmed ? 0 : 1;
+-      const int updatePending = updatesChecked ? 0 : 1;
+-      uint8_t blockerMask = 0;
+-      if (queuePending) {
+-        blockerMask |= kGateBlockerQueue;
+-      }
+-      if (ledgerPending) {
+-        blockerMask |= kGateBlockerLedger;
+-      }
+-      if (webhookPending) {
+-        blockerMask |= kGateBlockerWebhook;
+-      }
+-      if (updatePending) {
+-        blockerMask |= kGateBlockerUpdate;
+-      }
+-      if (blockerMask != 0) {
+-        lastGateBlockerBeforeRelease = blockerMask;
+-        gateReleaseReasonKnown = true;
+-      }
+-
+-      if (elapsedMs > kGateBlockLogThresholdMs &&
+-          lastGateBlockerMask != blockerMask) {
+-        if (ledgerPending) {
+-#if ENABLE_GATE_TRACE
+-          Log.info("GateDetail: wait=%lu ledger=%d pending=%u syncing=%d inflight=%d reason=%s",
+-                   elapsedMs,
+-                   ledgerPending,
+-                   ledgerDiagnostics.pendingCount,
+-                   ledgerDiagnostics.syncing ? 1 : 0,
+-                   ledgerDiagnostics.inflight ? 1 : 0,
+-                   gateBlockerReasonLabel(blockerMask));
+-          Log.info("GateDetailState: config=%d output=%d queued=%d statusSync=%d dataSync=%d statusInflight=%d dataInflight=%d",
+-                   configLedgersSynced ? 1 : 0,
+-                   outputLedgersSynced ? 1 : 0,
+-                   ledgerDiagnostics.pendingStatusPublish ? 1 : 0,
+-                   ledgerDiagnostics.pendingDeviceStatusSync ? 1 : 0,
+-                   ledgerDiagnostics.pendingDeviceDataSync ? 1 : 0,
+-                   ledgerDiagnostics.statusInflight ? 1 : 0,
+-                   ledgerDiagnostics.dataInflight ? 1 : 0);
+-#endif
+-        }
+-#if ENABLE_GATE_TRACE
+-        Log.info("GateBlock: wait=%lu reason=%s q=%d ledger=%d webhook=%d update=%d",
+-                 elapsedMs,
+-                 gateBlockerReasonLabel(blockerMask),
+-                 (int)queueDepth,
+-                 ledgerPending,
+-                 webhookPending,
+-                 updatePending);
+-#endif
+-        lastGateBlockerMask = blockerMask;
+-      }
+-
+-      if (elapsedMs < cloudSyncBudgetMs) {
+-        if (!gateWasBlocking ||
+-            (millis() - lastGateStatusLogMs) >= ConnectivityPolicy::CLOUD_OPS_STATUS_LOG_INTERVAL_MS) {
+-#if ENABLE_GATE_TRACE
+-          Log.info("Gate: q=%d ledger=%d webhook=%d update=%d wait=%lu/%lu",
+-                   (int)queueDepth,
+-                   ledgerPending,
+-                   webhookPending,
+-                   updatePending,
+-                   elapsedMs,
+-                   cloudSyncBudgetMs);
+-#endif
+-          gateWasBlocking = true;
+-          lastGateStatusLogMs = millis();
+-        }
+-        // Mark progress to prevent ThrashGuard timeout during legitimate cloud operations wait
+-        thrashGuard.markProgress("CLOUD_OPS_WAIT");
+-        serviceAwakeWatchdog();
+-        Particle.process(); // Keep connection alive
+-        return; // Stay in SLEEPING_STATE until complete or timeout
+-      }
+-
+-      // Budget exceeded - log incomplete operations and raise ONE alert (priority order)
+-       const char *gateFailReason = !queueEmpty ? "queue" :
+-        (!ledgersSynced ? "ledger" : (!webhookConfirmed ? "webhook" : "update"));
+-       Log.warn("GateFail: reason=%s timeout=%lu q=%d ledger=%d webhook=%d update=%d",
+-          gateFailReason,
+-          cloudSyncBudgetMs,
+-          (int)queueDepth,
+-          ledgerPending,
+-          webhookPending,
+-          updatePending);
+-       gateWasBlocking = false;
+-       lastGateStatusLogMs = 0;
+-       lastGateBlockerMask = kGateBlockerUninitialized;
+-       lastGateBlockerBeforeRelease = 0;
+-       gateReleaseReasonKnown = false;
+-
+-      // Only raise one alert - check in priority order (queue > ledger > updates > webhook)
+-      if (!queueEmpty) {
+-        Log.warn("SLEEP: Publish queue not empty - raising alert 43");
+-        RecoveryState::raiseAlert(43); // Queue drainage failure (highest priority)
+-      } else if (!ledgersSynced) {
+-        Log.warn("SLEEP: ledger sync incomplete after %lu ms (budget=%lu ms) - raising alert 44",
+-                 elapsedMs,
+-                 cloudSyncBudgetMs);
+-        Cloud::instance().logLedgerSleepTimeoutState();
+-        RecoveryState::raiseAlert(44); // Ledger sync timeout before sleep (minor - config already applied)
+-      } else if (!updatesChecked) {
+-        Log.warn("SLEEP: OTA updates pending - raising alert 42");
+-        RecoveryState::raiseAlert(42); // OTA updates pending
+-      } else if (!webhookConfirmed) {
+-        Log.warn("SLEEP: Webhook response not received - raising alert 40");
+-        RecoveryState::raiseAlert(40); // Webhook response timeout
+-      }
+-
+-      // Proceed with disconnect despite incomplete operations
+-      cloudSyncStartMs = 0;
+-      cloudSyncBudgetMs = 0;
+-      cloudSyncMaxQueueDepth = 0;
+-    } else {
+-      unsigned long gateWaitMs = millis() - cloudSyncStartMs;
+-      if (gateWaitMs > kGateBlockLogThresholdMs && lastGateBlockerMask != 0) {
+-#if ENABLE_GATE_TRACE
+-        Log.info("GateBlock: wait=%lu reason=none q=%u ledger=0 webhook=0 update=0",
+-                 gateWaitMs, (unsigned)PublishQueuePosix::instance().getNumEvents());
+-#endif
+-        lastGateBlockerMask = 0;
+-      }
+-      if (gateWasBlocking) {
+-        Cloud::LedgerSyncDiagnostics ledgerDiagnosticsRelease = Cloud::instance().ledgerSyncDiagnostics();
+-#if ENABLE_GATE_TRACE
+-        Log.info("GateReleaseDetail: wait=%lu pending=%u syncing=%d inflight=%d reason=%s",
+-                 gateWaitMs,
+-                 ledgerDiagnosticsRelease.pendingCount,
+-                 ledgerDiagnosticsRelease.syncing ? 1 : 0,
+-                 ledgerDiagnosticsRelease.inflight ? 1 : 0,
+-                 gateReleaseReasonKnown
+-                     ? gateBlockerReasonLabel(lastGateBlockerBeforeRelease)
+-                     : "unknown");
+-#endif
+-        (void)ledgerDiagnosticsRelease;
+-        Log.info("GateRelease: wait=%lu reason=%s",
+-                 gateWaitMs,
+-                 gateReleaseReasonKnown
+-                     ? gateBlockerReasonLabel(lastGateBlockerBeforeRelease)
+-                     : "unknown");
+-        Log.info("Gate: ok wait=%lu", gateWaitMs);
+-      }
+-      gateWasBlocking = false;
+-      lastGateStatusLogMs = 0;
+-      lastGateBlockerMask = kGateBlockerUninitialized;
+-      lastGateBlockerBeforeRelease = 0;
+-      gateReleaseReasonKnown = false;
+-      // All operations complete - reset timer and proceed
+-      cloudSyncStartMs = 0;
+-      cloudSyncBudgetMs = 0;
+-      cloudSyncMaxQueueDepth = 0;
+-    }
+-
+-    if (!operationsCompleteLogged) {
+-      if (SystemConfig::get_verboseMode()) {
+-        Log.info("SLEEP: Cloud operations gate passed - ready to disconnect");
+-        Log.info("SLEEP: disconnect context connected=%d radioOn=%d standbyEffective=%d occupied=%d",
+-                 Particle.connected(), Connectivity::isRadioPoweredOn(), useNetworkStandbyEffective, CurrentReadings::get_occupied());
+-      }
+-
+-      // Observability: end of service window (ledger sync + queue drain + OTA check + webhook).
+-      Observability::cycleStats().markServiceEnd(millis());
+-
+-      operationsCompleteLogged = true;
+-    }
+-  } else {
+-    // Not connected - reset timer
+-    cloudSyncStartMs = 0;
+-    cloudSyncBudgetMs = 0;
+-    cloudSyncMaxQueueDepth = 0;
+-    lastGateBlockerMask = kGateBlockerUninitialized;
+-    lastGateBlockerBeforeRelease = 0;
+-    gateReleaseReasonKnown = false;
+-  }
++  if (cloudGatePass(useNetworkStandbyEffective)) return;
+ 
+   if (SleepTeardown::run(useNetworkStandbyRequested, useNetworkStandbyEffective, standbyReturn.forceModemOff, standbyReturn.error) != SleepTeardown::Result::READY) { return; }
+ 
