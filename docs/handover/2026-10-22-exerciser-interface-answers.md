@@ -43,7 +43,7 @@ Answered by §0. The PIR driver is `sensors/PIRSensor.h`.
 **How minutes are credited:**
 - The session is credited **when it closes**, as `close time − start time`, into `totalOccupiedSeconds` (`closeOccupancySessionSafely`, `State_Common.h:332+`).
 - The close time is the moment the firmware notices the expiry. Asleep, that is the wake at the debounce timer, so a session runs from about the first pulse to the last pulse + debounce + wake latency.
-- **An untrusted clock credits nothing:** the session is kept open and retried (`:343–350`).
+- **An untrusted clock credits nothing:** the session is kept open and retried (`:341–349`).
 
 **What is reported:**
 - Each report carries `occupancy` (0/1, the current state) and `dailyoccupancy`, which is `totalOccupiedSeconds / 60`, cumulative minutes for today, truncated (`PIRSensor.cpp:26–29`).
@@ -85,7 +85,7 @@ Answered by §0. The PIR driver is `sensors/PIRSensor.h`.
 - Then `dailyCount`, `occupied`, the start time and `totalOccupiedSeconds` are cleared (`PIRSensor.cpp:14–22`).
 - The exerciser should be in a gap at close. Its power-off follows at night entry.
 
-**A reset during a session** caps the credit for that session at the boot time (`State_Common.h:353–358`). That is the known occupancy-lost-across-reset issue, recovery plan item 15. The exerciser will measure it, which is useful.
+**A reset during a session** caps the credit for that session at the boot time (`State_Common.h:355–360`). That is the known occupancy-lost-across-reset issue, recovery plan item 15. The exerciser will measure it, which is useful.
 
 ## Suggested V1 pattern (default 60 s debounce, reporting hourly)
 
