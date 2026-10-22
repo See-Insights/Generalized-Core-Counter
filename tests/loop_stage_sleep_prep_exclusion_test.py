@@ -119,6 +119,7 @@ MAIN_SRC = REPO_ROOT / "src" / "Generalized-Core-Counter.cpp"
 LOOP_SRC = REPO_ROOT / "src" / "observability" / "LoopForensics.cpp"
 SLEEP_SRC = REPO_ROOT / "src" / "state" / "State_Sleep.cpp"
 TEARDOWN_SRC = REPO_ROOT / "src" / "state" / "SleepTeardown.cpp"
+MODES_SRC = REPO_ROOT / "src" / "state" / "State_Modes.cpp"
 COMMON_HDR = REPO_ROOT / "src" / "state" / "State_Common.h"
 
 
@@ -639,18 +640,30 @@ def main() -> None:
     # the nightly heap guard into nightlyHeapGuard(): 13 here, 2 there, 1 in sleepAndResume(), 2 in SleepTeardown.cpp.
     (_, _, sp_body), = find_function_body(sleep_lines, "bool sleepPlan(")
     transition_calls_in_sp = re.findall(r"\btransitionTo\s*\(", "\n".join(sp_body))
-    EXPECTED_TRANSITION_CALLS = 13  # 17 real exit points minus the 2 in SleepTeardown.cpp and the 2 in sleepPlan()
+    # WO-2026-10-22-001 moved the post-wake routing into postWakeRouting() (8 transitions) and the
+    # wake-event processing into processSleepWakeEvent() in State_Modes.cpp (2): 3 here.
+    (_, _, pw_body), = find_function_body(sleep_lines, "static void postWakeRouting(")
+    transition_calls_in_pw = re.findall(r"\btransitionTo\s*\(", "\n".join(pw_body))
+    modes_lines = MODES_SRC.read_text().splitlines()
+    (_, _, pe_body), = find_function_body(modes_lines, "bool processSleepWakeEvent(")
+    transition_calls_in_pe = re.findall(r"\btransitionTo\s*\(", "\n".join(pe_body))
+    EXPECTED_TRANSITION_CALLS = 3  # 17 real exit points minus 2 in SleepTeardown.cpp, 2 in sleepPlan(), 8 in postWakeRouting() and 2 in processSleepWakeEvent()
     if len(transition_calls_in_hs) != EXPECTED_TRANSITION_CALLS:
         fail(f"expected exactly {EXPECTED_TRANSITION_CALLS} transitionTo( calls inside "
-             f"handleSleepingState() (17 real exit points minus 2 in SleepTeardown.cpp and 2 in sleepPlan()), found "
-             f"{len(transition_calls_in_hs)}")
+             f"handleSleepingState(), found {len(transition_calls_in_hs)}")
+    if len(transition_calls_in_pw) != 8:
+        fail(f"expected exactly 8 transitionTo( calls inside postWakeRouting(), found {len(transition_calls_in_pw)}")
+    if len(transition_calls_in_pe) != 2:
+        fail(f"expected exactly 2 transitionTo( calls inside processSleepWakeEvent() (State_Modes.cpp), "
+             f"found {len(transition_calls_in_pe)}")
     if len(transition_calls_in_sp) != 2:
         fail(f"expected exactly 2 transitionTo( calls inside sleepPlan() (close due, COUNTING LED defer), "
              f"found {len(transition_calls_in_sp)}")
     if len(transition_calls_in_sr) != 1:
         fail(f"expected exactly 1 transitionTo( call inside sleepAndResume() (the dead line after the "
              f"second System.reset()), found {len(transition_calls_in_sr)}")
-    print(f"PASS: all 17 real exit points (13 inside handleSleepingState(), 2 inside sleepPlan(), 2 in SleepTeardown.cpp) are plain transitionTo(...) "
+    print(f"PASS: all 17 real exit points (3 inside handleSleepingState(), 8 inside postWakeRouting(), 2 inside "
+          "processSleepWakeEvent(), 2 inside sleepPlan(), 2 in SleepTeardown.cpp) are plain transitionTo(...) "
           "calls again (exitSleepingState() removed), plus the 1 dead/unreachable line, unchanged")
 
     # ---- Check: the two System.reset() paths' purpose-built diagnostics

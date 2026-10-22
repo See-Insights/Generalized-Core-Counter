@@ -12,6 +12,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# S-5's four entry resets are the only handler lines allowed to name wifiGuard; the prefix is mapped back to the
+# base's statics for those four lines alone, so any other wifiGuard. text in the handler still differs.
+WIFI_RESETS = re.compile(r"^(    )wifiGuard\.(wifiOffGuardActive = false;|wifiOffGuardStartMs = 0;|wifiOffGuardLastRetryMs = 0;|wifiOffGuardRetries = 0;)$", re.M)
 SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "src"
 SLEEP = SRC / "state" / "State_Sleep.cpp"
 FIXTURE = ROOT / "tests" / "fixtures" / "sleep_cloud_gate_transcript.txt"
@@ -136,7 +140,7 @@ def normalized_block(code):
     head = handler[handler.index("  bool enteredState = (state != oldState);\n"):handler.index("  if (SleepTeardown::run(")]
     if head.count(CALL) != 1:
         return None, None
-    return gate, head.replace(CALL, "@@GATE@@").replace("cloudGate.", "").replace("wifiGuard.", "")
+    return gate, WIFI_RESETS.sub(r"\1\2", head.replace(CALL, "@@GATE@@").replace("cloudGate.", ""))
 
 
 def base_pieces(base_text):

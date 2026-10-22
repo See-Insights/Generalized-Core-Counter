@@ -2,6 +2,7 @@
 // Host fakes for the sleep-execution equivalence harness (WO-2026-10-21-001): what the
 // hibernate attempt, the ULP/STOP cascade and the standby decision call. Every call
 // that changes the world goes to sim::events; the inputs are scripted in sim::exec.
+#include <cstring>
 #include <ctime>
 #include <utility>
 #include "Particle.h"
@@ -60,7 +61,17 @@ struct Gate {
 };
 inline Gate gate;
 inline Exec exec;
+// Inputs of the wake-event processing (WO-2026-10-22-001), scripted per pass by the wake runner.
+struct WakeIn {
+  bool sensorReady = true;
+  int vcellState = 0, trust = 0;  // SensorManager::VcellSampleState, BatteryHealth::SocTrust
+  float vcell = 3.9f;
+};
+inline WakeIn wakeIn;
 }  // namespace sim
+namespace BatteryHealth {
+enum class SocTrust : uint8_t { Trusted, Suspect, Untrusted };
+}
 
 struct SystemSleepConfiguration {
   int m = -1, netIf = -1, netFlag = -1;
@@ -106,6 +117,17 @@ struct SerialStub {
     if (!x.reconnecting) return x.serialPre;
     x.serialPolls++;
     return x.serialUpAfter >= 0 && x.serialPolls > x.serialUpAfter;
+  }
+  explicit operator bool() { return isConnected(); }
+  void printf(const char *fmt, ...) {
+    char buf[256];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    size_t n = strlen(buf);
+    while (n && (buf[n - 1] == '\r' || buf[n - 1] == '\n')) buf[--n] = 0;
+    sim::emit("SERIAL %s", buf);
   }
   void flush() { sim::emit("CALL Serial.flush"); }
   void begin(int baud) { sim::emit("CALL Serial.begin %d", baud); sim::exec.reconnecting = true; }
@@ -184,6 +206,15 @@ struct SensorManagerStub {
   static SensorManagerStub &instance() { static SensorManagerStub s; return s; }
   void onEnterSleep() { sim::emit("SENSOR onEnterSleep"); }
   SensorStub *activeSensor() { static SensorStub s; return &s; }
+  enum class VcellSampleState : uint8_t { Known, Invalid, Unavailable };
+  void onExitSleep() { sim::emit("SENSOR onExitSleep"); }
+  bool isSensorReady() { return sim::wakeIn.sensorReady; }
+  void initializeFromConfig() { sim::emit("SENSOR initializeFromConfig"); }
+  VcellSampleState cachedBatteryVoltageState(float &vcell) {
+    vcell = sim::wakeIn.vcell;
+    return (VcellSampleState)sim::wakeIn.vcellState;
+  }
+  BatteryHealth::SocTrust cachedSocTrust() { return (BatteryHealth::SocTrust)sim::wakeIn.trust; }
 };
 using SensorManager = SensorManagerStub;
 

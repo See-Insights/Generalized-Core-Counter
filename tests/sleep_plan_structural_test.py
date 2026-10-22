@@ -13,6 +13,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# S-5's four entry resets are the only handler lines allowed to name wifiGuard; the prefix is mapped back to the
+# base's statics for those four lines alone, so any other wifiGuard. text in the handler still differs.
+WIFI_RESETS = re.compile(r"^(    )wifiGuard\.(wifiOffGuardActive = false;|wifiOffGuardStartMs = 0;|wifiOffGuardLastRetryMs = 0;|wifiOffGuardRetries = 0;)$", re.M)
 SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "src"
 SLEEP = SRC / "state" / "State_Sleep.cpp"
 FIXTURE = ROOT / "tests" / "fixtures" / "sleep_plan_transcript.txt"
@@ -22,6 +26,8 @@ STRUCT = "struct SleepPlan { int wakeInSeconds; const char *sleepReason; bool ov
 PLAN_CALL = ("  SleepPlan plan;\n  if (sleepPlan(plan)) return;\n  int wakeInSeconds = plan.wakeInSeconds;\n"
              "  const char *sleepReason = plan.sleepReason;\n  const bool overnightFallbackSleep = plan.overnightFallbackSleep;\n")
 HIB = "  hibernateAttempt(overnightFallbackSleep, wakeInSeconds);\n"
+ROUTE_CALL = "  postWakeRouting(wake.pirWake, wake.buttonWake, wake.timerWake, wake.wakeReasonLabel);\n"
+ROUTE_BASE = "  bool pirWake = wake.pirWake;\n"
 GUARD_CALL = "  if (nightlyHeapGuard(overnightFallbackSleep)) return;\n"
 # WO-2026-10-21-004 (Sleep S-5): the handler's other allowed differences are the summary call, the guard call
 # inside the kept `#if Wiring_WiFi`, the four removed Wi-Fi statics and their entry resets naming wifiGuard.
@@ -127,13 +133,13 @@ def normalized(code):
     plan = plan[:-len(PLAN_TAIL)].replace("return true;", "return;")
     guard = guard[:-len("  return false;\n")].replace("return true;", "return;")
     handler = body_of(code, "void handleSleepingState()")
-    if handler.count(PLAN_CALL) != 1 or handler.count(GUARD_CALL) != 1:
+    if handler.count(PLAN_CALL) != 1 or handler.count(GUARD_CALL) != 1 or handler.count(ROUTE_CALL) != 1:
         return None, None, None
     if handler.count(SUMMARY_CALL) != 1 or handler.count(WIFI_CALL) != 1:
         return None, None, None
-    handler = handler.replace(PLAN_CALL, "@@PLAN@@").replace(GUARD_CALL, "@@GUARD@@")
+    handler = handler.replace(PLAN_CALL, "@@PLAN@@").replace(GUARD_CALL, "@@GUARD@@").replace(ROUTE_CALL, "@@ROUTE@@\n")
     handler = handler.replace(SUMMARY_CALL, "@@SUMMARY@@\n").replace(WIFI_CALL, "#if Wiring_WiFi\n@@WIFI@@\n#endif\n")
-    return plan, guard, handler.replace("wifiGuard.", "")
+    return plan, guard, WIFI_RESETS.sub(r"\1\2", handler)
 
 
 def base_pieces(base_text):
@@ -149,6 +155,9 @@ def base_pieces(base_text):
     rest = rest[:s0] + "@@SUMMARY@@\n\n" + rest[s1:]
     w0, w1 = rest.index(WIFI_START), rest.index(WIFI_END)
     rest = rest[:w0] + "#if Wiring_WiFi\n@@WIFI@@\n#endif\n  \n  WakeContext wake;" + rest[w1 + len(WIFI_END):]
+    if rest.count(ROUTE_BASE) != 1:
+        return None, None, None
+    rest = rest[:rest.index(ROUTE_BASE)] + "@@ROUTE@@\n"
     return plan.rstrip("\n") + "\n", guard.rstrip("\n") + "\n", rest
 
 
@@ -220,7 +229,7 @@ if plan_cur.rstrip("\n") != plan_base.rstrip("\n"):
 if guard_cur.rstrip("\n") != guard_base.rstrip("\n"):
     fail("nightlyHeapGuard() differs from the base block beyond `return true;` and the final `return false;`")
 if handler_cur != handler_base:
-    fail("the handler differs from the base beyond the plan call and unpack lines and the guard call")
+    fail("the handler differs from the base beyond the plan call and unpack lines, the guard call and the post-wake routing call")
 
 # The byte-diff check itself is shown to fire: one changed character inside each moved block is detected.
 for old, new, idx in (("546 * 60", "545 * 60", 0), ("freeHeap <= ConnectivityPolicy::NIGHTLY_HEAP_RESET", "freeHeap < ConnectivityPolicy::NIGHTLY_HEAP_RESET", 1)):

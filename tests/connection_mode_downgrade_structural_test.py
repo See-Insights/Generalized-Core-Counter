@@ -136,7 +136,8 @@ if f'name("lowBatteryMode").value({DERIVED})' not in status or RAW in status:
 
 RAW_GATES = {
     "Generalized-Core-Counter.cpp": 1,
-    "state/State_Sleep.cpp": 2,
+    "state/State_Sleep.cpp": 1,
+    "state/State_Modes.cpp": 1,
 }
 for rel, expected in RAW_GATES.items():
     found = sources.get(rel, "").count(f"if ({RAW})")

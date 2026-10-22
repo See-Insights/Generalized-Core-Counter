@@ -15,6 +15,12 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# S-5's four entry resets are the only handler lines allowed to name wifiGuard; the prefix is mapped back to the
+# base's statics for those four lines alone, so any other wifiGuard. text in the handler still differs.
+WIFI_RESETS = re.compile(r"^(    )wifiGuard\.(wifiOffGuardActive = false;|wifiOffGuardStartMs = 0;|wifiOffGuardLastRetryMs = 0;|wifiOffGuardRetries = 0;)$", re.M)
+ROUTE_CALL = "  postWakeRouting(wake.pirWake, wake.buttonWake, wake.timerWake, wake.wakeReasonLabel);\n"
+ROUTE_BASE = "  bool pirWake = wake.pirWake;\n"
 SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "src"
 SLEEP = SRC / "state" / "State_Sleep.cpp"
 FIXTURE = ROOT / "tests" / "fixtures" / "sleep_preflight_transcript.txt"
@@ -164,10 +170,11 @@ def normalized(code):
     if not guard.endswith("  return false;\n"):
         return None, None, None
     guard = guard[:-len("  return false;\n")].replace("return true;", "return;").replace("wifiGuard.", "")
-    if handler.count(SUMMARY_CALL) != 1 or handler.count(WIFI_CALL) != 1:
+    if handler.count(SUMMARY_CALL) != 1 or handler.count(WIFI_CALL) != 1 or handler.count(ROUTE_CALL) != 1:
         return None, None, None
     handler = handler.replace(SUMMARY_CALL, "@@SUMMARY@@\n").replace(WIFI_CALL, "#if Wiring_WiFi\n@@WIFI@@\n#endif\n")
-    return summary.lstrip("\n"), guard, handler.replace("wifiGuard.", "")
+    handler = handler.replace(ROUTE_CALL, "@@ROUTE@@\n")
+    return summary.lstrip("\n"), guard, WIFI_RESETS.sub(r"\1\2", handler)
 
 
 def base_pieces(base_text):
@@ -182,6 +189,9 @@ def base_pieces(base_text):
     rest = handler.replace(WIFI_STATICS, "", 1)
     rest = rest.replace(handler[s0:s1], "@@SUMMARY@@\n\n", 1)
     rest = rest.replace(handler[w0:w1 + len(WIFI_END)], "#if Wiring_WiFi\n@@WIFI@@\n#endif\n  \n  WakeContext wake;", 1)
+    if rest.count(ROUTE_BASE) != 1:
+        return None, None, None
+    rest = rest[:rest.index(ROUTE_BASE)] + "@@ROUTE@@\n"
     return inner, wifi, rest
 
 
@@ -275,7 +285,7 @@ if summary_cur != summary_base:
 if guard_cur.rstrip("\n") != guard_base.rstrip("\n"):
     fail("wifiOffGuardPass() differs from the base block beyond the wifiGuard. prefix, `return true;` and `return false;`")
 if handler_cur != handler_base:
-    fail("the handler differs from the base beyond the two calls, the removed statics and the wifiGuard. entry resets")
+    fail("the handler differs from the base beyond the two calls, the removed statics, the wifiGuard. entry resets and the post-wake routing call")
 
 # The byte-diff check itself is shown to fire: one changed character inside each moved block, and in the
 # handler, is detected.

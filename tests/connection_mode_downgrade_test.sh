@@ -178,5 +178,10 @@ structural_mutation "diagnostic failsafe mirror reads the raw flag" "diagnostics
   "PowerConfig::get_lowBatteryMode() || tier == TIER_SURVIVAL" m5b
 structural_mutation "status lowBatteryMode reads the raw flag" "cloud/DeviceStatusPublisher.cpp" \
   "value(PowerManager::instance().downgradeActive())" "value(PowerConfig::get_lowBatteryMode())" m6
+# WO-2026-10-22-001: one raw-flag gate in each of the two wake-path files; dropping either must fail.
+structural_mutation "post-wake raw-flag gate dropped (State_Sleep.cpp)" "state/State_Sleep.cpp" \
+  "if (PowerConfig::get_lowBatteryMode()) {" "if (true) {" m7
+structural_mutation "PIR-wake raw-flag gate dropped (State_Modes.cpp)" "state/State_Modes.cpp" \
+  "if (PowerConfig::get_lowBatteryMode()) {" "if (true) {" m8
 
 echo "connection_mode_downgrade_test: clean run passed and all mutations detected"

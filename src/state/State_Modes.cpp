@@ -3,10 +3,13 @@
 #include "cloud/Cloud.h"
 #include "LocalTimeRK.h"
 #include "persist/CurrentReadings.h"
+#include "persist/PowerConfig.h"
 #include "persist/SystemConfig.h"
+#include "power/BatteryAuthority.h"
 #include "power/PowerManager.h"
 #include "PublishQueuePosixRK.h"
 #include "sensors/SensorManager.h"
+#include "ThrashGuard.h"
 #include "device_pinout.h"
 #include "sensors/SensorDefinitions.h"
 
@@ -157,4 +160,116 @@ void updateOccupancyState() {
       }
     }
   }
+}
+
+bool processSleepWakeEvent(bool pirWake) {
+    // Check if LED timeout expired FIRST (before processing new PIR wake)
+    // This ensures we don't immediately undo state changes from PIR processing
+    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
+      // LED timeout expired - debounce period elapsed without motion
+      const bool reportNow = reportsOccupancyChangesNow();
+      const OccupancyCloseResult closeResult = closeOccupancySessionSafely("sleep");
+      signalLED(false);  // Turn off LED
+      if (closeResult.valid) {
+        logUnoccupiedEvent("debounce", closeResult.sessionSeconds, closeResult.totalSeconds, reportNow);
+      }
+      
+      // Match the rest of the occupancy state machine: only KEEP_ALIVE and
+      // CONNECTED force an immediate report/connect on occupancy transitions.
+      if (reportNow && !closeResult.stillOpen) {
+        session.occupancyChangeTriggered = true;
+        transitionTo(REPORTING_STATE, "sleep-occupancy-debounce-report");
+        return true;
+      }
+    }
+
+    // Process PIR wake events (after checking LED timeout above)
+    // If this wake was caused by the PIR interrupt, synthesize a single
+    // detection event so that the motion that woke the device is counted
+    // even if the ISR flag did not survive ULTRA_LOW_POWER sleep.
+    if (pirWake) {
+      if (SystemConfig::get_sensorMode() == SystemConfig::COUNTING) {
+        CurrentReadings::set_hourlyCount(CurrentReadings::get_hourlyCount() + 1);
+        CurrentReadings::set_dailyCount(CurrentReadings::get_dailyCount() + 1);
+        // WO-2026-08-29-002 item 8: lastCountTime has no consumers anywhere
+        // in this codebase (write-only telemetry field) - gating on
+        // isClockTrusted() changes only the recorded value, never control
+        // flow.
+        CurrentReadings::set_lastCountTime(isClockTrusted() ? Time.now() : 0);
+        signalLED(true, 1000);  // Flash for 1 second
+        Log.info("Count detected from PIR wake - Hourly: %d, Daily: %d",
+                 CurrentReadings::get_hourlyCount(), CurrentReadings::get_dailyCount());
+        if (Serial && Serial.isConnected()) {
+          Serial.printf("Count detected from PIR wake - Hourly: %d, Daily: %d\r\n",
+                        CurrentReadings::get_hourlyCount(), CurrentReadings::get_dailyCount());
+        }
+      } else if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY) {
+        // Occupancy mode: PIR wakes are expected behavior, not thrashing
+        thrashGuard.markProgress("PIR_WAKE_OCCUPANCY");
+
+        // If KEEP_ALIVE was temporarily disabled for low battery, refresh the
+        // battery policy on wake so recovered power can restore the intended
+        // occupancy behavior before we decide whether to report or sleep again.
+        // WO-2026-09-21 Step 4 (corrected same day): evaluate() then commit() -
+        // one of the four deliberate policy-application sites.
+        if (PowerConfig::get_lowBatteryMode()) {
+          const float soc = PowerManager::instance().soc();
+          float vcell = 0.0f;
+          const SensorManager::VcellSampleState vcellState =
+              SensorManager::instance().cachedBatteryVoltageState(vcell);
+          const BatteryHealth::SocTrust trust = SensorManager::instance().cachedSocTrust();
+          BatteryAuthority::commit(
+              BatteryAuthority::evaluate(soc, vcellState, vcell, trust, BatteryAuthority::currentTier()),
+              soc);
+        }
+        
+        if (!CurrentReadings::get_occupied()) {
+          CurrentReadings::set_occupied(true);
+          // WO-2026-08-29-002 item 8: deliberately NOT gated on
+          // isClockTrusted(). Unlike lastCountTime, occupancyStartTime's 0
+          // value is a load-bearing sentinel for two consumers:
+          // MyPersistentData.cpp's validate() treats occupied=true with
+          // occupancyStartTime==0 as corrupt state and forces occupied=false
+          // (a real state-machine side effect, not just a recorded value),
+          // and State_Modes.cpp computes `Time.now() - occupancyStartTime`
+          // for a logged duration, which would become a multi-decade garbage
+          // span if this were 0 while occupied. Writing Time.now() here even
+          // when untrusted preserves existing behavior; see the
+          // Implementation Report for the Chief Engineer's review.
+          CurrentReadings::set_occupancyStartTime(Time.now());
+          // Treat the PIR wake as an occupancy event for debounce purposes.
+          // If lastOccupancyEvent is left at 0, the debounce logic that uses
+          // millis()-based timing will immediately expire and mark UNOCCUPIED.
+          CurrentReadings::set_lastOccupancyEvent(millis());
+
+          // Keep LED on for the debounce window (sensor.setting1 is milliseconds).
+          uint32_t debounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
+          if (debounceMs == 0) {
+            debounceMs = Config::occupancyDebounceMsForRuntime();
+          }
+          signalLED(true, debounceMs);
+          const bool reportNow = reportsOccupancyChangesNow();
+          logOccupiedEvent("pir-wake", debounceMs / 1000UL, reportNow);
+          
+          // Match the rest of the occupancy state machine: only KEEP_ALIVE and
+          // CONNECTED force an immediate report/connect on occupancy transitions.
+          if (reportNow) {
+            session.occupancyChangeTriggered = true;
+            setAppBreadcrumb(5);
+            transitionTo(REPORTING_STATE, "sleep-pir-occupancy-report");
+            return true;
+          }
+        } else {
+          // Already occupied - motion detected during debounce, restart timer
+          uint32_t debounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
+          if (debounceMs == 0) {
+            debounceMs = Config::occupancyDebounceMsForRuntime();
+          }
+          signalLED(true, debounceMs);  // Restart LED timer
+          logOccupiedEvent("pir-wake", debounceMs / 1000UL, false, true);
+        }
+        CurrentReadings::set_lastOccupancyEvent(millis());
+      }
+    }
+  return false;
 }

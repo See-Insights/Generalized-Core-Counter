@@ -29,6 +29,9 @@ class SensorManager {
     return cachedBatteryVoltageStateValue;
   }
 
+  // The test's sensor-event flag for the real handleCountingMode()/handleOccupancyMode().
+  bool loop() const { return sensorLoopEvent; }
+
   const char *cachedChargeStateLabel() const { return cachedChargeStateLabelValue; }
 
   BatteryHealth::SocTrust cachedSocTrust() const { return cachedSocTrustValue; }
@@ -37,4 +40,5 @@ class SensorManager {
   VcellSampleState cachedBatteryVoltageStateValue = VcellSampleState::Known;
   const char *cachedChargeStateLabelValue = "UNKNOWN";
   BatteryHealth::SocTrust cachedSocTrustValue = BatteryHealth::SocTrust::Trusted;
+  static inline bool sensorLoopEvent = false;
 };

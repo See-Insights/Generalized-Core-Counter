@@ -636,7 +636,10 @@ def main() -> None:
     # in the codebase, so writing a 0 sentinel when untrusted changes only
     # the recorded value, never control flow):
     persistent_text = (REPO_ROOT / "src" / "MyPersistentData.cpp").read_text()
-    sleep_text = (REPO_ROOT / "src" / "state" / "State_Sleep.cpp").read_text()
+    modes_text = MODES_SRC.read_text()
+    # WO-2026-10-22-001: the PIR-wake counting and occupancy synthesis moved to State_Modes.cpp.
+    sleep_text = extract_function(
+        modes_text, r"bool processSleepWakeEvent\(bool pirWake\)\s*\{", "processSleepWakeEvent", MODES_SRC.name)
 
     if "current.set_lastCountTime(isClockTrusted() ? Time.now() : 0)" not in persistent_text:
         fail(
@@ -646,7 +649,7 @@ def main() -> None:
         )
     if "CurrentReadings::set_lastCountTime(isClockTrusted() ? Time.now() : 0)" not in sleep_text:
         fail(
-            "State_Sleep.cpp's PIR-wake counting path must gate "
+            "State_Modes.cpp's processSleepWakeEvent() (the PIR-wake counting path) must gate "
             "set_lastCountTime() on isClockTrusted() (Change 2)"
         )
 
@@ -654,8 +657,7 @@ def main() -> None:
     # --- lastCountTime write (missed by the earlier item-8 sweep) must  ---
     # --- also be gated, identically to the other two lastCountTime      ---
     # --- sites above (same field, same "no consumers" analysis).        ---
-    modes_text = MODES_SRC.read_text()
-    if "CurrentReadings::set_lastCountTime(isClockTrusted() ? Time.now() : 0)" not in modes_text:
+    if "CurrentReadings::set_lastCountTime(isClockTrusted() ? Time.now() : 0)" not in modes_text.replace(sleep_text, ""):
         fail(
             "State_Modes.cpp's COUNTING-mode handler must gate "
             "set_lastCountTime() on isClockTrusted() (Finding 6, Round 4 "
@@ -704,18 +706,18 @@ def main() -> None:
                 "job' without redoing the consumer analysis)"
             )
 
-    # occupancyStartTime (State_Sleep.cpp PIR-wake path) must likewise still
+    # occupancyStartTime (State_Modes.cpp's processSleepWakeEvent() PIR-wake path) must likewise still
     # write Time.now() unconditionally and be documented as deliberately
     # ungated (validate()'s occupied-with-occupancyStartTime==0 forced-
     # unoccupied side effect, and State_Modes.cpp's duration-since-start
     # calculation would produce a garbage span).
     occ_needle = "CurrentReadings::set_occupancyStartTime(Time.now());"
     if occ_needle not in sleep_text:
-        fail("State_Sleep.cpp's PIR-wake occupancy-start path must still call set_occupancyStartTime(Time.now()) unconditionally")
+        fail("State_Modes.cpp's processSleepWakeEvent() PIR-wake occupancy-start path must still call set_occupancyStartTime(Time.now()) unconditionally")
     occ_idx = sleep_text.index(occ_needle)
     occ_preceding = sleep_text[max(0, occ_idx - 900):occ_idx]
     if "WO-2026-08-29-002" not in occ_preceding or "NOT gated" not in occ_preceding:
-        fail("State_Sleep.cpp's occupancyStartTime write must carry a comment documenting why it is deliberately NOT gated (Change 2)")
+        fail("State_Modes.cpp's processSleepWakeEvent() occupancyStartTime write must carry a comment documenting why it is deliberately NOT gated (Change 2)")
 
     # --- Round 4 review, Finding 3: setup()'s time-validation gate must ---
     # --- also force CONNECTING_STATE when this device has never (across ---

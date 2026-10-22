@@ -60,7 +60,8 @@ else:
     out["call_effective"] = line("  bool useNetworkStandbyEffective = effectiveStandby(")
     out["call_teardown"] = line("  if (SleepTeardown::run(")
     out["call_hibernate"] = line("  hibernateAttempt(")
-    out["call_sleep"] = span("  WakeContext wake;\n", "  const char *wakeReasonLabel = wake.wakeReasonLabel;\n")
+    out["call_sleep"] = span("  WakeContext wake;\n", "  if (sleepAndResume(wakeInSeconds, useNetworkStandby, sleepReason, wake)) return;\n")
+    out["call_route"] = line("  postWakeRouting(")
 for k, v in out.items():
     open(f"{outdir}/{kind}_{k}.inc", "w").write(v)
 PY
@@ -84,7 +85,7 @@ build_run() {
     -DBASE_HIB_INC="\"$inc/base_hib.inc\"" -DBASE_ULP_INC="\"$inc/base_ulp.inc\"" \
     -DCUR_DRAIN_INC="\"$inc/cur_drain.inc\"" -DCUR_FUNCS_INC="\"$inc/cur_funcs.inc\"" \
     -DCUR_CALL_EFFECTIVE_INC="\"$inc/cur_call_effective.inc\"" -DCUR_CALL_TEARDOWN_INC="\"$inc/cur_call_teardown.inc\"" \
-    -DCUR_CALL_HIBERNATE_INC="\"$inc/cur_call_hibernate.inc\"" -DCUR_CALL_SLEEP_INC="\"$inc/cur_call_sleep.inc\"" \
+    -DCUR_CALL_HIBERNATE_INC="\"$inc/cur_call_hibernate.inc\"" -DCUR_CALL_SLEEP_INC="\"$inc/cur_call_sleep.inc\"" -DCUR_CALL_ROUTE_INC="\"$inc/cur_call_route.inc\"" \
     "$tests_dir/sleep_execution_equivalence_test.cpp" -o "$out.bin"
   "$out.bin" "$mode" > "$out"
 }
@@ -224,5 +225,7 @@ mutate_and_expect_diff "standby preserved through an unstable modem" \
   "(!useNetworkStandbyRequested || session.modemUnstable || Cellular.isOff())" "(!useNetworkStandbyRequested || Cellular.isOff())"
 mutate_and_expect_diff "PIR classified from the wrong edge" \
   "bool pirWake = sensorCanWake && (wakePin == sensorWake.pin);" "bool pirWake = sensorCanWake && (wakePin != sensorWake.pin);"
+mutate_and_expect_diff "post-wake routing handed swapped pir and button" \
+  "postWakeRouting(wake.pirWake, wake.buttonWake, wake.timerWake, wake.wakeReasonLabel);" "postWakeRouting(wake.buttonWake, wake.pirWake, wake.timerWake, wake.wakeReasonLabel);"
 
 echo "sleep_execution_equivalence_test: both transcripts match the frozen pre-change output, all mutations detected"
