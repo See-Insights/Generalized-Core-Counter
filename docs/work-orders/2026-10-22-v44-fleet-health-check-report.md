@@ -1,6 +1,6 @@
 # v44 fleet health check: report (22 Oct 2026)
 
-**Brief:** `docs/work-orders/2026-10-22-v44-fleet-health-check.md`. **Grader:** Sonnet 5.5 subagent (`claude-sonnet-5-5`, medium), read-only; its report follows unedited. **Claude Code's spot-checks** are below it. **Verdict: one FINDING (MAFC-1, one sleep watchdog); the 22 Oct slow-connect cluster is open; no action taken.**
+**Brief:** `docs/work-orders/2026-10-22-v44-fleet-health-check.md`. **Grader:** Sonnet 5.5 subagent (`claude-sonnet-5-5`, medium), read-only; its report follows unedited. **Claude Code's spot-checks** are below it. **Verdict (Chip's rulings, 22 Oct): MAFC-1's one sleep watchdog is recorded as WATCH, not a regression; the 22 Oct slow-connect cluster is open (likely the carrier) pending a re-read at about 22:21Z. #143 stays open until that re-read.** The subagent graded MAFC-1 a FINDING by the canary rule; the ruling below supersedes that grade.
 
 ## Subagent report
 
@@ -49,6 +49,7 @@ S3 sync of day folders 2026-10-14 to 2026-10-22 for the four events (all devices
 
 ## What needs Chip's attention (no action taken)
 
-1. **MAFC-1:** one breadcrumb-28 sleep watchdog 22 Oct 02:01Z on v44, none on its v43 days: a FINDING by the canary rule (rate above its own v43; a reset type, 60, not seen on v43). One event, not a trend; the rest of the fleet had 4 on v43 in 43,802 sleep returns. Watch for a second; a pull of its serial is impossible (no serial on US devices).
+0. **Rulings (Chip, 22 Oct).** **MAFC-1 sleep watchdog: WATCH, not a regression** (the fleet's background breadcrumb-28 rate is about 0.1 per 1,000 sleeps, PR #113); it **escalates on a second event on MAFC-1 or a fleet v44 rate above v43's**. **Slow-connect cluster: likely the carrier;** the 22:21Z grading job also re-reads Court1, Trail02 and Court3 (connect times and lost reports since 13:00Z) and reports whether they recovered; **#143 is updated then, with whether it is ready to merge.**
+1. **MAFC-1 (subagent's grade FINDING, superseded by the WATCH ruling above):** one breadcrumb-28 sleep watchdog 22 Oct 02:01Z on v44, none on its v43 days: a FINDING by the canary rule (rate above its own v43; a reset type, 60, not seen on v43). One event, not a trend; the rest of the fleet had 4 on v43 in 43,802 sleep returns. Watch for a second; a pull of its serial is impossible (no serial on US devices).
 2. **22 Oct 11:00-13:03Z slow-connect cluster:** Court1 (660 s, alert 31 at 11:25Z and 13:01Z), Court3 (547 s), Trail02 (660 s, alert 31 at 13:03Z), PCKL1 (312 s), PCKL2 (121 s) in the same window with no resets and no lost reports; the subagent reads it as the network, not firmware. **Re-read Court1, Trail02 and Court3 in 2-3 h** before calling the fleet healthy.
 3. **Not a finding:** Court2's report was on time on 22 Oct (the 21 Oct hour-late was a one-off); alert 40 once on PCKL1 (20 Oct) and Dev-14 (19 Oct), never twice on one device; Trail02's reset 30 and PCKL3's reset 0 appear on their v43 days too.
