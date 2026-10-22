@@ -42,10 +42,12 @@ def fail(msg):
     sys.exit(1)
 
 
+_LEX = re.compile(r"/\*.*?\*/|//[^\n]*|(\"(?:\\.|[^\"\\\n])*\")|('(?:\\.|[^'\\\n])*')", re.S)
+
+
 def strip(code):
-    code = re.sub(r"/\*.*?\*/", "", code, flags=re.S)
-    code = re.sub(r"//[^\n]*", "", code)
-    return re.sub(r'"(?:\\.|[^"\\\n])*"', '""', code)
+    """One left-to-right pass, so a `//` inside a string is not a comment and a quote inside a comment is not a string."""
+    return _LEX.sub(lambda m: '""' if m.group(1) else (m.group(2) or ""), code)
 
 
 def close_of(text, open_idx):
@@ -135,6 +137,7 @@ probes = {
     "the routing call not last": (sleep.replace(ROUTE_CALL, ROUTE_CALL + "  Log.info(\"x\");\n", 1), modes, header),
     "a count write in postWakeRouting": (sleep.replace(EVENT_CALL, EVENT_CALL + "    CurrentReadings::set_hourlyCount(0);\n", 1), modes, header),
     "an occupancy writer elsewhere in State_Sleep.cpp": (sleep.replace("} // namespace\n\n" + ROUTE_SIG, "static void rogueOccupancyOwner() { CurrentReadings::set_occupied(false); }\n} // namespace\n\n" + ROUTE_SIG, 1), modes, header),
+    "an occupancy writer hidden after a // in a string": (sleep.replace("} // namespace\n\n" + ROUTE_SIG, 'static void rogueOccupancyOwner() { Log.info("//"); CurrentReadings::set_occupied(false); }\n} // namespace\n\n' + ROUTE_SIG, 1), modes, header),
     "an occupancy write in the handler": (sleep.replace(ROUTE_CALL, "  CurrentReadings::set_occupied(false);\n" + ROUTE_CALL, 1), modes, header),
     "a session close in the handler": (sleep.replace(ROUTE_CALL, '  closeOccupancySessionSafely("x");\n' + ROUTE_CALL, 1), modes, header),
     "an LED write in postWakeRouting": (sleep.replace(EVENT_CALL, EVENT_CALL + "    signalLED(true, 1000);\n", 1), modes, header),
