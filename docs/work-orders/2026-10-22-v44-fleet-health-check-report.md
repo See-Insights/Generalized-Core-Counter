@@ -53,3 +53,19 @@ S3 sync of day folders 2026-10-14 to 2026-10-22 for the four events (all devices
 1. **MAFC-1 (subagent's grade FINDING, superseded by the WATCH ruling above):** one breadcrumb-28 sleep watchdog 22 Oct 02:01Z on v44, none on its v43 days: a FINDING by the canary rule (rate above its own v43; a reset type, 60, not seen on v43). One event, not a trend; the rest of the fleet had 4 on v43 in 43,802 sleep returns. Watch for a second; a pull of its serial is impossible (no serial on US devices).
 2. **22 Oct 11:00-13:03Z slow-connect cluster:** Court1 (660 s, alert 31 at 11:25Z and 13:01Z), Court3 (547 s), Trail02 (660 s, alert 31 at 13:03Z), PCKL1 (312 s), PCKL2 (121 s) in the same window with no resets and no lost reports; the subagent reads it as the network, not firmware. **Re-read Court1, Trail02 and Court3 in 2-3 h** before calling the fleet healthy.
 3. **Not a finding:** Court2's report was on time on 22 Oct (the 21 Oct hour-late was a one-off); alert 40 once on PCKL1 (20 Oct) and Dev-14 (19 Oct), never twice on one device; Trail02's reset 30 and PCKL3's reset 0 appear on their v43 days too.
+
+## Re-read of the slow-connect cluster (22 Oct, graded about 23:00Z)
+
+**Grader:** Sonnet 5.5 subagent (`claude-sonnet-5-5`, medium), read-only; Claude Code re-computed the per-report connect times from the S3 hook files (`Ubidots-Sensor-Hook-v1/<id>/`, published since 22 Oct 13:00Z) and read the 22 Oct `watchdog` and `status` folders for all nine devices. The 23 Oct folders do not exist yet (it is 22 Oct 23:00Z).
+
+| Device | Reports since 13:00Z | Connect times | Alert 31 | Lost | Recovered? |
+|---|---|---|---|---|---|
+| Court1 | 21 | 660, 660 (13:01Z backlog), then 10–27 s from 13:01 to 20:01Z, then 0–6 s from 21:27Z; median 10, 13 of 21 at 8 s or more | the two 660 s reports only (13:01Z); alert 44 at 21:00Z | none (the 12:00Z slot arrived at 13:01Z) | **Yes, from 21:27Z** (10–27 s for 7 h, above its v44 median of 2 s, but with no alert 31) |
+| Court3 | 22 | 75, 75 (13:24Z backlog), 11 (14:00Z), then 0–6 s; median 1, 3 at 8 s or more | none | none | **Yes, from 14:33Z** |
+| Trail02 | 13 (batches 13:03, 16:00, 18:00, 20:00, 22:00Z) | 660 (13:03Z), 190 (16:00Z), 17 (18:00Z), 11, 14 | the 13:03Z batch only | none | **Yes, from the 18:00Z batch** (11–17 s is its v44 median of 15 s) |
+
+**Court1 note (new, Claude Code's read, not the subagent's):** Court1's hook `cyc` fell from 749 to 2 at the 20:01Z report, and S3 `status/e00fce68c9f3e64f79ccc884/2026-10-22T20-01-07-139Z.json` shows `resetReason 0`, `resetReasonData 0`, `appBreadcrumb 18`, `watchdogResetCount` 20 (unchanged), `failsafeStage 0`. So Court1 restarted at about 20:00Z with an unknown reset reason (the subagent called it "no reboot"). It is not a watchdog and not a failsafe, and no report was lost; it is a reset type Court1 did not show on its v43 or earlier v44 days (PCKL3 shows the same reset-0 pattern, again on 22 Oct at 22:38:18Z and 01:00:53Z, as on v43). **Open for Chip:** whether to watch Court1 for a second.
+
+**MAFC-1:** no second sleep watchdog since 22 Oct 02:01:07Z (the only MAFC-1 `watchdog` file in 10–22 Oct); the 22 Oct `watchdog` folders of the other eight devices are empty. **Fleet breadcrumb-28 rate** (S3 `watchdog` bc 28 over sleep returns = sum of positive hook `cyc` deltas, by `fw_version`): **v44 1 event in 20,923 returns = 0.048 per 1,000** (OTA to 23:00Z 22 Oct) against **v43 4 in 43,974 = 0.091 per 1,000**; no sign of an increase, so the WATCH ruling does not escalate.
+
+**Ready to merge?** As a record, **yes: the cluster recovered on all three devices** (consistent with the carrier), nothing was lost, and MAFC-1 has not repeated. The one new item (Court1's unknown-reason restart at about 20:00Z) is recorded here for Chip and does not block this docs-only PR.
