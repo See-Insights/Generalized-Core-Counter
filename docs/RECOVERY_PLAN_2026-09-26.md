@@ -330,6 +330,7 @@ Codex (`gpt-6-astra`, reasoning high, read-only, against `599038e`), plus one sc
   - **The wrap:** `ConfigApply.cpp:265` accepts 300–86400 s, but the store is `uint16_t` (`MyPersistentData.h:137`). So 65536–86400 wraps; for example 86400 is stored as 20864.
   - **Rewritten on every apply:** the comparison at `ConfigApply.cpp:266` (`uint16_t` against `int`) never matches a wrapped value, so the value is rewritten on every config apply (INF).
   - **Ruling pending:** the wrap is on the 1b fix's input path, and the architect's ruling on capping the range at 65535 is pending. The `uint16_t intervalSec` locals in `State_Idle.cpp` and `State_Sleep.cpp` lose nothing, since the source is already `uint16_t`.
+- **`lastOccupancyEvent` is a known wrong-to-persist field, handled at boot** (Step 7 Step 0, `WO-2026-10-22-002-step0-report.md` §3; architect's ruling 22 Oct): it is a `millis()` value, so the stored one belongs to the previous boot. Boot clears it right after loading (`Generalized-Core-Counter.cpp:497–505`) and the idle debounce re-arms from zero (`State_Idle.cpp:51–61`). **P7-6 (stop persisting it) is dropped:** up to +20 lines for no change in behavior. Recovery-plan item 15 (occupancy lost across a reset) is a separate matter.
 
 ## Guardrails (`AI_DEVELOPMENT_WORKFLOW.md` §12)
 

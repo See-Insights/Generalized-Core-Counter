@@ -92,3 +92,12 @@ Prefer deleting over reorganizing. **No code changes in this WO.**
 
 - Step 0: 0 `src/` lines.
 - The report: at most 150 lines (§13 (f)), committed on the WO branch.
+
+## Architect's rulings on the Step 0 report (22 Oct)
+
+1. **Shape A plus freeze is accepted.** The three records stay byte-for-byte as they are and no field is appended; a future stored field goes in a file owned by its concern. Shapes B and C are rejected for now.
+2. **Compatibility lasts while a rollback target reads these records** (v45 or any version that reads them); "forever" is too strong. Revisited after the fleet convergence.
+3. **P7-1, P7-2 and P7-3 are one WO:** `WO-2026-10-22-003-step7-p7a-remove-dead-persistence.md` (ships in v47).
+4. **`lastCountTime` waits** for the cleanup series, after the open sleep PRs (#128 to #139) merge, since its writers are in `State_Sleep.cpp`/`State_Modes.cpp`.
+5. **P7-4 is deferred, not cancelled** (the Device OS local-ledger bench test); it decides P7-5 and is scheduled after v46 settles.
+6. **P7-6 is dropped** and recorded in `docs/RECOVERY_PLAN_2026-09-26.md` as a known wrong-to-persist field handled at boot (`lastOccupancyEvent`, cleared at `Generalized-Core-Counter.cpp:497–505`).
