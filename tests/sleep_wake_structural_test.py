@@ -107,7 +107,7 @@ def problems_in(sleep, modes, header):
         out.append("the handler must call postWakeRouting(wake.pirWake, wake.buttonWake, wake.timerWake, wake.wakeReasonLabel)")
     if not handler.rstrip().endswith(strip(ROUTE_CALL).strip()):
         out.append("the postWakeRouting() call must be the handler's last statement")
-    for where, text in (("the handler", handler), ("postWakeRouting()", route)):
+    for where, text in (("State_Sleep.cpp", plain),):
         hit = OWNED_WRITES.search(text)
         if hit:
             out.append(f"{where} must not write occupancy or counting state, close a session, or switch the LED on "
@@ -134,6 +134,7 @@ probes = {
     "the event call from the handler": (sleep.replace(ROUTE_CALL, ROUTE_CALL + "  processSleepWakeEvent(false);\n", 1), modes, header),
     "the routing call not last": (sleep.replace(ROUTE_CALL, ROUTE_CALL + "  Log.info(\"x\");\n", 1), modes, header),
     "a count write in postWakeRouting": (sleep.replace(EVENT_CALL, EVENT_CALL + "    CurrentReadings::set_hourlyCount(0);\n", 1), modes, header),
+    "an occupancy writer elsewhere in State_Sleep.cpp": (sleep.replace("} // namespace\n\n" + ROUTE_SIG, "static void rogueOccupancyOwner() { CurrentReadings::set_occupied(false); }\n} // namespace\n\n" + ROUTE_SIG, 1), modes, header),
     "an occupancy write in the handler": (sleep.replace(ROUTE_CALL, "  CurrentReadings::set_occupied(false);\n" + ROUTE_CALL, 1), modes, header),
     "a session close in the handler": (sleep.replace(ROUTE_CALL, '  closeOccupancySessionSafely("x");\n' + ROUTE_CALL, 1), modes, header),
     "an LED write in postWakeRouting": (sleep.replace(EVENT_CALL, EVENT_CALL + "    signalLED(true, 1000);\n", 1), modes, header),
