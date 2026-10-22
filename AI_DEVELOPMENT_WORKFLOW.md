@@ -733,6 +733,7 @@ Step 0 ends with STOP or PROCEED. It stops if the estimate is over budget, or if
 - **Not a round:** it doesn't count as a review round.
 - **Before verification:** it must land, with a rebuild and a test run, before verification.
 - **Record:** it is recorded in the closing record as a controller edit, with its line count.
+- **Standing pre-authorization for test-only Stage 7 defects (architect, 22 October 2026):** a precise Stage 7 defect that needs **no `src/` change** and about **20 test lines or fewer** may be fixed by the controller, then rechecked by Codex (a further round). It is recorded in the closing record as a controller edit with its line count. Any `src/` change still goes to Copilot (Stage 6).
 
 **(e, remainder) Models.** In addition to §5:
 - The architect picks the tier by complexity, and Claude Code probes each model with a one-line call before every dispatch.
