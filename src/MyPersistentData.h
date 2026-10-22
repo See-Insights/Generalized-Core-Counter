@@ -116,9 +116,8 @@ public:
 	public:
 		// This structure must always begin with the header (16 bytes)
 		StorageHelperRK::PersistentDataBase::SavedDataHeader sysHeader;
-		// Your fields go here. Once you've added a field you cannot add fields
-		// (except at the end), insert fields, remove fields, change size of a field.
-		// Doing so will cause the data to be corrupted!
+		// FROZEN: no field is appended, inserted, removed, resized or moved while a rollback
+		// target reads this record (WO-2026-10-22-003); tests/persisted_layout_preservation_test.py enforces it.
 		uint8_t reservedUint8_0;                   // Reserved: was structuresVersion; kept to preserve the stored layout
 		bool verboseMode;                                 // Turns on extra messaging
 		bool solarPowerMode;                              // Powered by a solar panel or utility power
@@ -173,7 +172,7 @@ public:
 		uint32_t lastWatchdogResetReasonData;            // System.resetReasonData() from the last watchdog boot
 		bool hasValidLedgerConfig;                       // True once at least one complete, valid ledger configuration has been applied
 		uint8_t configSource;                            // Config::Source enum persisted for diagnostics
-		// ***** Appended per the persistent-layout append-only contract - do not reorder or insert above *****
+		// ***** Records are frozen: no field is appended while a rollback target reads them (WO-2026-10-22-003) *****
 		uint8_t lastWatchdogSource;                       // WatchdogSource enum: which mechanism reported the last watchdog reset (DEVICE_OS vs AB1805_PIN)
 
 		// ********** F2a Thermal Charge Inhibit Configuration (WO-2026-08-25-001) **********

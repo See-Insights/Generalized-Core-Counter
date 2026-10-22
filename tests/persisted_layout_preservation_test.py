@@ -6,11 +6,11 @@ using only these sizes, offsets and magic/version pairs, and v45 must still read
 them after a downgrade. The records are frozen: no member may be appended,
 inserted, removed, resized or moved, and no version may change.
 
-The comparison is positional, not by name: every data member of each class is
-extracted from the header in order, an offsetof/sizeof table is compiled for the
-real ARM target, and it is compared to the frozen (offset, size) list below.
-Renaming a member (e.g. to a reserved slot) passes; anything that changes a
-position fails.
+Every data member of each class is extracted from the header in order (any
+unrecognized declaration in the class body fails the test), and an offsetof/sizeof
+table is compiled for the real ARM target. Each member must match the frozen
+(name, type, offset, size) exactly; only `reserved*` slots may be renamed, and
+only to another `reserved*` name of the same type, offset and size.
 """
 import re
 import subprocess
@@ -31,27 +31,52 @@ PREFIX = {"SysData": "SYS", "SensorData": "SENSOR", "CurrentData": "CURRENT"}
 # Frozen layout: (offset, size) per data member in declaration order, then the
 # record size, from the v45 header. Do not edit to make a change pass.
 FROZEN_SIZE = {"SysData": 272, "SensorData": 36, "CurrentData": 88}
-FROZEN_MEMBERS = {
-    "SysData": [
-        (0, 16), (16, 1), (17, 1), (18, 1), (19, 1), (20, 1),
-        (21, 1), (22, 39), (61, 1), (62, 1), (64, 8), (72, 8),
-        (80, 8), (88, 2), (90, 1), (91, 1), (92, 2), (94, 1),
-        (95, 1), (96, 2), (104, 8), (112, 8), (120, 8), (128, 1),
-        (129, 1), (130, 1), (131, 1), (132, 2), (134, 2), (136, 2),
-        (138, 1), (139, 1), (140, 4), (144, 2), (146, 1), (147, 64),
-        (211, 1), (212, 4), (216, 1), (224, 8), (232, 1), (234, 2),
-        (236, 1), (240, 4), (244, 4), (248, 1), (249, 1), (250, 1),
-        (252, 4), (256, 4), (260, 4), (264, 4),
-    ],
-    "SensorData": [
-        (0, 16), (16, 1), (20, 4), (24, 4), (28, 4), (32, 4),
-    ],
-    "CurrentData": [
-        (0, 16), (16, 2), (18, 2), (20, 2), (22, 2), (24, 8),
-        (32, 4), (36, 4), (40, 1), (48, 8), (56, 4), (60, 1),
-        (62, 2), (64, 2), (66, 1), (68, 4), (72, 8), (80, 4),
-    ],
+# Each member is name:type:offset:size. Live members match by exact name and
+# type; only `reserved*` slots may be renamed (to another `reserved*`).
+_FROZEN_TEXT = {
+    "SysData": """
+        sysHeader:SavedDataHeader:0:16 reservedUint8_0:uint8_t:16:1 verboseMode:bool:17:1
+        solarPowerMode:bool:18:1 reservedBool0:bool:19:1 lowBatteryMode:bool:20:1
+        resetCount:uint8_t:21:1 timeZoneStr:char[39]:22:39 openTime:uint8_t:61:1
+        closeTime:uint8_t:62:1 lastReport:time_t:64:8 lastConnection:time_t:72:8
+        lastHookResponse:time_t:80:8 lastConnectionDuration:uint16_t:88:2
+        reservedUint8_1:uint8_t:90:1 reservedBool1:bool:91:1 reportingInterval:uint16_t:92:2
+        reservedBool2:bool:94:1 serialConnected:bool:95:1 verboseTimeoutMin:uint16_t:96:2
+        reservedTime0:time_t:104:8 lastDailyCleanup:time_t:112:8 lastTimeSync:time_t:120:8
+        sensorMode:uint8_t:128:1 connectionMode:uint8_t:129:1 reportingMode:uint8_t:130:1
+        samplingMode:uint8_t:131:1 connectAttemptBudgetSec:uint16_t:132:2
+        cloudDisconnectBudgetSec:uint16_t:134:2 modemOffBudgetSec:uint16_t:136:2
+        currentBatteryTier:uint8_t:138:1 connectionAttemptCounter:uint8_t:139:1
+        reservedFloat0:float:140:4 testConnectionDurationOverride:uint16_t:144:2
+        reservedByte0:uint8_t:146:1 webhookName:char[64]:147:64 webhookEnabled:bool:211:1
+        webhookTimeoutMs:uint32_t:212:4 connectivityRecoveryStage:uint8_t:216:1
+        lastConnectivityRecoveryAction:time_t:224:8 connectivityRecoveryCount:uint8_t:232:1
+        watchdogResetCount:uint16_t:234:2 lastWatchdogBreadcrumb:uint8_t:236:1
+        lastWatchdogUptimeMs:uint32_t:240:4 lastWatchdogResetReasonData:uint32_t:244:4
+        hasValidLedgerConfig:bool:248:1 configSource:uint8_t:249:1
+        lastWatchdogSource:uint8_t:250:1 thermalChargeArmHighC:float:252:4
+        thermalChargeArmLowC:float:256:4 thermalChargeReleaseHighC:float:260:4
+        thermalChargeReleaseLowC:float:264:4
+    """,
+    "SensorData": """
+        sensorHeader:SavedDataHeader:0:16 type:uint8_t:16:1 setting1:uint32_t:20:4
+        setting2:uint32_t:24:4 setting3:uint32_t:28:4 setting4:uint32_t:32:4
+    """,
+    "CurrentData": """
+        currentHeader:SavedDataHeader:0:16 reservedUint16_0:uint16_t:16:2
+        reservedUint16_1:uint16_t:18:2 reservedUint16_2:uint16_t:20:2
+        reservedUint16_3:uint16_t:22:2 lastCountTime:time_t:24:8 internalTempC:float:32:4
+        reservedFloat1:float:36:4 alertCode:uint8_t:40:1 lastAlertTime:time_t:48:8
+        stateOfCharge:float:56:4 batteryState:uint8_t:60:1 hourlyCount:uint16_t:62:2
+        dailyCount:uint16_t:64:2 occupied:bool:66:1 lastOccupancyEvent:uint32_t:68:4
+        occupancyStartTime:time_t:72:8 totalOccupiedSeconds:uint32_t:80:4
+    """,
 }
+FROZEN_MEMBERS = {
+    k: [(n, t, int(o), int(z)) for n, t, o, z in (tok.rsplit(":", 3) for tok in v.split())]
+    for k, v in _FROZEN_TEXT.items()
+}
+# Members in the frozen table, header included: 52 / 6 / 18 (51 / 5 / 17 data members).
 # (magic, version) per record.
 FROZEN_CONSTS = {
     "SysData": (0x20a15e75, 4),
@@ -67,7 +92,11 @@ PREAMBLE = """#include <stdint.h>
 struct SavedDataHeader { uint32_t magic; uint16_t version; uint16_t size; uint32_t hash; uint32_t reserved1; };
 """
 
-MEMBER_RE = re.compile(r"^[\w:]+\s+(\w+)(?:\[[^\]]*\])?\s*;$")
+MEMBER_RE = re.compile(r"^([\w:]+)\s+(\w+)(\[[^\]]*\])?\s*(?:=[^;]*|\{[^;]*\})?;$")
+ACCESS_RE = re.compile(r"^(public|private|protected)\s*:$")
+OTHER_OK_RE = re.compile(
+    r"^(?:using\s|typedef\s|static\s+(?:const|constexpr)\s|friend\s)[^;]*;$"
+    r"|^[\w:<>&*\s~]+\([^;{}]*\)\s*(?:const)?\s*(?:=\s*(?:delete|default))?\s*;$")
 
 
 def fail(msg):
@@ -76,7 +105,11 @@ def fail(msg):
 
 
 def extract_struct(header_text, name):
-    """Return (body, member names in order) of `class <name> { ... };`."""
+    """Return (body, [(member name, type)] in order) of `class <name> { ... };`.
+
+    Fails closed: any non-blank, non-comment line in the class body that is not a
+    recognized member, access label, method declaration or using/static const is an error.
+    """
     start = header_text.find(f"class {name} {{")
     if start < 0:
         fail(f"could not find `class {name} {{` in the header - extraction is broken, not the layout")
@@ -95,8 +128,16 @@ def extract_struct(header_text, name):
     body = body.replace("StorageHelperRK::PersistentDataBase::SavedDataHeader", "SavedDataHeader")
     code = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
     code = re.sub(r"//[^\n]*", "", code)
-    members = [m.group(1) for line in code.splitlines()[1:]
-               for m in [MEMBER_RE.match(line.strip())] if m]
+    members = []
+    for line in code.splitlines()[1:]:
+        line = line.strip()
+        if not line or line == "};" or ACCESS_RE.match(line):
+            continue
+        m = MEMBER_RE.match(line)
+        if m:
+            members.append((m.group(2), m.group(1) + (m.group(3) or "")))
+        elif not OTHER_OK_RE.match(line):
+            fail(f"{name}: unrecognized declaration in record class body (not a member the guard can freeze): {line}")
     return body, members
 
 
@@ -106,8 +147,8 @@ def build_probe(header_text):
     for name in CLASSES:
         body, members = extract_struct(header_text, name)
         parts.append(body)
-        counts[name] = len(members)
-        for m in members:
+        counts[name] = members
+        for m, _ in members:
             entries.append(f"offsetof({name}, {m}), sizeof((({name} *)0)->{m}),")
         entries.append(f"sizeof({name}),")
     consts = dict(re.findall(
@@ -149,8 +190,12 @@ def main():
 
     source, counts = build_probe(HEADER.read_text())
     for name in CLASSES:
-        if counts[name] != len(FROZEN_MEMBERS[name]):
-            fail(f"{name}: member count changed ({counts[name]} now, {len(FROZEN_MEMBERS[name])} frozen)")
+        if len(counts[name]) != len(FROZEN_MEMBERS[name]):
+            fail(f"{name}: member count changed ({len(counts[name])} now, {len(FROZEN_MEMBERS[name])} frozen)")
+        for k, ((n, t), (fn, ft, _, _)) in enumerate(zip(counts[name], FROZEN_MEMBERS[name])):
+            if t != ft or not (n == fn or (fn.startswith("reserved") and n.startswith("reserved"))):
+                fail(f"{name}: member #{k} is `{t} {n}`, frozen `{ft} {fn}` "
+                     "(live members keep name and type; only reserved* slots may be renamed to reserved*)")
     with tempfile.TemporaryDirectory() as tmp:
         words = data_words(source, Path(tmp), "current")
 
@@ -160,14 +205,14 @@ def main():
         n = 2 * len(frozen) + 1
         got = words[pos : pos + n]
         pos += n
-        want = [v for pair in frozen for v in pair] + [FROZEN_SIZE[name]]
+        want = [v for f in frozen for v in f[2:]] + [FROZEN_SIZE[name]]
         if got != want:
             gp = list(zip(got[0:-1:2], got[1:-1:2]))
             for k, (g, f) in enumerate(zip(gp, frozen)):
-                if g != f:
-                    fail(f"{name}: member #{k} (offset,size) is {g}, frozen {f}")
+                if g != f[2:]:
+                    fail(f"{name}: member {f[0]} (#{k}) (offset,size) is {g}, frozen {f[2:]}")
             fail(f"{name}: sizeof is {got[-1]}, frozen {FROZEN_SIZE[name]}")
-        print(f"OK: {name} header + {len(frozen) - 1} data members, {FROZEN_SIZE[name]} bytes, every (offset, size) frozen (ARM cortex-m4)")
+        print(f"OK: {name} header + {len(frozen) - 1} data members, {FROZEN_SIZE[name]} bytes, every (name, type, offset, size) frozen (ARM cortex-m4)")
     if len(words) != pos + 6:
         fail("probe emitted an unexpected number of words - extraction is broken")
     for name, k in zip(CLASSES, range(pos, pos + 6, 2)):
