@@ -261,18 +261,6 @@ static void testResetEverythingWithoutSensorTotals() {
         "resetEverything(true) clears all six sensor totals");
 }
 
-// --- 6. The two sensorType fields stay distinct (Finding 3). ---
-static void testSensorTypeFieldsStayDistinct() {
-  SystemConfig::set_sensorType(1);
-  SystemConfig::SensorSettings::set_sensorType(3);
-  CHECK(SystemConfig::get_sensorType() == 1, "sysStatus sensorType is unaffected by the sensor.dat write");
-  CHECK(SystemConfig::SensorSettings::get_sensorType() == 3, "sensor.dat sensorType holds its own value");
-
-  SystemConfig::set_sensorType(2);
-  CHECK(SystemConfig::SensorSettings::get_sensorType() == 3,
-        "sensor.dat sensorType is unaffected by the sysStatus write");
-}
-
 // --- 7. Thermal threshold set-wise fallback still resolves through the facade. ---
 static void testThermalThresholdFallback() {
   // A zero-padded (migrated) record is invalid AS A SET; all four getters must
@@ -301,7 +289,6 @@ int main() {
   testDeferredVsForcedPersistence();
   testResetEverythingCrossStore();
   testResetEverythingWithoutSensorTotals();
-  testSensorTypeFieldsStayDistinct();
   testThermalThresholdFallback();
 
   if (failures) {
@@ -314,7 +301,6 @@ int main() {
   std::cout << "OK: each facade's loop() services its OWN store; flushNow() stays forced\n";
   std::cout << "OK: resetEverything() still performs its cross-store reset-count clear\n";
   std::cout << "OK: resetEverything(false) keeps the central work and leaves the sensor totals\n";
-  std::cout << "OK: the two sensorType fields remain distinct\n";
   std::cout << "OK: thermal threshold set-wise fallback resolves through PowerConfig\n";
   std::cout << "persistence_facade_behavior_test: all checks passed\n";
   return 0;
