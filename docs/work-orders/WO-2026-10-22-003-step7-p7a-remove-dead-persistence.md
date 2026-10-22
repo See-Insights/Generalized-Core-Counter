@@ -101,3 +101,36 @@ The report's matrix, done once:
 - The retained outcome.
 - The bench result.
 - Fields removed and fields kept, with the reason for each.
+
+## Step 0, Stage 6 and controller reproduction (22 Oct)
+
+**Step 0** (`WO-2026-10-22-003-step0-report.md`): PROCEED, prototype net −143. `solarPowerMode` is **live and kept** (read under `FIELD_BUILD`, which every release build defines; `PowerManager.cpp:12–18`). `lastCountTime` kept (ruling 4).
+**Stage 6** (Copilot, Sonnet 5.5, medium): round 1 applied the design (11 declarations renamed in place to `reserved*` slots, accessors, facade forwarders, four `initialize()` writes and one orphaned comment deleted; the freeze guard rewritten positionally; facade-test section 6 retired). **Round 2** (after Stage 7 round 1) made the guard fail closed and match live members by name and type, and updated two header comments to say the records are frozen. `src/` tree hash (`find src -type f | LC_ALL=C sort | xargs shasum -a 256 | shasum -a 256`) `9d30…2535` → `3da3961c20e6308fabd1f36b37ffc18e083ba34e4fe3d176d03caefc1c5432d1`.
+**Controller reproduction** (Boron 6.4.1, fresh `BUILD_PATH_BASE`, `-frandom-seed=p6`, "before" is `git archive HEAD`): suite **91/91** (sh via zsh, py via python3, serial); text/data/bss `151724/1094/2228 → 151636/1094/2228` (−88 text); **`.backup` byte-identical** with the same retained symbols (outcome A); guard mutations in git-backed copies: appended tail-padding member, end append, inserted member, resized live member, reorder, live rename and swap all **fail**; a `reserved*` rename and the clean tree **pass**.
+
+## Stage 7 result (22 Oct)
+
+**Round 1** (Codex `gpt-5.6-sol`, high; `…-stage7-verdict.md`): NOT VERIFIED on the guard only: **F1 (High)** a tail-padding member declared with an initializer was not parsed, so appending it passed; **F2 (High)** the frozen table had no member identity, so swapping `openTime`/`closeTime` passed; **F3 (Low)** two header comments still said "append at the end". Checks 1 (no live reader), 2 (layout identical, 272/36/88, all 161 probe words equal), 3 (downgrade safe: v45 reads none of the retired bytes; the four no-longer-initialized slots are now 0 on a first boot; existing devices keep their stored values), 5, 6 and 7 PASS.
+**Round 2** (the last round; `…-stage7-round2-verdict.md`): **VERIFIED WITH CONCERNS (Low only)**; no real freeze gap with ordinary syntax. **C1 (Low), accepted by the architect under §12.4 ("accepted by the architect: parser edge case, not a regression"), not fixed:** the method-declaration allowlist also accepts a function-pointer data member (`void (*x)();`), which no real record uses.
+
+## Closing record
+
+| Item | Budget | Actual |
+|---|---|---|
+| `src/` net | ≤ +20, hard (expected about −100 to −127) | **−144** (+14/−158): `MyPersistentData.cpp` −96, `MyPersistentData.h` +14/−45, `SystemConfig.h` −10, `PowerConfig.h` −2, `CurrentReadings.h` −2; only the five authorized files; round 2 added no code lines |
+| Tests | guideline +100 | **+55 net** (+150/−95): the guard rewritten (+105/−81 then +81/−36), facade-test section 6 retired (−14); no fixture; no new suite file |
+| Suite | baseline 91 | **91/91**; golden payload unchanged |
+
+- **Test complexity (ruling 9), against main `0c565fa`:** `src/` 22,306 → 22,162 (**−144**); test lines excluding fixtures 28,893 → 28,935 (**+42**; the +55 is against `df6d99d`); fixtures 834 → 834; suite 91 → 91. (Counts here are over `df6d99d`'s tree plus this WO: the open sleep PRs are not in it.)
+- **Layout probe, before and after:** SysData 272 B (51 members + header), SensorData 36 B (5), CurrentData 88 B (17); versions 4/1/1; magics `0x20a15e75`/`0x20a47e74`/`0x20a99e74`; every offset unchanged (all 161 emitted words equal). The guard now freezes `(name, type, offset, size)` per member.
+- **ELF:** −88 B text: `sysStatusData::initialize()` 0x1b0 → 0x188 (−40) and four setters gone (`set_lowPowerMode`, `set_sensorType`, `set_structuresVersion` 12 B each, `set_verboseModeStartTime` 10 B); static-init stubs unchanged.
+- **Retained outcome A.** No `retained` keyword added.
+- **Fields removed (11):** SysData `structuresVersion`, `lowPowerMode`, `sensorType` (the SysData one), `updatesPending`, `disconnectedMode`, `verboseModeStartTime`; CurrentData `faceNumber`, `faceScore`, `gestureType`, `gestureScore`, `externalTempC`: each now a `reserved*` slot of the same type and width. **Kept:** `solarPowerMode` (live reader), `lastCountTime` (ruling 4), `reservedFloat0`/`reservedByte0` (as before).
+- **Bench (Chip; Dev-14, laptop USB, branch build): not run, waits for Chip.** Note for step 4: a first boot now leaves `structuresVersion`, SysData `sensorType`, `lowPowerMode` and `verboseModeStartTime` at 0 (they were initialized to 2, 1, false, 0); v45 reads none of them.
+- **Deviations:** none from the design; Stage 6 took two rounds; the guard's frozen table includes each record's header entry.
+- **Rounds:** Stage 6 two; Stage 7 two (NOT VERIFIED, VERIFIED WITH CONCERNS). Ships in v47. **The PR is marked "do not merge until v46 is cut".**
+
+## For the architect
+
+- C1 (function-pointer data member) accepted under §12.4, recorded.
+- `solarPowerMode` is a de-facto constant after first boot (only `initialize()` writes it); replacing the read by the constant is a possible later simplification.
