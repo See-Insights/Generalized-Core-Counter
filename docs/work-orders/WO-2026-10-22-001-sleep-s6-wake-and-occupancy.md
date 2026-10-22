@@ -149,3 +149,42 @@ These are the duplicates this move puts side by side. Each is a necessity-review
 - The ruling-8 table.
 
 **Plus a series closing note:** `handleSleepingState()`'s line count at `0c565fa` and after S-6, and the list of phase functions.
+
+## Stage 6 result and controller reproduction (22 Oct)
+
+**Stage 6** (Copilot, Sonnet 5.5, high; implementation commit `febcf0b` on `wip/s6-sleep-wake-and-occupancy`, no PR): option D as designed. **Step 0 split rule: 6a + 6b = +12 ≤ +20, one WO.** `src/` net **+12** (`State_Sleep.cpp` 1,383 → 1,275, −108; `State_Modes.cpp` +115 including the three includes; `StateHandlers.h` +5); the three files are byte-identical to Claude Code's compiled prototype. `src/` tree hash (`find src -type f | LC_ALL=C sort | xargs shasum -a 256 | shasum -a 256`) `88d823de…` → `437c9dca2275323293745127b9c0bc37c08185c44af773c7269c9eca93108f56`.
+**Controller reproduction** (Device OS 6.4.1 Boron, fresh `BUILD_PATH_BASE`, `-frandom-seed=p6`, "before" is `git archive HEAD`):
+- **Fixture:** `--regenerate` from the base `e6d3e69` is byte-identical; `COPY_MISMATCH` fires under `SLEEP_WAKE_TAMPER_COPY=1`; 143 scenarios, 143 passes, 31 distinct event forms; the S-1 to S-5 fixtures are unchanged.
+- **Suite 103/103** (sh via zsh, py via python3, serial; baseline 101); `git diff --check` flags only `State_Modes.cpp:176,225,253`, trailing-space blank lines carried from the base.
+- **ARM:** text/data/bss `151348/1114/2212 → 151340/1114/2212`; `processSleepWakeEvent(bool)` is an out-of-line 0x250 B symbol, `postWakeRouting` inlines, `handleSleepingState()` 0x14f4 → 0x12a0; **`.backup` unchanged** (retained outcome A).
+- **Mutations (git-backed copies):** the four WO mutations (PIR wake before the LED-timeout close; breadcrumb 5 dropped; the PIR-wake `BatteryAuthority` refresh skipped; a CONNECTED PIR wake routed back to sleep) each fail the transcript and the structural test; the control passes. Copilot also ran 22 mutations (the timer-suppress condition, a stray occupancy write, a `retained` probe, one per re-anchored test).
+
+## Stage 7 result and controller edits (22 Oct)
+
+**Round 1** (Codex `gpt-5.6-sol`, high, on `febcf0b`): NOT VERIFIED on **F1 (Medium)**: the new structural test checked for occupancy/counting writes only in the handler and `postWakeRouting`, so a rogue writer elsewhere in `State_Sleep.cpp` passed. Checks 1–5 and 7 PASS (moved code verbatim, ordering, ODR, transcript, re-anchors, ELF; retained outcome A). **Round 2**: F1 narrowed: `strip()` removed `//` before strings, so `Log.info("//"); …set_occupied(false);` hid a write. **Round 3: VERIFIED WITH CONCERNS (Low only)**, suite 103/103, `src/` tree identical to `febcf0b`.
+- **Controller edits (§13 (d); test-only, accepted retroactively by the architect, 22 Oct), both in `tests/sleep_wake_structural_test.py`, +8/−4 lines in total (net +4):** (1) `OWNED_WRITES` now scans the whole comment-stripped `State_Sleep.cpp` (base had ten such writes; the candidate has none) plus a probe; (2) `strip()` is one left-to-right pass over comments, strings and character literals plus a probe. Each was checked by git-backed mutants and rechecked by Codex.
+- **C1 (Low), accepted by the architect under §12.4 ("lexical evasion of a structural test, not a regression"), not fixed:** a C++ raw string with an embedded quote (`R"tag(" //)tag"`) still hides a write from the lexer. No raw string occurs in the file. **No round 4** (architect, 22 Oct).
+- **C2 (Low), accepted by the architect:** non-fixture test code is +960 lines, 9.6× the +100 guideline; the 1,545-line fixture is within the 1,500–3,000 estimate.
+
+## Closing record
+
+| Item | Budget | Actual |
+|---|---|---|
+| `src/` net | ≤ +20, hard | **+12** (+235/−223; Sleep −108, Modes +115, header +5); only the three authorized files |
+| Tests (S-6 alone) | guideline +100 | **+960** non-fixture lines (+1,021/−61, including the +4 controller edit; 9.6×), a **1,545-line fixture** (estimate 1,500–3,000) |
+| Suite | baseline 101 | **103/103** (sh via zsh, py via python3, serial); golden fixture sha256 `07de1e19…` unchanged |
+
+- **Test complexity (ruling 9), against main `0c565fa` (cumulative, Claude Code's count):** `src/` 22,306 → 22,390 (**+84**); test lines excluding fixtures 28,893 → 34,043 (**+5,150**); fixture lines 834 → 20,435 (**+19,601**); suite 91 → 103 (**+12**). S-6 alone: +12 / +960 / +1,545 / +2.
+- **Design (option D):** `bool processSleepWakeEvent(bool pirWake)` at the end of `State_Modes.cpp` (declared in `StateHandlers.h`), holding the LED-timeout close and PIR-wake synthesis verbatim; `static void postWakeRouting(bool, bool, bool, const char *)` in `State_Sleep.cpp` after `} // namespace` (the one slot outside every harness span), holding the rest of the post-wake routing; the handler calls it last. `logWakeSummary` and the simplify-series duplicates (debounce default four ways, two session-end tests, the PIR event counted twice, occupancy start written twice, the duplicate low-battery `BatteryAuthority` refresh) are moved verbatim and stay.
+- **Transcript provenance:** `tests/fixtures/sleep_wake_transcript.txt`, base `e6d3e69`; 143 scenarios; file sha256 `30a2e150…`, body `af9dc4a5…`. Regenerated from the base by Claude Code and Codex: byte-identical.
+- **`handleSleepingState()` length:** **1,492 lines at main `0c565fa`, 377 at S-5, 155 after S-6.** Phase functions extracted by the series: `SleepTeardown::run` (S-1), `sleepAndResume` (S-2), `cloudGatePass` (S-3), `sleepPlan` with `nightlyHeapGuard` and `hibernateAttempt` (S-4), `endOfCycleSummary` and `wifiOffGuardPass` (S-5), `postWakeRouting` and `processSleepWakeEvent` (S-6).
+- **ELF and retained:** as above; static-init stubs 22/22; no `retained` keyword added; outcome A.
+- **Ruling-8 table (final):** ten tests re-anchored and mutation-checked (battery-authority allowlist; the two connection-mode-downgrade tests; clock-resync wiring; hourly-while-occupied; occupancy-report-by-mode; loop-stage prep exclusion; the S-2 harness call site; the S-4 and S-5 structural tests), and the three `wifiGuard.` normalizations narrowed to S-5's four reset lines (S-5 C1 closed). The four WO mutations are pinned by the new transcript.
+- **Argon:** not built.
+- **Deviations:** the fixture is within the estimate but the test code is 9.6× the guideline; Copilot's report said `src/` hash `decb954c…`/`12dc9de0…` (a different method, not comparable); two controller edits (above).
+- **Rounds:** Stage 6 one round; Stage 7 three rounds (NOT VERIFIED, NOT VERIFIED, VERIFIED WITH CONCERNS). Ships in v46 with S-1 to S-5. **The PR is marked "do not merge until v45 is cut and #128, #130, #131, #132 and #136 are merged"** (release/v45 is cut: PR #135).
+
+## For the architect
+
+- C1 (raw-string lexical evasion) is accepted and recorded, not fixed.
+- Series state: S-1 to S-6 done; `handleSleepingState()` is 155 lines.
