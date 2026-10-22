@@ -1,0 +1,18 @@
+AGENT: Codex · MODEL: gpt-5.6-sol · REASONING: high
+AUTHORIZATION SCOPE: review the Stage 6 change `git diff df6d99d cc84832` (HEAD adds only this dispatch). Run the host suite (one at a time) and ARM builds in scratch copies; write scratch under `build-tmp/wo20261022-003-stage7/`; mutate only in `git worktree add --detach` copies. Write your verdict to `docs/work-orders/WO-2026-10-22-003-stage7-verdict.md` (the only file you may add). **Not authorized:** other changes; commits, pushes, stash, reset, checkout or restore in the review tree; device, network or AWS access.
+
+# Stage 7 dispatch: WO-2026-10-22-003 (Step 7 P7-A: remove 11 dead persistence fields' accessors; freeze the stored layout)
+
+**Spec:** `WO-2026-10-22-003-step7-p7a-remove-dead-persistence.md`, `…-step0-report.md`, `…-stage6-copilot-dispatch.md`. Treat Copilot's report as unverified. Claude Code's reproduction: `src/` +11/−154 = **−143** (limit +20); suite 91/91 (baseline 91); ARM Boron text/data/bss `151724/1094/2228 → 151636/1094/2228`, `.backup` byte-identical; the guard fails on appended/widened/moved/version mutants and passes a rename.
+
+## Checks (PASS / FAIL / CONCERN with evidence)
+1. **No live reader.** By your own bare-name search over `src/`, `lib/`, `tests/` and macros: each of the 11 fields (`structuresVersion`, `lowPowerMode`, SysData `sensorType`, `updatesPending`, `disconnectedMode`, `verboseModeStartTime`, `faceNumber`, `faceScore`, `gestureType`, `gestureScore`, `externalTempC`) has no reader or writer left, including in string-built names, `offsetof` uses and the `sensorConfig` (SensorData) `sensorType`, which must be untouched. `solarPowerMode` and `lastCountTime` are untouched.
+2. **Layout unchanged.** Types, widths, order and offsets of every member of `SysData`, `SensorData`, `CurrentData` (272/36/88 B), versions (4, 1, 1) and magics, by your own ARM probe against `df6d99d`. Only member names changed.
+3. **Behavior and downgrade.** `initialize()` no longer writes `structuresVersion` (was 2), SysData `sensorType` (was 1), `lowPowerMode` (false) or `verboseModeStartTime` (0): on a first boot those bytes are now 0. State whether any v45 code (or StorageHelperRK validation/hash) reads them, so a v46/v47-initialized device read back by v45 behaves the same; and whether an existing device's stored values are left as they were. A FAIL is a reader.
+4. **The guard** (`persisted_layout_preservation_test.py`): positional, frozen table of 51/5/17 members; does it catch appended (including a small member hidden by tail padding), inserted, removed, resized, moved members and version/magic bumps, and pass renames? Run two mutations of your own. Is it weaker than the test it replaced in anything it used to check?
+5. **Retired test.** `persistence_facade_behavior_test.cpp` section 6 only tested the removed SysData `sensorType` facade; confirm nothing else it covered was lost.
+6. **ELF and retained.** Your own Boron 6.4.1 build, fresh `BUILD_PATH_BASE`, `-frandom-seed=p6`: sizes, symbol accounting (`nm -C -S`), no new static-init stub, the whole `.backup` section before and after (outcome A/B/C), no `retained` in an added line.
+7. **Budget.** `src/` net ≤ +20; tests against +100 (flag, don't fail); `git diff --check`; full suite N/N serial; golden payload unchanged.
+
+## Verdict (write to the file above, then a short summary)
+VERIFIED / VERIFIED WITH CONCERNS / NOT VERIFIED; model and reasoning; interpreter line; table of checks 1–7 and on its own line the retained outcome; findings with file:line and severity (observation vs inference); budget row; confirmations (tree unchanged, only your scratch removed).
