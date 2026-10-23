@@ -11,13 +11,13 @@ A report follows each close by 60 s, then a close report at 10:00:30; dailyoccup
   +.5, +1.5, +.5, +1.5, +.5, +1.5, 0.
 - missing: the report after close 2 is dropped. Day still 33, flagged; windows 6; the merged window
   measures 22 - 11 = 11 vs expected 2 * 5.5 = 11.
-- SGT-8 (UTC+8, midnight 10-20 16:00Z) with open 7, and EST5EDT (UTC-4 in October, midnight 04:00Z) with
-  open 20, close 23 (T0 20:54:30 local = 00:54:30Z next day): same offsets from local midnight, so the same
-  answers as perfect. A wrong sign or UTC-day assignment finds no report that day.
-- no_ts: an extra occupancy=1 report 30 min before T0 with no payload timestamp (published_at would be
-  T0 - 1400 s). It must be ignored and noted; the answers equal perfect.
-- reset: session 2 (08:34:30..08:40:00) is cut by a reset at 08:37 and not credited: 5, 11, 11, 16, 22, 27.
-  Day 27 vs 33.0, error -6.0 min = -18.1818%, flagged; its window measures 0 vs 5.5 = -5.5.
+- SGT-8 (UTC+8, midnight 10-20 16:00Z), open 7: the 07:54:30 T0 is on the previous UTC date; same answers
+  as perfect. A wrong sign or UTC-day assignment finds no report that day.
+- EST5EDT,M3.2.0/2:00:00,M11.1.0/2:00:00, open 20, close 23, T0 20:54:30 local, sessions as in perfect.
+  EDT (2026-10-21, UTC-4): local midnight 04:00Z, T0 = 00:54:30Z on 10-22; day 33.0 min, 6 sessions.
+  EST (2026-12-09, UTC-5): midnight 05:00Z, T0 = 01:54:30Z on 12-10. Reports are generated at the real
+  UTC instants, so a fixed -5 h (DST ignored) would put the October T0 at 19:54:30 local, before open 20:
+  no report that day. A fixed -4 h would put the December T0 at 21:54:30, off the answers likewise.
 """
 import csv, json, os, shutil, subprocess, sys, tempfile
 from datetime import datetime, timezone
@@ -26,6 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPT = os.path.join(HERE, "..", "tools", "exerciser_baseline.py")
 DEV = "e00fce68399ee6244a963935"
 BASE = datetime(2026, 10, 21, tzinfo=timezone.utc).timestamp()
+DEC = datetime(2026, 12, 9, tzinfo=timezone.utc).timestamp()
 
 
 def iso(t):
@@ -41,7 +42,7 @@ def write(root, sub, name, ts, payload, pub_delay=400):
         json.dump(env, f)
 
 
-def run(credit_s=330, drop=None, reset=False, base=BASE, tz="UTC", h=7, no_ts=False):
+def run(credit_s=330, drop=None, reset=False, base=BASE, tz="UTC0", h=7, no_ts=False, date="2026-10-21"):
     tmp, T0 = tempfile.mkdtemp(), base + h * 3600 + 54 * 60 + 30
     # published_at lags the payload timestamp by 400 s, so using it as the phase moves every close
     reps, cum = [(T0, 1, 0)], 0
@@ -59,7 +60,7 @@ def run(credit_s=330, drop=None, reset=False, base=BASE, tz="UTC", h=7, no_ts=Fa
         write(tmp, "status", "s0", base + (h + 1) * 3600 + 37 * 60, {"resetReason": 60}, 0)
     out = os.path.join(tmp, "out.csv")
     p = subprocess.run([sys.executable, SCRIPT, "--hooks", os.path.join(tmp, "hooks"), "--status",
-                        os.path.join(tmp, "status"), "--id", DEV, "--dates", "2026-10-21", "--open", str(h),
+                        os.path.join(tmp, "status"), "--id", DEV, "--dates", date, "--open", str(h),
                         "--close", str(h + 3), "--tz", tz, "--debounce-ms", "60000", "--csv", out],
                        capture_output=True, text=True, check=True)
     rows = list(csv.DictReader(open(out)))
@@ -92,11 +93,15 @@ def main():
     bad += check("reset day", (day["measured"], float(day["error"]), day["error_pct"], day["flags"]),
                  ("27", -6.0, "-18.1818", "reset"))
     bad += check("reset window", win[2], -5.5)
-    # SGT-8 = UTC+8: local midnight is 2026-10-20 16:00Z, so the 07:54 T0 is on the previous UTC date
-    for tz, b, h in (("SGT-8", BASE - 8 * 3600, 7), ("EST5EDT", BASE + 4 * 3600, 20)):
-        out, day, win = run(base=b, tz=tz, h=h)
-        bad += check(tz + " day", (day["measured"], day["expected"], day["count"]), ("33", "33.0", "6"))
-        bad += check(tz + " windows", win, [-.5, .5, -.5, .5, -.5, .5, 0.0])
+    rule = "EST5EDT,M3.2.0/2:00:00,M11.1.0/2:00:00"
+    for tz, b, h, date in (("SGT-8", BASE - 8 * 3600, 7, "2026-10-21"), (rule, BASE + 4 * 3600, 20, "2026-10-21"),
+                           (rule, DEC + 5 * 3600, 20, "2026-12-09")):
+        out, day, win = run(base=b, tz=tz, h=h, date=date)
+        bad += check(tz + date + " day", (day["measured"], day["expected"], day["count"]), ("33", "33.0", "6"))
+        bad += check(tz + date + " windows", win, [-.5, .5, -.5, .5, -.5, .5, 0.0])
+    p = subprocess.run([sys.executable, SCRIPT, "--hooks", ".", "--id", DEV, "--dates", "2026-10-21",
+                        "--debounce-ms", "60000", "--tz", "garbage"], capture_output=True, text=True)
+    bad += check("bad tz", (p.returncode, "Traceback" in p.stderr, len(p.stderr.strip().splitlines())), (1, False, 1))
     out, day, win = run(no_ts=True)
     bad += check("no-timestamp ignored", (day["measured"], day["count"], win, "1 reports without a payload timestamp ignored" in out),
                  ("33", "6", [-.5, .5, -.5, .5, -.5, .5, 0.0], True))

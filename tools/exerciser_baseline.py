@@ -4,8 +4,8 @@
 Reads local S3 report-hook and status JSON files only (no network, no AWS).
 """
 import argparse, csv, glob, html, json, os, re, statistics, sys
-from datetime import date, datetime, time, timedelta, timezone
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+import time
+from datetime import date, datetime, timedelta
 
 TRUNC_NOTE = ("NOTE: dailyoccupancy is truncated to whole minutes, so a +/-1 min error "
               "per window is quantization, not firmware.")
@@ -14,16 +14,16 @@ PHASE_NOTE = ("NOTE: T0 is the payload timestamp of the day's first occupancy=1 
               "between windows; try --phase-offset-s. Expected minutes never come from the counter.")
 
 
-def get_tz(name):
-    try:
-        return ZoneInfo(name)
-    except (ZoneInfoNotFoundError, ValueError, OSError):
-        m = re.fullmatch(r"[A-Za-z]{3,}([+-]?)(\d{1,2})(?::([0-5]\d))?", name)
-        if not m:
-            sys.exit(f"error: unknown timezone {name!r}; use an IANA name or a fixed POSIX offset like SGT-8")
-        mins = int(m.group(2)) * 60 + int(m.group(3) or 0)
-        # POSIX sign is inverted: SGT-8 is UTC+8, EST5 is UTC-5
-        return timezone(timedelta(minutes=mins if m.group(1) == "-" else -mins), name)
+def set_tz(name):
+    # tzset() falls back to UTC silently on garbage, so reject obviously malformed strings first
+    if not re.match(r"[A-Za-z]{3,}[+-]?\d{1,2}(:\d{2})?", name):
+        sys.exit(f"error: unparsable POSIX TZ {name!r}; expected like SGT-8 or EST5EDT,M3.2.0/2:00:00,M11.1.0/2:00:00")
+    os.environ["TZ"] = name
+    time.tzset()
+
+
+def local_epoch(dt):
+    return time.mktime(dt.timetuple()[:8] + (-1,))
 
 
 def load(root, dev, pub_ok=False):
@@ -70,7 +70,7 @@ def parse_args(argv):
     ap.add_argument("--status", help="dir of status JSON files, for resets")
     ap.add_argument("--id", required=True, help="device (core) id")
     ap.add_argument("--dates", nargs="+", required=True, help="local days, YYYY-MM-DD")
-    ap.add_argument("--tz", default="UTC")
+    ap.add_argument("--tz", default="UTC0", help="POSIX TZ string, e.g. SGT-8 or EST5EDT,M3.2.0/2:00:00,M11.1.0/2:00:00")
     ap.add_argument("--open", type=float, default=0, help="local open hour")
     ap.add_argument("--close", type=float, default=24, help="local close hour")
     ap.add_argument("--debounce-ms", type=int, required=True, help="300000 production, 60000 bench")
@@ -93,23 +93,23 @@ def sessions(t0, close, credit, cycle_s):
 
 def main(argv=None):
     a = parse_args(argv)
-    tz = get_tz(a.tz)
+    set_tz(a.tz)
     hooks, no_ts = load(a.hooks, a.id)
     resets = [s["ts"] for s in (load(a.status, a.id, pub_ok=True)[0] if a.status else [])
               if s["d"].get("resetReason") not in (None, 30, 70)]
     excl = []
     for e in a.exclude:
         lo, hi = (datetime.fromisoformat(x) for x in e.split(".."))
-        excl.append((lo.replace(tzinfo=lo.tzinfo or tz).timestamp(), hi.replace(tzinfo=hi.tzinfo or tz).timestamp()))
+        excl.append(tuple(x.timestamp() if x.tzinfo else local_epoch(x) for x in (lo, hi)))
     credit = (a.pulses - 1) * a.spacing_s + a.debounce_ms / 1000
-    hhmm = lambda t: datetime.fromtimestamp(t, tz).strftime("%H:%M:%S")
+    hhmm = lambda t: time.strftime("%H:%M:%S", time.localtime(t))
     overlaps = lambda lo, hi: any(lo <= e1 and e0 <= hi for e0, e1 in excl)
     days, wins = [], []
     for day in a.dates:
-        d0 = datetime.combine(date.fromisoformat(day), time(0), tz)
-        open_t = (d0 + timedelta(hours=a.open)).timestamp()
-        close_t = (d0 + timedelta(hours=a.close)).timestamp()
-        reps = [r for r in hooks if d0.timestamp() <= r["ts"] < (d0 + timedelta(days=1)).timestamp()
+        d0 = datetime.fromisoformat(day)
+        at = lambda days=0, hours=0: local_epoch(d0 + timedelta(days=days, hours=hours))
+        open_t, close_t = at(hours=a.open), at(hours=a.close)
+        reps = [r for r in hooks if at() <= r["ts"] < at(1)
                 and r["d"].get("dailyoccupancy") is not None]
         first = next((r for r in reps if r["d"].get("occupancy") == 1 and r["ts"] >= open_t), None)
         if not first:
