@@ -95,9 +95,9 @@ On the first exerciser day on v45 (Dev-09 and Dev-14), Claude Code syncs the hoo
 - The fixture answers.
 - The first run's v45 numbers, with their source and window (§13 (j)).
 
-## Amendment 1 (architect/Chip, 23 Oct): the power-up session
+## Amendment 1 (23 Oct): the power-up session: DROPPED
 
-**Flag and exclude the first session after each exerciser power-up** (a possible power-up edge of about +6 s from the start-up quiet period), and **report it separately**: in the per-day table, the per-window table and the summary, that session is marked `powerup`, left out of the accuracy and precision statistics, and listed on its own line with its measured and expected minutes. A power-up is the first session of a local day, or the first session after a gap of more than 1.5 cycles with no session, or the first session after an `--exclude` window. Context: Dev-14 serial, 23 Oct, first exerciser session `session=581s` against 570 s expected; the later 11:49 local session measured about 580 s by the hooks (S3, start report 03:48:57Z to end report 03:58:37Z), so a recurring offset of about +10 s exists that the power-up edge alone does not explain. Implemented as a small follow-up round on this branch after Stage 8 (below); the exerciser sketch is frozen after 23 Oct except for driving IO1 LOW first in `setup()`.
+It was proposed to flag and exclude the first session after each exerciser power-up (a possible +6 s start-up edge). **Chip dropped it on 23 Oct:** Dev-14 shows a **steady +10 s bias** (first session `session=581s` on serial; the 11:49 local session 580 s by the hooks, S3 start report 03:48:57Z to end report 03:58:37Z, against 570 s expected), not a power-up edge. **The script stays as Codex verified it** (no change). The exerciser sketch is frozen after 23 Oct except for driving IO1 LOW first in `setup()`.
 
 ## Stage 6 and Stage 7 result (23 Oct)
 
@@ -119,5 +119,5 @@ On the first exerciser day on v45 (Dev-09 and Dev-14), Claude Code syncs the hoo
 
 ## For the architect
 
-- Amendment 1 (power-up session) is the next small round.
-- The hooks show sessions about 10 s longer than 570 s (581 s and 580 s on Dev-14): a recurring offset to understand before the v46 comparison.
+- Amendment 1 (power-up session) is dropped; the script stays as verified.
+- The hooks show sessions about 10 s longer than 570 s (581 s and 580 s on Dev-14): a **steady bias of about +10 s** (about 0.17 min per session, so about 0.5 min per hour at three sessions), to carry into the v46 comparison rather than correct for.
