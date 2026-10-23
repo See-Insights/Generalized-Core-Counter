@@ -97,7 +97,7 @@ On the first exerciser day on v45 (Dev-09 and Dev-14), Claude Code syncs the hoo
 
 ## Amendment 1 (23 Oct): the power-up session: DROPPED
 
-It was proposed to flag and exclude the first session after each exerciser power-up (a possible +6 s start-up edge). **Chip dropped it on 23 Oct:** Dev-14 shows a **steady +10 s bias** (first session `session=581s` on serial; the 11:49 local session 580 s by the hooks, S3 start report 03:48:57Z to end report 03:58:37Z, against 570 s expected), not a power-up edge. **The script stays as Codex verified it** (no change). The exerciser sketch is frozen after 23 Oct except for driving IO1 LOW first in `setup()`.
+It was proposed to flag and exclude the first session after each exerciser power-up (a possible +6 s start-up edge). **Chip dropped it on 23 Oct:** the power-up session and the next one were equally long (Dev-14 first session `session=581s` on serial; the 11:49 local session 580 s by the hooks, S3 start report 03:48:57Z to end report 03:58:37Z, against 570 s expected), so power-up is not the discriminator. Session length: 569–581 s observed; the two long sessions (580–581 s, hooks) ran while Dev-14 was on laptop USB, and the clean serial values after the move to the forwarder were 569 s and 570 s; cause open; Saturday's full day on the forwarder decides (serial `session=` 569 s on Dev-14 at 04:18:31Z and 570 s on Dev-09 at 04:24:15Z, S3 `serialLog`, 23 Oct). **The script stays as Codex verified it** (no change). The exerciser sketch is frozen after 23 Oct except for driving IO1 LOW first in `setup()`.
 
 ## Stage 6 and Stage 7 result (23 Oct)
 
@@ -120,4 +120,4 @@ It was proposed to flag and exclude the first session after each exerciser power
 ## For the architect
 
 - Amendment 1 (power-up session) is dropped; the script stays as verified.
-- The hooks show sessions about 10 s longer than 570 s (581 s and 580 s on Dev-14): a **steady bias of about +10 s** (about 0.17 min per session, so about 0.5 min per hour at three sessions), to carry into the v46 comparison rather than correct for.
+- Session length: 569–581 s observed; the two long sessions (580–581 s, hooks) ran while Dev-14 was on laptop USB, and the clean serial values after the move to the forwarder were 569 s and 570 s; cause open; Saturday's full day on the forwarder decides. The Saturday run reports the per-session start-to-end distribution from the hooks (and serial `session=` where captured) alongside the day totals.
