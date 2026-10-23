@@ -16,6 +16,17 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v45-PowerSplit] - 2026-10-21
+
+### Changed
+
+- **No intended behavior change.** v45 should report, wake, reset and sleep exactly like v44 (Device OS 6.6.0). It is the power half of Step 6, seven moves (P-0 to P-6, PRs #110, #112, #114, #116, #118, #123, #124):
+  - **Code moved to its own modules:** the loop forensics and awake watchdog (P-1), the connectivity failsafe (P-2), report publishing and the daily cleanup (P-3), the clock and hibernate helpers (P-4) and the modem-health latch (P-5). The main file goes from 2,719 to 1,492 lines.
+  - **Duplicates and dead code removed (P-6):** the power-source codes and the PMIC fault masks are defined once, and three unused items are gone (two labels and an unread capability field).
+  - **P-0 pins the layout of the retained memory** so later changes cannot silently shift it.
+- **First boot after this update:** the boot-storm and breadcrumb values reset once (P-0 pins their memory layout), so the first status shows breadcrumb 0. That is expected.
+- **The ThrashGuard diagnostic counters read wrong once** on the first boot after this update (report-only, P-0).
+
 ## [v44-DeviceOS660] - 2026-10-17
 
 ### Changed

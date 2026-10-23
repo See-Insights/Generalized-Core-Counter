@@ -15,9 +15,9 @@
 #define FIRMWARE_VERSION_H
 
 /** @brief Particle Product integer version (must be an integer). */
-#define FIRMWARE_PRODUCT_VERSION 44
+#define FIRMWARE_PRODUCT_VERSION 45
 
 /** @brief Current firmware release string. */
-inline const char* FIRMWARE_VERSION = "v44-DeviceOS660";
+inline const char* FIRMWARE_VERSION = "v45-PowerSplit";
 
 #endif /* FIRMWARE_VERSION_H */
