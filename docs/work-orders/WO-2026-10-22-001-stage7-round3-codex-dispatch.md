@@ -1,0 +1,8 @@
+AGENT: Codex · MODEL: gpt-5.6-sol · REASONING: high
+AUTHORIZATION SCOPE: as in `WO-2026-10-22-001-stage7-round2-codex-dispatch.md` (scratch under `build-tmp/wo20261022-001-stage7r3/`; mutate only in `git worktree add --detach` copies; no commits/pushes; no device/network/AWS). Write your verdict to `docs/work-orders/WO-2026-10-22-001-stage7-round3-verdict.md` (the only file you may add).
+
+# Stage 7 round 3: WO-2026-10-22-001
+
+Round 2 (`…-stage7-round2-verdict.md`) found F1 narrowed: `strip()` removed `//` comments before strings, so `Log.info("//"); CurrentReadings::set_occupied(false);` hid a write. Fix (last commit, test-only, `git diff HEAD~1 -- tests/sleep_wake_structural_test.py`; `src/` unchanged from `febcf0b`): `strip()` is now one left-to-right regex pass (block comment | line comment | string | char literal) plus one probe. Claude Code's checks: your round-2 mutant, a `char q = '"';` prefix, a `/* "x */` prefix and the plain write all fail; a write only inside a string literal passes (correct); suite 103/103.
+
+Check: (1) your round-2 mutant and two more lexical evasions of your choice (raw strings `R"(...)"`, line continuation `\` after a comment, `'"'`, a `//` inside a char literal) — report which fail and which pass, and whether any passing one is a *real* write the test should catch or only text; (2) no false positive on the real tree; the existing `retained` probes (they also use `strip`) still behave; (3) `src/` tree identical to `febcf0b`; (4) suite N/N serial. Verdict VERIFIED / VERIFIED WITH CONCERNS (Low only) / NOT VERIFIED, short. If an evasion needs a construct that does not occur in this file, say so and rate it Low.

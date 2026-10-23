@@ -10,7 +10,7 @@
 #include "persist/CurrentReadings.h"
 #include "persist/RecoveryState.h"
 
-enum State { SLEEPING_STATE, ERROR_STATE, IDLE_STATE, FIRMWARE_UPDATE_STATE, REPORTING_STATE };
+enum State { SLEEPING_STATE, ERROR_STATE, IDLE_STATE, FIRMWARE_UPDATE_STATE, REPORTING_STATE, CONNECTING_STATE };
 
 namespace sim {
 inline int transitions = 0;
@@ -34,6 +34,7 @@ struct SessionState {
   bool modemUnstable = false;
   bool awaitingWebhookResponse = false;
   bool occupancyChangeTriggered = false;
+  bool serviceRequestTriggered = false;
 };
 inline SessionState session;
 

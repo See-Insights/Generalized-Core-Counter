@@ -25,8 +25,10 @@ BatteryAuthorityCommand.cpp is never counted as a call site.
   1. `BatteryAuthority::commit(` appears exactly four times in the entire
      src/ tree, at exactly the four deliberate policy-application sites:
      Generalized-Core-Counter.cpp's setup() (x1), state/State_Report.cpp's
-     reporting cycle (x1), and state/State_Sleep.cpp's two low-battery-
-     recovery checks (x2).
+     reporting cycle (x1), state/State_Sleep.cpp's post-wake low-battery
+     recovery check (x1) and state/State_Modes.cpp's PIR-wake low-battery
+     refresh in processSleepWakeEvent() (x1) (WO-2026-10-22-001 moved it
+     there).
   2. No other file contains a call to BatteryAuthority::commit() - in
      particular, the four read-path files this step's report named
      (cloud/DeviceStatusPublisher.cpp, diagnostics/ConnectivityFailsafeTest.cpp,
@@ -48,7 +50,8 @@ COMMIT_CALL_PATTERN = re.compile(r"BatteryAuthority::commit\s*\(")
 ALLOWED_COMMIT_SITES = {
     SRC_ROOT / "Generalized-Core-Counter.cpp": 1,
     SRC_ROOT / "state" / "State_Report.cpp": 1,
-    SRC_ROOT / "state" / "State_Sleep.cpp": 2,
+    SRC_ROOT / "state" / "State_Sleep.cpp": 1,
+    SRC_ROOT / "state" / "State_Modes.cpp": 1,
 }
 
 # Read paths that must never call commit() - named explicitly so a failure

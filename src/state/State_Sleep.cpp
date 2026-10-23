@@ -993,6 +993,120 @@ bool sleepAndResume(int wakeInSeconds, bool useNetworkStandby, const char *sleep
 
 } // namespace
 
+static void postWakeRouting(bool pirWake, bool buttonWake, bool timerWake, const char *wakeReasonLabel) {
+  // LED will be turned on with proper timeout by PIR wake processing below
+  // Don't turn it on here without timeout as it causes false LED timeout detection
+
+  if (buttonWake) {
+    // User button wake: queue a fresh service report, then force immediate connect.
+    SensorManager::instance().onExitSleep();
+    measure.batteryState(BatterySampleContext::PostWake);
+    logWakeSummary(wakeReasonLabel);
+    session.serviceRequestTriggered = true;
+    transitionTo(REPORTING_STATE, "sleep-wake-button");
+    return;
+  } else {
+    // In this state the device was awoken for hourly reporting or PIR
+    // Re-enable sensors only if within opening hours; otherwise they
+    // remain powered down to minimize sleep current.
+    if (isWithinOpenHours()) {
+      // If the sensor stack was never initialized (for example, device booted
+      // while closed and remained asleep), onExitSleep() will be a no-op.
+      // Ensure we (re)initialize the active sensor when entering open hours.
+      SensorManager::instance().onExitSleep();
+      if (!SensorManager::instance().isSensorReady()) {
+        SensorManager::instance().initializeFromConfig();
+      }
+
+      // Refresh battery state immediately after wake while the radio is still off.
+      measure.batteryState(BatterySampleContext::PostWake);
+
+      // If KEEP_ALIVE was previously disabled due to low battery, re-evaluate
+      // battery policy immediately after the post-wake sample so this wake's
+      // occupancy and sleep decisions do not use a stale downgraded mode.
+      // WO-2026-09-21 Step 4 (corrected same day): evaluate() then commit() -
+      // one of the four deliberate policy-application sites.
+      if (PowerConfig::get_lowBatteryMode()) {
+        const float soc = PowerManager::instance().soc();
+        float vcell = 0.0f;
+        const SensorManager::VcellSampleState vcellState =
+            SensorManager::instance().cachedBatteryVoltageState(vcell);
+        const BatteryHealth::SocTrust trust = SensorManager::instance().cachedSocTrust();
+        BatteryAuthority::commit(
+            BatteryAuthority::evaluate(soc, vcellState, vcell, trust, BatteryAuthority::currentTier()),
+            soc);
+      }
+
+      // In CONNECTED operating mode, the device should reconnect at the
+      // start of open hours so it can resume normal connected behavior.
+      if (PowerManager::instance().effectiveConnectionMode() == SystemConfig::CONNECTED && !Particle.connected()) {
+        logWakeSummary(wakeReasonLabel);
+        transitionTo(CONNECTING_STATE, "sleep-open-hours-reconnect");
+        return;
+      }
+    }
+
+    if (processSleepWakeEvent(pirWake)) return;
+
+    logWakeSummary(wakeReasonLabel);
+
+    // For COUNTING mode: Turn off LED if flash completed during sleep
+    if (SystemConfig::get_sensorMode() == SystemConfig::COUNTING && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
+      signalLED(false);
+    }
+
+    // Timer wake = scheduled report. No checks, no gates.
+    // We trust that the system timer woke us at the correct boundary.
+    if (timerWake) {
+      // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, suppress periodic reports
+      // while occupied UNLESS one is due for this reporting interval
+      // (WO-2026-10-02-002: report every hour, occupied or not).
+      if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && CurrentReadings::get_occupied() &&
+          PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE && !reportDueThisInterval()) {
+        transitionTo(SLEEPING_STATE, "sleep-timer-occupied-suppress-report");
+        return;
+      }
+
+      transitionTo(REPORTING_STATE, "sleep-timer-report");
+      return;
+    }
+
+    // For PIR wakes, check if reporting is also due (opportunistic reporting)
+    // WO-2026-09-19 Step 3b: Clock::openness() != Closed, not
+    // isTimeValid()+isWithinOpenHours() - Unknown is treated as Open, same
+    // reasoning as the scheduled-reporting site in State_Idle.cpp: an
+    // opportunistic report is a resync opportunity, not a commitment.
+    if (pirWake && Clock::openness() != Clock::Openness::Closed) {
+      // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, a PIR hit while occupied
+      // reports only when one is due for this reporting interval
+      // (WO-2026-10-02-002); otherwise it only resets debounce.
+      if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && CurrentReadings::get_occupied() &&
+          PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
+        if (reportDueThisInterval()) { transitionTo(REPORTING_STATE, "sleep-pir-overdue-report"); return; }
+      } else {
+      uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
+
+      time_t now = Time.now();
+      time_t lastReport = SystemConfig::get_lastReport();
+      if (lastReport > 0 && (now - lastReport) >= intervalSec) {
+        transitionTo(REPORTING_STATE, "sleep-pir-overdue-report");
+        return;
+      }
+      }
+    }
+
+    // If PIR woke us in INTERMITTENT or DISCONNECTED mode and no report is needed,
+    // return immediately to sleep. This check comes AFTER opportunistic reporting
+    // so overdue reports are not missed.
+    if (pirWake && PowerManager::instance().effectiveConnectionMode() != SystemConfig::CONNECTED) {
+      transitionTo(SLEEPING_STATE, "sleep-pir-return-to-sleep");
+      return;
+    }
+
+    transitionTo(IDLE_STATE, "sleep-wake-idle");
+  }
+}
+
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
 // No behavioral changes were made.
@@ -1157,227 +1271,5 @@ void handleSleepingState() {
   
   WakeContext wake;
   if (sleepAndResume(wakeInSeconds, useNetworkStandby, sleepReason, wake)) return;
-  bool pirWake = wake.pirWake;
-  bool buttonWake = wake.buttonWake;
-  bool timerWake = wake.timerWake;
-  const char *wakeReasonLabel = wake.wakeReasonLabel;
-  
-  // LED will be turned on with proper timeout by PIR wake processing below
-  // Don't turn it on here without timeout as it causes false LED timeout detection
-
-  if (buttonWake) {
-    // User button wake: queue a fresh service report, then force immediate connect.
-    SensorManager::instance().onExitSleep();
-    measure.batteryState(BatterySampleContext::PostWake);
-    logWakeSummary(wakeReasonLabel);
-    session.serviceRequestTriggered = true;
-    transitionTo(REPORTING_STATE, "sleep-wake-button");
-    return;
-  } else {
-    // In this state the device was awoken for hourly reporting or PIR
-    // Re-enable sensors only if within opening hours; otherwise they
-    // remain powered down to minimize sleep current.
-    if (isWithinOpenHours()) {
-      // If the sensor stack was never initialized (for example, device booted
-      // while closed and remained asleep), onExitSleep() will be a no-op.
-      // Ensure we (re)initialize the active sensor when entering open hours.
-      SensorManager::instance().onExitSleep();
-      if (!SensorManager::instance().isSensorReady()) {
-        SensorManager::instance().initializeFromConfig();
-      }
-
-      // Refresh battery state immediately after wake while the radio is still off.
-      measure.batteryState(BatterySampleContext::PostWake);
-
-      // If KEEP_ALIVE was previously disabled due to low battery, re-evaluate
-      // battery policy immediately after the post-wake sample so this wake's
-      // occupancy and sleep decisions do not use a stale downgraded mode.
-      // WO-2026-09-21 Step 4 (corrected same day): evaluate() then commit() -
-      // one of the four deliberate policy-application sites.
-      if (PowerConfig::get_lowBatteryMode()) {
-        const float soc = PowerManager::instance().soc();
-        float vcell = 0.0f;
-        const SensorManager::VcellSampleState vcellState =
-            SensorManager::instance().cachedBatteryVoltageState(vcell);
-        const BatteryHealth::SocTrust trust = SensorManager::instance().cachedSocTrust();
-        BatteryAuthority::commit(
-            BatteryAuthority::evaluate(soc, vcellState, vcell, trust, BatteryAuthority::currentTier()),
-            soc);
-      }
-
-      // In CONNECTED operating mode, the device should reconnect at the
-      // start of open hours so it can resume normal connected behavior.
-      if (PowerManager::instance().effectiveConnectionMode() == SystemConfig::CONNECTED && !Particle.connected()) {
-        logWakeSummary(wakeReasonLabel);
-        transitionTo(CONNECTING_STATE, "sleep-open-hours-reconnect");
-        return;
-      }
-    }
-
-    // Check if LED timeout expired FIRST (before processing new PIR wake)
-    // This ensures we don't immediately undo state changes from PIR processing
-    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
-      // LED timeout expired - debounce period elapsed without motion
-      const bool reportNow = reportsOccupancyChangesNow();
-      const OccupancyCloseResult closeResult = closeOccupancySessionSafely("sleep");
-      signalLED(false);  // Turn off LED
-      if (closeResult.valid) {
-        logUnoccupiedEvent("debounce", closeResult.sessionSeconds, closeResult.totalSeconds, reportNow);
-      }
-      
-      // Match the rest of the occupancy state machine: only KEEP_ALIVE and
-      // CONNECTED force an immediate report/connect on occupancy transitions.
-      if (reportNow && !closeResult.stillOpen) {
-        session.occupancyChangeTriggered = true;
-        transitionTo(REPORTING_STATE, "sleep-occupancy-debounce-report");
-        return;
-      }
-    }
-
-    // Process PIR wake events (after checking LED timeout above)
-    // If this wake was caused by the PIR interrupt, synthesize a single
-    // detection event so that the motion that woke the device is counted
-    // even if the ISR flag did not survive ULTRA_LOW_POWER sleep.
-    if (pirWake) {
-      if (SystemConfig::get_sensorMode() == SystemConfig::COUNTING) {
-        CurrentReadings::set_hourlyCount(CurrentReadings::get_hourlyCount() + 1);
-        CurrentReadings::set_dailyCount(CurrentReadings::get_dailyCount() + 1);
-        // WO-2026-08-29-002 item 8: lastCountTime has no consumers anywhere
-        // in this codebase (write-only telemetry field) - gating on
-        // isClockTrusted() changes only the recorded value, never control
-        // flow.
-        CurrentReadings::set_lastCountTime(isClockTrusted() ? Time.now() : 0);
-        signalLED(true, 1000);  // Flash for 1 second
-        Log.info("Count detected from PIR wake - Hourly: %d, Daily: %d",
-                 CurrentReadings::get_hourlyCount(), CurrentReadings::get_dailyCount());
-        if (Serial && Serial.isConnected()) {
-          Serial.printf("Count detected from PIR wake - Hourly: %d, Daily: %d\r\n",
-                        CurrentReadings::get_hourlyCount(), CurrentReadings::get_dailyCount());
-        }
-      } else if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY) {
-        // Occupancy mode: PIR wakes are expected behavior, not thrashing
-        thrashGuard.markProgress("PIR_WAKE_OCCUPANCY");
-
-        // If KEEP_ALIVE was temporarily disabled for low battery, refresh the
-        // battery policy on wake so recovered power can restore the intended
-        // occupancy behavior before we decide whether to report or sleep again.
-        // WO-2026-09-21 Step 4 (corrected same day): evaluate() then commit() -
-        // one of the four deliberate policy-application sites.
-        if (PowerConfig::get_lowBatteryMode()) {
-          const float soc = PowerManager::instance().soc();
-          float vcell = 0.0f;
-          const SensorManager::VcellSampleState vcellState =
-              SensorManager::instance().cachedBatteryVoltageState(vcell);
-          const BatteryHealth::SocTrust trust = SensorManager::instance().cachedSocTrust();
-          BatteryAuthority::commit(
-              BatteryAuthority::evaluate(soc, vcellState, vcell, trust, BatteryAuthority::currentTier()),
-              soc);
-        }
-        
-        if (!CurrentReadings::get_occupied()) {
-          CurrentReadings::set_occupied(true);
-          // WO-2026-08-29-002 item 8: deliberately NOT gated on
-          // isClockTrusted(). Unlike lastCountTime, occupancyStartTime's 0
-          // value is a load-bearing sentinel for two consumers:
-          // MyPersistentData.cpp's validate() treats occupied=true with
-          // occupancyStartTime==0 as corrupt state and forces occupied=false
-          // (a real state-machine side effect, not just a recorded value),
-          // and State_Modes.cpp computes `Time.now() - occupancyStartTime`
-          // for a logged duration, which would become a multi-decade garbage
-          // span if this were 0 while occupied. Writing Time.now() here even
-          // when untrusted preserves existing behavior; see the
-          // Implementation Report for the Chief Engineer's review.
-          CurrentReadings::set_occupancyStartTime(Time.now());
-          // Treat the PIR wake as an occupancy event for debounce purposes.
-          // If lastOccupancyEvent is left at 0, the debounce logic that uses
-          // millis()-based timing will immediately expire and mark UNOCCUPIED.
-          CurrentReadings::set_lastOccupancyEvent(millis());
-
-          // Keep LED on for the debounce window (sensor.setting1 is milliseconds).
-          uint32_t debounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
-          if (debounceMs == 0) {
-            debounceMs = Config::occupancyDebounceMsForRuntime();
-          }
-          signalLED(true, debounceMs);
-          const bool reportNow = reportsOccupancyChangesNow();
-          logOccupiedEvent("pir-wake", debounceMs / 1000UL, reportNow);
-          
-          // Match the rest of the occupancy state machine: only KEEP_ALIVE and
-          // CONNECTED force an immediate report/connect on occupancy transitions.
-          if (reportNow) {
-            session.occupancyChangeTriggered = true;
-            setAppBreadcrumb(5);
-            transitionTo(REPORTING_STATE, "sleep-pir-occupancy-report");
-            return;
-          }
-        } else {
-          // Already occupied - motion detected during debounce, restart timer
-          uint32_t debounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
-          if (debounceMs == 0) {
-            debounceMs = Config::occupancyDebounceMsForRuntime();
-          }
-          signalLED(true, debounceMs);  // Restart LED timer
-          logOccupiedEvent("pir-wake", debounceMs / 1000UL, false, true);
-        }
-        CurrentReadings::set_lastOccupancyEvent(millis());
-      }
-    }
-
-    logWakeSummary(wakeReasonLabel);
-
-    // For COUNTING mode: Turn off LED if flash completed during sleep
-    if (SystemConfig::get_sensorMode() == SystemConfig::COUNTING && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
-      signalLED(false);
-    }
-
-    // Timer wake = scheduled report. No checks, no gates.
-    // We trust that the system timer woke us at the correct boundary.
-    if (timerWake) {
-      // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, suppress periodic reports
-      // while occupied UNLESS one is due for this reporting interval
-      // (WO-2026-10-02-002: report every hour, occupied or not).
-      if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && CurrentReadings::get_occupied() &&
-          PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE && !reportDueThisInterval()) {
-        transitionTo(SLEEPING_STATE, "sleep-timer-occupied-suppress-report");
-        return;
-      }
-
-      transitionTo(REPORTING_STATE, "sleep-timer-report");
-      return;
-    }
-
-    // For PIR wakes, check if reporting is also due (opportunistic reporting)
-    // WO-2026-09-19 Step 3b: Clock::openness() != Closed, not
-    // isTimeValid()+isWithinOpenHours() - Unknown is treated as Open, same
-    // reasoning as the scheduled-reporting site in State_Idle.cpp: an
-    // opportunistic report is a resync opportunity, not a commitment.
-    if (pirWake && Clock::openness() != Clock::Openness::Closed) {
-      // In OCCUPANCY + INTERMITTENT_KEEP_ALIVE mode, a PIR hit while occupied
-      // reports only when one is due for this reporting interval
-      // (WO-2026-10-02-002); otherwise it only resets debounce.
-      if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && CurrentReadings::get_occupied() &&
-          PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
-        if (reportDueThisInterval()) { transitionTo(REPORTING_STATE, "sleep-pir-overdue-report"); return; }
-      } else {
-      uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
-
-      time_t now = Time.now();
-      time_t lastReport = SystemConfig::get_lastReport();
-      if (lastReport > 0 && (now - lastReport) >= intervalSec) {
-        transitionTo(REPORTING_STATE, "sleep-pir-overdue-report");
-        return;
-      }
-      }
-    }
-
-    // If PIR woke us in INTERMITTENT or DISCONNECTED mode and no report is needed,
-    // return immediately to sleep. This check comes AFTER opportunistic reporting
-    // so overdue reports are not missed.
-    if (pirWake && PowerManager::instance().effectiveConnectionMode() != SystemConfig::CONNECTED) {
-      transitionTo(SLEEPING_STATE, "sleep-pir-return-to-sleep");
-      return;
-    }
-
-    transitionTo(IDLE_STATE, "sleep-wake-idle");
-  }
+  postWakeRouting(wake.pirWake, wake.buttonWake, wake.timerWake, wake.wakeReasonLabel);
 }

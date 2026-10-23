@@ -48,6 +48,15 @@ namespace {
 #include CUR_DRAIN_INC
 #include CUR_FUNCS_INC
 }  // namespace
+// Records the arguments the handler hands to postWakeRouting(), the post-wake routing's only input.
+static bool routedPir = false, routedButton = false, routedTimer = false;
+static const char *routedLabel = nullptr;
+static void postWakeRouting(bool pirWake, bool buttonWake, bool timerWake, const char *wakeReasonLabel) {
+  routedPir = pirWake;
+  routedButton = buttonWake;
+  routedTimer = timerWake;
+  routedLabel = wakeReasonLabel;
+}
 }  // namespace cur
 
 struct Outcome { bool fell, pir, btn, timer; const char *label; bool eff; bool preserve, force; int err; };
@@ -73,7 +82,8 @@ static void driveCur(bool useNetworkStandbyRequested, bool overnightFallbackSlee
 #include CUR_CALL_TEARDOWN_INC
 #include CUR_CALL_HIBERNATE_INC
 #include CUR_CALL_SLEEP_INC
-  o = {true, pirWake, buttonWake, timerWake, wakeReasonLabel, useNetworkStandbyEffective,
+#include CUR_CALL_ROUTE_INC
+  o = {true, routedPir, routedButton, routedTimer, routedLabel, useNetworkStandbyEffective,
        standbyReturn.preserveAfterNormalReturn, standbyReturn.forceModemOff, standbyReturn.error};
 }
 

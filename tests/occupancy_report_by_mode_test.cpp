@@ -13,8 +13,9 @@
 //                                            from src/state/State_Modes.cpp
 //   - the head of handleIdleState(), through the pending-change consumer
 //                                            from src/state/State_Idle.cpp
-//   - from handleSleepingState(): the pending-change check, the wake end
-//     block, the wake start block and the timer-wake block
+//   - from State_Modes.cpp: processSleepWakeEvent() (the wake end and wake start blocks, whole)
+//   - from handleSleepingState() and postWakeRouting(): the pending-change check, the
+//     call to processSleepWakeEvent() and the timer-wake block
 //                                            from src/state/State_Sleep.cpp
 //   - from handleReportingState(): the entry take of the flag, the alert-40
 //     block, the service-request take, the config-invalid exit, the first two
@@ -39,6 +40,7 @@
 #include "persist/PowerConfig.h"
 #include "persist/RecoveryState.h"
 #include "persist/SystemConfig.h"
+#include "power/BatteryAuthority.h"
 #include "power/ConnectivityPolicy.h"
 #include "power/PowerManager.h"
 
@@ -103,7 +105,10 @@ void transitionTo(State next, const char *reason) {
 
 bool ledOn = false;
 uint32_t ledRemainingSec = 0;
-void signalLED(bool on, uint32_t = 0) { ledOn = on; }
+void signalLED(bool on, uint32_t ms = 0) {
+  ledOn = on;
+  ledRemainingSec = (on && ms) ? ms : 0;  // a timed LED has time remaining, as the real one does
+}
 void signalLEDUpdate() {}
 bool signalLEDStatus() { return ledOn; }
 uint32_t signalLEDTimeRemaining() { return ledRemainingSec; }
@@ -112,17 +117,20 @@ void publishStateTransition() {}
 void setAppBreadcrumb(int) {}
 const int LOOP_STAGE_IDLE_PROCESSING = 5;
 
-bool sensorEvent = false;
-struct SensorManager {
-  static SensorManager &instance() {
-    static SensorManager s;
-    return s;
-  }
-  bool loop() { return sensorEvent; }
-};
+bool &sensorEvent = SensorManager::sensorLoopEvent;
 
 void logOccupiedEvent(const char *, uint32_t, bool, bool = false) {}
 void logUnoccupiedEvent(const char *, uint32_t, uint32_t, bool) {}
+
+// What processSleepWakeEvent() collaborates with beyond the above.
+struct {
+  explicit operator bool() const { return false; }
+  bool isConnected() const { return false; }
+  void printf(const char *, ...) const {}
+} Serial;
+struct {
+  void markProgress(const char *) const {}
+} thrashGuard;
 
 #include "extracted_predicate.inc"
 #include "extracted_close_1.inc"
@@ -130,6 +138,7 @@ void logUnoccupiedEvent(const char *, uint32_t, uint32_t, bool) {}
 #include "extracted_close_3.inc"
 #include "extracted_modes_update.inc"
 #include "extracted_modes_handle.inc"
+#include "extracted_modes_wake_event.inc"
 
 void idleHead() {
 #include "extracted_idle_head.inc"
@@ -412,6 +421,27 @@ void testWakeEnd() {
   }
 }
 
+// WO-2026-10-22-001: a PIR wake whose LED timer ran out. processSleepWakeEvent() closes the session first
+// and processes the PIR event after it, so a reporting mode reports the close, and any other mode opens a
+// new session at the wake's time.
+void testWakePirAfterEnd() {
+  for (const ModeCase &m : kModes) {
+    arm(m);
+    occupiedPastDebounce(SLEEPING_STATE);
+    const time_t before = CurrentReadings::get_occupancyStartTime();
+    wakeKind = WAKE_PIR;
+    sleepPass();
+    if (m.reportsNow) {
+      CHECK_MODE(m, state == REPORTING_STATE && wentTo("sleep-occupancy-debounce-report") && !wentTo("sleep-pir-occupancy-report"),
+                 "wake pir+end: the close reports before the PIR event is processed");
+    } else {
+      CHECK_MODE(m, state == SLEEPING_STATE && wakeFellThrough && !anyOccupancyReport(), "wake pir+end: no immediate report");
+      CHECK_MODE(m, CurrentReadings::get_occupied() && CurrentReadings::get_occupancyStartTime() > before,
+                 "wake pir+end: the PIR event starts a new session after the close");
+    }
+  }
+}
+
 // --- The soak: the end is latched by the main-loop handler while SLEEPING -------
 // Pass N is a timer wake whose end gate is false (the LED was switched off).
 // The tail then latches the end. Pass N+1 must report before it sleeps again;
@@ -610,7 +640,7 @@ int main() {
   testAwakeLatchedOutsideIdle();
   testWakeStart();
   testWakeEnd();
-  testSoakLatchedWhileSleeping();
+  testWakePirAfterEnd();  testSoakLatchedWhileSleeping();
   testTeardownLatchedAfterRequest();
   testPendingMidGateResetsGateTimer();
   testNoRepeat();

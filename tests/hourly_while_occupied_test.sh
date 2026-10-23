@@ -28,11 +28,12 @@ helper_header="$work_dir/real_due_helper.h"
 
 common_src="$src_root/state/State_Common.h"
 sleep_src="$src_root/state/State_Sleep.cpp"
+modes_src="$src_root/state/State_Modes.cpp"
 idle_src="$src_root/state/State_Idle.cpp"
 report_src="$src_root/state/State_Report.cpp"
 policy_src="$src_root/power/ConnectivityPolicy.h"
 
-for f in "$common_src" "$sleep_src" "$idle_src" "$report_src" "$policy_src"; do
+for f in "$common_src" "$sleep_src" "$modes_src" "$idle_src" "$report_src" "$policy_src"; do
   [[ -f "$f" ]] || { echo "FAILED: missing source $f" >&2; exit 1; }
 done
 
@@ -284,8 +285,11 @@ echo "OK: all three sites report when due while occupied"
 echo "OK: the unoccupied rules at all three sites are unchanged"
 
 # Protected behavior: occupancy-change reports and the return-to-sleep path.
-for needle in "sleep-pir-occupancy-report" "sleep-occupancy-debounce-report" \
-              "sleep-pir-return-to-sleep" "sleep-timer-report"; do
+# WO-2026-10-22-001: the two occupancy-change reports moved to processSleepWakeEvent() in State_Modes.cpp.
+for needle in "sleep-pir-occupancy-report" "sleep-occupancy-debounce-report"; do
+  grep -q "\"$needle\"" "$modes_src" || fail "the protected transition $needle must still exist in State_Modes.cpp"
+done
+for needle in "sleep-pir-return-to-sleep" "sleep-timer-report"; do
   grep -q "\"$needle\"" "$sleep_src" || fail "the protected transition $needle must still exist"
 done
 echo "OK: occupancy-change reports and the return-to-sleep path are untouched"

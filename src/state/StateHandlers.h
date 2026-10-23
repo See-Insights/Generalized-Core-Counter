@@ -48,6 +48,11 @@ void handleCountingMode();
 void handleOccupancyMode();
 
 /**
+ * @brief Processes a sensor event that woke the device from sleep (LED-timeout session close, PIR-wake count or occupancy start); returns true when it has transitioned.
+ */
+bool processSleepWakeEvent(bool pirWake);
+
+/**
  * @brief Advances occupancy debounce and occupied or unoccupied transitions.
  */
 void updateOccupancyState();

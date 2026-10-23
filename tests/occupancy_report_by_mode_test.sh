@@ -193,10 +193,17 @@ sar = sleep.find("bool sleepAndResume(")
 if sleep.text.count("bool sleepAndResume(") != 1:
     die("State_Sleep.cpp: sleepAndResume() not found once")
 sar_end = sleep.text.find("\n}\n", sar)
-if "bool pirWake = sensorCanWake && (wakePin == sensorWake.pin);" not in sleep.text[sar:sar_end]:
+if sleep.text.count("bool pirWake = sensorCanWake && (wakePin == sensorWake.pin);") != 1 or \
+        "bool pirWake = sensorCanWake && (wakePin == sensorWake.pin);" not in sleep.text[sar:sar_end]:
     die("sleepAndResume() lost the pirWake classification")
-if sleep.text.count("bool pirWake = wake.pirWake;") != 1 or sleep.text.find("bool pirWake = wake.pirWake;") < wake_site:
-    die("the handler's pirWake unpack must follow the sleepAndResume( call, once")
+# WO-2026-10-22-001: the handler passes the wake classification to postWakeRouting(), once, after sleepAndResume().
+route_call = "postWakeRouting(wake.pirWake, wake.buttonWake, wake.timerWake, wake.wakeReasonLabel);"
+if sleep.text.count(route_call) != 1 or sleep.text.find(route_call) < wake_site:
+    die("the handler's postWakeRouting( call must follow the sleepAndResume( call, once, with the wake fields in order")
+route = sleep.find("static void postWakeRouting(bool pirWake, bool buttonWake, bool timerWake, const char *wakeReasonLabel) {")
+route_end = sleep.close_of(sleep.open_after(route))
+if sleep.text.count("processSleepWakeEvent(") != 1 or not route < sleep.find("if (processSleepWakeEvent(pirWake)) return;", route) < route_end:
+    die("postWakeRouting() must call processSleepWakeEvent(pirWake) once, and return when it transitions")
 
 sleep_segments = []
 pend_idx = sleep.find("if (session.occupancyChangeTriggered", sfn, required=False)
@@ -222,28 +229,25 @@ sleep_segments.append((gate_site, "if (!modelGate()) return;  // model: the clou
 sleep_segments.append((teardown_site, "if (!modelTeardown()) return;  // model: teardown request or wait"))
 sleep_segments.append((wake_site, "modelSleep();  // model: System.sleep() returns"))
 
-s, e = sleep.stmt("if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {", sfn)
-emit("extracted_sleep_wake_end.inc", sleep, s, e)
-sleep_segments.append((s, '#include "extracted_sleep_wake_end.inc"'))
-pir = sleep.find('thrashGuard.markProgress("PIR_WAKE_OCCUPANCY")', sfn)
-s, e = sleep.stmt("if (!CurrentReadings::get_occupied()) {", pir, with_else=True)
-emit("extracted_sleep_wake_start.inc", sleep, s, e)
-sleep_segments.append((s, 'if (pirWake) {\n#include "extracted_sleep_wake_start.inc"\n}'))
-s, e = sleep.stmt("if (timerWake) {", sfn)
+# The wake path is postWakeRouting(): the wake event (State_Modes.cpp's processSleepWakeEvent(), extracted whole
+# and called where postWakeRouting() calls it) and the timer-wake block, in the function's source order.
+s, e = modes.stmt("bool processSleepWakeEvent(bool pirWake) {")
+emit("extracted_modes_wake_event.inc", modes, s, e)
+route_segments = []
+call_idx = sleep.find("if (processSleepWakeEvent(pirWake)) return;", route)
+route_segments.append((call_idx, "if (processSleepWakeEvent(pirWake)) return;"))
+s, e = sleep.stmt("if (timerWake) {", route)
 emit("extracted_sleep_timer.inc", sleep, s, e)
-sleep_segments.append((s, '#include "extracted_sleep_timer.inc"'))
-write("sleep_pass.inc", "\n".join(code for _, code in sorted(sleep_segments)))
+route_segments.append((s, '#include "extracted_sleep_timer.inc"'))
+write("sleep_pass.inc", "\n".join(code for _, code in sorted(sleep_segments) + sorted(route_segments)))
 
-# Before every standby-teardown request, every System.sleep() and every
-# sleep-or-suppress decision.
+# Before every standby-teardown request, every System.sleep() and the post-wake routing (every sleep-or-suppress
+# decision lives in it, and it is only called after sleepAndResume()).
 decision_offsets = [
     sleep.find_code("sleepAndResume(", sfn),
     sleep.find_code("hibernateAttempt(", sfn),
     sleep.find_code("SleepTeardown::run(", sfn),
-    sleep.find('"sleep-timer-occupied-suppress-report"', sfn),
-    sleep.find('"sleep-pir-return-to-sleep"', sfn),
-    sleep.find('"sleep-timer-report"', sfn),
-    sleep.find('closeOccupancySessionSafely("sleep")', sfn),
+    sleep.find(route_call, sfn),
 ]
 sleep_order_ok = int(pend_idx >= 0 and all(pend_idx < f for f in decision_offsets))
 
@@ -473,6 +477,30 @@ mutate_and_expect_failure "sleep check moved below sleepAndResume" "soak:" "stat
 " "  WakeContext wake;
   if (sleepAndResume(wakeInSeconds, useNetworkStandby, sleepReason, wake)) return;
 $sleep_pending"
+# WO-2026-10-22-001: the wake's LED-timeout close must run before the PIR event is processed.
+mutate_and_expect_failure "PIR event processed before the LED-timeout close" "wake pir\\+end:" "state/State_Modes.cpp" \
+  "    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {" \
+  "    if (false) {" \
+  "        CurrentReadings::set_lastOccupancyEvent(millis());
+      }
+    }
+  return false;
+}" \
+  "        CurrentReadings::set_lastOccupancyEvent(millis());
+      }
+    }
+    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
+      const bool reportNow = reportsOccupancyChangesNow();
+      const OccupancyCloseResult closeResult = closeOccupancySessionSafely(\"sleep\");
+      signalLED(false);
+      if (reportNow && !closeResult.stillOpen) {
+        session.occupancyChangeTriggered = true;
+        transitionTo(REPORTING_STATE, \"sleep-occupancy-debounce-report\");
+        return true;
+      }
+    }
+  return false;
+}"
 mutate_and_expect_failure "connected clear restored, entry take removed" "norepeat:" "state/State_Report.cpp" \
   "$entry_take" "  const bool occupancyChangeTriggered = session.occupancyChangeTriggered;
 " \
