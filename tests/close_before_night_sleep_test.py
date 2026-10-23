@@ -15,7 +15,8 @@ This is a source-invariant check on the REAL checked-in file, not a mirror.
 Comments are stripped before each check so prose cannot produce a false
 positive or a false negative.
 
-  1. `handleSleepingState()`'s `parkOpenness == Clock::Openness::Closed`
+  1. `sleepPlan()`'s (State_Sleep.cpp; WO-2026-10-21-003, moved out of
+     `handleSleepingState()`) `parkOpenness == Clock::Openness::Closed`
      branch calls `DailyBoundary::check(` and, when the close is due,
      `transitionTo(REPORTING_STATE, "close due before night sleep")` and
      returns.
@@ -70,7 +71,7 @@ def extract_closed_branch(sleeping_fn: str) -> str:
     if not match:
         fail(
             "could not locate the night-sleep commitment branch "
-            "(if (parkOpenness == Clock::Openness::Closed)) in handleSleepingState()"
+            "(if (parkOpenness == Clock::Openness::Closed)) in sleepPlan()"
         )
     depth = 0
     for index in range(match.end() - 1, len(sleeping_fn)):
@@ -103,7 +104,7 @@ def main() -> None:
         )
 
     sleeping_fn = extract_function(
-        full_text, r"void\s+handleSleepingState\s*\(\s*\)\s*\{", "handleSleepingState"
+        full_text, r"bool\s+sleepPlan\s*\(\s*SleepPlan\s*&\s*plan\s*\)\s*\{", "sleepPlan"
     )
     closed_branch = extract_closed_branch(sleeping_fn)
 
@@ -124,14 +125,14 @@ def main() -> None:
     guard = re.search(
         r"if\s*\(\s*DailyBoundary::check\s*\([^;]*\)\s*\.\s*due\s*\)\s*\{\s*"
         + re.escape(TRANSITION)
-        + r"\s*;\s*return\s*;\s*\}",
+        + r"\s*;\s*return\s+true\s*;\s*\}",
         closed_branch,
     )
     if not guard:
         fail(
             "the close-due turnaround must be a guarded early return: "
             "if (DailyBoundary::check(...).due) { transitionTo(REPORTING_STATE, "
-            '"close due before night sleep"); return; }'
+            '"close due before night sleep"); return true; }'
         )
 
     # --- Invariant 2: it happens before any night-sleep work. ---

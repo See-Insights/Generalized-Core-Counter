@@ -18,7 +18,9 @@
 #define PLATFORM_ID PLATFORM_BORON
 #define ALLOW_BLOCKING_SERIAL_WAITS 0
 #define ENABLE_DIAGNOSTICS_PUBLISH_MODE 1
+#ifndef CONNECTIVITY_FAILSAFE_TEST_MODE
 #define CONNECTIVITY_FAILSAFE_TEST_MODE 0
+#endif
 #define Wiring_Watchdog 1
 #ifndef ENABLE_SLEEP_TRACE
 #define ENABLE_SLEEP_TRACE 0
@@ -49,6 +51,7 @@ struct Exec {
   int serialUpAfter = 0, serialPolls = 0;  // after wake: connected from poll N+1; -1 = never
   bool tdClears = false;  // the teardown fake clears the failure latch, as the real one does
   bool tdWait = false;    // the teardown fake is still waiting, so the handler returns before the sleep
+  unsigned long freeHeap = 0;  // System.freeMemory() for the nightly heap guard (WO-2026-10-21-003)
 };
 // Inputs of the cloud-operations gate (WO-2026-10-21-002), scripted per pass by the gate runner.
 struct Gate {
@@ -93,6 +96,7 @@ struct SystemStub {
     return SystemSleepResult{s.err, s.pin};
   }
   void reset(uint32_t cause) { sim::emit("RESET cause=%u", (unsigned)cause); }
+  unsigned long freeMemory() { return sim::exec.freeHeap; }
 };
 inline SystemStub System;
 
@@ -172,6 +176,7 @@ inline MeasureStub measure;
 struct SensorStub { SensorWakeSource wakeSource() { return {sim::exec.sensorPin, RISING}; } };
 struct SensorManagerStub {
   static SensorManagerStub &instance() { static SensorManagerStub s; return s; }
+  void onEnterSleep() { sim::emit("SENSOR onEnterSleep"); }
   SensorStub *activeSensor() { static SensorStub s; return &s; }
 };
 using SensorManager = SensorManagerStub;

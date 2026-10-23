@@ -82,9 +82,19 @@ def main() -> None:
         fail(f"{STATE_SLEEP} does not exist")
 
     full_text = strip_comments(STATE_SLEEP.read_text())
-    sleeping_fn = extract_function(
+    # WO-2026-10-21-003: the decision moved from handleSleepingState() into
+    # sleepPlan(); the handler must not derive parkOpenness a second time.
+    handler_fn = extract_function(
         full_text, r"void\s+handleSleepingState\s*\(\s*\)\s*\{", "handleSleepingState"
     )
+    sleeping_fn = extract_function(
+        full_text, r"bool\s+sleepPlan\s*\(\s*SleepPlan\s*&\s*plan\s*\)\s*\{", "sleepPlan"
+    )
+    if PARK_OPENNESS_ASSIGNMENT_PATTERN.search(handler_fn) or "parkOpenness" in handler_fn:
+        fail(
+            "handleSleepingState() must not derive or read parkOpenness: the "
+            "single decision site is sleepPlan() (WO-2026-10-21-003)"
+        )
 
     # --- Invariant 1: exactly one `parkOpenness = Clock::openness()`
     # assignment - the single decision site the night-sleep-vs-nap decision
@@ -167,10 +177,11 @@ def main() -> None:
         "isWithinOpenHours();",
         "if (isWithinOpenHours()) {",
     }
-    for match in WITHIN_OPEN_HOURS_CALL_PATTERN.finditer(sleeping_fn):
-        line_start = sleeping_fn.rfind("\n", 0, match.start()) + 1
-        line_end = sleeping_fn.find("\n", match.end())
-        line = sleeping_fn[line_start:line_end if line_end != -1 else None].strip()
+    both_fns = sleeping_fn + "\n" + handler_fn
+    for match in WITHIN_OPEN_HOURS_CALL_PATTERN.finditer(both_fns):
+        line_start = both_fns.rfind("\n", 0, match.start()) + 1
+        line_end = both_fns.find("\n", match.end())
+        line = both_fns[line_start:line_end if line_end != -1 else None].strip()
         if not any(line.endswith(allowed) for allowed in ALLOWED_WITHIN_OPEN_HOURS_USES):
             fail(
                 "handleSleepingState() calls isWithinOpenHours() directly on "

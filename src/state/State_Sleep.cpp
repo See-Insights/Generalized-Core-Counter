@@ -352,6 +352,174 @@ bool cloudGatePass(bool useNetworkStandbyEffective) {
   return false;
 }
 
+struct SleepPlan { int wakeInSeconds; const char *sleepReason; bool overnightFallbackSleep; };
+
+bool sleepPlan(SleepPlan &plan) {
+  // WO-2026-09-19 Step 3b: the behavioral core of this step. parkOpenness is
+  // computed ONCE here and reused below (line ~1006 used to re-derive
+  // isWithinOpenHours() a second time, redundantly) - Closed is the only
+  // verdict that commits the device to the night-sleep branch below. An
+  // untrusted clock (Unknown) must NOT commit to an overnight hibernate
+  // based on a wrong belief about what time it is - see Clock::openness()'s
+  // doc comment. logTimeDiag()'s isOpen= stays sourced from the raw,
+  // fail-open isWithinOpenHours() (not parkOpenness) so its openness= field
+  // in the same log line can be compared against it - the two are expected
+  // to diverge exactly when the clock is untrusted.
+  int nightSleepSec = -1;
+  const Clock::Openness parkOpenness = Clock::openness();
+  logTimeDiag(isWithinOpenHours());
+  if (parkOpenness == Clock::Openness::Closed) {
+    // WO-2026-09-30-001: never commit to night sleep while the close is due.
+    if (DailyBoundary::check(Time.now()).due) {
+      transitionTo(REPORTING_STATE, "close due before night sleep");
+      return true;
+    }
+
+    // Notify sensor layer we are entering full night sleep so sensors and
+    // indicator LEDs can be powered down. During daytime naps we keep
+    // interrupt-driven sensors (like PIR) powered so they can wake the
+    // device from ULTRA_LOW_POWER sleep.
+    SensorManager::instance().onEnterSleep();
+    signalLED(false);
+
+    // ********** Night sleep (outside opening hours) **********
+    nightSleepSec = secondsUntilNextOpen();
+    if (nightSleepSec <= 0) {
+      nightSleepSec = Config::DEFAULT_REPORT_INTERVAL_SEC;
+    }
+
+    // Device OS maximum sleep duration is 546 minutes (~9.1 hours).
+    // Clamp our requested night sleep to this limit so the
+    // underlying platform will reliably honour it.
+    const int MAX_SLEEP_SEC = 546 * 60;
+    if (nightSleepSec > MAX_SLEEP_SEC) {
+      Log.info("Clamping night sleep duration to max supported %d seconds (requested=%d)", MAX_SLEEP_SEC, nightSleepSec);
+      nightSleepSec = MAX_SLEEP_SEC;
+    }
+
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+    const int requestedNightSleepSec = nightSleepSec;
+    if (claimFailsafeDeferLog(FAILSAFE_DEFER_CLOSED_HOURS_LONG_SLEEP)) {
+      Log.info("FailsafeDefer: reason=%s open=0 sleep=%ds",
+               failsafeDeferReasonName(FAILSAFE_DEFER_CLOSED_HOURS_LONG_SLEEP),
+               requestedNightSleepSec);
+    }
+    if (nightSleepSec > (int)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC) {
+      Log.info("FailsafeTest: cap closed sleep %ds->%lds",
+               requestedNightSleepSec,
+               (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC);
+      nightSleepSec = (int)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC;
+    }
+#endif
+
+  }
+
+  // ********** ULTRA_LOW_POWER sleep (daytime or night fallback) **********
+  // During opening hours we use the reportingIntervalSec as before.
+  // Outside opening hours,
+  // fall back to ULTRA_LOW_POWER with a long sleep equal to the
+  // time until next open to avoid rapid wake/sleep thrashing.
+  uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
+
+  const char *sleepReason = "scheduled";
+  int wakeInSeconds;
+  // Reuses parkOpenness computed above rather than re-deriving
+  // isWithinOpenHours() a second time - both checks are the identical
+  // question, and re-deriving it separately is exactly how this site could
+  // silently drift from the commitment decision above.
+  const bool overnightFallbackSleep = (parkOpenness == Clock::Openness::Closed && nightSleepSec > 0);
+  if (overnightFallbackSleep) {
+    wakeInSeconds = nightSleepSec;
+    sleepReason = "closed";
+  } else {
+    // Within opening hours (or clock Unknown - the short-nap path), align
+    // wake to the reporting boundary. Add 1 second margin to ensure we wake
+    // slightly after the boundary.
+    // WO-2026-09-19 Step 3b: Clock::isTrusted(), not isTimeValid() - this is
+    // a plain "can I trust Time.now() for this arithmetic" question, not an
+    // open/closed one, so it stays a boolean rather than routing through
+    // openness().
+    if (Clock::isTrusted() && intervalSec > 0) {
+      int boundary = (int)intervalSec;
+      time_t now = Time.now();
+      int offset = (int)(now % boundary);
+      int aligned = boundary - offset;
+      if (aligned < 1) {
+        aligned = 1;
+      } else if (aligned > boundary) {
+        aligned = boundary;
+      }
+      wakeInSeconds = aligned + 1;
+    } else {
+      wakeInSeconds = (int)intervalSec;
+    }
+  }
+
+  // COUNTING MODE: Defer sleep until LED flash completes
+  if (SystemConfig::get_sensorMode() == SystemConfig::COUNTING) {
+    uint32_t ledRemaining = signalLEDTimeRemaining();
+    if (ledRemaining > 0) {
+      Log.info("COUNTING: Deferring sleep - LED remaining=%lu sec", 
+               ledRemaining);
+      transitionTo(IDLE_STATE, "sleep-counting-led-defer");
+      return true;
+    }
+    // Turn off LED before sleep (should already be off)
+    if (signalLEDStatus()) {
+      signalLED(false);
+    }
+  }
+
+  // OCCUPANCY MODE: Calculate sleep duration based on debounce timer or scheduled wake
+  if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY) {
+    if (CurrentReadings::get_occupied()) {
+      // Occupied - wake for debounce timeout check
+      uint32_t setting1Raw = SystemConfig::SensorSettings::get_sensorSetting1();
+      uint32_t debounceSeconds = (setting1Raw > 0) ? (setting1Raw / 1000) : 60;
+      if (debounceSeconds < (uint32_t)wakeInSeconds) {
+        wakeInSeconds = (int)debounceSeconds;
+      }
+      sleepReason = "debounce";
+    } else {
+      // Unoccupied - use scheduled wake time
+      sleepReason = "scheduled";
+    }
+  }
+  plan = {wakeInSeconds, sleepReason, overnightFallbackSleep};
+  return false;
+}
+
+bool nightlyHeapGuard(bool overnightFallbackSleep) {
+  // Before a long overnight
+  // ULTRA_LOW_POWER fallback sleep, optionally reset first when heap has
+  // drifted low. This gives the next day a clean start without affecting
+  // open-hours behavior.
+  if (overnightFallbackSleep) {
+    const unsigned long freeHeap = (unsigned long)System.freeMemory();
+
+    if (freeHeap <= ConnectivityPolicy::NIGHTLY_HEAP_RESET_THRESHOLD_BYTES) {
+      Log.info("ModemTeardown: radioOn=%d point=heap-guard-reset", (int)Connectivity::isRadioPoweredOn());
+      Log.warn("Nightly heap guard: freeHeap=%lu <= %lu before overnight ULTRA_LOW_POWER fallback - resetting for clean next-day start",
+               freeHeap,
+               ConnectivityPolicy::NIGHTLY_HEAP_RESET_THRESHOLD_BYTES);
+      // Reset drops RAM - flush the diagnostics batch now, since this is
+      // the only chance for this cycle's accumulated entries.
+#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
+      PowerDiagnostics::flushDiagBatch();
+#endif
+      System.reset(RESET_CAUSE_SLEEP_HEAP_GUARD);
+      return true;
+    }
+
+    if (freeHeap <= ConnectivityPolicy::NIGHTLY_HEAP_WARN_THRESHOLD_BYTES) {
+      Log.warn("Nightly heap guard: freeHeap=%lu <= %lu before overnight ULTRA_LOW_POWER fallback - monitoring only",
+               freeHeap,
+               ConnectivityPolicy::NIGHTLY_HEAP_WARN_THRESHOLD_BYTES);
+    }
+  }
+  return false;
+}
+
 struct WakeContext { bool pirWake, buttonWake, timerWake; const char *wakeReasonLabel; };
 struct { bool preserveAfterNormalReturn = false; bool forceModemOff = false; int error = SYSTEM_ERROR_NONE; } standbyReturn;
 
@@ -823,166 +991,15 @@ void handleSleepingState() {
 
   setAppBreadcrumb(23); // BREADCRUMB_SLEEP_GATE_DONE (was stale literal 19, colliding with BREADCRUMB_REPORT_POST_LEDGER)
 
-  // WO-2026-09-19 Step 3b: the behavioral core of this step. parkOpenness is
-  // computed ONCE here and reused below (line ~1006 used to re-derive
-  // isWithinOpenHours() a second time, redundantly) - Closed is the only
-  // verdict that commits the device to the night-sleep branch below. An
-  // untrusted clock (Unknown) must NOT commit to an overnight hibernate
-  // based on a wrong belief about what time it is - see Clock::openness()'s
-  // doc comment. logTimeDiag()'s isOpen= stays sourced from the raw,
-  // fail-open isWithinOpenHours() (not parkOpenness) so its openness= field
-  // in the same log line can be compared against it - the two are expected
-  // to diverge exactly when the clock is untrusted.
-  int nightSleepSec = -1;
-  const Clock::Openness parkOpenness = Clock::openness();
-  logTimeDiag(isWithinOpenHours());
-  if (parkOpenness == Clock::Openness::Closed) {
-    // WO-2026-09-30-001: never commit to night sleep while the close is due.
-    if (DailyBoundary::check(Time.now()).due) {
-      transitionTo(REPORTING_STATE, "close due before night sleep");
-      return;
-    }
-
-    // Notify sensor layer we are entering full night sleep so sensors and
-    // indicator LEDs can be powered down. During daytime naps we keep
-    // interrupt-driven sensors (like PIR) powered so they can wake the
-    // device from ULTRA_LOW_POWER sleep.
-    SensorManager::instance().onEnterSleep();
-    signalLED(false);
-
-    // ********** Night sleep (outside opening hours) **********
-    nightSleepSec = secondsUntilNextOpen();
-    if (nightSleepSec <= 0) {
-      nightSleepSec = Config::DEFAULT_REPORT_INTERVAL_SEC;
-    }
-
-    // Device OS maximum sleep duration is 546 minutes (~9.1 hours).
-    // Clamp our requested night sleep to this limit so the
-    // underlying platform will reliably honour it.
-    const int MAX_SLEEP_SEC = 546 * 60;
-    if (nightSleepSec > MAX_SLEEP_SEC) {
-      Log.info("Clamping night sleep duration to max supported %d seconds (requested=%d)", MAX_SLEEP_SEC, nightSleepSec);
-      nightSleepSec = MAX_SLEEP_SEC;
-    }
-
-#if CONNECTIVITY_FAILSAFE_TEST_MODE
-    const int requestedNightSleepSec = nightSleepSec;
-    if (claimFailsafeDeferLog(FAILSAFE_DEFER_CLOSED_HOURS_LONG_SLEEP)) {
-      Log.info("FailsafeDefer: reason=%s open=0 sleep=%ds",
-               failsafeDeferReasonName(FAILSAFE_DEFER_CLOSED_HOURS_LONG_SLEEP),
-               requestedNightSleepSec);
-    }
-    if (nightSleepSec > (int)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC) {
-      Log.info("FailsafeTest: cap closed sleep %ds->%lds",
-               requestedNightSleepSec,
-               (long)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC);
-      nightSleepSec = (int)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC;
-    }
-#endif
-
-  }
-
-  // ********** ULTRA_LOW_POWER sleep (daytime or night fallback) **********
-  // During opening hours we use the reportingIntervalSec as before.
-  // Outside opening hours,
-  // fall back to ULTRA_LOW_POWER with a long sleep equal to the
-  // time until next open to avoid rapid wake/sleep thrashing.
-  uint16_t intervalSec = Config::reportingIntervalSecForRuntime();
-
-  const char *sleepReason = "scheduled";
-  int wakeInSeconds;
-  // Reuses parkOpenness computed above rather than re-deriving
-  // isWithinOpenHours() a second time - both checks are the identical
-  // question, and re-deriving it separately is exactly how this site could
-  // silently drift from the commitment decision above.
-  const bool overnightFallbackSleep = (parkOpenness == Clock::Openness::Closed && nightSleepSec > 0);
-  if (overnightFallbackSleep) {
-    wakeInSeconds = nightSleepSec;
-    sleepReason = "closed";
-  } else {
-    // Within opening hours (or clock Unknown - the short-nap path), align
-    // wake to the reporting boundary. Add 1 second margin to ensure we wake
-    // slightly after the boundary.
-    // WO-2026-09-19 Step 3b: Clock::isTrusted(), not isTimeValid() - this is
-    // a plain "can I trust Time.now() for this arithmetic" question, not an
-    // open/closed one, so it stays a boolean rather than routing through
-    // openness().
-    if (Clock::isTrusted() && intervalSec > 0) {
-      int boundary = (int)intervalSec;
-      time_t now = Time.now();
-      int offset = (int)(now % boundary);
-      int aligned = boundary - offset;
-      if (aligned < 1) {
-        aligned = 1;
-      } else if (aligned > boundary) {
-        aligned = boundary;
-      }
-      wakeInSeconds = aligned + 1;
-    } else {
-      wakeInSeconds = (int)intervalSec;
-    }
-  }
-
-  // COUNTING MODE: Defer sleep until LED flash completes
-  if (SystemConfig::get_sensorMode() == SystemConfig::COUNTING) {
-    uint32_t ledRemaining = signalLEDTimeRemaining();
-    if (ledRemaining > 0) {
-      Log.info("COUNTING: Deferring sleep - LED remaining=%lu sec", 
-               ledRemaining);
-      transitionTo(IDLE_STATE, "sleep-counting-led-defer");
-      return;
-    }
-    // Turn off LED before sleep (should already be off)
-    if (signalLEDStatus()) {
-      signalLED(false);
-    }
-  }
-
-  // OCCUPANCY MODE: Calculate sleep duration based on debounce timer or scheduled wake
-  if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY) {
-    if (CurrentReadings::get_occupied()) {
-      // Occupied - wake for debounce timeout check
-      uint32_t setting1Raw = SystemConfig::SensorSettings::get_sensorSetting1();
-      uint32_t debounceSeconds = (setting1Raw > 0) ? (setting1Raw / 1000) : 60;
-      if (debounceSeconds < (uint32_t)wakeInSeconds) {
-        wakeInSeconds = (int)debounceSeconds;
-      }
-      sleepReason = "debounce";
-    } else {
-      // Unoccupied - use scheduled wake time
-      sleepReason = "scheduled";
-    }
-  }
+  SleepPlan plan;
+  if (sleepPlan(plan)) return;
+  int wakeInSeconds = plan.wakeInSeconds;
+  const char *sleepReason = plan.sleepReason;
+  const bool overnightFallbackSleep = plan.overnightFallbackSleep;
 
   hibernateAttempt(overnightFallbackSleep, wakeInSeconds);
 
-  // Before a long overnight
-  // ULTRA_LOW_POWER fallback sleep, optionally reset first when heap has
-  // drifted low. This gives the next day a clean start without affecting
-  // open-hours behavior.
-  if (overnightFallbackSleep) {
-    const unsigned long freeHeap = (unsigned long)System.freeMemory();
-
-    if (freeHeap <= ConnectivityPolicy::NIGHTLY_HEAP_RESET_THRESHOLD_BYTES) {
-      Log.info("ModemTeardown: radioOn=%d point=heap-guard-reset", (int)Connectivity::isRadioPoweredOn());
-      Log.warn("Nightly heap guard: freeHeap=%lu <= %lu before overnight ULTRA_LOW_POWER fallback - resetting for clean next-day start",
-               freeHeap,
-               ConnectivityPolicy::NIGHTLY_HEAP_RESET_THRESHOLD_BYTES);
-      // Reset drops RAM - flush the diagnostics batch now, since this is
-      // the only chance for this cycle's accumulated entries.
-#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
-      PowerDiagnostics::flushDiagBatch();
-#endif
-      System.reset(RESET_CAUSE_SLEEP_HEAP_GUARD);
-      return;
-    }
-
-    if (freeHeap <= ConnectivityPolicy::NIGHTLY_HEAP_WARN_THRESHOLD_BYTES) {
-      Log.warn("Nightly heap guard: freeHeap=%lu <= %lu before overnight ULTRA_LOW_POWER fallback - monitoring only",
-               freeHeap,
-               ConnectivityPolicy::NIGHTLY_HEAP_WARN_THRESHOLD_BYTES);
-    }
-  }
+  if (nightlyHeapGuard(overnightFallbackSleep)) return;
 
   // The sleep configuration is built fresh as a local at each sleep site
   // (below), so GPIO selections cannot accumulate across calls.
