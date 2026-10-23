@@ -188,7 +188,15 @@ sfn = sleep.find("void handleSleepingState() {")
 decl = sfn
 reset_end = sleep.find("SleepTeardown::guardLostTimestamp();", decl)
 teardown_site = sleep.find("if (SleepTeardown::run(", decl)
-wake_site = sleep.find("bool pirWake = sensorCanWake && (wakePin == sensorWake.pin);", sfn)
+wake_site = sleep.find("if (sleepAndResume(", sfn)
+sar = sleep.find("bool sleepAndResume(")
+if sleep.text.count("bool sleepAndResume(") != 1:
+    die("State_Sleep.cpp: sleepAndResume() not found once")
+sar_end = sleep.text.find("\n}\n", sar)
+if "bool pirWake = sensorCanWake && (wakePin == sensorWake.pin);" not in sleep.text[sar:sar_end]:
+    die("sleepAndResume() lost the pirWake classification")
+if sleep.text.count("bool pirWake = wake.pirWake;") != 1 or sleep.text.find("bool pirWake = wake.pirWake;") < wake_site:
+    die("the handler's pirWake unpack must follow the sleepAndResume( call, once")
 
 sleep_segments = []
 pend_idx = sleep.find("if (session.occupancyChangeTriggered", sfn, required=False)
@@ -221,7 +229,8 @@ write("sleep_pass.inc", "\n".join(code for _, code in sorted(sleep_segments)))
 # Before every standby-teardown request, every System.sleep() and every
 # sleep-or-suppress decision.
 decision_offsets = [
-    sleep.find_code("System.sleep(", sfn),
+    sleep.find_code("sleepAndResume(", sfn),
+    sleep.find_code("hibernateAttempt(", sfn),
     sleep.find_code("Connectivity::request", sfn),
     sleep.find_code("SleepTeardown::run(", sfn),
     sleep.find('"sleep-timer-occupied-suppress-report"', sfn),
@@ -439,6 +448,13 @@ mutate_and_expect_failure "sleep check moved below suppress" "soak:" "state/Stat
   "    // For PIR wakes, check if reporting is also due (opportunistic reporting)
 " "$sleep_pending    // For PIR wakes, check if reporting is also due (opportunistic reporting)
 "
+mutate_and_expect_failure "sleep check moved below sleepAndResume" "soak:" "state/State_Sleep.cpp" \
+  "$sleep_pending" "" \
+  "  WakeContext wake;
+  if (sleepAndResume(wakeInSeconds, useNetworkStandby, sleepReason, wake)) return;
+" "  WakeContext wake;
+  if (sleepAndResume(wakeInSeconds, useNetworkStandby, sleepReason, wake)) return;
+$sleep_pending"
 mutate_and_expect_failure "connected clear restored, entry take removed" "norepeat:" "state/State_Report.cpp" \
   "$entry_take" "  const bool occupancyChangeTriggered = session.occupancyChangeTriggered;
 " \

@@ -118,6 +118,343 @@ const char *gateBlockerReasonLabel(uint8_t blockerMask) {
   }
 }
 
+struct WakeContext { bool pirWake, buttonWake, timerWake; const char *wakeReasonLabel; };
+struct { bool preserveAfterNormalReturn = false; bool forceModemOff = false; int error = SYSTEM_ERROR_NONE; } standbyReturn;
+
+bool effectiveStandby(bool useNetworkStandbyRequested) {
+  bool preserveStandbyForThisPass = false;
+#if HAL_PLATFORM_CELLULAR
+  if (standbyReturn.preserveAfterNormalReturn &&
+      (!useNetworkStandbyRequested || session.modemUnstable || Cellular.isOff())) {
+    standbyReturn.preserveAfterNormalReturn = false;
+  }
+  preserveStandbyForThisPass = standbyReturn.preserveAfterNormalReturn;
+#endif
+  bool useNetworkStandbyEffective =
+      useNetworkStandbyRequested &&
+      (preserveStandbyForThisPass ||
+       Observability::cycleStats().connect_result ==
+           Observability::WakeCycleStats::ConnectResult::SUCCESS);
+#if HAL_PLATFORM_CELLULAR
+  useNetworkStandbyEffective = useNetworkStandbyEffective && !Cellular.isOff();
+  if (session.modemUnstable || standbyReturn.forceModemOff) {
+    useNetworkStandbyEffective = false;
+  }
+#else
+  useNetworkStandbyEffective = false;
+#endif
+  return useNetworkStandbyEffective;
+}
+
+void hibernateAttempt(bool overnightFallbackSleep, int wakeInSeconds) {
+#if PLATFORM_ID == PLATFORM_BORON
+  if (overnightFallbackSleep) {
+    time_t rtcNow = 0;
+    if (shouldUseBoronRtcAlarmHibernate((uint32_t)wakeInSeconds, rtcNow)) {
+      pinMode(WAKEUP_PIN, INPUT_PULLUP);
+      if (digitalRead(WAKEUP_PIN) == HIGH) {
+        if (clearAb1805StaleAlarmInterrupts()) {
+          const time_t wakeTime = rtcNow + (time_t)wakeInSeconds;
+          if (ab1805.interruptAtTime(wakeTime)) {
+            setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START (was stale literal 20, colliding with BREADCRUMB_REPORT_EXIT)
+            // Fresh local configuration per sleep: Device OS move-assigns
+            // without freeing the previous wake-source list, so a reused
+            // long-lived object orphans that list on every cycle.
+            SystemSleepConfiguration hibernateConfig;
+            hibernateConfig.mode(SystemSleepMode::HIBERNATE)
+              .gpio(WAKEUP_PIN, FALLING)
+              .gpio(BUTTON_PIN, FALLING);
+
+            const bool watchdogStopped = ab1805.stopWDT();
+            pauseAwakeWatchdogForSleep("hibernate");
+            if (!watchdogStopped) {
+              Log.warn("SleepCall: watchdog-stop failed mode=HIBERNATE dur=%ds", wakeInSeconds);
+            }
+
+            // WO-2026-09-16 Step 2: HibernateCycle now owns the retained
+            // hibernate-cycle fields; wakeTime itself is used above for
+            // ab1805.interruptAtTime() only - nothing reads it back on
+            // wake (confirmed dead as a retained field), so it is not
+            // passed through here.
+            HibernateCycle::armForSleep(rtcNow, (uint32_t)wakeInSeconds);
+
+            Log.info("ModemTeardown: radioOn=%d point=hibernate", (int)Connectivity::isRadioPoweredOn());
+            Log.info("Sleep: HIBERNATE reason=closed dur=%ds wakePin=%d", wakeInSeconds, (int)WAKEUP_PIN);
+            PowerDiagnostics::logPowerState("pre-hibernate");
+            thrashGuard.markProgress("SLEEP_ATTEMPT");
+            Cloud::instance().logLedgerSleepState();
+            setAppBreadcrumb(25); // BREADCRUMB_SLEEP_SYSTEM_CALL (was stale literal 21, colliding with BREADCRUMB_IDLE_ENTRY) - entering final pre-sleep sequence
+            drainSerialBeforeSleep();
+            setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
+            // HIBERNATE may reset the MCU without returning - flush the
+            // diagnostics batch now, since this is the only chance.
+#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
+            PowerDiagnostics::flushDiagBatch();
+            setAppBreadcrumb(27); // BREADCRUMB_SLEEP_DIAG_FLUSH_DONE
+#endif
+            setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
+            const SystemSleepResult hibernateResult = System.sleep(hibernateConfig);
+            AwakeCycles::recordSleepReturn(hibernateResult.error() == SYSTEM_ERROR_NONE);
+
+            // HIBERNATE should reset the MCU. If we return here, treat it as failed and fall back.
+            HibernateCycle::abandon();
+            ab1805.resumeWDT();
+            restoreAwakeWatchdogAfterWake("hibernate");
+            Log.warn("HIBERNATE sleep failed err=%d - falling back to ULTRA_LOW_POWER",
+                     (int)hibernateResult.error());
+          } else {
+            Log.warn("HIBERNATE bypass: failed to program AB1805 alarm - falling back to ULTRA_LOW_POWER");
+          }
+        } else {
+          Log.warn("HIBERNATE bypass: failed stale interrupt cleanup - falling back to ULTRA_LOW_POWER");
+        }
+      } else {
+        Log.warn("HIBERNATE bypass: wake pin held low before sleep - falling back to ULTRA_LOW_POWER");
+      }
+    }
+  }
+#endif
+}
+
+// Returns true when the caller must return (all sleep attempts failed).
+bool sleepAndResume(int wakeInSeconds, bool useNetworkStandby, const char *sleepReason, WakeContext &wake) {
+  const SensorWakeSource sensorWake = SensorManager::instance().activeSensor()->wakeSource();
+  const bool sensorCanWake = (sensorWake.pin != PIN_INVALID);
+  SystemSleepConfiguration ulpConfig;
+  ulpConfig.mode(SystemSleepMode::ULTRA_LOW_POWER)
+    .gpio(BUTTON_PIN, FALLING);    // Service button wake (active-low)
+  if (sensorCanWake) ulpConfig.gpio(sensorWake.pin, sensorWake.edge);  // Sensor wake
+    
+  // Add network standby for occupancy mode to avoid reconnection delays
+  // Note: Network standby is only supported/needed on cellular devices to prevent
+  // carrier blacklisting. WiFi reconnection is already fast enough (~2-5s).
+  if (useNetworkStandby) {
+#if HAL_PLATFORM_CELLULAR
+    // Keep cellular modem in low-power standby so we can quickly reconnect
+    // when occupancy changes. This prevents 30-60s reconnection overhead and
+    // potential carrier blacklisting from rapid disconnect/reconnect cycles.
+    ulpConfig.network(NETWORK_INTERFACE_CELLULAR, SystemSleepNetworkFlag::INACTIVE_STANDBY);
+#endif
+  }
+  
+  ulpConfig.duration((uint32_t)wakeInSeconds * 1000UL);  // Timer-based wake at reporting boundary
+
+  // Stop watchdog immediately before sleep (after config is fully built)
+  // to minimize time between I2C transaction and sleep entry
+  const bool watchdogStopped = ab1805.stopWDT();
+  pauseAwakeWatchdogForSleep("ulp");
+#if ENABLE_SLEEP_TRACE
+  Log.info("SleepCall: standby=%d dur=%d wdt=%s gate=ok",
+           useNetworkStandby ? 1 : 0,
+           wakeInSeconds,
+           watchdogStopped ? "off" : "err");
+#else
+  if (!watchdogStopped) {
+    Log.warn("SleepCall: watchdog-stop failed standby=%d dur=%d",
+             useNetworkStandby ? 1 : 0,
+             wakeInSeconds);
+  }
+#endif
+#if CONNECTIVITY_FAILSAFE_TEST_MODE
+  Log.info("Sleep: ULP standby=%d reason=%s dur=%ds occ=%d soc=%.1f test=1",
+           useNetworkStandby ? 1 : 0,
+           sleepReason,
+           wakeInSeconds,
+           CurrentReadings::get_occupied() ? 1 : 0,
+           (double)PowerManager::instance().soc());
+#else
+  Log.info("Sleep: ULP standby=%d reason=%s dur=%ds occ=%d soc=%.1f",
+           useNetworkStandby ? 1 : 0,
+           sleepReason,
+           wakeInSeconds,
+           CurrentReadings::get_occupied() ? 1 : 0,
+           (double)PowerManager::instance().soc());
+#endif
+
+  thrashGuard.markProgress("SLEEP_ATTEMPT");
+  PowerDiagnostics::logPowerState("pre-sleep-ulp");
+  const unsigned long sleepCallStartMs = millis();
+  Cloud::instance().logLedgerSleepState();
+  setAppBreadcrumb(25); // BREADCRUMB_SLEEP_SYSTEM_CALL (was stale literal 21, colliding with BREADCRUMB_IDLE_ENTRY) - entering final pre-sleep sequence
+  drainSerialBeforeSleep();
+  setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
+  setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
+  SystemSleepResult result = System.sleep(ulpConfig);
+  AwakeCycles::recordSleepReturn(result.error() == SYSTEM_ERROR_NONE);
+  const unsigned long sleepElapsedMs = millis() - sleepCallStartMs;
+  pin_t wakePin = result.wakeupPin();
+  const char *wakeReturnReason = (result.error() != SYSTEM_ERROR_NONE) ? "ERROR" :
+      ((wakePin == BUTTON_PIN) ? "BUTTON" : ((wakePin == sensorWake.pin) ? "PIR" : "TIMER"));
+
+#if HAL_PLATFORM_CELLULAR
+  if (useNetworkStandby) {
+    if (result.error() == SYSTEM_ERROR_NONE) {
+      standbyReturn.preserveAfterNormalReturn = true;
+      standbyReturn.forceModemOff = false;
+      standbyReturn.error = SYSTEM_ERROR_NONE;
+      if (SystemConfig::get_verboseMode()) {
+        Log.info("SLEEP: standby sleep returned normally; preserving modem standby");
+      }
+    } else {
+      standbyReturn.preserveAfterNormalReturn = false;
+      standbyReturn.forceModemOff = true;
+      standbyReturn.error = (int)result.error();
+      Log.warn("SLEEP: standby sleep failed; forcing modem-off reason=sleep_error err=%d",
+               standbyReturn.error);
+    }
+  } else {
+    standbyReturn.preserveAfterNormalReturn = false;
+    standbyReturn.forceModemOff = false;
+    standbyReturn.error = SYSTEM_ERROR_NONE;
+  }
+#endif
+
+  // If Device OS rejects the sleep configuration, System.sleep() returns
+  // immediately and the wake pin will be invalid (65535). Without handling
+  // that error, the state machine will interpret it as a timer wake and can
+  // thrash in a tight loop.
+  if (result.error() != SYSTEM_ERROR_NONE) {
+    thrashGuard.markProgress("SLEEP_RETURNED");
+    Log.error("ULTRA_LOW_POWER sleep failed err=%d (wakeIn=%d sec, button=%d pir=%d) - falling back to STOP", (int)result.error(), wakeInSeconds, (int)BUTTON_PIN, (int)sensorWake.pin);
+    RecoveryState::raiseAlert(16);
+
+   // STOP generally supports a wider set of wake pins on some platforms.
+    setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START (was stale literal 20, colliding with BREADCRUMB_REPORT_EXIT)
+    SystemSleepConfiguration stopConfig;
+    stopConfig.mode(SystemSleepMode::STOP)
+      .gpio(BUTTON_PIN, FALLING);
+    if (sensorCanWake) stopConfig.gpio(sensorWake.pin, sensorWake.edge);
+    stopConfig.duration((uint32_t)wakeInSeconds * 1000UL);
+    PowerDiagnostics::logPowerState("pre-sleep-stop-fallback");
+    Cloud::instance().logLedgerSleepState();
+    setAppBreadcrumb(25); // BREADCRUMB_SLEEP_SYSTEM_CALL (was stale literal 21, colliding with BREADCRUMB_IDLE_ENTRY) - entering final pre-sleep sequence
+    drainSerialBeforeSleep();
+    setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
+    setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
+    result = System.sleep(stopConfig);
+    AwakeCycles::recordSleepReturn(result.error() == SYSTEM_ERROR_NONE);
+
+    if (result.error() != SYSTEM_ERROR_NONE) {
+      Log.error("STOP sleep fallback failed err=%d (wakeIn=%d sec) - using timer-only STOP sleep", (int)result.error(), wakeInSeconds);
+      setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START
+      SystemSleepConfiguration stopTimerConfig;
+      stopTimerConfig.mode(SystemSleepMode::STOP)
+        .duration((uint32_t)wakeInSeconds * 1000UL);
+      PowerDiagnostics::logPowerState("pre-sleep-stop-timer-only");
+      Cloud::instance().logLedgerSleepState();
+      setAppBreadcrumb(25); // BREADCRUMB_SLEEP_SYSTEM_CALL - entering final pre-sleep sequence
+      drainSerialBeforeSleep();
+      setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
+      setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
+      result = System.sleep(stopTimerConfig);
+      AwakeCycles::recordSleepReturn(result.error() == SYSTEM_ERROR_NONE);
+
+      if (result.error() != SYSTEM_ERROR_NONE) {
+        // All sleep modes failed - this indicates a device state corruption
+        // that requires immediate reset (alert 16 already raised on first failure).
+        Log.info("ModemTeardown: radioOn=%d point=sleep-attempts-failed-reset", (int)Connectivity::isRadioPoweredOn());
+        Log.error("All sleep attempts failed err=%d - immediate reset required", (int)result.error());
+        ab1805.resumeWDT();
+
+        // Brief delay to allow log output to flush before reset
+        delay(2000);
+
+        // Reset device to clear corrupted state
+        Log.info("Resetting device to clear sleep failure state");
+        // Reset drops RAM - flush the diagnostics batch now, since this is
+        // the only chance for this cycle's cascade of sleep-attempt entries.
+#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
+        PowerDiagnostics::flushDiagBatch();
+#endif
+        System.reset(RESET_CAUSE_SLEEP_ATTEMPTS_EXHAUSTED);
+        
+        // Should never reach here, but set ERROR_STATE as fallback
+        transitionTo(ERROR_STATE, "sleep-all-attempts-failed");
+        return true;
+      }
+    }
+  }
+  
+  // Clear any pending interrupts on wake pins after sleep to ensure clean state
+  // This is critical for proper interrupt handling after wake
+  pinMode(BUTTON_PIN, INPUT);    // Reset pin mode
+  if (sensorCanWake) pinMode(sensorWake.pin, INPUT);  // Reset pin mode
+  
+  // Resume hardware watchdog immediately after wake
+  ab1805.resumeWDT();
+  restoreAwakeWatchdogAfterWake("ulp");
+
+  // Mark progress immediately after wake to reset ThrashGuard timer
+  thrashGuard.markProgress("WAKE_FROM_SLEEP");
+  setAppBreadcrumb(4);
+
+  // Single convergence point for the ULP/STOP-fallback/STOP-timer-only sleep
+  // cascade - whichever attempt actually succeeded lands here, so this flushes
+  // the whole cycle's diagnostics batch exactly once regardless of how many
+  // fallback attempts fired. (Hibernate and the total-sleep-failure reset are
+  // flushed separately at their own non-returning call sites, above.)
+#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
+  PowerDiagnostics::flushDiagBatch();
+#endif
+
+  if (SystemConfig::get_serialConnected() || (ALLOW_BLOCKING_SERIAL_WAITS != 0)) {
+    // Re-initialize USB serial after wake and give the host a bounded chance
+    // to re-enumerate before we continue through another short wake cycle.
+    Serial.begin(9600);
+    delay(ConnectivityPolicy::DEBUG_SERIAL_REENUM_DELAY_MS);
+
+    unsigned long serialWaitStart = millis();
+    while (!Serial.isConnected() && (millis() - serialWaitStart) < ConnectivityPolicy::DEBUG_SERIAL_WAIT_TIMEOUT_MS) {
+      thrashGuard.markProgress("SERIAL_WAIT");
+      serviceAwakeWatchdog();
+      Particle.process();
+      delay(ConnectivityPolicy::DEBUG_SERIAL_WAIT_POLL_DELAY_MS);
+    }
+
+    if (Serial.isConnected()) {
+      delay(ConnectivityPolicy::DEBUG_SERIAL_POST_CONNECT_DELAY_MS);
+    } else {
+      Log.warn("Serial did not reconnect within 30s - continuing without serial");
+    }
+  }
+
+  Log.info("WakeReturn: elapsed=%lu reason=%s",
+           sleepElapsedMs,
+           wakeReturnReason);
+
+#if Wiring_Watchdog
+#if ENABLE_SLEEP_TRACE
+  Log.info("AppWDT: active ctx=ulp armed=%d",
+           Watchdog.started() ? 1 : 0);
+#else
+  if (!Watchdog.started()) {
+    Log.warn("AppWDT: active abnormal ctx=ulp armed=0");
+  }
+#endif
+#endif
+
+  // Re-attach user button interrupt after sleep (sleep may have detached it)
+  attachInterrupt(BUTTON_PIN, userSwitchISR, FALLING);
+  userSwitchDetected = false;  // Clear any spurious flag
+
+  // When both GPIO and timer wake are configured, the wake source detection can be
+  // ambiguous. The explicit approach: if neither GPIO pin woke us, it's the timer.
+  bool pirWake = sensorCanWake && (wakePin == sensorWake.pin);
+  bool buttonWake = (wakePin == BUTTON_PIN);
+  bool timerWake = !pirWake && !buttonWake;  // If no GPIO woke us, it's the timer
+  const char *wakeReasonLabel = buttonWake ? "BUTTON" : (pirWake ? "PIR" : "TIMER");
+  wake = {pirWake, buttonWake, timerWake, wakeReasonLabel};
+
+  // Observability: start of a new wake cycle (ULP return path).
+  Observability::cycleStats().resetOnWake(millis());
+
+  // Battery must be sampled before any later report/connect logic turns on the
+  // modem, so mark the first post-wake sample for fuel-gauge stabilization now.
+  measure.noteWakeFromLowPowerSleep();
+  PowerDiagnostics::logPowerState("post-wake");
+  return false;
+}
+
 } // namespace
 
 // NOTE:
@@ -149,13 +486,6 @@ void handleSleepingState() {
   static uint8_t lastGateBlockerMask = kGateBlockerUninitialized;
   static uint8_t lastGateBlockerBeforeRelease = 0;
   static bool gateReleaseReasonKnown = false;
-#if HAL_PLATFORM_CELLULAR
-  static bool preserveStandbyAfterNormalReturn = false;
-  static bool forceModemOffAfterStandbyFailure = false;
-  static int standbySleepFailureError = SYSTEM_ERROR_NONE;
-#else
-  bool forceModemOffAfterStandbyFailure = false; int standbySleepFailureError = SYSTEM_ERROR_NONE;
-#endif
 
   if (enteredState) {
     setAppBreadcrumb(3);
@@ -178,27 +508,7 @@ void handleSleepingState() {
   bool useNetworkStandbyRequested =
       (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) &&
       isWithinOpenHours();
-  bool preserveStandbyForThisPass = false;
-#if HAL_PLATFORM_CELLULAR
-  if (preserveStandbyAfterNormalReturn &&
-      (!useNetworkStandbyRequested || session.modemUnstable || Cellular.isOff())) {
-    preserveStandbyAfterNormalReturn = false;
-  }
-  preserveStandbyForThisPass = preserveStandbyAfterNormalReturn;
-#endif
-  bool useNetworkStandbyEffective =
-      useNetworkStandbyRequested &&
-      (preserveStandbyForThisPass ||
-       Observability::cycleStats().connect_result ==
-           Observability::WakeCycleStats::ConnectResult::SUCCESS);
-#if HAL_PLATFORM_CELLULAR
-  useNetworkStandbyEffective = useNetworkStandbyEffective && !Cellular.isOff();
-  if (session.modemUnstable || forceModemOffAfterStandbyFailure) {
-    useNetworkStandbyEffective = false;
-  }
-#else
-  useNetworkStandbyEffective = false;
-#endif
+  bool useNetworkStandbyEffective = effectiveStandby(useNetworkStandbyRequested);
 
   static unsigned long cloudSyncStartMs = 0;
   // If a ledger update (or time progression) moves the park into OPEN hours
@@ -501,7 +811,7 @@ void handleSleepingState() {
     gateReleaseReasonKnown = false;
   }
 
-  if (SleepTeardown::run(useNetworkStandbyRequested, useNetworkStandbyEffective, forceModemOffAfterStandbyFailure, standbySleepFailureError) != SleepTeardown::Result::READY) { return; }
+  if (SleepTeardown::run(useNetworkStandbyRequested, useNetworkStandbyEffective, standbyReturn.forceModemOff, standbyReturn.error) != SleepTeardown::Result::READY) { return; }
 
   setAppBreadcrumb(23); // BREADCRUMB_SLEEP_GATE_DONE (was stale literal 19, colliding with BREADCRUMB_REPORT_POST_LEDGER)
 
@@ -636,73 +946,7 @@ void handleSleepingState() {
     }
   }
 
-#if PLATFORM_ID == PLATFORM_BORON
-  if (overnightFallbackSleep) {
-    time_t rtcNow = 0;
-    if (shouldUseBoronRtcAlarmHibernate((uint32_t)wakeInSeconds, rtcNow)) {
-      pinMode(WAKEUP_PIN, INPUT_PULLUP);
-      if (digitalRead(WAKEUP_PIN) == HIGH) {
-        if (clearAb1805StaleAlarmInterrupts()) {
-          const time_t wakeTime = rtcNow + (time_t)wakeInSeconds;
-          if (ab1805.interruptAtTime(wakeTime)) {
-            setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START (was stale literal 20, colliding with BREADCRUMB_REPORT_EXIT)
-            // Fresh local configuration per sleep: Device OS move-assigns
-            // without freeing the previous wake-source list, so a reused
-            // long-lived object orphans that list on every cycle.
-            SystemSleepConfiguration hibernateConfig;
-            hibernateConfig.mode(SystemSleepMode::HIBERNATE)
-              .gpio(WAKEUP_PIN, FALLING)
-              .gpio(BUTTON_PIN, FALLING);
-
-            const bool watchdogStopped = ab1805.stopWDT();
-            pauseAwakeWatchdogForSleep("hibernate");
-            if (!watchdogStopped) {
-              Log.warn("SleepCall: watchdog-stop failed mode=HIBERNATE dur=%ds", wakeInSeconds);
-            }
-
-            // WO-2026-09-16 Step 2: HibernateCycle now owns the retained
-            // hibernate-cycle fields; wakeTime itself is used above for
-            // ab1805.interruptAtTime() only - nothing reads it back on
-            // wake (confirmed dead as a retained field), so it is not
-            // passed through here.
-            HibernateCycle::armForSleep(rtcNow, (uint32_t)wakeInSeconds);
-
-            Log.info("ModemTeardown: radioOn=%d point=hibernate", (int)Connectivity::isRadioPoweredOn());
-            Log.info("Sleep: HIBERNATE reason=closed dur=%ds wakePin=%d", wakeInSeconds, (int)WAKEUP_PIN);
-            PowerDiagnostics::logPowerState("pre-hibernate");
-            thrashGuard.markProgress("SLEEP_ATTEMPT");
-            Cloud::instance().logLedgerSleepState();
-            setAppBreadcrumb(25); // BREADCRUMB_SLEEP_SYSTEM_CALL (was stale literal 21, colliding with BREADCRUMB_IDLE_ENTRY) - entering final pre-sleep sequence
-            drainSerialBeforeSleep();
-            setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
-            // HIBERNATE may reset the MCU without returning - flush the
-            // diagnostics batch now, since this is the only chance.
-#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
-            PowerDiagnostics::flushDiagBatch();
-            setAppBreadcrumb(27); // BREADCRUMB_SLEEP_DIAG_FLUSH_DONE
-#endif
-            setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
-            const SystemSleepResult hibernateResult = System.sleep(hibernateConfig);
-            AwakeCycles::recordSleepReturn(hibernateResult.error() == SYSTEM_ERROR_NONE);
-
-            // HIBERNATE should reset the MCU. If we return here, treat it as failed and fall back.
-            HibernateCycle::abandon();
-            ab1805.resumeWDT();
-            restoreAwakeWatchdogAfterWake("hibernate");
-            Log.warn("HIBERNATE sleep failed err=%d - falling back to ULTRA_LOW_POWER",
-                     (int)hibernateResult.error());
-          } else {
-            Log.warn("HIBERNATE bypass: failed to program AB1805 alarm - falling back to ULTRA_LOW_POWER");
-          }
-        } else {
-          Log.warn("HIBERNATE bypass: failed stale interrupt cleanup - falling back to ULTRA_LOW_POWER");
-        }
-      } else {
-        Log.warn("HIBERNATE bypass: wake pin held low before sleep - falling back to ULTRA_LOW_POWER");
-      }
-    }
-  }
-#endif
+  hibernateAttempt(overnightFallbackSleep, wakeInSeconds);
 
   // Before a long overnight
   // ULTRA_LOW_POWER fallback sleep, optionally reset first when heap has
@@ -876,239 +1120,12 @@ void handleSleepingState() {
   }
 #endif
   
-  const SensorWakeSource sensorWake = SensorManager::instance().activeSensor()->wakeSource();
-  const bool sensorCanWake = (sensorWake.pin != PIN_INVALID);
-  SystemSleepConfiguration ulpConfig;
-  ulpConfig.mode(SystemSleepMode::ULTRA_LOW_POWER)
-    .gpio(BUTTON_PIN, FALLING);    // Service button wake (active-low)
-  if (sensorCanWake) ulpConfig.gpio(sensorWake.pin, sensorWake.edge);  // Sensor wake
-    
-  // Add network standby for occupancy mode to avoid reconnection delays
-  // Note: Network standby is only supported/needed on cellular devices to prevent
-  // carrier blacklisting. WiFi reconnection is already fast enough (~2-5s).
-  if (useNetworkStandby) {
-#if HAL_PLATFORM_CELLULAR
-    // Keep cellular modem in low-power standby so we can quickly reconnect
-    // when occupancy changes. This prevents 30-60s reconnection overhead and
-    // potential carrier blacklisting from rapid disconnect/reconnect cycles.
-    ulpConfig.network(NETWORK_INTERFACE_CELLULAR, SystemSleepNetworkFlag::INACTIVE_STANDBY);
-#endif
-  }
-  
-  ulpConfig.duration((uint32_t)wakeInSeconds * 1000UL);  // Timer-based wake at reporting boundary
-
-  // Stop watchdog immediately before sleep (after config is fully built)
-  // to minimize time between I2C transaction and sleep entry
-  const bool watchdogStopped = ab1805.stopWDT();
-  pauseAwakeWatchdogForSleep("ulp");
-#if ENABLE_SLEEP_TRACE
-  Log.info("SleepCall: standby=%d dur=%d wdt=%s gate=ok",
-           useNetworkStandby ? 1 : 0,
-           wakeInSeconds,
-           watchdogStopped ? "off" : "err");
-#else
-  if (!watchdogStopped) {
-    Log.warn("SleepCall: watchdog-stop failed standby=%d dur=%d",
-             useNetworkStandby ? 1 : 0,
-             wakeInSeconds);
-  }
-#endif
-#if CONNECTIVITY_FAILSAFE_TEST_MODE
-  Log.info("Sleep: ULP standby=%d reason=%s dur=%ds occ=%d soc=%.1f test=1",
-           useNetworkStandby ? 1 : 0,
-           sleepReason,
-           wakeInSeconds,
-           CurrentReadings::get_occupied() ? 1 : 0,
-           (double)PowerManager::instance().soc());
-#else
-  Log.info("Sleep: ULP standby=%d reason=%s dur=%ds occ=%d soc=%.1f",
-           useNetworkStandby ? 1 : 0,
-           sleepReason,
-           wakeInSeconds,
-           CurrentReadings::get_occupied() ? 1 : 0,
-           (double)PowerManager::instance().soc());
-#endif
-
-  thrashGuard.markProgress("SLEEP_ATTEMPT");
-  PowerDiagnostics::logPowerState("pre-sleep-ulp");
-  const unsigned long sleepCallStartMs = millis();
-  Cloud::instance().logLedgerSleepState();
-  setAppBreadcrumb(25); // BREADCRUMB_SLEEP_SYSTEM_CALL (was stale literal 21, colliding with BREADCRUMB_IDLE_ENTRY) - entering final pre-sleep sequence
-  drainSerialBeforeSleep();
-  setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
-  setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
-  SystemSleepResult result = System.sleep(ulpConfig);
-  AwakeCycles::recordSleepReturn(result.error() == SYSTEM_ERROR_NONE);
-  const unsigned long sleepElapsedMs = millis() - sleepCallStartMs;
-  pin_t wakePin = result.wakeupPin();
-  const char *wakeReturnReason = (result.error() != SYSTEM_ERROR_NONE) ? "ERROR" :
-      ((wakePin == BUTTON_PIN) ? "BUTTON" : ((wakePin == sensorWake.pin) ? "PIR" : "TIMER"));
-
-#if HAL_PLATFORM_CELLULAR
-  if (useNetworkStandby) {
-    if (result.error() == SYSTEM_ERROR_NONE) {
-      preserveStandbyAfterNormalReturn = true;
-      forceModemOffAfterStandbyFailure = false;
-      standbySleepFailureError = SYSTEM_ERROR_NONE;
-      if (SystemConfig::get_verboseMode()) {
-        Log.info("SLEEP: standby sleep returned normally; preserving modem standby");
-      }
-    } else {
-      preserveStandbyAfterNormalReturn = false;
-      forceModemOffAfterStandbyFailure = true;
-      standbySleepFailureError = (int)result.error();
-      Log.warn("SLEEP: standby sleep failed; forcing modem-off reason=sleep_error err=%d",
-               standbySleepFailureError);
-    }
-  } else {
-    preserveStandbyAfterNormalReturn = false;
-    forceModemOffAfterStandbyFailure = false;
-    standbySleepFailureError = SYSTEM_ERROR_NONE;
-  }
-#endif
-
-  // If Device OS rejects the sleep configuration, System.sleep() returns
-  // immediately and the wake pin will be invalid (65535). Without handling
-  // that error, the state machine will interpret it as a timer wake and can
-  // thrash in a tight loop.
-  if (result.error() != SYSTEM_ERROR_NONE) {
-    thrashGuard.markProgress("SLEEP_RETURNED");
-    Log.error("ULTRA_LOW_POWER sleep failed err=%d (wakeIn=%d sec, button=%d pir=%d) - falling back to STOP", (int)result.error(), wakeInSeconds, (int)BUTTON_PIN, (int)sensorWake.pin);
-    RecoveryState::raiseAlert(16);
-
-   // STOP generally supports a wider set of wake pins on some platforms.
-    setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START (was stale literal 20, colliding with BREADCRUMB_REPORT_EXIT)
-    SystemSleepConfiguration stopConfig;
-    stopConfig.mode(SystemSleepMode::STOP)
-      .gpio(BUTTON_PIN, FALLING);
-    if (sensorCanWake) stopConfig.gpio(sensorWake.pin, sensorWake.edge);
-    stopConfig.duration((uint32_t)wakeInSeconds * 1000UL);
-    PowerDiagnostics::logPowerState("pre-sleep-stop-fallback");
-    Cloud::instance().logLedgerSleepState();
-    setAppBreadcrumb(25); // BREADCRUMB_SLEEP_SYSTEM_CALL (was stale literal 21, colliding with BREADCRUMB_IDLE_ENTRY) - entering final pre-sleep sequence
-    drainSerialBeforeSleep();
-    setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
-    setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
-    result = System.sleep(stopConfig);
-    AwakeCycles::recordSleepReturn(result.error() == SYSTEM_ERROR_NONE);
-
-    if (result.error() != SYSTEM_ERROR_NONE) {
-      Log.error("STOP sleep fallback failed err=%d (wakeIn=%d sec) - using timer-only STOP sleep", (int)result.error(), wakeInSeconds);
-      setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START
-      SystemSleepConfiguration stopTimerConfig;
-      stopTimerConfig.mode(SystemSleepMode::STOP)
-        .duration((uint32_t)wakeInSeconds * 1000UL);
-      PowerDiagnostics::logPowerState("pre-sleep-stop-timer-only");
-      Cloud::instance().logLedgerSleepState();
-      setAppBreadcrumb(25); // BREADCRUMB_SLEEP_SYSTEM_CALL - entering final pre-sleep sequence
-      drainSerialBeforeSleep();
-      setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
-      setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
-      result = System.sleep(stopTimerConfig);
-      AwakeCycles::recordSleepReturn(result.error() == SYSTEM_ERROR_NONE);
-
-      if (result.error() != SYSTEM_ERROR_NONE) {
-        // All sleep modes failed - this indicates a device state corruption
-        // that requires immediate reset (alert 16 already raised on first failure).
-        Log.info("ModemTeardown: radioOn=%d point=sleep-attempts-failed-reset", (int)Connectivity::isRadioPoweredOn());
-        Log.error("All sleep attempts failed err=%d - immediate reset required", (int)result.error());
-        ab1805.resumeWDT();
-
-        // Brief delay to allow log output to flush before reset
-        delay(2000);
-
-        // Reset device to clear corrupted state
-        Log.info("Resetting device to clear sleep failure state");
-        // Reset drops RAM - flush the diagnostics batch now, since this is
-        // the only chance for this cycle's cascade of sleep-attempt entries.
-#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
-        PowerDiagnostics::flushDiagBatch();
-#endif
-        System.reset(RESET_CAUSE_SLEEP_ATTEMPTS_EXHAUSTED);
-        
-        // Should never reach here, but set ERROR_STATE as fallback
-        transitionTo(ERROR_STATE, "sleep-all-attempts-failed");
-        return;
-      }
-    }
-  }
-  
-  // Clear any pending interrupts on wake pins after sleep to ensure clean state
-  // This is critical for proper interrupt handling after wake
-  pinMode(BUTTON_PIN, INPUT);    // Reset pin mode
-  if (sensorCanWake) pinMode(sensorWake.pin, INPUT);  // Reset pin mode
-  
-  // Resume hardware watchdog immediately after wake
-  ab1805.resumeWDT();
-  restoreAwakeWatchdogAfterWake("ulp");
-
-  // Mark progress immediately after wake to reset ThrashGuard timer
-  thrashGuard.markProgress("WAKE_FROM_SLEEP");
-  setAppBreadcrumb(4);
-
-  // Single convergence point for the ULP/STOP-fallback/STOP-timer-only sleep
-  // cascade - whichever attempt actually succeeded lands here, so this flushes
-  // the whole cycle's diagnostics batch exactly once regardless of how many
-  // fallback attempts fired. (Hibernate and the total-sleep-failure reset are
-  // flushed separately at their own non-returning call sites, above.)
-#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
-  PowerDiagnostics::flushDiagBatch();
-#endif
-
-  if (SystemConfig::get_serialConnected() || (ALLOW_BLOCKING_SERIAL_WAITS != 0)) {
-    // Re-initialize USB serial after wake and give the host a bounded chance
-    // to re-enumerate before we continue through another short wake cycle.
-    Serial.begin(9600);
-    delay(ConnectivityPolicy::DEBUG_SERIAL_REENUM_DELAY_MS);
-
-    unsigned long serialWaitStart = millis();
-    while (!Serial.isConnected() && (millis() - serialWaitStart) < ConnectivityPolicy::DEBUG_SERIAL_WAIT_TIMEOUT_MS) {
-      thrashGuard.markProgress("SERIAL_WAIT");
-      serviceAwakeWatchdog();
-      Particle.process();
-      delay(ConnectivityPolicy::DEBUG_SERIAL_WAIT_POLL_DELAY_MS);
-    }
-
-    if (Serial.isConnected()) {
-      delay(ConnectivityPolicy::DEBUG_SERIAL_POST_CONNECT_DELAY_MS);
-    } else {
-      Log.warn("Serial did not reconnect within 30s - continuing without serial");
-    }
-  }
-
-  Log.info("WakeReturn: elapsed=%lu reason=%s",
-           sleepElapsedMs,
-           wakeReturnReason);
-
-#if Wiring_Watchdog
-#if ENABLE_SLEEP_TRACE
-  Log.info("AppWDT: active ctx=ulp armed=%d",
-           Watchdog.started() ? 1 : 0);
-#else
-  if (!Watchdog.started()) {
-    Log.warn("AppWDT: active abnormal ctx=ulp armed=0");
-  }
-#endif
-#endif
-
-  // Re-attach user button interrupt after sleep (sleep may have detached it)
-  attachInterrupt(BUTTON_PIN, userSwitchISR, FALLING);
-  userSwitchDetected = false;  // Clear any spurious flag
-
-  // When both GPIO and timer wake are configured, the wake source detection can be
-  // ambiguous. The explicit approach: if neither GPIO pin woke us, it's the timer.
-  bool pirWake = sensorCanWake && (wakePin == sensorWake.pin);
-  bool buttonWake = (wakePin == BUTTON_PIN);
-  bool timerWake = !pirWake && !buttonWake;  // If no GPIO woke us, it's the timer
-  const char *wakeReasonLabel = buttonWake ? "BUTTON" : (pirWake ? "PIR" : "TIMER");
-
-  // Observability: start of a new wake cycle (ULP return path).
-  Observability::cycleStats().resetOnWake(millis());
-
-  // Battery must be sampled before any later report/connect logic turns on the
-  // modem, so mark the first post-wake sample for fuel-gauge stabilization now.
-  measure.noteWakeFromLowPowerSleep();
-  PowerDiagnostics::logPowerState("post-wake");
+  WakeContext wake;
+  if (sleepAndResume(wakeInSeconds, useNetworkStandby, sleepReason, wake)) return;
+  bool pirWake = wake.pirWake;
+  bool buttonWake = wake.buttonWake;
+  bool timerWake = wake.timerWake;
+  const char *wakeReasonLabel = wake.wakeReasonLabel;
   
   // LED will be turned on with proper timeout by PIR wake processing below
   // Don't turn it on here without timeout as it causes false LED timeout detection

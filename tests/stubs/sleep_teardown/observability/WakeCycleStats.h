@@ -3,6 +3,9 @@
 
 namespace Observability {
 struct WakeCycleStats {
+  enum class ConnectResult { NONE, SUCCESS, FAILED };
+  ConnectResult connect_result = ConnectResult::NONE;
+  void resetOnWake(uint32_t nowMs) { sim::emit("CYCLE resetOnWake ms=%u", (unsigned)nowMs); }
   void markTeardownStart(uint32_t startMs, bool useNetworkStandby) {
     sim::emit("CYCLE teardownStart ms=%u standby=%d", (unsigned)startMs, useNetworkStandby ? 1 : 0);
   }

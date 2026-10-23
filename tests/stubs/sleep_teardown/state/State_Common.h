@@ -29,6 +29,7 @@ struct SessionState {
   uint32_t lastCloudDisconnectElapsedMs = 0;
   uint32_t lastModemOffElapsedMs = 0;
   uint32_t lastTotalTeardownElapsedMs = 0;
+  bool modemUnstable = false;
 };
 inline SessionState session;
 
@@ -39,4 +40,5 @@ class PowerManager {
     return p;
   }
   uint8_t effectiveConnectionMode() const { return sim::connectionMode; }
+  float soc() const { return 87.5f; }
 };

@@ -631,12 +631,18 @@ def main() -> None:
     teardown_transitions = len(re.findall(r"\btransitionTo\s*\(", TEARDOWN_SRC.read_text()))
     if teardown_transitions != 2:
         fail(f"expected exactly 2 transitionTo( calls in SleepTeardown.cpp, found {teardown_transitions}")
-    EXPECTED_TRANSITION_CALLS = 16  # 17 real exit points + 1 dead line after the second System.reset(), minus the 2 moved
+    # WO-2026-10-21-001 moved the ULP/STOP cascade into sleepAndResume(), taking the one
+    # dead/unreachable line after the second System.reset() with it: 15 here, 1 there.
+    (_, _, sr_body), = find_function_body(sleep_lines, "bool sleepAndResume(")
+    transition_calls_in_sr = re.findall(r"\btransitionTo\s*\(", "\n".join(sr_body))
+    EXPECTED_TRANSITION_CALLS = 15  # 17 real exit points minus the 2 in SleepTeardown.cpp
     if len(transition_calls_in_hs) != EXPECTED_TRANSITION_CALLS:
         fail(f"expected exactly {EXPECTED_TRANSITION_CALLS} transitionTo( calls inside "
-             f"handleSleepingState() (17 real exit points minus the 2 in SleepTeardown.cpp, plus "
-             f"the 1 dead/unreachable line after the second System.reset()), found "
+             f"handleSleepingState() (17 real exit points minus the 2 in SleepTeardown.cpp), found "
              f"{len(transition_calls_in_hs)}")
+    if len(transition_calls_in_sr) != 1:
+        fail(f"expected exactly 1 transitionTo( call inside sleepAndResume() (the dead line after the "
+             f"second System.reset()), found {len(transition_calls_in_sr)}")
     print(f"PASS: all 17 real exit points (15 inside handleSleepingState(), 2 in SleepTeardown.cpp) are plain transitionTo(...) "
           "calls again (exitSleepingState() removed), plus the 1 dead/unreachable line, unchanged")
 
@@ -649,9 +655,11 @@ def main() -> None:
     # WO-2026-10-01-001 item C made each reset name itself:
     # `System.reset(RESET_CAUSE_...)`. Match the call, not the bare form.
     reset_line_indices = [i for i, l in enumerate(hs_body) if "System.reset(" in l]
-    if len(reset_line_indices) != 2:
-        fail(f"expected exactly 2 System.reset() calls inside handleSleepingState(), "
-             f"found {len(reset_line_indices)}")
+    sr_resets = [l for l in sr_body if "System.reset(" in l]
+    if len(reset_line_indices) != 1 or len(sr_resets) != 1:
+        fail(f"expected exactly 1 System.reset() call inside handleSleepingState() (heap guard) and 1 "
+             f"inside sleepAndResume() (all attempts failed), "
+             f"found {len(reset_line_indices)} and {len(sr_resets)}")
     if "Nightly heap guard: freeHeap=%lu <= %lu before overnight ULTRA_LOW_POWER fallback - resetting" not in sleep_text:
         fail("nightly heap-guard reset's purpose-built Log.warn(...) diagnostic is missing/changed")
     if "All sleep attempts failed err=%d - immediate reset required" not in sleep_text:
