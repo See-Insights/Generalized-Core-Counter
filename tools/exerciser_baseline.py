@@ -3,9 +3,9 @@
 
 Reads local S3 report-hook and status JSON files only (no network, no AWS).
 """
-import argparse, csv, glob, html, json, os, statistics, sys
-from datetime import date, datetime, time, timedelta
-from zoneinfo import ZoneInfo
+import argparse, csv, glob, html, json, os, re, statistics, sys
+from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 TRUNC_NOTE = ("NOTE: dailyoccupancy is truncated to whole minutes, so a +/-1 min error "
               "per window is quantization, not firmware.")
@@ -14,8 +14,20 @@ PHASE_NOTE = ("NOTE: T0 is the payload timestamp of the day's first occupancy=1 
               "between windows; try --phase-offset-s. Expected minutes never come from the counter.")
 
 
-def load(root, dev):
-    out = []
+def get_tz(name):
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError, OSError):
+        m = re.fullmatch(r"[A-Za-z]{3,}([+-]?)(\d{1,2})(?::([0-5]\d))?", name)
+        if not m:
+            sys.exit(f"error: unknown timezone {name!r}; use an IANA name or a fixed POSIX offset like SGT-8")
+        mins = int(m.group(2)) * 60 + int(m.group(3) or 0)
+        # POSIX sign is inverted: SGT-8 is UTC+8, EST5 is UTC-5
+        return timezone(timedelta(minutes=mins if m.group(1) == "-" else -mins), name)
+
+
+def load(root, dev, pub_ok=False):
+    out, skipped = [], 0
     for p in sorted(glob.glob(os.path.join(root, "**", "*.json"), recursive=True)):
         try:
             with open(p) as f:
@@ -27,9 +39,13 @@ def load(root, dev):
         if part.get("coreid") != dev:
             continue
         ms = data.get("timestamp")
-        out.append(dict(ts=ms / 1000 if ms is not None else pub, pub=pub,
-                        fw=part.get("fw_version") or "?", d=data))
-    return sorted(out, key=lambda r: r["ts"])
+        if not isinstance(ms, (int, float)):
+            if not pub_ok:
+                skipped += 1
+                continue
+            ms = pub * 1000
+        out.append(dict(ts=ms / 1000, fw=part.get("fw_version") or "?", d=data))
+    return sorted(out, key=lambda r: r["ts"]), skipped
 
 
 def phase(r):
@@ -77,9 +93,9 @@ def sessions(t0, close, credit, cycle_s):
 
 def main(argv=None):
     a = parse_args(argv)
-    tz = ZoneInfo(a.tz)
-    hooks = load(a.hooks, a.id)
-    resets = [s["ts"] for s in (load(a.status, a.id) if a.status else [])
+    tz = get_tz(a.tz)
+    hooks, no_ts = load(a.hooks, a.id)
+    resets = [s["ts"] for s in (load(a.status, a.id, pub_ok=True)[0] if a.status else [])
               if s["d"].get("resetReason") not in (None, 30, 70)]
     excl = []
     for e in a.exclude:
@@ -128,6 +144,8 @@ def main(argv=None):
     print(f"Exerciser baseline, device {a.id}: debounce {a.debounce_ms} ms, {credit / 60:.2f} min credit per session")
     print(PHASE_NOTE)
     print(TRUNC_NOTE)
+    if no_ts:
+        print(f"NOTE: {no_ts} reports without a payload timestamp ignored.")
     print("\nPER DAY (minutes; error = measured - expected)")
     print(f"{'day':<12}{'fw':<8}{'measured':>9}{'expected':>9}{'error':>8}{'err%':>8}{'sessions':>9}  flags")
     for r in days:
