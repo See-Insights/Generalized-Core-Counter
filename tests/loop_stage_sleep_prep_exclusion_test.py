@@ -118,6 +118,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 MAIN_SRC = REPO_ROOT / "src" / "Generalized-Core-Counter.cpp"
 LOOP_SRC = REPO_ROOT / "src" / "observability" / "LoopForensics.cpp"
 SLEEP_SRC = REPO_ROOT / "src" / "state" / "State_Sleep.cpp"
+TEARDOWN_SRC = REPO_ROOT / "src" / "state" / "SleepTeardown.cpp"
 COMMON_HDR = REPO_ROOT / "src" / "state" / "State_Common.h"
 
 
@@ -625,13 +626,18 @@ def main() -> None:
     # due instead of being skipped while occupied. WO-2026-10-07-004 added the
     # 17th: the pending-occupancy-change turnaround at the top of sleep prep.) ----
     transition_calls_in_hs = re.findall(r"\btransitionTo\s*\(", "\n".join(hs_body))
-    EXPECTED_TRANSITION_CALLS = 18  # 17 real exit points + 1 dead line after the second System.reset()
+    # WO-2026-10-20-003 moved the two teardown-timeout exits (sleep-disconnect-timeout and
+    # sleep-precondition-timeout) into SleepTeardown.cpp; the 18 are 16 here plus those 2.
+    teardown_transitions = len(re.findall(r"\btransitionTo\s*\(", TEARDOWN_SRC.read_text()))
+    if teardown_transitions != 2:
+        fail(f"expected exactly 2 transitionTo( calls in SleepTeardown.cpp, found {teardown_transitions}")
+    EXPECTED_TRANSITION_CALLS = 16  # 17 real exit points + 1 dead line after the second System.reset(), minus the 2 moved
     if len(transition_calls_in_hs) != EXPECTED_TRANSITION_CALLS:
         fail(f"expected exactly {EXPECTED_TRANSITION_CALLS} transitionTo( calls inside "
-             f"handleSleepingState() (17 real exit points reverted from exitSleepingState(), plus "
+             f"handleSleepingState() (17 real exit points minus the 2 in SleepTeardown.cpp, plus "
              f"the 1 dead/unreachable line after the second System.reset()), found "
              f"{len(transition_calls_in_hs)}")
-    print(f"PASS: all 17 real exit points inside handleSleepingState() are plain transitionTo(...) "
+    print(f"PASS: all 17 real exit points (15 inside handleSleepingState(), 2 in SleepTeardown.cpp) are plain transitionTo(...) "
           "calls again (exitSleepingState() removed), plus the 1 dead/unreachable line, unchanged")
 
     # ---- Check: the two System.reset() paths' purpose-built diagnostics

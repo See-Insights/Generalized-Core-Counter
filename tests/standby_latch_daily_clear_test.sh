@@ -5,7 +5,7 @@ set -euo pipefail
 #
 # The real daily-close block (State_Report.cpp), the real latch owner
 # (power/ModemHealth.{h,cpp}: thresholds, enum, latch functions and
-# clearAtDailyClose) and the real teardown trip check (State_Sleep.cpp) are
+# clearAtDailyClose) and the real teardown trip check (SleepTeardown.cpp) are
 # extracted byte-for-byte
 # and compiled into standby_latch_daily_clear_test.cpp. A separate step re-reads
 # src/ and fails with COPY_MISMATCH if any extracted piece differs from it.
@@ -29,7 +29,7 @@ import sys
 
 root, out = sys.argv[1], sys.argv[2]
 report = open(f"{root}/state/State_Report.cpp").read()
-sleep = open(f"{root}/state/State_Sleep.cpp").read()
+sleep = open(f"{root}/state/SleepTeardown.cpp").read()
 mh_h = open(f"{root}/power/ModemHealth.h").read()
 mh_cpp = open(f"{root}/power/ModemHealth.cpp").read()
 
@@ -74,7 +74,7 @@ import sys
 
 root, d = sys.argv[1], sys.argv[2]
 report = open(f"{root}/state/State_Report.cpp").read()
-sleep = open(f"{root}/state/State_Sleep.cpp").read()
+sleep = open(f"{root}/state/SleepTeardown.cpp").read()
 owner = open(f"{root}/power/ModemHealth.h").read() + open(f"{root}/power/ModemHealth.cpp").read()
 for name, src in (("gen_report_block.inc", report), ("gen_trip_check.inc", sleep)):
     if open(f"{d}/{name}").read().rstrip("\n") not in src:
@@ -100,7 +100,7 @@ mutate_and_expect_failure() {
   local label="$1" expect="$2" file="$3" old="$4" new="$5"
   local m="$work/mut_${label// /_}"
   mkdir -p "$m/src/state" "$m/src/power"
-  cp "$src_root/state/State_Report.cpp" "$src_root/state/State_Sleep.cpp" "$m/src/state/"
+  cp "$src_root/state/State_Report.cpp" "$src_root/state/SleepTeardown.cpp" "$m/src/state/"
   cp "$src_root/power/ModemHealth.cpp" "$src_root/power/ModemHealth.h" "$m/src/power/"
   python3 - "$m/src/$file" "$old" "$new" <<'PY'
 import sys

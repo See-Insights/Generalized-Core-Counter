@@ -185,9 +185,9 @@ if idle_consumer_present:
 
 # --- State_Sleep.cpp: the blocks of handleSleepingState(), in source order -----
 sfn = sleep.find("void handleSleepingState() {")
-decl = sleep.find("static bool disconnectRequested = false;", sfn)
-reset_end = sleep.find('Log.warn("SLEEP: disconnectRequested latched without timestamp', decl)
-teardown_site = sleep.find("disconnectRequested = true;", decl)
+decl = sfn
+reset_end = sleep.find("SleepTeardown::guardLostTimestamp();", decl)
+teardown_site = sleep.find("if (SleepTeardown::run(", decl)
 wake_site = sleep.find("bool pirWake = sensorCanWake && (wakePin == sensorWake.pin);", sfn)
 
 sleep_segments = []
@@ -198,10 +198,10 @@ sleep_below_reset = 0
 if pend_idx >= 0:
     ps, pe = sleep.stmt("if (session.occupancyChangeTriggered", sfn)
     emit("extracted_sleep_pending.inc", sleep, ps, pe)
-    sleep_consumer_gated = int("!disconnectRequested" in sleep.text[ps:ps + 80])
+    sleep_consumer_gated = int("!SleepTeardown::disconnectRequested()" in sleep.text[ps:ps + 100])
     sleep_below_reset = int(pend_idx > reset_end)
     sleep_segments.append((ps, '#include "extracted_sleep_pending.inc"'))
-gate_site = sleep.find("if (Particle.connected() && !disconnectRequested) {", decl)
+gate_site = sleep.find("if (Particle.connected() && !SleepTeardown::disconnectRequested()) {", decl)
 sleep_segments.append((gate_site, "if (!modelGate()) return;  // model: the cloud-ops gate wait"))
 sleep_segments.append((teardown_site, "if (!modelTeardown()) return;  // model: teardown request or wait"))
 sleep_segments.append((wake_site, "modelSleep();  // model: System.sleep() returns"))
@@ -223,6 +223,7 @@ write("sleep_pass.inc", "\n".join(code for _, code in sorted(sleep_segments)))
 decision_offsets = [
     sleep.find_code("System.sleep(", sfn),
     sleep.find_code("Connectivity::request", sfn),
+    sleep.find_code("SleepTeardown::run(", sfn),
     sleep.find('"sleep-timer-occupied-suppress-report"', sfn),
     sleep.find('"sleep-pir-return-to-sleep"', sfn),
     sleep.find('"sleep-timer-report"', sfn),
@@ -389,7 +390,7 @@ PY
   echo "OK (mutation): '$name' caught by /$expect/ ($(grep -c '^FAIL:' "$dir/run.log") failed checks, e.g. $(grep -m1 -E "^FAIL: .*($expect)" "$dir/run.log" | cut -c1-110))"
 }
 
-sleep_pending='  if (session.occupancyChangeTriggered && !disconnectRequested) {
+sleep_pending='  if (session.occupancyChangeTriggered && !SleepTeardown::disconnectRequested()) {
     cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
     transitionTo(REPORTING_STATE, "occupancy change pending");
     return;
@@ -428,7 +429,7 @@ mutate_and_expect_failure "flag take moved below the early exits" "norepeat:" "s
 " "$entry_take  if (!Particle.connected()) {
 "
 mutate_and_expect_failure "sleep check ignores disconnectRequested" "teardown:" "state/State_Sleep.cpp" \
-  "if (session.occupancyChangeTriggered && !disconnectRequested) {" "if (session.occupancyChangeTriggered) {"
+  "if (session.occupancyChangeTriggered && !SleepTeardown::disconnectRequested()) {" "if (session.occupancyChangeTriggered) {"
 mutate_and_expect_failure "mid-gate exit keeps the gate timer" "midgate:" "state/State_Sleep.cpp" \
   "    cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
     transitionTo(REPORTING_STATE, \"occupancy change pending\");" \
