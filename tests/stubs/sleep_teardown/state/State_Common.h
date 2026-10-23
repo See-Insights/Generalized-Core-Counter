@@ -15,6 +15,8 @@ enum State { SLEEPING_STATE, ERROR_STATE, IDLE_STATE, FIRMWARE_UPDATE_STATE, REP
 namespace sim {
 inline int transitions = 0;
 inline uint8_t connectionMode = 0;
+inline float soc = 87.5f;
+inline uint8_t battState = 0;
 }  // namespace sim
 
 inline void transitionTo(State newState, const char *reason) {
@@ -42,5 +44,6 @@ class PowerManager {
     return p;
   }
   uint8_t effectiveConnectionMode() const { return sim::connectionMode; }
-  float soc() const { return 87.5f; }
+  float soc() const { return sim::soc; }
+  uint8_t batteryState() const { return sim::battState; }
 };

@@ -141,6 +141,8 @@ inline void abandon() { sim::emit("HIB abandon"); }
 }  // namespace HibernateCycle
 namespace Connectivity {
 inline bool isRadioPoweredOn() { return sim::world.radioOn; }
+inline void requestCloudDisconnectOnly() { sim::emit("CALL Connectivity::requestCloudDisconnectOnly"); }
+inline void requestRadioPowerOff() { sim::emit("CALL Connectivity::requestRadioPowerOff"); }
 }
 namespace PowerDiagnostics {
 inline void logPowerState(const char *tag) { sim::emit("POWER %s", tag); }
@@ -171,7 +173,11 @@ struct PublishQueuePosix {
 };
 struct CloudHolder { using LedgerSyncDiagnostics = CloudStub::LedgerSyncDiagnostics; static CloudStub &instance() { static CloudStub c; return c; } };
 using Cloud = CloudHolder;
-struct MeasureStub { void noteWakeFromLowPowerSleep() { sim::emit("MEASURE noteWakeFromLowPowerSleep"); } };
+enum class BatterySampleContext : uint8_t { General = 0, Setup, PreSleep, PostWake };
+struct MeasureStub {
+  void noteWakeFromLowPowerSleep() { sim::emit("MEASURE noteWakeFromLowPowerSleep"); }
+  bool batteryState(BatterySampleContext c = BatterySampleContext::General) { sim::emit("MEASURE batteryState %d", (int)c); return true; }
+};
 inline MeasureStub measure;
 struct SensorStub { SensorWakeSource wakeSource() { return {sim::exec.sensorPin, RISING}; } };
 struct SensorManagerStub {

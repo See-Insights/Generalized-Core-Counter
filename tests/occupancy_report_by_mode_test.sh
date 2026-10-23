@@ -239,7 +239,6 @@ write("sleep_pass.inc", "\n".join(code for _, code in sorted(sleep_segments)))
 decision_offsets = [
     sleep.find_code("sleepAndResume(", sfn),
     sleep.find_code("hibernateAttempt(", sfn),
-    sleep.find_code("Connectivity::request", sfn),
     sleep.find_code("SleepTeardown::run(", sfn),
     sleep.find('"sleep-timer-occupied-suppress-report"', sfn),
     sleep.find('"sleep-pir-return-to-sleep"', sfn),
@@ -462,6 +461,11 @@ mutate_and_expect_failure "sleep check moved below cloudGatePass" "cloud gate|mi
   "  if (cloudGatePass(useNetworkStandbyEffective)) return;
 " "  if (cloudGatePass(useNetworkStandbyEffective)) return;
 $sleep_pending"
+# WO-2026-10-21-004: the teardown marker is the handler's SleepTeardown::run( call (the Wi-Fi guard's radio
+# requests now live in wifiOffGuardPass()), so a check moved below the teardown must still fail.
+mutate_and_expect_failure "sleep check moved below the teardown" "sits before System.sleep\\(\\)|teardown:" "state/State_Sleep.cpp" \
+  "$sleep_pending" "" \
+  "  setAppBreadcrumb(23); // BREADCRUMB_SLEEP_GATE_DONE" "$sleep_pending  setAppBreadcrumb(23); // BREADCRUMB_SLEEP_GATE_DONE"
 mutate_and_expect_failure "sleep check moved below sleepAndResume" "soak:" "state/State_Sleep.cpp" \
   "$sleep_pending" "" \
   "  WakeContext wake;

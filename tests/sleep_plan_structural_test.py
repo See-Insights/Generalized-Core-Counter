@@ -23,6 +23,16 @@ PLAN_CALL = ("  SleepPlan plan;\n  if (sleepPlan(plan)) return;\n  int wakeInSec
              "  const char *sleepReason = plan.sleepReason;\n  const bool overnightFallbackSleep = plan.overnightFallbackSleep;\n")
 HIB = "  hibernateAttempt(overnightFallbackSleep, wakeInSeconds);\n"
 GUARD_CALL = "  if (nightlyHeapGuard(overnightFallbackSleep)) return;\n"
+# WO-2026-10-21-004 (Sleep S-5): the handler's other allowed differences are the summary call, the guard call
+# inside the kept `#if Wiring_WiFi`, the four removed Wi-Fi statics and their entry resets naming wifiGuard.
+SUMMARY_CALL = "  endOfCycleSummary(useNetworkStandby);\n"
+WIFI_CALL = "#if Wiring_WiFi\n  if (wifiOffGuardPass(useNetworkStandby)) return;\n#endif\n"
+WIFI_STATICS = ("#if Wiring_WiFi\n  static bool wifiOffGuardActive = false;\n  static unsigned long wifiOffGuardStartMs = 0;\n"
+                "  static unsigned long wifiOffGuardLastRetryMs = 0;\n  static uint8_t wifiOffGuardRetries = 0;\n#endif\n")
+SUMMARY_START = "  {\n    measure.batteryState(BatterySampleContext::PreSleep);"
+SUMMARY_END = "  // On WiFi platforms"
+WIFI_START = "#if Wiring_WiFi\n  if (!useNetworkStandby) {"
+WIFI_END = "  }\n#endif\n  \n  WakeContext wake;"
 PLAN_TAIL = "  plan = {wakeInSeconds, sleepReason, overnightFallbackSleep};\n  return false;\n"
 PLAN_START = "  // WO-2026-09-19 Step 3b: the behavioral core of this step."
 GUARD_START = "  // Before a long overnight\n"
@@ -119,7 +129,11 @@ def normalized(code):
     handler = body_of(code, "void handleSleepingState()")
     if handler.count(PLAN_CALL) != 1 or handler.count(GUARD_CALL) != 1:
         return None, None, None
-    return plan, guard, handler.replace(PLAN_CALL, "@@PLAN@@").replace(GUARD_CALL, "@@GUARD@@")
+    if handler.count(SUMMARY_CALL) != 1 or handler.count(WIFI_CALL) != 1:
+        return None, None, None
+    handler = handler.replace(PLAN_CALL, "@@PLAN@@").replace(GUARD_CALL, "@@GUARD@@")
+    handler = handler.replace(SUMMARY_CALL, "@@SUMMARY@@\n").replace(WIFI_CALL, "#if Wiring_WiFi\n@@WIFI@@\n#endif\n")
+    return plan, guard, handler.replace("wifiGuard.", "")
 
 
 def base_pieces(base_text):
@@ -127,7 +141,15 @@ def base_pieces(base_text):
     a, b, e = handler.index(PLAN_START), handler.index(GUARD_START), handler.index(END)
     plan = handler[a:handler.index(HIB)]
     guard = handler[b:e]
-    return plan.rstrip("\n") + "\n", guard.rstrip("\n") + "\n", handler[:a] + "@@PLAN@@\n" + handler[handler.index(HIB):b] + "@@GUARD@@\n" + handler[e:]
+    rest = handler[:a] + "@@PLAN@@\n" + handler[handler.index(HIB):b] + "@@GUARD@@\n" + handler[e:]
+    if rest.count(WIFI_STATICS) != 1 or rest.count(SUMMARY_START) != 1 or rest.count(WIFI_START) != 1:
+        return None, None, None
+    rest = rest.replace(WIFI_STATICS, "", 1)
+    s0, s1 = rest.index(SUMMARY_START), rest.index(SUMMARY_END)
+    rest = rest[:s0] + "@@SUMMARY@@\n\n" + rest[s1:]
+    w0, w1 = rest.index(WIFI_START), rest.index(WIFI_END)
+    rest = rest[:w0] + "#if Wiring_WiFi\n@@WIFI@@\n#endif\n  \n  WakeContext wake;" + rest[w1 + len(WIFI_END):]
+    return plan.rstrip("\n") + "\n", guard.rstrip("\n") + "\n", rest
 
 
 # ---- probes: every check fires on a text that breaks it -------------------------------------------------
@@ -180,7 +202,7 @@ if cur_retained != base_retained:
 # The S-2 functions, cloudGatePass() and the includes are unchanged.
 tail_of = lambda t: t[t.index("struct WakeContext {"):t.index("} // namespace\n", t.index("struct WakeContext {"))]
 prefix_of = lambda t: t[:t.index("namespace {")]
-cloud_of = lambda t: t[t.index("struct {\n  bool operationsCompleteLogged"):t.index("struct SleepPlan {") if "struct SleepPlan {" in t else t.index("struct WakeContext {")]
+cloud_of = lambda t: t[t.index("struct {\n  bool operationsCompleteLogged"):t.index("void endOfCycleSummary(") if "void endOfCycleSummary(" in t else t.index("struct SleepPlan {") if "struct SleepPlan {" in t else t.index("struct WakeContext {")]
 if tail_of(sleep) != tail_of(base_sleep):
     fail("the S-2 functions (struct WakeContext .. end of the anonymous namespace) differ from the base")
 if prefix_of(sleep) != prefix_of(base_sleep):
