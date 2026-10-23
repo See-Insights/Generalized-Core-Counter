@@ -94,3 +94,30 @@ On the first exerciser day on v45 (Dev-09 and Dev-14), Claude Code syncs the hoo
 - Lines (script, tests).
 - The fixture answers.
 - The first run's v45 numbers, with their source and window (§13 (j)).
+
+## Amendment 1 (architect/Chip, 23 Oct): the power-up session
+
+**Flag and exclude the first session after each exerciser power-up** (a possible power-up edge of about +6 s from the start-up quiet period), and **report it separately**: in the per-day table, the per-window table and the summary, that session is marked `powerup`, left out of the accuracy and precision statistics, and listed on its own line with its measured and expected minutes. A power-up is the first session of a local day, or the first session after a gap of more than 1.5 cycles with no session, or the first session after an `--exclude` window. Context: Dev-14 serial, 23 Oct, first exerciser session `session=581s` against 570 s expected; the later 11:49 local session measured about 580 s by the hooks (S3, start report 03:48:57Z to end report 03:58:37Z), so a recurring offset of about +10 s exists that the power-up edge alone does not explain. Implemented as a small follow-up round on this branch after Stage 8 (below); the exerciser sketch is frozen after 23 Oct except for driving IO1 LOW first in `setup()`.
+
+## Stage 6 and Stage 7 result (23 Oct)
+
+**Stage 6** (Copilot, Sonnet 5.5, medium): round 1 wrote `tools/exerciser_baseline.py` (166 lines) and `tests/exerciser_baseline_test.py` (94 lines); round 2 and round 3 (after Stage 7 round 1) fixed the findings. **Stage 7** (Codex `gpt-5.6-sol`, medium): **round 1 NOT VERIFIED:** `--tz SGT-8` crashed (the project's timezone strings are POSIX, not IANA), a missing payload `timestamp` fell back to `published_at` for the phase, and the tests covered neither. **Round 2 (the last, architect-set): VERIFIED WITH CONCERNS (Low only):** the three defects are fixed (POSIX TZ via `os.environ["TZ"]` + `time.tzset()` + `time.mktime()`; hook reports without a payload `timestamp` are ignored with a note; tests for `SGT-8` across the UTC date line and for `EST5EDT,M3.2.0/2:00:00,M11.1.0/2:00:00` in October (EDT) and December (EST)). **C1 (Low), accepted:** the test file is 113 lines against the 100-line guideline.
+**Controller reproduction** (Claude Code): the test passes; suite **92/92** (91 + the new test); the WO mutations (`<` → `<=` at the close hour, `published_at` for the phase, truncation note dropped) plus the wrong `SGT-8` sign and DST ignored each fail the test, the control passes (git-backed copies); no network/AWS path.
+
+## Closing record
+
+| Item | Budget | Actual |
+|---|---|---|
+| `src/` | 0 | **0** |
+| Script | ≤ 200 lines | **184** (`tools/exerciser_baseline.py`, new) |
+| Tests | guideline +100 | **113** (`tests/exerciser_baseline_test.py`, new; fixtures generated in the test) |
+| Suite | baseline 91 | **92/92** |
+
+- **Fixture answers (60 s debounce, 330 s = 5.5 min per session, hand-worked in the test's docstring):** a perfect counter measures 33.0 min over 6 sessions (daily 5, 11, 16, 22, 27, 33; window errors ±0.5 from truncation); +60 s per session measures 39 (error +6.0 min, +18.18 %); one missing report (flagged) still measures 33; a reset mid-session (flagged) measures 27 (error −6.0 min). Session 6 would close exactly at the close hour, which is not before it, so 6 sessions.
+- **First run (v45 baseline):** pending: today (23 Oct) is shakedown; Saturday 24 Oct (full day) is the baseline on v45, Dev-09 and Dev-14 (Dev-14 `--exclude` 23 Oct 02:50Z..03:20Z). Phase uncertainty (the start report is stamped after the connect completes) is reported by the script's note.
+- **Deviations:** none from the design; Stage 6 took three rounds, Stage 7 two. **No merge hold** (a tool, not firmware).
+
+## For the architect
+
+- Amendment 1 (power-up session) is the next small round.
+- The hooks show sessions about 10 s longer than 570 s (581 s and 580 s on Dev-14): a recurring offset to understand before the v46 comparison.
