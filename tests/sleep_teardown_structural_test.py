@@ -70,9 +70,12 @@ def sleep_cpp_problems(code):
     run = re.search(r"if \(SleepTeardown::run\(.*?\) != SleepTeardown::Result::READY\) \{\s*return;\s*\}", plain, re.S)
     if not run:
         problems.append("State_Sleep.cpp must return unless SleepTeardown::run(...) is READY")
-    guard, first_read = plain.find("SleepTeardown::guardLostTimestamp()"), plain.find("SleepTeardown::disconnectRequested()")
-    if guard < 0 or first_read < 0 or guard > first_read:
-        problems.append("the lost-timestamp guard must run before the first disconnectRequested() read")
+    handler = plain.find("void handleSleepingState() {")
+    body = plain[handler:] if handler >= 0 else ""
+    guard = body.find("SleepTeardown::guardLostTimestamp()")
+    readers = [i for i in (body.find("SleepTeardown::disconnectRequested()"), body.find("cloudGatePass(")) if i >= 0]
+    if guard < 0 or not readers or guard > min(readers):
+        problems.append("the lost-timestamp guard must run before the handler's first disconnectRequested() read (the cloudGatePass( call counts as one)")
     if run and plain.find("setAppBreadcrumb(23)") < run.end():
         problems.append("setAppBreadcrumb(23) must follow the SleepTeardown::run gate")
     return problems
@@ -104,6 +107,9 @@ probes = {
     "the moved alert": sleep + "\n  RecoveryState::raiseAlert(15);\n",
     "a second run call": sleep + "\n  SleepTeardown::run(a, b, c, d);\n",
     "a dropped include": sleep.replace('#include "state/SleepTeardown.h"', ""),
+    "the guard below the cloudGatePass( call": sleep.replace("  SleepTeardown::guardLostTimestamp();\n", "", 1).replace(
+        "  if (cloudGatePass(useNetworkStandbyEffective)) return;\n",
+        "  if (cloudGatePass(useNetworkStandbyEffective)) return;\n  SleepTeardown::guardLostTimestamp();\n", 1),
     "a dropped gate return": re.sub(r"(\) != SleepTeardown::Result::READY\) \{\s*)return;", r"\1", sleep, count=1),
 }
 for name, text in probes.items():

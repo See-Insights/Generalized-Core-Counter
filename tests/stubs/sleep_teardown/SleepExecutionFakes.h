@@ -50,6 +50,12 @@ struct Exec {
   bool tdClears = false;  // the teardown fake clears the failure latch, as the real one does
   bool tdWait = false;    // the teardown fake is still waiting, so the handler returns before the sleep
 };
+// Inputs of the cloud-operations gate (WO-2026-10-21-002), scripted per pass by the gate runner.
+struct Gate {
+  bool queueEmpty = true, cfgSynced = true, outSynced = true, updatesPending = false, disconnectRequested = false;
+  int queueDepth = 0;
+};
+inline Gate gate;
 inline Exec exec;
 }  // namespace sim
 
@@ -78,6 +84,7 @@ struct SystemSleepResult {
   pin_t wakeupPin() const { return pin; }
 };
 struct SystemStub {
+  bool updatesPending() { return sim::gate.updatesPending; }
   SystemSleepResult sleep(const SystemSleepConfiguration &c) {
     auto &x = sim::exec;
     const sim::Exec::Sleep s = x.nextSleep < x.sleeps.size() ? x.sleeps[x.nextSleep++] : sim::Exec::Sleep{-1, PIN_INVALID};
@@ -138,8 +145,27 @@ inline void flushDiagBatch() { sim::emit("POWER flushDiagBatch"); }
 namespace AwakeCycles {
 inline void recordSleepReturn(bool ok) { sim::emit("AWAKE recordSleepReturn %d", (int)ok); }
 }
-struct CloudStub { void logLedgerSleepState() { sim::emit("CLOUD logLedgerSleepState"); } };
-struct CloudHolder { static CloudStub &instance() { static CloudStub c; return c; } };
+struct CloudStub {
+  struct LedgerSyncDiagnostics {
+    uint16_t pendingCount;
+    bool pendingStatusPublish, pendingDeviceStatusSync, pendingDeviceDataSync, statusInflight, dataInflight, syncing, inflight;
+  };
+  void logLedgerSleepState() { sim::emit("CLOUD logLedgerSleepState"); }
+  void logLedgerSleepTimeoutState() { sim::emit("CLOUD logLedgerSleepTimeoutState"); }
+  bool areLedgersSynced() { return sim::gate.cfgSynced; }
+  bool hasPendingOutputLedgerSync() { return !sim::gate.outSynced; }
+  LedgerSyncDiagnostics ledgerSyncDiagnostics() {
+    const bool all = sim::gate.cfgSynced && sim::gate.outSynced;
+    return {(uint16_t)(all ? 0 : 3), !sim::gate.outSynced, !sim::gate.cfgSynced, !sim::gate.outSynced,
+            !sim::gate.cfgSynced, !sim::gate.outSynced, !all, !sim::gate.cfgSynced};
+  }
+};
+struct PublishQueuePosix {
+  static PublishQueuePosix &instance() { static PublishQueuePosix q; return q; }
+  bool getCanSleep() { return sim::gate.queueEmpty; }
+  size_t getNumEvents() { return (size_t)sim::gate.queueDepth; }
+};
+struct CloudHolder { using LedgerSyncDiagnostics = CloudStub::LedgerSyncDiagnostics; static CloudStub &instance() { static CloudStub c; return c; } };
 using Cloud = CloudHolder;
 struct MeasureStub { void noteWakeFromLowPowerSleep() { sim::emit("MEASURE noteWakeFromLowPowerSleep"); } };
 inline MeasureStub measure;
@@ -154,6 +180,9 @@ using SensorManager = SensorManagerStub;
 // scripted, clears the failure latch the way the real one does once the modem is off.
 namespace SleepTeardown {
 enum class Result { WAIT, READY, ERROR };
+inline void enter() {}
+inline void guardLostTimestamp() {}
+inline bool disconnectRequested() { return sim::gate.disconnectRequested; }
 inline Result run(bool req, bool eff, bool &force, int &err) {
   sim::emit("TEARDOWN req=%d eff=%d force=%d err=%d", (int)req, (int)eff, (int)force, err);
   if (sim::exec.tdClears) { force = false; err = SYSTEM_ERROR_NONE; }

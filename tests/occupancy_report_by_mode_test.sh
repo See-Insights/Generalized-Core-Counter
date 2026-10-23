@@ -209,7 +209,15 @@ if pend_idx >= 0:
     sleep_consumer_gated = int("!SleepTeardown::disconnectRequested()" in sleep.text[ps:ps + 100])
     sleep_below_reset = int(pend_idx > reset_end)
     sleep_segments.append((ps, '#include "extracted_sleep_pending.inc"'))
-gate_site = sleep.find("if (Particle.connected() && !SleepTeardown::disconnectRequested()) {", decl)
+# The gate lives in cloudGatePass(): its wait condition is the extracted guard below, and the handler's
+# call to it is the site the pending-change exit must precede.
+gate_fn = sleep.find("bool cloudGatePass(bool useNetworkStandbyEffective) {")
+gate_fn_end = sleep.close_of(sleep.open_after(gate_fn))
+gate_guard = sleep.find("if (Particle.connected() && !SleepTeardown::disconnectRequested()) {", gate_fn)
+if not gate_fn < gate_guard < gate_fn_end or gate_fn_end > sfn:
+    die("cloudGatePass() must hold the connected && !disconnectRequested wait, ahead of handleSleepingState()")
+gate_site = sleep.find_code("cloudGatePass(", sfn)
+sleep_before_gate = int(pend_idx >= 0 and pend_idx < gate_site)
 sleep_segments.append((gate_site, "if (!modelGate()) return;  // model: the cloud-ops gate wait"))
 sleep_segments.append((teardown_site, "if (!modelTeardown()) return;  // model: teardown request or wait"))
 sleep_segments.append((wake_site, "modelSleep();  // model: System.sleep() returns"))
@@ -313,6 +321,7 @@ print(f"-DSLEEP_CONSUMER_PRESENT={sleep_consumer_present}")
 print(f"-DSLEEP_CONSUMER_BELOW_RESET={sleep_below_reset}")
 print(f"-DSLEEP_CONSUMER_GATED={sleep_consumer_gated}")
 print(f"-DSLEEP_CONSUMER_BEFORE_SLEEP_DECISIONS={sleep_order_ok}")
+print(f"-DSLEEP_CONSUMER_BEFORE_CLOUD_GATE={sleep_before_gate}")
 print(f"-DIDLE_CONSUMER_PRESENT={idle_consumer_present}")
 print(f"-DIDLE_CONSUMER_AFTER_OCCUPANCY_BLOCK={idle_order_ok}")
 print(f"-DREPORT_TAKE_AFTER_PUBLISH_BEFORE_EXITS={report_take_ok}")
@@ -400,7 +409,7 @@ PY
 }
 
 sleep_pending='  if (session.occupancyChangeTriggered && !SleepTeardown::disconnectRequested()) {
-    cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
+    cloudGate.cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
     transitionTo(REPORTING_STATE, "occupancy change pending");
     return;
   }
@@ -440,7 +449,7 @@ mutate_and_expect_failure "flag take moved below the early exits" "norepeat:" "s
 mutate_and_expect_failure "sleep check ignores disconnectRequested" "teardown:" "state/State_Sleep.cpp" \
   "if (session.occupancyChangeTriggered && !SleepTeardown::disconnectRequested()) {" "if (session.occupancyChangeTriggered) {"
 mutate_and_expect_failure "mid-gate exit keeps the gate timer" "midgate:" "state/State_Sleep.cpp" \
-  "    cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
+  "    cloudGate.cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
     transitionTo(REPORTING_STATE, \"occupancy change pending\");" \
   "    transitionTo(REPORTING_STATE, \"occupancy change pending\");"
 mutate_and_expect_failure "sleep check moved below suppress" "soak:" "state/State_Sleep.cpp" \
@@ -448,6 +457,11 @@ mutate_and_expect_failure "sleep check moved below suppress" "soak:" "state/Stat
   "    // For PIR wakes, check if reporting is also due (opportunistic reporting)
 " "$sleep_pending    // For PIR wakes, check if reporting is also due (opportunistic reporting)
 "
+mutate_and_expect_failure "sleep check moved below cloudGatePass" "cloud gate|midgate:" "state/State_Sleep.cpp" \
+  "$sleep_pending" "" \
+  "  if (cloudGatePass(useNetworkStandbyEffective)) return;
+" "  if (cloudGatePass(useNetworkStandbyEffective)) return;
+$sleep_pending"
 mutate_and_expect_failure "sleep check moved below sleepAndResume" "soak:" "state/State_Sleep.cpp" \
   "$sleep_pending" "" \
   "  WakeContext wake;
