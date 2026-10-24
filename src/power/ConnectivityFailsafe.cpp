@@ -225,7 +225,9 @@ void connectivityFailsafeSupervisor() {
   const time_t now = Time.now();
   const time_t openedAt = DailyBoundary::todayAt(SystemConfig::get_openTime());
   const time_t ageBase = (openedAt > lastConnection) ? openedAt : lastConnection;
-  if (Clock::openness() != Clock::Openness::Open || now <= ageBase) {
+  // Recovery item 18 (WO-2026-10-24-001): Unknown is treated as Open here. Its own
+  // stage-2 reset leaves the clock untrusted, so requiring Open is the circular case above.
+  if (Clock::openness() == Clock::Openness::Closed || now <= ageBase) {
     return;
   }
 
