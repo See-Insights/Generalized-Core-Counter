@@ -44,6 +44,19 @@ Any breadcrumb-28 watchdog, a payload difference, a missing report not explained
 
 - **24 Oct about 05:09Z: the antenna verdict.** `ConnSummary sig=` quality followed the antenna (S3 serial, 24 Oct): Dev-14 on Dev-09's old antenna read 77/6, 75/6, 75/6, 77/12, 75/6 and one 660 s failure after its first 80/29; Dev-09 on Dev-14's old antenna read 78-80/29-33 over nine connects. **Dev-09's old antenna (or its cable or connector) is bad; it is on Dev-14 until 31 Oct.** Dev-14's connect metrics after 03:59Z are excluded from the grading (section 2).
 
+## 3b. Catch-up if the session jobs did not fire (Chip's laptop may be asleep or offline while he travels)
+
+The jobs in section 5 live only in the Claude session, so a sleeping laptop can skip them. **When the session is reopened, run every missed job, in this order, from S3, each over its ORIGINAL window (never "now"), using the same relay text, and say in each report that it is a catch-up and from when.** S3 keeps the raw files, so a late run gives the same numbers; the day totals for a past day do not change. Check what the devices actually ran in each window (firmware version per hook `fw_version`, and the first v46 boot from serial and status) instead of assuming the plan happened: if Chip could not lock Dev-09 on Sunday, Mon and Tue are v45 days, and the report says so.
+
+**Catch-up order (one line each):**
+1. **Sat v45 day 1** (job `2edc80e6`): SGT 24 Oct = 23 Oct 16:00Z to 24 Oct 16:00Z; Dev-09 from 24 Oct 01:13:04Z; Dev-14 sleep path and session lengths only.
+2. **Sun v45 day 2** (job `53704073`): SGT 25 Oct = 24 Oct 16:00Z to 25 Oct 16:00Z; Dev-09 v45 accuracy and precision over Sat+Sun.
+3. **Mon v46 day 1 + day-1 check** (job `32ef1d06`): SGT 26 Oct = 25 Oct 16:00Z to 26 Oct 16:00Z; confirm Dev-09's first v46 boot (about Sun 25 Oct 22:01Z).
+4. **Mon 24 h soak grading** (job `b686b4ab`): the 24 h from Dev-09's first v46 boot (about Sun 22:01Z to Mon 22:01Z); read-only Sonnet subagent.
+5. **Tue v46 day 2 + the Dev-09 v45-vs-v46 comparison** (job `91e5b6e2`): SGT 27 Oct = 26 Oct 16:00Z to 27 Oct 16:00Z.
+
+The Dev-14 rules of section 2 (exclude its connect metrics after 03:59Z 24 Oct, report its session lengths separately, a 3 h dark period is a possible item-18 recurrence, change nothing) apply to every catch-up run. The AWS SSO token may have expired by then: if so, the first job reports "token needed" and Chip renews it.
+
 ## 4. Default (if both pass)
 
 Set v46 as the product default (recheck size and sha256); merge the release PR; the fleet health check about 24 h later. Dev-09 and Dev-14 stay locked for v47 (the P7-A persistence freeze; its bench step is already done, PASS).
