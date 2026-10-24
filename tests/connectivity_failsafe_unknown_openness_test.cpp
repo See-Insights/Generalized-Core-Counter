@@ -31,6 +31,11 @@ Action lastActionTaken = NONE;
 int actionCount = 0;
 uint8_t persistedStage = 0;
 time_t persistedAction = 0;
+// The persisted stage AT THE MOMENT the action was called. A real System.reset() or deep
+// power-down does not return, so anything the supervisor persists after it is lost: the
+// stage must be on flash before the call (otherwise stage 2 could repeat on every boot).
+uint8_t persistedStageAtAction = 0;
+struct ActionStop {};  // thrown by the fakes: the real calls never return
 constexpr uint32_t FAKE_JITTER_SEC = 1000;
 } // namespace
 
@@ -80,11 +85,11 @@ using PowerManager = PowerManagerFake;
 
 struct SystemFake {
   bool updatesPending() { return false; }
-  void reset(int) { lastActionTaken = RESET; ++actionCount; }
+  void reset(int) { lastActionTaken = RESET; ++actionCount; persistedStageAtAction = persistedStage; throw ActionStop{}; }
 } System;
 
 struct Ab1805Fake {
-  void deepPowerDown() { lastActionTaken = DEEP_POWER_DOWN; ++actionCount; }
+  void deepPowerDown() { lastActionTaken = DEEP_POWER_DOWN; ++actionCount; persistedStageAtAction = persistedStage; throw ActionStop{}; }
 } ab1805;
 
 struct TimeFake {
@@ -136,7 +141,11 @@ Action run(const Scenario &s) {
   actionCount = 0;
   persistedStage = 0;
   persistedAction = 0;
-  connectivityFailsafeSupervisor();
+  persistedStageAtAction = 0;
+  try {
+    connectivityFailsafeSupervisor();
+  } catch (const ActionStop &) {
+  }
   return lastActionTaken;
 }
 
@@ -146,12 +155,12 @@ const char *name(Action a) {
 
 void check(const char *what, const Scenario &s, Action want, uint8_t wantStage = 0) {
   const Action got = run(s);
-  const bool stageOk = (want == NONE) || persistedStage == wantStage;
+  const bool stageOk = (want == NONE) || persistedStageAtAction == wantStage;
   if (got == want && stageOk && actionCount == (want == NONE ? 0 : 1)) {
     printf("  ok   %-64s -> %s\n", what, name(got));
   } else {
     printf("  FAIL %-64s got %s (stage %u), want %s\n", what, name(got),
-           (unsigned)persistedStage, name(want));
+           (unsigned)persistedStageAtAction, name(want));
     failures++;
   }
 }
