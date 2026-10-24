@@ -116,13 +116,12 @@ public:
 	public:
 		// This structure must always begin with the header (16 bytes)
 		StorageHelperRK::PersistentDataBase::SavedDataHeader sysHeader;
-		// Your fields go here. Once you've added a field you cannot add fields
-		// (except at the end), insert fields, remove fields, change size of a field.
-		// Doing so will cause the data to be corrupted!
-		uint8_t structuresVersion;                        // Version of the data structures (system and data)
+		// FROZEN: no field is appended, inserted, removed, resized or moved while a rollback
+		// target reads this record (WO-2026-10-22-003); tests/persisted_layout_preservation_test.py enforces it.
+		uint8_t reservedUint8_0;                   // Reserved: was structuresVersion; kept to preserve the stored layout
 		bool verboseMode;                                 // Turns on extra messaging
 		bool solarPowerMode;                              // Powered by a solar panel or utility power
-  		bool lowPowerMode;                                // Does the device need to run disconnected to save battery
+		bool reservedBool0;                     // Reserved: was lowPowerMode; kept to preserve the stored layout
 		bool lowBatteryMode;                              // Is the battery level so low that we can no longer connect
 		uint8_t resetCount;                               // reset count of device (0-256)
 		char timeZoneStr[39];							  // String for the timezone - https://developer.ibm.com/technologies/systems/articles/au-aix-posix/
@@ -132,13 +131,13 @@ public:
 		time_t lastConnection;                     		  // Last time we successfully connected to Particle
 		time_t lastHookResponse;                   		  // Last time we got a valid Webhook response
 		uint16_t lastConnectionDuration;                  // How long - in seconds - did it take to last connect to the Particle cloud
-		uint8_t sensorType;                               // What is the sensor type - 0-Pressure Sensor, 1-PIR Sensor
-		bool updatesPending;                              // Has there been a change to the sysStatus that we need to effect 
+		uint8_t reservedUint8_1;                   // Reserved: was sensorType; kept to preserve the stored layout
+		bool reservedBool1;                     // Reserved: was updatesPending; kept to preserve the stored layout
 		uint16_t reportingInterval;                       // How often do we report in to the Particle cloud - in seconds
-		bool disconnectedMode;                            // Are we in disconnected mode - this is used to prevent the device from trying to connect to the Particle cloud - for Development and testing purposes
+		bool reservedBool2;                     // Reserved: was disconnectedMode; kept to preserve the stored layout
 		bool serialConnected;							  // Is the serial port connected - used to determine if we should wait for a serial connection before starting the device
 		uint16_t verboseTimeoutMin;                       // Minutes before verbose mode auto-disables (0 = no timeout)
-		time_t verboseModeStartTime;                      // Timestamp when verbose mode was enabled (0 = not active)
+		time_t reservedTime0;                     // Reserved: was verboseModeStartTime; kept to preserve the stored layout
 		time_t lastDailyCleanup;                           // Last time dailyCleanup() successfully ran
 		time_t lastTimeSync;                               // Last time we synced time from Particle cloud
 		
@@ -173,7 +172,7 @@ public:
 		uint32_t lastWatchdogResetReasonData;            // System.resetReasonData() from the last watchdog boot
 		bool hasValidLedgerConfig;                       // True once at least one complete, valid ledger configuration has been applied
 		uint8_t configSource;                            // Config::Source enum persisted for diagnostics
-		// ***** Appended per the persistent-layout append-only contract - do not reorder or insert above *****
+		// ***** Records are frozen: no field is appended while a rollback target reads them (WO-2026-10-22-003) *****
 		uint8_t lastWatchdogSource;                       // WatchdogSource enum: which mechanism reported the last watchdog reset (DEVICE_OS vs AB1805_PIN)
 
 		// ********** F2a Thermal Charge Inhibit Configuration (WO-2026-08-25-001) **********
@@ -219,17 +218,11 @@ public:
 	 * 
 	 */
 
-	uint8_t get_structuresVersion() const ;
-	void set_structuresVersion(uint8_t value);
-
 	bool get_verboseMode() const;
 	void set_verboseMode(bool value);
 
 	bool get_solarPowerMode() const;
 	void set_solarPowerMode(bool value);
-
-	bool get_lowPowerMode() const;
-	void set_lowPowerMode(bool value);
 
 	bool get_lowBatteryMode() const;
 	void set_lowBatteryMode(bool value);
@@ -266,17 +259,8 @@ public:
 	time_t get_alertTimestampNode() const;
 	void set_alertTimestampNode(time_t value);
 
-	uint8_t get_sensorType() const;
-	void set_sensorType(uint8_t value);
-
-	bool get_updatesPending() const;
-	void set_updatesPending(bool value);
-
 	uint16_t get_reportingInterval() const;
 	void set_reportingInterval(uint16_t value);
-
-	bool get_disconnectedMode() const;
-	void set_disconnectedMode(bool value);
 
 	bool get_serialConnected() const;
 	void set_serialConnected(bool value);
@@ -303,9 +287,6 @@ public:
 
 	uint16_t get_verboseTimeoutMin() const;
 	void set_verboseTimeoutMin(uint16_t value);
-
-	time_t get_verboseModeStartTime() const;
-	void set_verboseModeStartTime(time_t value);
 
 	uint16_t get_connectAttemptBudgetSec() const;
 	void set_connectAttemptBudgetSec(uint16_t value);
@@ -674,13 +655,13 @@ public:
 		// (except at the end), insert fields, remove fields, change size of a field.
 		// Doing so will cause the data to be corrupted!
 		// You may want to keep a version number in your data.
-		uint16_t faceNumber;                            // number of faces counted
-		uint16_t faceScore;							  	// Score of the face counted
-		uint16_t gestureType;                           // Gesure observed
-		uint16_t gestureScore;                          // faceNumber to the object in cm
+		uint16_t reservedUint16_0;                  // Reserved: was faceNumber; kept to preserve the stored layout
+		uint16_t reservedUint16_1;                  // Reserved: was faceScore; kept to preserve the stored layout
+		uint16_t reservedUint16_2;                  // Reserved: was gestureType; kept to preserve the stored layout
+		uint16_t reservedUint16_3;                  // Reserved: was gestureScore; kept to preserve the stored layout
 		time_t lastCountTime;							// Last time a count was made
 		float internalTempC;                            // Enclosure temperature in degrees C
-		float externalTempC;							// Temp Sensor at the ultrasonic device
+		float reservedFloat1;                    // Reserved: was externalTempC; kept to preserve the stored layout
 		uint8_t alertCode;								// Current Alert Code
 		time_t lastAlertTime;
 		float stateOfCharge;                            // Battery charge level
@@ -722,26 +703,11 @@ public:
 	 * 
 	 */
 
-	uint16_t get_faceNumber() const;
-	void set_faceNumber(uint16_t value);
-
-	uint16_t get_faceScore() const;
-	void set_faceScore(uint16_t value);
-
-	uint16_t get_gestureType() const;
-	void set_gestureType(uint16_t value);
-
-	uint16_t get_gestureScore() const;
-	void set_gestureScore(uint16_t value);
-
 	time_t get_lastCountTime() const;
 	void set_lastCountTime(time_t value);
 
 	float get_internalTempC() const ;
 	void set_internalTempC(float value);
-
-	float get_externalTempC() const ;
-	void set_externalTempC(float value);
 
 	int8_t get_alertCode() const;
 	void set_alertCode(int8_t value);
