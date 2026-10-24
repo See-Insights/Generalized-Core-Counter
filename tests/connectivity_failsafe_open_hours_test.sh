@@ -85,9 +85,12 @@ echo "Production failsafe timings from $policy_src:"
 echo "  stale=${stale_sec}s cooldown=${cooldown_sec}s jitterMax=${jitter_sec}s"
 
 # --- Structural facts, from the real supervisor body ----------------------
+# 0 = no openness gate, 1 = skips only Closed (Unknown acts), 2 = requires exactly Open
 open_gate=0
-if print -r -- "$supervisor" | grep -q "Clock::openness() != Clock::Openness::Open"; then
+if print -r -- "$supervisor" | grep -q "Clock::openness() == Clock::Openness::Closed"; then
   open_gate=1
+elif print -r -- "$supervisor" | grep -q "Clock::openness() != Clock::Openness::Open"; then
+  open_gate=2
 fi
 
 open_base=0
@@ -133,10 +136,11 @@ if (( jitter_sec != 30 * 60 )); then
 fi
 echo "OK: production timings are 3 h stale / 6 h cooldown / 30 min jitter"
 
-(( open_gate == 1 )) || fail "the supervisor must act only while Clock::openness() == Open"
+(( open_gate == 1 )) || \
+  fail "the supervisor must skip only Clock::openness() == Closed (Unknown is treated as Open)"
 (( open_base == 1 )) || \
   fail "the supervisor must base the age on DailyBoundary::todayAt(SystemConfig::get_openTime())"
-echo "OK: the supervisor gates on Clock::openness() and bases the age on today's opening"
+echo "OK: the supervisor skips only Closed and bases the age on today's opening"
 
 # The age must be measured from the LATER of lastConnection and the opening.
 if ! print -r -- "$supervisor" | grep -q "(openedAt > lastConnection) ? openedAt : lastConnection"; then
@@ -166,7 +170,7 @@ PY
 echo "OK: test mode keeps its 5 min stale threshold"
 
 failsafe_test_src="$repo_root/src/diagnostics/ConnectivityFailsafeTest.cpp"
-for needle in "Clock::openness() == Clock::Openness::Open" \
+for needle in "Clock::openness() != Clock::Openness::Closed" \
               "DailyBoundary::todayAt(SystemConfig::get_openTime())" \
               "now - ageBase"; do
   grep -q "$needle" "$failsafe_test_src" || \

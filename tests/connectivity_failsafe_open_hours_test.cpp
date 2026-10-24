@@ -7,7 +7,8 @@
 //
 //   REAL_STALE_SEC / REAL_COOLDOWN_SEC / REAL_JITTER_MAX_SEC
 //       parsed from src/power/ConnectivityPolicy.h (production branch)
-//   REAL_OPEN_GATE      1 when the supervisor checks Clock::openness()
+//   REAL_OPEN_GATE      the openness gate: 0 none, 1 skips only Closed (Unknown
+//                       acts, recovery item 18), 2 requires exactly Open
 //   REAL_USES_OPEN_BASE 1 when the supervisor bases the age on
 //                       DailyBoundary::todayAt(SystemConfig::get_openTime())
 //   REAL_FIRST_STAGE    the stage taken with no stage recorded
@@ -46,7 +47,9 @@ int failures = 0;
 // Mirrors connectivityFailsafeSupervisor() from the "lastConnection" read
 // down to the stage dispatch, with the jitter at its maximum (the real
 // jitter is a per-stage random value in [0, JITTER_MAX]).
-uint8_t failsafeAction(bool open,
+enum class Openness { Open, Closed, Unknown };
+
+uint8_t failsafeAction(Openness openness,
                        time_t now,
                        time_t lastConnection,
                        time_t openedAt,
@@ -65,12 +68,16 @@ uint8_t failsafeAction(bool open,
   (void)openedAt;
 #endif
 
-#if REAL_OPEN_GATE
-  if (!open) {
+#if REAL_OPEN_GATE == 1
+  if (openness == Openness::Closed) {
+    return 0;
+  }
+#elif REAL_OPEN_GATE == 2
+  if (openness != Openness::Open) {
     return 0;
   }
 #else
-  (void)open;
+  (void)openness;
 #endif
 
   if (now <= ageBase) {
@@ -136,33 +143,40 @@ int main() {
   // 1. The 06:00 wake after a normal 22:00 close must NOT reset: 8 h of wall
   //    clock have passed, but zero open hours.
   check("06:00 wake after a 22:00 close does not reset",
-        failsafeAction(true, OPEN_TODAY + 5, silentSince, OPEN_TODAY, 0, 0), 0);
+        failsafeAction(Openness::Open, OPEN_TODAY + 5, silentSince, OPEN_TODAY, 0, 0), 0);
 
   // 2. Not before 3 open hours.
   check("2 h 59 m of open hours does not act",
-        failsafeAction(true, OPEN_TODAY + 3 * 3600 - 60, silentSince, OPEN_TODAY, 0, 0), 0);
+        failsafeAction(Openness::Open, OPEN_TODAY + 3 * 3600 - 60, silentSince, OPEN_TODAY, 0, 0), 0);
 
   // 3. At 3 open hours the full reset (stage 2) fires.
   check("3 h of open hours fires the full reset",
-        failsafeAction(true, OPEN_TODAY + 3 * 3600, silentSince, OPEN_TODAY, 0, 0), 2);
+        failsafeAction(Openness::Open, OPEN_TODAY + 3 * 3600, silentSince, OPEN_TODAY, 0, 0), 2);
   check("a stage 1 persisted by older firmware still progresses to 2",
-        failsafeAction(true, OPEN_TODAY + 3 * 3600, silentSince, OPEN_TODAY, 1, 0), 2);
+        failsafeAction(Openness::Open, OPEN_TODAY + 3 * 3600, silentSince, OPEN_TODAY, 1, 0), 2);
 
   // 4. Closed hours never act, however old the connection is.
   check("closed hours never act (a day of silence)",
-        failsafeAction(false, OPEN_TODAY + 20 * 3600, silentSince, OPEN_TODAY, 0, 0), 0);
+        failsafeAction(Openness::Closed, OPEN_TODAY + 20 * 3600, silentSince, OPEN_TODAY, 0, 0), 0);
   check("closed hours never act (overnight, stage 1 recorded)",
-        failsafeAction(false, OPEN_TODAY - 3600, silentSince, OPEN_TODAY - 86400, 1, 0), 0);
+        failsafeAction(Openness::Closed, OPEN_TODAY - 3600, silentSince, OPEN_TODAY - 86400, 1, 0), 0);
+
+  // 4b. Unknown (an untrusted clock) acts like Open: the ladder must keep
+  //     climbing after its own stage-2 reset.
+  check("an Unknown clock fires the full reset at 3 open hours",
+        failsafeAction(Openness::Unknown, OPEN_TODAY + 3 * 3600, silentSince, OPEN_TODAY, 0, 0), 2);
+  check("an Unknown clock does not act before 3 open hours",
+        failsafeAction(Openness::Unknown, OPEN_TODAY + 3 * 3600 - 60, silentSince, OPEN_TODAY, 0, 0), 0);
 
   // 5. A successful connection clears it: lastConnection moves past the
   //    opening, so the age restarts from the connection.
   const time_t connectedAt = OPEN_TODAY + 2 * 3600;
   check("a successful connection clears the timer",
-        failsafeAction(true, connectedAt + 60, connectedAt, OPEN_TODAY, 0, 0), 0);
+        failsafeAction(Openness::Open, connectedAt + 60, connectedAt, OPEN_TODAY, 0, 0), 0);
   check("a successful connection restarts the full 3 h",
-        failsafeAction(true, connectedAt + 3 * 3600 - 60, connectedAt, OPEN_TODAY, 0, 0), 0);
+        failsafeAction(Openness::Open, connectedAt + 3 * 3600 - 60, connectedAt, OPEN_TODAY, 0, 0), 0);
   check("3 h after a successful connection acts again",
-        failsafeAction(true, connectedAt + 3 * 3600, connectedAt, OPEN_TODAY, 0, 0), 2);
+        failsafeAction(Openness::Open, connectedAt + 3 * 3600, connectedAt, OPEN_TODAY, 0, 0), 2);
 
   // 6. Stage 3 stays COOLDOWN + jitter after stage 2, and still needs 3 open
   //    hours of age - so a stage 2 late in the day pushes stage 3 into the
@@ -170,17 +184,17 @@ int main() {
   const time_t stage2At = OPEN_TODAY + 3 * 3600;
   const time_t stage3Due = stage2At + REAL_COOLDOWN_SEC + REAL_JITTER_MAX_SEC;
   check("stage 3 waits the full cooldown + jitter after stage 2",
-        failsafeAction(true, stage3Due - 1, silentSince, OPEN_TODAY, 2, stage2At), 0);
+        failsafeAction(Openness::Open, stage3Due - 1, silentSince, OPEN_TODAY, 2, stage2At), 0);
   check("stage 3 fires once cooldown + jitter has elapsed",
-        failsafeAction(true, stage3Due, silentSince, OPEN_TODAY, 2, stage2At), 3);
+        failsafeAction(Openness::Open, stage3Due, silentSince, OPEN_TODAY, 2, stage2At), 3);
   check("stage 3 does not fire during closed hours",
-        failsafeAction(false, stage3Due, silentSince, OPEN_TODAY, 2, stage2At), 0);
+        failsafeAction(Openness::Closed, stage3Due, silentSince, OPEN_TODAY, 2, stage2At), 0);
   check("stage 3 is the last stage",
-        failsafeAction(true, stage3Due + 86400, silentSince, OPEN_TODAY, 3, stage2At), 0);
+        failsafeAction(Openness::Open, stage3Due + 86400, silentSince, OPEN_TODAY, 3, stage2At), 0);
 
   // 7. No last connection recorded: nothing to measure.
   check("no recorded connection defers",
-        failsafeAction(true, OPEN_TODAY + 10 * 3600, 0, OPEN_TODAY, 0, 0), 0);
+        failsafeAction(Openness::Open, OPEN_TODAY + 10 * 3600, 0, OPEN_TODAY, 0, 0), 0);
 
   if (failures != 0) {
     printf("\nFAILED: %d check(s)\n", failures);
