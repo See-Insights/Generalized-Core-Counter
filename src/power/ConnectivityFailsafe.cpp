@@ -164,13 +164,12 @@ void clearConnectivityFailsafeRecovery(const char *reason) {
  * (radio reset) is retired (WO-2026-10-02-001 item B); the first action is stage 2.
  * Prevents indefinite modem-on battery drain and recovers from radio firmware wedges.
  *
- * Acts during open hours only, measuring the age from the later of lastConnection
+ * Acts unless Closed (Unknown counts as open), measuring the age from the later of lastConnection
  * and today's opening. Defers if disconnected, firmware updating, time invalid,
  * recently connected,
  * within cooldown period, or jitter delay not elapsed (prevents fleet-wide simultaneous resets).
  *
  * @note Stage 3 deep power-down will not wake for hours/days - last resort only.
- * @see docs/architecture/connectivity-failsafe.md for escalation timing and policy details
  */
 void connectivityFailsafeSupervisor() {
   if (PowerManager::instance().effectiveConnectionMode() == SystemConfig::DISCONNECTED) {
@@ -217,7 +216,7 @@ void connectivityFailsafeSupervisor() {
     return;
   }
 
-  // WO-2026-10-02-001 item A: act during open hours only, and measure the age
+  // WO-2026-10-02-001 item A: act unless Closed (Unknown counts as open), and measure the age
   // from the later of lastConnection and today's opening. Wall-clock age would
   // make every device cross the 3 h threshold on its 06:00 wake, because the
   // overnight gap since the 22:00 close is 7-8 h and this supervisor runs at
