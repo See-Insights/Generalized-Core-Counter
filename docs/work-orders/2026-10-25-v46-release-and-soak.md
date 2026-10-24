@@ -33,6 +33,10 @@ Chip uploads the PR's `.bin` as product v46 (Particle's size and sha256 must mat
 
 Any breadcrumb-28 watchdog, a payload difference, a missing report, or an occupied-minute error outside the v45 spread is a FINDING and holds the rollout.
 
+## 3a. Bench events that bear on the grading (keep this list current)
+
+- **24 Oct about 03:59Z: Chip swapped the antennas between Dev-09 and Dev-14.** Dev-14 (v46) now has the antenna Dev-09 had, and Dev-09 (v45) has Dev-14's. **Any Dev-14 connect failure, slow registration or long `connecttime` after 03:59Z is judged against the swap, not against v46**, until the swap's effect is understood (the watch of 24 Oct 04:00 to 05:03Z reports which device's registration failures follow the antenna; see its report). The same applies to Dev-09 and to any reset or alert caused by a failed connect on either device. Before the swap Dev-09 had been failing to register (CELLULAR_ACQUIRE 660 s failures from 02:11Z, then a self-recovery at 03:53:17Z), while Dev-14 connected cleanly (`sig` 78/29 to 78/33, connecttime 1 to 2 s). The Monday and Tuesday grading, the v46 day-1 check and the baseline comparison treat a Dev-14 connect failure after 03:59Z as an antenna question first; a **sleep-path** finding (a breadcrumb-28 watchdog, a payload difference, a missing report not explained by a connect failure) is still a v46 finding. If the antennas are swapped back, add the time here.
+
 ## 4. Default (if both pass)
 
 Set v46 as the product default (recheck size and sha256); merge the release PR; the fleet health check about 24 h later. Dev-09 and Dev-14 stay locked for v47 (the P7-A persistence freeze; its bench step is already done, PASS).
