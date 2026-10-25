@@ -461,7 +461,8 @@ needed both a local and a cloud build.*
   6.6.0`), run by Claude Code (Codex's sandbox has no network). It covers **every
   WO in that release**; no WO or PR needs its own cloud compile.
 - **Record:** the result, with **flash and RAM**, goes in the release record
-  (`release/` notes and the release PR), beside the `.bin` size and sha256 of §13
+  (the release WO, `docs/work-orders/<date>-vNN-release-and-soak.md`, and the
+  release PR body), beside the `.bin` size and sha256 of §13
   (j). The compile must be of the head that is uploaded, not an earlier commit.
 - **What stays per change:** the local ARM build above, with a fresh
   `BUILD_PATH_BASE`, and the linkage check (`nm` on the symbolised ELF). A WO's
