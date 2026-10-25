@@ -2,7 +2,7 @@
 
 **WO:** `2026-10-25-v46-release-and-soak.md` §3b (catch-up 1; the 24 Oct 14:30Z session job did not fire) and §3. **Run:** 25 Oct about 01:08Z, from S3, over the original window (SGT 24 Oct = 23 Oct 16:00Z to 24 Oct 16:00Z); a catch-up, not a live run. **Agents:** Sonnet 5.5 subagents (`claude-sonnet-5-5`), read-only, three: the catch-up run, an independent spot-check (fresh S3 pull, §13 (j)), and the Dev-14 evidence run. `tools/exerciser_baseline.py` was byte-identical to main's (sha256 `d7503dfd…8e70b`). All times UTC unless marked SGT.
 
-**Verdict: Dev-09's v45 day 1 is recorded as the baseline, with the categories below. Dev-14 has one FINDING by the WO's letter: a breadcrumb-28 sleep watchdog on v46 (the reset at about 11:24:36Z on 24 Oct). Per Chip's ruling it is added to #113 and holds v46's fleet default until judged; it does not stop the Dev-09 plan (lock to v46 after the Sunday 14:30Z run).** Nothing was changed on any device or in AWS.
+**Verdict: Dev-09's v45 day 1 is recorded as the baseline, with the categories below. Dev-14 has one FINDING by the WO's letter: a breadcrumb-28 sleep watchdog on v46 (the reset at about 11:24:36Z on 24 Oct). Chip's ruling (25 Oct): a watch, not a v46 regression; the v46 decision rests on Dev-09. The evidence is recorded in recovery item 14 and as an addendum (section 8) to the sleep-watchdog investigation report; it does not stop the Dev-09 plan (lock to v46 after the Sunday 14:30Z run).** Nothing was changed on any device or in AWS.
 
 ## Firmware check
 
@@ -88,6 +88,6 @@ The serial has **no breadcrumb lines** (breadcrumbs are in status and the watchd
 ## What follows
 
 1. **Recovery item 20** (hour-straddler over-credit) is recorded in `docs/RECOVERY_PLAN_2026-09-26.md`; the read-only Codex Step 0 (gpt-5.6-sol, high, stdin closed; dispatch and report in this directory) found the mechanism (above). No fix yet.
-2. **Dev-14's watchdog** evidence is this file; Chip's ruling is to add it to #113 (the merged breadcrumb-28 investigation), which holds v46's fleet default until judged. #113 is merged, so that is a PR comment; **not posted yet** (awaiting Chip's go on the comment). The Dev-09 plan (lock to v46 after the Sunday 14:30Z run, v46 Mon-Tue) is not affected. Under WO §2, the antenna is the likely trigger, but a sleep-stage watchdog on v46 stays a v46 finding.
+2. **Dev-14's watchdog** is recorded in recovery item 14 and in section 8 of `2026-10-19-sleep-watchdog-investigation-report.md` (Chip's ruling: no PR comment on #113). A watch, not a v46 regression; Dev-14's breadcrumb-28 events per 1,000 sleeps are counted through 31 Oct and judged against the antenna.
 3. **Sunday and later runs** are graded per session category (normal, hour-straddler, close-cut) as in the table above, with the orphan and the delayed-connect sessions listed separately.
 4. Sunday's day-2 run (job `53704073`, 14:30Z) is next, then Monday.
