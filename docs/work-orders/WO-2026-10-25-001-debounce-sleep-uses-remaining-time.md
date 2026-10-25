@@ -61,9 +61,13 @@ On the v47 soak, hour-straddling sessions should come in at **570 s ± a few sec
 - **Stage 8:** pre-approved on VERIFIED, or on VERIFIED WITH CONCERNS when every concern is Low. Controller test-only fixes follow §13 (d).
 - **PR:** marked "do not merge until v46 is cut"; ships in v47.
 
-## Closing record
+## Closing record (Claude Code, 25 Oct 2026)
 
-- Budget versus actual.
-- The fixture-diff list.
-- History.
-- Ruling 9's numbers.
+- **Budget versus actual.** `src/`: **+4 net** (7 added, 3 removed, one file, `State_Sleep.cpp`; 1,275 to 1,279 lines) against the WO's +3 to +6 and the Step 0 estimate of +7; limit +20. Tests: **+189** non-fixture lines against the +100 guideline (about 1.9x, at the flag threshold; accepted: independent expected values, copy checks, three structural re-anchors, one new diagnostic test), fixture +124 lines. Review rounds: Stage 7 round 1 only. Controller edits (§13 (d)): none.
+- **Verification.** Step 0: PROCEED. Stage 6: Copilot (claude-sonnet-5.5, medium), accepted after the controller reproduced the suite (105/105, serial) and the four mutations in place (each caught by the check aimed at it). Stage 7: Codex (gpt-5.6-sol, high, stdin closed): **VERIFIED WITH CONCERNS, all Low** (`WO-2026-10-25-001-stage7-verdict.md`): the ARM build on Device OS 6.6.0 is text 151572 to 151580 B, data 1114, bss 2200, `.backup` 152 unchanged; `sleepPlan()` is inlined into `handleSleepingState()` (4768 to 4784 B) and the chain to `signalLEDTimeRemaining` is linked; two mutations of its own were caught. `src/` tree hash `1c5659d45f8544bee15dcc5665dc64f0811b6270aca3a0730a4d88d02e186dc8`.
+- **The fixture-diff list.** Expected and confirmed independently by the controller and by Codex: S55-S67 each gain one `CALL signalLEDTimeRemaining` line with no plan value changed; S1-S80 otherwise byte-identical; S81-S90 appended (ledRem 300, 120, 5, 1, 0, each with the boundary nearer and further); header counts 98 scenarios (release 91) and the body hash updated.
+- **History (§12.1).** `git log -S'debounceSeconds'` on the sleep file finds only `eda6b7e` (v3.24 Occupancy Mode, 9 Feb 2026), which introduced the occupied sleep as the full debounce. It was never based on the time left, so this adds a behavior; there was none to restore.
+- **Ruling 9's numbers** (base `bf4e628` plus the WO commits; test lines excluding `tests/fixtures/`, fixture lines, suite, `src/` lines): 34,143 / 20,435 / 104 / 22,378 before; 34,332 / 20,559 / 105 / 22,382 after.
+- **Particle cloud compile (mandatory, §3 Stage 7): NOT COMPLETED.** `particle compile boron . --target 6.6.0` on a clean copy of the candidate (`src/`, `lib/`, `project.properties`; same `src/` hash) failed three times with "Compile failed: Compiler timed out or encountered an error" after about 2 minutes and no compiler diagnostics; the **unmodified base** (`git archive HEAD`) failed identically, so the failure is the cloud service or target, not the candidate. The local ARM build (Codex and Copilot, separate fresh `BUILD_PATH_BASE`) passed. **To do before the merge:** a passing cloud compile of the final head, with its flash/RAM numbers added here.
+- **Low concerns carried (Codex).** (1) A backward clock step while occupied can defer the close to the next report or awake opportunity (bounded by the reporting boundary; no cap, by the WO's rule); recorded in recovery item 20 as a separate clock-step question. (2) Two cited evidence files were missing on this branch because it was cut before #154; the branch was merged with main. (3) Test growth, accepted above.
+- **Bench (the v47 soak).** Hour-straddling sessions should read 570 s plus or minus a few seconds, against 12-13 min credited on v45 and v46; the baseline script's per-category report is the pass test.

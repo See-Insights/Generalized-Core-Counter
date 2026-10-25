@@ -6,6 +6,7 @@
 // (tests/stubs/sleep_teardown/SleepExecutionFakes.h). Mode "a" writes the frozen fixture, mode "b" must
 // equal it. Built with -DWiring_Cellular=1 -DHAL_PLATFORM_CELLULAR=1; the release build runs the full table,
 // a build with -DCONNECTIVITY_FAILSAFE_TEST_MODE=1 runs only the small test-mode matrix.
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <functional>
@@ -91,10 +92,10 @@ static void pass() {
 }
 }  // namespace cur
 
-struct Sc { std::string name; In in; };
+struct Sc { std::string name; In in; int expectWake = -1; };
 static std::vector<Sc> table;
 static std::set<std::string> distinctEvents;
-static int scenarios = 0, nExitPlan = 0, nExitGuard = 0, nContinue = 0;
+static int scenarios = 0, nExitPlan = 0, nExitGuard = 0, nContinue = 0, nExpectMismatch = 0;
 
 static std::string normalize(const std::string &line) {
   std::string out;
@@ -108,8 +109,8 @@ static std::string normalize(const std::string &line) {
   return out;
 }
 
-static void add(const std::string &name, std::function<void(In &)> f = {}) {
-  Sc s{name, In()};
+static void add(const std::string &name, std::function<void(In &)> f = {}, int expectWake = -1) {
+  Sc s{name, In(), expectWake};
   if (f) f(s.in);
   table.push_back(s);
 }
@@ -134,6 +135,10 @@ static void runScenario(const Sc &s, bool useBase, int index) {
   printf("  OUT %s transitions=%d hibernateCalls=%d hibernate=%d/%d", where, sim::transitions, hibCalls, hibWake, hibOvernight);
   if (stage == 3) printf(" plan wake=%d reason=%s overnight=%d", finalWake, finalReason, (int)finalOvernight);
   printf("\n");
+  if (s.expectWake >= 0 && (stage != 3 || finalWake != s.expectWake || strcmp(finalReason, "debounce") != 0)) {
+    printf("  EXPECT_MISMATCH want wake=%d reason=debounce\n", s.expectWake);
+    nExpectMismatch++;
+  }
   if (stage == 0) nExitPlan++; else if (stage == 2) nExitGuard++; else nContinue++;
   scenarios++;
 }
@@ -197,10 +202,25 @@ int main(int argc, char **argv) {
     add("heap daytime " + std::to_string(heap), [=](In &i) { i.open = 0; i.heap = heap; });
   }
   add("heap unknown clock", [](In &i) { i.open = 2; i.trusted = false; i.heap = 0; });
+  // WO-2026-10-25-001: an occupied OCCUPANCY device sleeps the LED time left + 1, or the full debounce when none is
+  // left, never past the reporting boundary wake. The boundary wake is set through the untrusted-clock interval
+  // (wake = interval) so it can sit below 2 s. Expected values come from the rule, not from the plan block.
+  // The base blocks have no such rule, so mode "a" does not run these.
+  if (!useBase) {
+    const uint32_t DEBOUNCE_SEC = 300;
+    for (uint32_t rem : {300u, 120u, 5u, 1u, 0u}) for (int near : {1, 0}) {
+      const int boundary = near ? (rem ? (int)rem : 100) : (int)rem + 1000;
+      const int want = rem ? std::min((int)rem + 1, boundary) : std::min((int)DEBOUNCE_SEC, boundary);
+      add("debounce-left occupied ledRem=" + std::to_string(rem) + " boundary=" + std::to_string(boundary),
+          [=](In &i) { i.mode = 1; i.occupied = true; i.set1 = DEBOUNCE_SEC * 1000; i.ledRem = rem; i.trusted = false; i.interval = (uint16_t)boundary; },
+          want);
+    }
+  }
 #endif
 
   int index = 0;
   for (const Sc &s : table) runScenario(s, useBase, index++);
+  if (nExpectMismatch) printf("EXPECT_MISMATCHES %d\n", nExpectMismatch);
   printf("SCENARIOS %d PASSES %d PLAN_EXIT %d GUARD_EXIT %d CONTINUE %d DISTINCT_EVENTS %d\n", scenarios, scenarios, nExitPlan,
          nExitGuard, nContinue, (int)distinctEvents.size());
   for (const auto &e : distinctEvents) printf("EVENT %s\n", e.c_str());

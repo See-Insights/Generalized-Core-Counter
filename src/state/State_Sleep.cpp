@@ -37,7 +37,7 @@ void logWakeSummary(const char *reason) {
            isWithinOpenHours() ? 1 : 0,
            SensorManager::instance().isSensorReady() ? 1 : 0,
            CurrentReadings::get_occupied() ? 1 : 0,
-           (unsigned long)(signalLEDTimeRemaining() / 1000UL));
+           (unsigned long)signalLEDTimeRemaining());
 }
 
 // Drain USB CDC serial buffer before sleep to prevent split log lines (bench testing only)
@@ -610,8 +610,12 @@ bool sleepPlan(SleepPlan &plan) {
       // Occupied - wake for debounce timeout check
       uint32_t setting1Raw = SystemConfig::SensorSettings::get_sensorSetting1();
       uint32_t debounceSeconds = (setting1Raw > 0) ? (setting1Raw / 1000) : 60;
-      if (debounceSeconds < (uint32_t)wakeInSeconds) {
-        wakeInSeconds = (int)debounceSeconds;
+      const uint32_t remaining = signalLEDTimeRemaining();  // 0 when expired or no valid time
+      if (remaining > 0) {
+        const int untilDeadline = (int)remaining + 1;  // wake just after the deadline
+        if (untilDeadline < wakeInSeconds) wakeInSeconds = untilDeadline;
+      } else if (debounceSeconds < (uint32_t)wakeInSeconds) {
+        wakeInSeconds = (int)debounceSeconds;  // no deadline known: the full debounce
       }
       sleepReason = "debounce";
     } else {
