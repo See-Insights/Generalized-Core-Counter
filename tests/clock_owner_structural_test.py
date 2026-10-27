@@ -147,8 +147,13 @@ def main() -> None:
     plausible_epoch_callers = len(
         re.findall(r"Clock::isPlausibleEpoch\s*\(", strip_comments(HIBERNATE_ELIGIBILITY_CPP.read_text()))
     )
-    if re.search(r"Clock::isPlausibleEpoch\s*\(", strip_comments(STATE_SLEEP.read_text())):
-        fail(f"{STATE_SLEEP.name} must not call Clock::isPlausibleEpoch(...) directly")
+    # WO-2026-10-21-001: scan every src/ file, so the sleep phase functions (or any other
+    # file) cannot pick up a direct call; only HibernateEligibility.cpp and Clock.* may name it.
+    for path in sorted(SRC_ROOT.rglob("*")):
+        if path.suffix not in (".cpp", ".h") or path in (HIBERNATE_ELIGIBILITY_CPP, CLOCK_CPP, CLOCK_H):
+            continue
+        if re.search(r"Clock::isPlausibleEpoch\s*\(", strip_comments(path.read_text())):
+            fail(f"{path.relative_to(REPO_ROOT)} must not call Clock::isPlausibleEpoch(...) directly")
     if plausible_epoch_callers != 1:
         fail(
             f"{HIBERNATE_ELIGIBILITY_CPP.name} must call Clock::isPlausibleEpoch(...) exactly "

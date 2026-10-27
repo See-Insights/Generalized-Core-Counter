@@ -23,42 +23,13 @@
 #include "observability/WakeCycleStats.h"
 #include "ThrashGuard.h"
 #include "state/SleepPrepSpanTiming.h"
+#include "state/SleepTeardown.h"
 #include "time/HibernateCycle.h"
 #include "time/HibernateEligibility.h"
 #include "time/Clock.h"
 #include "time/DailyBoundary.h"
 
 namespace {
-
-const char *connectionModeLabel(SystemConfig::ConnectionMode mode) {
-  switch (mode) {
-  case SystemConfig::CONNECTED:
-    return "CONN";
-  case SystemConfig::INTERMITTENT:
-    return "INT";
-  case SystemConfig::DISCONNECTED:
-    return "DISC";
-  case SystemConfig::INTERMITTENT_KEEP_ALIVE:
-    return "IKA";
-  default:
-    return "?";
-  }
-}
-
-const char *batteryTierLabel(uint8_t tier) {
-  switch (tier) {
-  case TIER_HEALTHY:
-    return "H";
-  case TIER_CONSERVING:
-    return "C";
-  case TIER_CRITICAL:
-    return "CR";
-  case TIER_SURVIVAL:
-    return "S";
-  default:
-    return "?";
-  }
-}
 
 void logWakeSummary(const char *reason) {
   Log.info("Wake: reason=%s open=%d ready=%d occ=%d led=%lus",
@@ -67,22 +38,6 @@ void logWakeSummary(const char *reason) {
            SensorManager::instance().isSensorReady() ? 1 : 0,
            CurrentReadings::get_occupied() ? 1 : 0,
            (unsigned long)(signalLEDTimeRemaining() / 1000UL));
-}
-
-void logTeardownContext(const char *prefix,
-                       bool standbyRequested,
-                       bool standbyEffective) {
-  if (!SystemConfig::get_verboseMode()) {
-    return;
-  }
-
-  Log.info("%s mode=%s standby=%d/%d tier=%s occ=%d",
-           prefix,
-           connectionModeLabel(static_cast<SystemConfig::ConnectionMode>(PowerManager::instance().effectiveConnectionMode())),
-           standbyRequested ? 1 : 0,
-           standbyEffective ? 1 : 0,
-           batteryTierLabel(PowerConfig::get_currentBatteryTier()),
-           CurrentReadings::get_occupied() ? 1 : 0);
 }
 
 // Drain USB CDC serial buffer before sleep to prevent split log lines (bench testing only)
@@ -163,204 +118,25 @@ const char *gateBlockerReasonLabel(uint8_t blockerMask) {
   }
 }
 
-} // namespace
+struct {
+  bool operationsCompleteLogged = false;  // Track if we've logged completion message
+  bool gateWasBlocking = false;
+  unsigned long lastGateStatusLogMs = 0;
+  uint8_t lastGateBlockerMask = kGateBlockerUninitialized;
+  uint8_t lastGateBlockerBeforeRelease = 0;
+  bool gateReleaseReasonKnown = false;
+  unsigned long cloudSyncStartMs = 0;
+  unsigned long cloudSyncBudgetMs = 0;
+  uint16_t cloudSyncMaxQueueDepth = 0;
+  uint16_t lastQueueDepth = 0xFFFF;
+} cloudGate;
 
-// NOTE:
-// This file was split from StateHandlers.cpp as a mechanical refactor.
-// No behavioral changes were made.
-
-/**
- * @brief SLEEPING_STATE: deep sleep between reporting intervals.
- * ...
- */
-// Firmware-update record owned by Generalized-Core-Counter.cpp (WO-2026-10-01-001 A).
-extern volatile bool firmwareUpdateInProgress;
-
-void handleSleepingState() {
-  setLoopStage(LOOP_STAGE_SLEEP_PREP);
-
-  // Zero-gated (not enteredState-gated): two of this function's real exit
-  // paths transition SLEEPING_STATE -> SLEEPING_STATE
-  // (sleep-timer-occupied-suppress-report, sleep-pir-return-to-sleep) - a
-  // real cycle ends and a new one begins, but the FSM `state` value doesn't
-  // change, so an enteredState-gated reset would never fire for the new
-  // cycle. This mirrors the existing cloudSyncStartMs pattern below.
-  maybeStartSleepPrepSpan(retainedLoopForensics.sleepPrepSpanStartMillis, millis());
-
-  bool enteredState = (state != oldState);
-  static bool operationsCompleteLogged = false;  // Track if we've logged completion message
-  static bool gateWasBlocking = false;
-  static unsigned long lastGateStatusLogMs = 0;
-  static uint8_t lastGateBlockerMask = kGateBlockerUninitialized;
-  static uint8_t lastGateBlockerBeforeRelease = 0;
-  static bool gateReleaseReasonKnown = false;
-  static bool cloudDisconnectCompleteLogged = false;
-#if HAL_PLATFORM_CELLULAR
-  static bool preserveStandbyAfterNormalReturn = false;
-  static bool forceModemOffAfterStandbyFailure = false;
-  static int standbySleepFailureError = SYSTEM_ERROR_NONE;
-#endif
-#if Wiring_Cellular
-  static bool radioOffCompleteLogged = false;
-#endif
-
-  if (enteredState) {
-    setAppBreadcrumb(3);
-    publishStateTransition();
-    operationsCompleteLogged = false;  // Reset flag on state entry
-    gateWasBlocking = false;
-    lastGateStatusLogMs = 0;
-    lastGateBlockerMask = kGateBlockerUninitialized;
-    lastGateBlockerBeforeRelease = 0;
-    gateReleaseReasonKnown = false;
-    cloudDisconnectCompleteLogged = false;
-  #if Wiring_Cellular
-    radioOffCompleteLogged = false;
-  #endif
-  }
-
-  // Determine if we will use *effective* network standby for the upcoming sleep.
-  // Only cellular platforms actually apply standby; on WiFi, treat as disabled
-  // so disconnect logic doesn't wait for a radio state that won't change.
-  // Standby is only useful after a successful cloud session in the current
-  // wake cycle; if connect never succeeded, preserving the modem state buys
-  // nothing and can carry a bad NCP state into the next wake.
-  bool useNetworkStandbyRequested =
-      (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) &&
-      isWithinOpenHours();
-  bool preserveStandbyForThisPass = false;
-#if HAL_PLATFORM_CELLULAR
-  if (preserveStandbyAfterNormalReturn &&
-      (!useNetworkStandbyRequested || session.modemUnstable || Cellular.isOff())) {
-    preserveStandbyAfterNormalReturn = false;
-  }
-  preserveStandbyForThisPass = preserveStandbyAfterNormalReturn;
-#endif
-  bool useNetworkStandbyEffective =
-      useNetworkStandbyRequested &&
-      (preserveStandbyForThisPass ||
-       Observability::cycleStats().connect_result ==
-           Observability::WakeCycleStats::ConnectResult::SUCCESS);
-#if HAL_PLATFORM_CELLULAR
-  useNetworkStandbyEffective = useNetworkStandbyEffective && !Cellular.isOff();
-  if (session.modemUnstable || forceModemOffAfterStandbyFailure) {
-    useNetworkStandbyEffective = false;
-  }
-#else
-  useNetworkStandbyEffective = false;
-#endif
-
-  static unsigned long cloudSyncStartMs = 0;
-  // If a ledger update (or time progression) moves the park into OPEN hours
-  // while we are in SLEEPING_STATE, abort sleeping immediately in CONNECTED
-  // mode so we stay awake/connected and resume counting.
-  //
-  // WO-2026-09-19 Step 3b: Clock::openness() != Closed, not
-  // isTimeValid()+isWithinOpenHours(). Unknown is treated as Open here,
-  // consistent with every other CONNECTED-mode site this step converts:
-  // abort the sleep and stay awake/connected so a resync can occur, rather
-  // than committing to a sleep the device can't actually justify.
-  if (PowerManager::instance().effectiveConnectionMode() == SystemConfig::CONNECTED && Clock::openness() != Clock::Openness::Closed) {
-    ensureSensorEnabled("SLEEP abort: CONNECTED+OPEN");
-    cloudSyncStartMs = 0;
-    transitionTo(IDLE_STATE, "sleep-abort-open-hours");
-    return;
-  }
-
-  // If we are connected and the publish queue is not yet in a sleep-safe
-  // state (events queued or a publish in progress), we will wait below in the
-  // unified cloud-operations gate (with a timeout budget) so we never wait
-  // indefinitely on a stuck publish.
-
-  // ********** Cloud Operations Sync Prerequisites (with timeout budget) **********
-  // Before disconnecting, ensure critical operations complete:
-  //   1) Publish queue drained
-  //   2) Ledgers synced from cloud
-  //   3) OTA updates checked
-  //   4) Webhook response received
-  // Use a timeout budget to prevent battery drain if operations hang.
-  // NOTE: This code is non-blocking at application level (Particle.process() called)
-  // but blocks state transition until prerequisites complete or timeout.
-  static unsigned long cloudSyncBudgetMs = 0;
-  static uint16_t cloudSyncMaxQueueDepth = 0;
-  static uint16_t lastQueueDepth = 0xFFFF;
-
-  // ********** Non-blocking disconnect + modem power-down **********
-  // Device OS already manages the asynchronous cloud session teardown once
-  // Particle.disconnect() has been requested. Here, we keep application
-  // logic minimal: request cloud disconnect and radio-off once, then wait
-  // (bounded) until both cloud and modem are actually off before sleeping.
-  static bool disconnectRequested = false;
-  static unsigned long disconnectRequestStartMs = 0;
-  static unsigned long cloudDisconnectStartMs = 0;
-  static unsigned long cloudDisconnectElapsedMs = 0;
-  static unsigned long modemOffElapsedMs = 0;
-  static unsigned long lastDisconnectProgressMs = 0;
-  static unsigned long lastGateProgressMs = 0;
-#if Wiring_WiFi
-  static bool wifiOffGuardActive = false;
-  static unsigned long wifiOffGuardStartMs = 0;
-  static unsigned long wifiOffGuardLastRetryMs = 0;
-  static uint8_t wifiOffGuardRetries = 0;
-#endif
-
-  if (enteredState) {
-    disconnectRequested = false;
-    disconnectRequestStartMs = 0;
-    cloudDisconnectStartMs = 0;
-    cloudDisconnectElapsedMs = 0;
-    modemOffElapsedMs = 0;
-    cloudSyncBudgetMs = 0;
-    cloudSyncMaxQueueDepth = 0;
-    lastQueueDepth = 0xFFFF;
-    lastDisconnectProgressMs = 0;
-    lastGateProgressMs = 0;
-#if Wiring_WiFi
-    wifiOffGuardActive = false;
-    wifiOffGuardStartMs = 0;
-    wifiOffGuardLastRetryMs = 0;
-    wifiOffGuardRetries = 0;
-#endif
-  }
-
-  // Safety: if disconnectRequested was latched but the timestamp got lost
-  // (for example, due to an unexpected state-machine re-entry), reset so we
-  // can actually issue the request instead of waiting forever.
-  if (disconnectRequested && disconnectRequestStartMs == 0) {
-    Log.warn("SLEEP: disconnectRequested latched without timestamp - resetting");
-    disconnectRequested = false;
-    cloudDisconnectStartMs = 0;
-    cloudDisconnectElapsedMs = 0;
-    modemOffElapsedMs = 0;
-  }
-
-  // Particle's reference pattern (STATE_SLEEP's first check): a firmware
-  // download in flight outranks sleep. Sit here on every pass until no
-  // teardown has been requested, so a `begin` delivered between loop passes is
-  // caught before the cloud disconnect / radio-off requests below, not after
-  // the transfer has already been lost (WO-2026-10-01-001 item A).
-  if (!disconnectRequested && firmwareUpdateInProgress) {
-    cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
-    transitionTo(FIRMWARE_UPDATE_STATE, "firmware update in progress");
-    return;
-  }
-
-  // An occupancy change latched after the last wake decision (for example by
-  // the main-loop handler while already SLEEPING) reports before any
-  // sleep-or-suppress decision below can commit to sleep. Once this span has
-  // requested teardown it stays latched and reports on the first pass after
-  // the wake, so Report/Connect never starts while the disconnect is in flight.
-  if (session.occupancyChangeTriggered && !disconnectRequested) {
-    cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
-    transitionTo(REPORTING_STATE, "occupancy change pending");
-    return;
-  }
-
+bool cloudGatePass(bool useNetworkStandbyEffective) {
   // Only wait for cloud operations *before* requesting disconnect.
-  if (Particle.connected() && !disconnectRequested) {
+  if (Particle.connected() && !SleepTeardown::disconnectRequested()) {
     // Initialize timer on first check
-    if (cloudSyncStartMs == 0) {
-      cloudSyncStartMs = millis();
+    if (cloudGate.cloudSyncStartMs == 0) {
+      cloudGate.cloudSyncStartMs = millis();
     }
     // Check prerequisite completion
     bool queueEmpty = PublishQueuePosix::instance().getCanSleep();
@@ -374,29 +150,29 @@ void handleSleepingState() {
     bool updatesChecked = !System.updatesPending();
     bool webhookConfirmed = !session.awaitingWebhookResponse;
     uint16_t queueDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
-    if (queueDepth > cloudSyncMaxQueueDepth) {
-      cloudSyncMaxQueueDepth = queueDepth;
+    if (queueDepth > cloudGate.cloudSyncMaxQueueDepth) {
+      cloudGate.cloudSyncMaxQueueDepth = queueDepth;
     }
-    unsigned long queueAwareBudgetMs = computeCloudSyncTimeoutMs(cloudSyncMaxQueueDepth);
-    if (queueAwareBudgetMs > cloudSyncBudgetMs) {
-      cloudSyncBudgetMs = queueAwareBudgetMs;
+    unsigned long queueAwareBudgetMs = computeCloudSyncTimeoutMs(cloudGate.cloudSyncMaxQueueDepth);
+    if (queueAwareBudgetMs > cloudGate.cloudSyncBudgetMs) {
+      cloudGate.cloudSyncBudgetMs = queueAwareBudgetMs;
     }
     if (!outputLedgersSynced &&
-        ConnectivityPolicy::OUTPUT_LEDGER_SYNC_TIMEOUT_MS > cloudSyncBudgetMs) {
-      cloudSyncBudgetMs = ConnectivityPolicy::OUTPUT_LEDGER_SYNC_TIMEOUT_MS;
+        ConnectivityPolicy::OUTPUT_LEDGER_SYNC_TIMEOUT_MS > cloudGate.cloudSyncBudgetMs) {
+      cloudGate.cloudSyncBudgetMs = ConnectivityPolicy::OUTPUT_LEDGER_SYNC_TIMEOUT_MS;
     }
 
     {
-      if (lastQueueDepth != 0xFFFF && queueDepth < lastQueueDepth) {
+      if (cloudGate.lastQueueDepth != 0xFFFF && queueDepth < cloudGate.lastQueueDepth) {
         thrashGuard.markProgress("QUEUE_DRAIN");
       }
-      lastQueueDepth = queueDepth;
+      cloudGate.lastQueueDepth = queueDepth;
     }
 
     bool allComplete = queueEmpty && ledgersSynced && updatesChecked && webhookConfirmed;
 
     if (!allComplete) {
-      unsigned long elapsedMs = millis() - cloudSyncStartMs;
+      unsigned long elapsedMs = millis() - cloudGate.cloudSyncStartMs;
       const int queuePending = queueEmpty ? 0 : 1;
       const int ledgerPending = ledgersSynced ? 0 : 1;
       const int webhookPending = webhookConfirmed ? 0 : 1;
@@ -415,12 +191,12 @@ void handleSleepingState() {
         blockerMask |= kGateBlockerUpdate;
       }
       if (blockerMask != 0) {
-        lastGateBlockerBeforeRelease = blockerMask;
-        gateReleaseReasonKnown = true;
+        cloudGate.lastGateBlockerBeforeRelease = blockerMask;
+        cloudGate.gateReleaseReasonKnown = true;
       }
 
       if (elapsedMs > kGateBlockLogThresholdMs &&
-          lastGateBlockerMask != blockerMask) {
+          cloudGate.lastGateBlockerMask != blockerMask) {
         if (ledgerPending) {
 #if ENABLE_GATE_TRACE
           Log.info("GateDetail: wait=%lu ledger=%d pending=%u syncing=%d inflight=%d reason=%s",
@@ -449,12 +225,12 @@ void handleSleepingState() {
                  webhookPending,
                  updatePending);
 #endif
-        lastGateBlockerMask = blockerMask;
+        cloudGate.lastGateBlockerMask = blockerMask;
       }
 
-      if (elapsedMs < cloudSyncBudgetMs) {
-        if (!gateWasBlocking ||
-            (millis() - lastGateStatusLogMs) >= ConnectivityPolicy::CLOUD_OPS_STATUS_LOG_INTERVAL_MS) {
+      if (elapsedMs < cloudGate.cloudSyncBudgetMs) {
+        if (!cloudGate.gateWasBlocking ||
+            (millis() - cloudGate.lastGateStatusLogMs) >= ConnectivityPolicy::CLOUD_OPS_STATUS_LOG_INTERVAL_MS) {
 #if ENABLE_GATE_TRACE
           Log.info("Gate: q=%d ledger=%d webhook=%d update=%d wait=%lu/%lu",
                    (int)queueDepth,
@@ -462,16 +238,16 @@ void handleSleepingState() {
                    webhookPending,
                    updatePending,
                    elapsedMs,
-                   cloudSyncBudgetMs);
+                   cloudGate.cloudSyncBudgetMs);
 #endif
-          gateWasBlocking = true;
-          lastGateStatusLogMs = millis();
+          cloudGate.gateWasBlocking = true;
+          cloudGate.lastGateStatusLogMs = millis();
         }
         // Mark progress to prevent ThrashGuard timeout during legitimate cloud operations wait
         thrashGuard.markProgress("CLOUD_OPS_WAIT");
         serviceAwakeWatchdog();
         Particle.process(); // Keep connection alive
-        return; // Stay in SLEEPING_STATE until complete or timeout
+        return true; // Stay in SLEEPING_STATE until complete or timeout
       }
 
       // Budget exceeded - log incomplete operations and raise ONE alert (priority order)
@@ -479,16 +255,16 @@ void handleSleepingState() {
         (!ledgersSynced ? "ledger" : (!webhookConfirmed ? "webhook" : "update"));
        Log.warn("GateFail: reason=%s timeout=%lu q=%d ledger=%d webhook=%d update=%d",
           gateFailReason,
-          cloudSyncBudgetMs,
+          cloudGate.cloudSyncBudgetMs,
           (int)queueDepth,
           ledgerPending,
           webhookPending,
           updatePending);
-       gateWasBlocking = false;
-       lastGateStatusLogMs = 0;
-       lastGateBlockerMask = kGateBlockerUninitialized;
-       lastGateBlockerBeforeRelease = 0;
-       gateReleaseReasonKnown = false;
+       cloudGate.gateWasBlocking = false;
+       cloudGate.lastGateStatusLogMs = 0;
+       cloudGate.lastGateBlockerMask = kGateBlockerUninitialized;
+       cloudGate.lastGateBlockerBeforeRelease = 0;
+       cloudGate.gateReleaseReasonKnown = false;
 
       // Only raise one alert - check in priority order (queue > ledger > updates > webhook)
       if (!queueEmpty) {
@@ -497,7 +273,7 @@ void handleSleepingState() {
       } else if (!ledgersSynced) {
         Log.warn("SLEEP: ledger sync incomplete after %lu ms (budget=%lu ms) - raising alert 44",
                  elapsedMs,
-                 cloudSyncBudgetMs);
+                 cloudGate.cloudSyncBudgetMs);
         Cloud::instance().logLedgerSleepTimeoutState();
         RecoveryState::raiseAlert(44); // Ledger sync timeout before sleep (minor - config already applied)
       } else if (!updatesChecked) {
@@ -509,19 +285,19 @@ void handleSleepingState() {
       }
 
       // Proceed with disconnect despite incomplete operations
-      cloudSyncStartMs = 0;
-      cloudSyncBudgetMs = 0;
-      cloudSyncMaxQueueDepth = 0;
+      cloudGate.cloudSyncStartMs = 0;
+      cloudGate.cloudSyncBudgetMs = 0;
+      cloudGate.cloudSyncMaxQueueDepth = 0;
     } else {
-      unsigned long gateWaitMs = millis() - cloudSyncStartMs;
-      if (gateWaitMs > kGateBlockLogThresholdMs && lastGateBlockerMask != 0) {
+      unsigned long gateWaitMs = millis() - cloudGate.cloudSyncStartMs;
+      if (gateWaitMs > kGateBlockLogThresholdMs && cloudGate.lastGateBlockerMask != 0) {
 #if ENABLE_GATE_TRACE
         Log.info("GateBlock: wait=%lu reason=none q=%u ledger=0 webhook=0 update=0",
                  gateWaitMs, (unsigned)PublishQueuePosix::instance().getNumEvents());
 #endif
-        lastGateBlockerMask = 0;
+        cloudGate.lastGateBlockerMask = 0;
       }
-      if (gateWasBlocking) {
+      if (cloudGate.gateWasBlocking) {
         Cloud::LedgerSyncDiagnostics ledgerDiagnosticsRelease = Cloud::instance().ledgerSyncDiagnostics();
 #if ENABLE_GATE_TRACE
         Log.info("GateReleaseDetail: wait=%lu pending=%u syncing=%d inflight=%d reason=%s",
@@ -529,30 +305,30 @@ void handleSleepingState() {
                  ledgerDiagnosticsRelease.pendingCount,
                  ledgerDiagnosticsRelease.syncing ? 1 : 0,
                  ledgerDiagnosticsRelease.inflight ? 1 : 0,
-                 gateReleaseReasonKnown
-                     ? gateBlockerReasonLabel(lastGateBlockerBeforeRelease)
+                 cloudGate.gateReleaseReasonKnown
+                     ? gateBlockerReasonLabel(cloudGate.lastGateBlockerBeforeRelease)
                      : "unknown");
 #endif
         (void)ledgerDiagnosticsRelease;
         Log.info("GateRelease: wait=%lu reason=%s",
                  gateWaitMs,
-                 gateReleaseReasonKnown
-                     ? gateBlockerReasonLabel(lastGateBlockerBeforeRelease)
+                 cloudGate.gateReleaseReasonKnown
+                     ? gateBlockerReasonLabel(cloudGate.lastGateBlockerBeforeRelease)
                      : "unknown");
         Log.info("Gate: ok wait=%lu", gateWaitMs);
       }
-      gateWasBlocking = false;
-      lastGateStatusLogMs = 0;
-      lastGateBlockerMask = kGateBlockerUninitialized;
-      lastGateBlockerBeforeRelease = 0;
-      gateReleaseReasonKnown = false;
+      cloudGate.gateWasBlocking = false;
+      cloudGate.lastGateStatusLogMs = 0;
+      cloudGate.lastGateBlockerMask = kGateBlockerUninitialized;
+      cloudGate.lastGateBlockerBeforeRelease = 0;
+      cloudGate.gateReleaseReasonKnown = false;
       // All operations complete - reset timer and proceed
-      cloudSyncStartMs = 0;
-      cloudSyncBudgetMs = 0;
-      cloudSyncMaxQueueDepth = 0;
+      cloudGate.cloudSyncStartMs = 0;
+      cloudGate.cloudSyncBudgetMs = 0;
+      cloudGate.cloudSyncMaxQueueDepth = 0;
     }
 
-    if (!operationsCompleteLogged) {
+    if (!cloudGate.operationsCompleteLogged) {
       if (SystemConfig::get_verboseMode()) {
         Log.info("SLEEP: Cloud operations gate passed - ready to disconnect");
         Log.info("SLEEP: disconnect context connected=%d radioOn=%d standbyEffective=%d occupied=%d",
@@ -562,288 +338,157 @@ void handleSleepingState() {
       // Observability: end of service window (ledger sync + queue drain + OTA check + webhook).
       Observability::cycleStats().markServiceEnd(millis());
 
-      operationsCompleteLogged = true;
+      cloudGate.operationsCompleteLogged = true;
     }
   } else {
     // Not connected - reset timer
-    cloudSyncStartMs = 0;
-    cloudSyncBudgetMs = 0;
-    cloudSyncMaxQueueDepth = 0;
-    lastGateBlockerMask = kGateBlockerUninitialized;
-    lastGateBlockerBeforeRelease = 0;
-    gateReleaseReasonKnown = false;
+    cloudGate.cloudSyncStartMs = 0;
+    cloudGate.cloudSyncBudgetMs = 0;
+    cloudGate.cloudSyncMaxQueueDepth = 0;
+    cloudGate.lastGateBlockerMask = kGateBlockerUninitialized;
+    cloudGate.lastGateBlockerBeforeRelease = 0;
+    cloudGate.gateReleaseReasonKnown = false;
   }
+  return false;
+}
 
-  // If we're going to sleep with cellular network standby, do NOT wait for radio-off.
-  // We only need to tear down the cloud session (quickly) before sleeping.
-  bool stillOn;
-#if Wiring_Cellular
-  // WO-2026-10-04-001 item A2: Device OS has in-between modem states where
-  // both isOn() and isOff() are false. System.sleep() then blocks up to 120 s
-  // waiting for the modem, which is longer than the 60 s MCU watchdog, so the
-  // non-standby gate tests !Cellular.isOff() instead of isOn().
-  stillOn = useNetworkStandbyEffective ? Particle.connected() : (Particle.connected() || !Cellular.isOff());
-#else
-  // On WiFi platforms, waiting for WiFi.isOn() to flip false can take a long
-  // time and is not required for safe low-power sleep. Only gate on cloud.
-  stillOn = Particle.connected();
-#endif
 
-  // Compute disconnect budget once per loop to avoid duplicated logic.
-  auto computeDisconnectBudgetMs = [&]() -> unsigned long {
-    // Use ledger-configured budgets when available, with conservative defaults.
-    uint16_t cloudBudgetSec = SystemConfig::get_cloudDisconnectBudgetSec();
-    if (cloudBudgetSec < ConnectivityPolicy::DISCONNECT_BUDGET_MIN_SEC ||
-        cloudBudgetSec > ConnectivityPolicy::DISCONNECT_BUDGET_MAX_SEC) {
-      cloudBudgetSec = ConnectivityPolicy::DISCONNECT_CLOUD_DEFAULT_SEC;
+void endOfCycleSummary(bool useNetworkStandby) {
+    measure.batteryState(BatterySampleContext::PreSleep);
+    const uint16_t qDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
+    const float soc = PowerManager::instance().soc();
+    const uint16_t socTenths = (soc >= 0.0f && soc <= 100.0f) ? (uint16_t)(soc * 10.0f + 0.5f) : 0xFFFF;
+    const uint8_t battState = PowerManager::instance().batteryState();
+    const uint8_t isCharging = (battState == 0) ? 0xFF : ((battState == 2) ? 1 : 0); // 0=Unknown, 2=Charging
+
+    Observability::cycleStats().finalizeBeforeSleep(
+        millis(),
+        Particle.connected(),
+        Connectivity::isRadioPoweredOn(),
+        qDepth,
+        socTenths,
+        isCharging,
+        SystemConfig::get_lastConnection());
+
+    // Invariants (log-only): detect regressions without affecting behavior.
+    // Ceiling is derived from existing budgets and includes firmware update time.
+    const unsigned long awakeCeilingMs =
+        (unsigned long)ConnectivityPolicy::CONNECT_BUDGET_DEEP_MS +
+        (unsigned long)ConnectivityPolicy::FIRMWARE_UPDATE_MAX_MS +
+      (unsigned long)ConnectivityPolicy::OUTPUT_LEDGER_SYNC_TIMEOUT_MS +
+        (unsigned long)ConnectivityPolicy::DISCONNECT_MODEM_DEFAULT_SEC * 1000UL +
+        30000UL; // slack
+
+    // Debug builds may intentionally stay awake longer for diagnostics.
+    const bool allowCeilingOver = (DEV_BUILD != 0);
+    if (!allowCeilingOver && Observability::cycleStats().total_awake_ms > awakeCeilingMs) {
+      Log.warn("INV: awake_ms=%lu > ceiling_ms=%lu", (unsigned long)Observability::cycleStats().total_awake_ms,
+               (unsigned long)awakeCeilingMs);
     }
 
-    uint16_t modemBudgetSec = SystemConfig::get_modemOffBudgetSec();
-    if (modemBudgetSec < ConnectivityPolicy::DISCONNECT_BUDGET_MIN_SEC ||
-        modemBudgetSec > ConnectivityPolicy::DISCONNECT_BUDGET_MAX_SEC) {
-      modemBudgetSec = ConnectivityPolicy::DISCONNECT_MODEM_DEFAULT_SEC;
-    }
-
-    unsigned long budgetMs = (unsigned long)((modemBudgetSec > cloudBudgetSec) ? modemBudgetSec : cloudBudgetSec) * 1000UL;
-
-    // When using network standby, shorten the disconnect grace period: we don't
-    // want to burn connection budget waiting for a perfect teardown.
-    if (useNetworkStandbyEffective) {
-      budgetMs = (unsigned long)cloudBudgetSec * 1000UL;
-      if (budgetMs > ConnectivityPolicy::DISCONNECT_STANDBY_MAX_MS) {
-        budgetMs = ConnectivityPolicy::DISCONNECT_STANDBY_MAX_MS;
+    if (!useNetworkStandby) {
+      if (Particle.connected() || Connectivity::isRadioPoweredOn()) {
+        Log.warn("INV: entering sleep with cloud=%d radioOn=%d (standby=0)",
+                 (int)Particle.connected(), (int)Connectivity::isRadioPoweredOn());
+      }
+    } else {
+      if (Particle.connected()) {
+        Log.warn("INV: entering sleep with cloud still connected (standby=1)");
       }
     }
-    return budgetMs;
-  };
 
-  unsigned long disconnectBudgetMs = computeDisconnectBudgetMs();
+    // Connect duration should be within the selected budget when an attempt was made.
+    if (Observability::cycleStats().connect_attempt_type != Observability::WakeCycleStats::ConnectAttemptType::NONE &&
+        Observability::cycleStats().connect_budget_ms > 0 &&
+        Observability::cycleStats().connect_duration_ms > (Observability::cycleStats().connect_budget_ms + 1000UL)) {
+      Log.warn("INV: connect_ms=%lu > budget_ms=%lu", (unsigned long)Observability::cycleStats().connect_duration_ms,
+               (unsigned long)Observability::cycleStats().connect_budget_ms);
+    }
 
-  // If cloud is already offline but the radio is still on (common after a transient
-  // cloud drop), power down the radio before sleeping (unless using standby).
-#if Wiring_Cellular
-  if (!disconnectRequested && !useNetworkStandbyEffective && !Particle.connected() && Connectivity::isRadioPoweredOn()) {
-    unsigned long requestMs = millis();
-    cloudDisconnectCompleteLogged = true;
-    cloudDisconnectElapsedMs = 0;
+    // One compact line for field parsing.
     if (SystemConfig::get_verboseMode()) {
-      Log.info("SLEEP: cloud disconnect complete elapsed=0 ms");
+      Log.info(
+        "CYCLE end awake=%lums conn=%s/%s/%lums svc=%lums td=%lums q=%d/%d/%d soc=%.1f%% chg=%d lastOk=%ld",
+          (unsigned long)Observability::cycleStats().total_awake_ms,
+          Observability::toString(Observability::cycleStats().connect_attempt_type),
+          Observability::toString(Observability::cycleStats().connect_result),
+          (unsigned long)Observability::cycleStats().connect_duration_ms,
+          (unsigned long)Observability::cycleStats().service_duration_ms,
+          (unsigned long)Observability::cycleStats().teardown_duration_ms,
+        (int)(Observability::cycleStats().publish_queue_depth_before_connect == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_before_connect),
+        (int)(Observability::cycleStats().publish_queue_depth_after_connect == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_after_connect),
+        (int)(Observability::cycleStats().publish_queue_depth_before_sleep == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_before_sleep),
+          (double)(Observability::cycleStats().battery_soc_tenths == 0xFFFF ? -1.0 : ((double)Observability::cycleStats().battery_soc_tenths / 10.0)),
+        (int)(Observability::cycleStats().is_charging == 0xFF ? -1 : (int)Observability::cycleStats().is_charging),
+          (long)Observability::cycleStats().last_success_epoch);
     }
-  #if HAL_PLATFORM_CELLULAR
-    if (forceModemOffAfterStandbyFailure) {
-      Log.warn("SLEEP: standby sleep failed; forcing modem-off reason=sleep_error err=%d",
-               standbySleepFailureError);
-      forceModemOffAfterStandbyFailure = false;
-      standbySleepFailureError = SYSTEM_ERROR_NONE;
-    }
-  #endif
-    logTeardownContext("SLEEP: modem-off start", useNetworkStandbyRequested, useNetworkStandbyEffective);
-    Connectivity::requestRadioPowerOff();
-    disconnectRequested = true;
-    disconnectRequestStartMs = requestMs;
-    Observability::cycleStats().markTeardownStart((uint32_t)disconnectRequestStartMs, useNetworkStandbyEffective);
-    return;
-  }
-#endif
+}
 
-  // Once cloud operations are satisfied (or timed out), initiate disconnect exactly once.
-  if (Particle.connected() && !disconnectRequested) {
-    unsigned long requestMs = millis();
-    logTeardownContext("SLEEP: cloud disconnect start", useNetworkStandbyRequested, useNetworkStandbyEffective);
-    cloudDisconnectStartMs = requestMs;
-    cloudDisconnectElapsedMs = 0;
-    if (useNetworkStandbyEffective) {
+#if Wiring_WiFi
+struct {
+  bool wifiOffGuardActive = false;
+  unsigned long wifiOffGuardStartMs = 0;
+  unsigned long wifiOffGuardLastRetryMs = 0;
+  uint8_t wifiOffGuardRetries = 0;
+} wifiGuard;
+
+bool wifiOffGuardPass(bool useNetworkStandby) {
+  if (!useNetworkStandby) {
+    if (Particle.connected()) {
       Connectivity::requestCloudDisconnectOnly();
-    } else {
-      logTeardownContext("SLEEP: modem-off start", useNetworkStandbyRequested, useNetworkStandbyEffective);
-      modemOffElapsedMs = 0;
-      Connectivity::requestFullDisconnectAndRadioOff();
     }
-    disconnectRequested = true;
-    disconnectRequestStartMs = requestMs;
+    if (WiFi.isOn()) {
+      constexpr unsigned long WIFI_OFF_GUARD_MAX_MS = 2000UL;
+      constexpr unsigned long WIFI_OFF_GUARD_RETRY_MS = 400UL;
+      const unsigned long nowMs = millis();
 
-    // Observability: teardown window start.
-    Observability::cycleStats().markTeardownStart((uint32_t)disconnectRequestStartMs, useNetworkStandbyEffective);
-
-    return;
-  }
-
-  // If disconnect was requested, wait (bounded) for it to take effect before sleeping.
-  if (disconnectRequested && !cloudDisconnectCompleteLogged && !Particle.connected()) {
-    cloudDisconnectElapsedMs = (cloudDisconnectStartMs == 0) ? 0UL : (millis() - cloudDisconnectStartMs);
-    if (SystemConfig::get_verboseMode()) {
-      Log.info("SLEEP: cloud disconnect complete elapsed=%lu ms standby=%d",
-               cloudDisconnectElapsedMs,
-               useNetworkStandbyEffective ? 1 : 0);
-    }
-    cloudDisconnectCompleteLogged = true;
-  }
-#if Wiring_Cellular
-  if (disconnectRequested && !useNetworkStandbyEffective &&
-      !radioOffCompleteLogged && Cellular.isOff()) {
-    modemOffElapsedMs = (disconnectRequestStartMs == 0) ? 0UL : (millis() - disconnectRequestStartMs);
-    if (SystemConfig::get_verboseMode()) {
-      Log.info("SLEEP: modem-off complete elapsed=%lu ms", modemOffElapsedMs);
-    }
-    radioOffCompleteLogged = true;
-  }
-#endif
-
-  if (disconnectRequested && stillOn) {
-    if (disconnectRequestStartMs != 0 && (millis() - disconnectRequestStartMs) > disconnectBudgetMs) {
-      Log.warn("SLEEP: disconnect/modem-off exceeded budget (%lu ms, cloud=%d radioOn=%d standby=%d) - raising alert 15",
-               (unsigned long)(millis() - disconnectRequestStartMs),
-               (int)Particle.connected(),
-               (int)Connectivity::isRadioPoweredOn(),
-               useNetworkStandbyEffective ? 1 : 0);
-      markModemUnstable(MODEM_UNSTABLE_REASON_SLOW_TEARDOWN,
-                        (unsigned long)(millis() - disconnectRequestStartMs));
-      RecoveryState::raiseAlert(15);
-      transitionTo(ERROR_STATE, "sleep-disconnect-timeout");
-      disconnectRequested = false;
-      disconnectRequestStartMs = 0;
-      cloudDisconnectStartMs = 0;
-      cloudDisconnectElapsedMs = 0;
-      modemOffElapsedMs = 0;
-      cloudDisconnectCompleteLogged = false;
-    #if Wiring_Cellular
-      radioOffCompleteLogged = false;
-    #endif
-      return;
-    }
-
-    // Help DeviceOS make progress on the disconnect.
-    // Throttle progress markers to avoid noisy per-loop updates.
-    unsigned long nowMs = millis();
-    if ((nowMs - lastDisconnectProgressMs) > 1000UL) {
-      thrashGuard.markProgress("DISCONNECT_WAIT");
-      lastDisconnectProgressMs = nowMs;
-    }
-    serviceAwakeWatchdog();
-    Particle.process();
-    return;
-  }
-
-  // Observability: teardown completed (bounded wait finished and we are proceeding to sleep).
-  if (disconnectRequested && !stillOn) {
-    const unsigned long teardownElapsedMs =
-        (disconnectRequestStartMs == 0) ? 0UL : (millis() - disconnectRequestStartMs);
-    Log.info("Sleep: td=%lums cloud=%lums modem=%lums standby=%d/%d mode=%s tier=%s occ=%d",
-             teardownElapsedMs,
-             cloudDisconnectElapsedMs,
-             modemOffElapsedMs,
-             useNetworkStandbyRequested ? 1 : 0,
-             useNetworkStandbyEffective ? 1 : 0,
-         connectionModeLabel(static_cast<SystemConfig::ConnectionMode>(PowerManager::instance().effectiveConnectionMode())),
-             batteryTierLabel(PowerConfig::get_currentBatteryTier()),
-             CurrentReadings::get_occupied() ? 1 : 0);
-    session.lastCloudDisconnectElapsedMs = cloudDisconnectElapsedMs;
-    session.lastModemOffElapsedMs = modemOffElapsedMs;
-    session.lastTotalTeardownElapsedMs = teardownElapsedMs;
-    session.lastTeardownEndMs = millis();
-    if (teardownElapsedMs > MODEM_UNSTABLE_SLOW_TEARDOWN_MS) {
-      markModemUnstable(MODEM_UNSTABLE_REASON_SLOW_TEARDOWN, teardownElapsedMs);
-    } else {
-      maybeClearModemUnstable(teardownElapsedMs);
-    }
-    Observability::cycleStats().markTeardownEnd(millis());
-    disconnectRequested = false;
-    disconnectRequestStartMs = 0;
-    cloudDisconnectStartMs = 0;
-    cloudDisconnectElapsedMs = 0;
-    modemOffElapsedMs = 0;
-  }
-
-  setAppBreadcrumb(22); // BREADCRUMB_SLEEP_GATE_START (was stale literal 18, colliding with BREADCRUMB_PUBLISH_QUEUE_EXIT)
-
-  // Enforce sleep preconditions before any final sleep call in this state.
-  // Non-standby cellular sleep requires both cloud disconnect and radio/modem off.
-  // Standby sleep requires cloud disconnect only.
-  auto sleepPreconditionsSatisfied = [&]() -> bool {
-#if Wiring_Cellular
-    if (!useNetworkStandbyEffective) {
-      return !Particle.connected() && Cellular.isOff();
-    }
-#endif
-    return !Particle.connected();
-  };
-
-  if (!sleepPreconditionsSatisfied()) {
-    bool cloudConnected = Particle.connected();
-
-    // Request teardown exactly once, then wait with existing budget handling.
-    if (!disconnectRequested) {
-      if (useNetworkStandbyEffective) {
-        Log.warn("SLEEP: pre-sleep gate blocked (cloud=%d standby=1) - requesting disconnect",
-                 (int)cloudConnected);
-        logTeardownContext("SLEEP: cloud disconnect start", useNetworkStandbyRequested, useNetworkStandbyEffective);
-        cloudDisconnectStartMs = millis();
-        cloudDisconnectElapsedMs = 0;
-        Connectivity::requestCloudDisconnectOnly();
-      } else if (cloudConnected) {
-        Log.warn("SLEEP: pre-sleep gate blocked (cloud=1 standby=0) - requesting disconnect + modem off");
-        logTeardownContext("SLEEP: cloud disconnect start", useNetworkStandbyRequested, useNetworkStandbyEffective);
-        logTeardownContext("SLEEP: modem-off start", useNetworkStandbyRequested, useNetworkStandbyEffective);
-        cloudDisconnectStartMs = millis();
-        cloudDisconnectElapsedMs = 0;
-        modemOffElapsedMs = 0;
-        Connectivity::requestFullDisconnectAndRadioOff();
-      } else {
-        Log.warn("SLEEP: pre-sleep gate blocked (cloud=0 radioOn=1 standby=0) - requesting modem off");
-        cloudDisconnectCompleteLogged = true;
-        cloudDisconnectElapsedMs = 0;
-        if (SystemConfig::get_verboseMode()) {
-          Log.info("SLEEP: cloud disconnect complete elapsed=0 ms");
-        }
-        logTeardownContext("SLEEP: modem-off start", useNetworkStandbyRequested, useNetworkStandbyEffective);
-        modemOffElapsedMs = 0;
-        Connectivity::requestRadioPowerOff();
+      if (!wifiGuard.wifiOffGuardActive) {
+        wifiGuard.wifiOffGuardActive = true;
+        wifiGuard.wifiOffGuardStartMs = nowMs;
+        wifiGuard.wifiOffGuardLastRetryMs = 0;
+        wifiGuard.wifiOffGuardRetries = 0;
+        Log.info("SLEEP: WiFi still on - starting bounded radio-off guard");
       }
 
-      disconnectRequested = true;
-      disconnectRequestStartMs = millis();
-      Observability::cycleStats().markTeardownStart((uint32_t)disconnectRequestStartMs, useNetworkStandbyEffective);
-      return;
-    }
+      if (wifiGuard.wifiOffGuardLastRetryMs == 0 || (nowMs - wifiGuard.wifiOffGuardLastRetryMs) >= WIFI_OFF_GUARD_RETRY_MS) {
+        Connectivity::requestRadioPowerOff();
+        wifiGuard.wifiOffGuardLastRetryMs = nowMs;
+        if (wifiGuard.wifiOffGuardRetries < 255) {
+          wifiGuard.wifiOffGuardRetries++;
+        }
+      }
 
-    if (disconnectRequestStartMs == 0) {
-      disconnectRequestStartMs = millis();
-    }
+      unsigned long guardElapsedMs = nowMs - wifiGuard.wifiOffGuardStartMs;
+      if (guardElapsedMs <= WIFI_OFF_GUARD_MAX_MS) {
+        thrashGuard.markProgress("WIFI_OFF_GUARD");
+        Particle.process();
+        return true;
+      }
 
-    unsigned long elapsedMs = millis() - disconnectRequestStartMs;
-    if (elapsedMs > disconnectBudgetMs) {
-      Log.warn("SLEEP: pre-sleep teardown exceeded budget (%lu ms, cloud=%d radioOn=%d standby=%d) - raising alert 15",
-               elapsedMs,
-               (int)Particle.connected(),
-               (int)Connectivity::isRadioPoweredOn(),
-               useNetworkStandbyEffective ? 1 : 0);
-      markModemUnstable(MODEM_UNSTABLE_REASON_SLOW_TEARDOWN, elapsedMs);
-      RecoveryState::raiseAlert(15);
-      transitionTo(ERROR_STATE, "sleep-precondition-timeout");
-      disconnectRequested = false;
-      disconnectRequestStartMs = 0;
-      cloudDisconnectStartMs = 0;
-      cloudDisconnectElapsedMs = 0;
-      modemOffElapsedMs = 0;
-      cloudDisconnectCompleteLogged = false;
-    #if Wiring_Cellular
-      radioOffCompleteLogged = false;
-    #endif
-      return;
+      Log.warn("SLEEP: WiFi radio remained on after %lu ms (%u retries) - proceeding to sleep",
+               guardElapsedMs,
+               wifiGuard.wifiOffGuardRetries);
+      wifiGuard.wifiOffGuardActive = false;
+      wifiGuard.wifiOffGuardStartMs = 0;
+      wifiGuard.wifiOffGuardLastRetryMs = 0;
+      wifiGuard.wifiOffGuardRetries = 0;
+    } else if (wifiGuard.wifiOffGuardActive) {
+      unsigned long guardElapsedMs = millis() - wifiGuard.wifiOffGuardStartMs;
+      if (SystemConfig::get_verboseMode()) {
+        Log.info("SLEEP: WiFi radio powered off before sleep (%lu ms)", guardElapsedMs);
+      }
+      wifiGuard.wifiOffGuardActive = false;
+      wifiGuard.wifiOffGuardStartMs = 0;
+      wifiGuard.wifiOffGuardLastRetryMs = 0;
+      wifiGuard.wifiOffGuardRetries = 0;
     }
-
-    unsigned long nowMs = millis();
-    if ((nowMs - lastGateProgressMs) > 1000UL) {
-      thrashGuard.markProgress("DISCONNECT_WAIT");
-      lastGateProgressMs = nowMs;
-    }
-    serviceAwakeWatchdog();
-    Particle.process();
-    return;
   }
+  return false;
+}
+#endif
+struct SleepPlan { int wakeInSeconds; const char *sleepReason; bool overnightFallbackSleep; };
 
-  setAppBreadcrumb(23); // BREADCRUMB_SLEEP_GATE_DONE (was stale literal 19, colliding with BREADCRUMB_REPORT_POST_LEDGER)
-
+bool sleepPlan(SleepPlan &plan) {
   // WO-2026-09-19 Step 3b: the behavioral core of this step. parkOpenness is
   // computed ONCE here and reused below (line ~1006 used to re-derive
   // isWithinOpenHours() a second time, redundantly) - Closed is the only
@@ -861,7 +506,7 @@ void handleSleepingState() {
     // WO-2026-09-30-001: never commit to night sleep while the close is due.
     if (DailyBoundary::check(Time.now()).due) {
       transitionTo(REPORTING_STATE, "close due before night sleep");
-      return;
+      return true;
     }
 
     // Notify sensor layer we are entering full night sleep so sensors and
@@ -951,7 +596,7 @@ void handleSleepingState() {
       Log.info("COUNTING: Deferring sleep - LED remaining=%lu sec", 
                ledRemaining);
       transitionTo(IDLE_STATE, "sleep-counting-led-defer");
-      return;
+      return true;
     }
     // Turn off LED before sleep (should already be off)
     if (signalLEDStatus()) {
@@ -974,7 +619,70 @@ void handleSleepingState() {
       sleepReason = "scheduled";
     }
   }
+  plan = {wakeInSeconds, sleepReason, overnightFallbackSleep};
+  return false;
+}
 
+bool nightlyHeapGuard(bool overnightFallbackSleep) {
+  // Before a long overnight
+  // ULTRA_LOW_POWER fallback sleep, optionally reset first when heap has
+  // drifted low. This gives the next day a clean start without affecting
+  // open-hours behavior.
+  if (overnightFallbackSleep) {
+    const unsigned long freeHeap = (unsigned long)System.freeMemory();
+
+    if (freeHeap <= ConnectivityPolicy::NIGHTLY_HEAP_RESET_THRESHOLD_BYTES) {
+      Log.info("ModemTeardown: radioOn=%d point=heap-guard-reset", (int)Connectivity::isRadioPoweredOn());
+      Log.warn("Nightly heap guard: freeHeap=%lu <= %lu before overnight ULTRA_LOW_POWER fallback - resetting for clean next-day start",
+               freeHeap,
+               ConnectivityPolicy::NIGHTLY_HEAP_RESET_THRESHOLD_BYTES);
+      // Reset drops RAM - flush the diagnostics batch now, since this is
+      // the only chance for this cycle's accumulated entries.
+#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
+      PowerDiagnostics::flushDiagBatch();
+#endif
+      System.reset(RESET_CAUSE_SLEEP_HEAP_GUARD);
+      return true;
+    }
+
+    if (freeHeap <= ConnectivityPolicy::NIGHTLY_HEAP_WARN_THRESHOLD_BYTES) {
+      Log.warn("Nightly heap guard: freeHeap=%lu <= %lu before overnight ULTRA_LOW_POWER fallback - monitoring only",
+               freeHeap,
+               ConnectivityPolicy::NIGHTLY_HEAP_WARN_THRESHOLD_BYTES);
+    }
+  }
+  return false;
+}
+
+struct WakeContext { bool pirWake, buttonWake, timerWake; const char *wakeReasonLabel; };
+struct { bool preserveAfterNormalReturn = false; bool forceModemOff = false; int error = SYSTEM_ERROR_NONE; } standbyReturn;
+
+bool effectiveStandby(bool useNetworkStandbyRequested) {
+  bool preserveStandbyForThisPass = false;
+#if HAL_PLATFORM_CELLULAR
+  if (standbyReturn.preserveAfterNormalReturn &&
+      (!useNetworkStandbyRequested || session.modemUnstable || Cellular.isOff())) {
+    standbyReturn.preserveAfterNormalReturn = false;
+  }
+  preserveStandbyForThisPass = standbyReturn.preserveAfterNormalReturn;
+#endif
+  bool useNetworkStandbyEffective =
+      useNetworkStandbyRequested &&
+      (preserveStandbyForThisPass ||
+       Observability::cycleStats().connect_result ==
+           Observability::WakeCycleStats::ConnectResult::SUCCESS);
+#if HAL_PLATFORM_CELLULAR
+  useNetworkStandbyEffective = useNetworkStandbyEffective && !Cellular.isOff();
+  if (session.modemUnstable || standbyReturn.forceModemOff) {
+    useNetworkStandbyEffective = false;
+  }
+#else
+  useNetworkStandbyEffective = false;
+#endif
+  return useNetworkStandbyEffective;
+}
+
+void hibernateAttempt(bool overnightFallbackSleep, int wakeInSeconds) {
 #if PLATFORM_ID == PLATFORM_BORON
   if (overnightFallbackSleep) {
     time_t rtcNow = 0;
@@ -1042,179 +750,10 @@ void handleSleepingState() {
     }
   }
 #endif
+}
 
-  // Before a long overnight
-  // ULTRA_LOW_POWER fallback sleep, optionally reset first when heap has
-  // drifted low. This gives the next day a clean start without affecting
-  // open-hours behavior.
-  if (overnightFallbackSleep) {
-    const unsigned long freeHeap = (unsigned long)System.freeMemory();
-
-    if (freeHeap <= ConnectivityPolicy::NIGHTLY_HEAP_RESET_THRESHOLD_BYTES) {
-      Log.info("ModemTeardown: radioOn=%d point=heap-guard-reset", (int)Connectivity::isRadioPoweredOn());
-      Log.warn("Nightly heap guard: freeHeap=%lu <= %lu before overnight ULTRA_LOW_POWER fallback - resetting for clean next-day start",
-               freeHeap,
-               ConnectivityPolicy::NIGHTLY_HEAP_RESET_THRESHOLD_BYTES);
-      // Reset drops RAM - flush the diagnostics batch now, since this is
-      // the only chance for this cycle's accumulated entries.
-#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
-      PowerDiagnostics::flushDiagBatch();
-#endif
-      System.reset(RESET_CAUSE_SLEEP_HEAP_GUARD);
-      return;
-    }
-
-    if (freeHeap <= ConnectivityPolicy::NIGHTLY_HEAP_WARN_THRESHOLD_BYTES) {
-      Log.warn("Nightly heap guard: freeHeap=%lu <= %lu before overnight ULTRA_LOW_POWER fallback - monitoring only",
-               freeHeap,
-               ConnectivityPolicy::NIGHTLY_HEAP_WARN_THRESHOLD_BYTES);
-    }
-  }
-
-  // The sleep configuration is built fresh as a local at each sleep site
-  // (below), so GPIO selections cannot accumulate across calls.
-  setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START (was stale literal 20, colliding with BREADCRUMB_REPORT_EXIT)
-
-  // ********** WORKING SLEEP CONFIGURATION **********
-  // Based on Connected-Counter-Next which uses system timer + GPIO wake.
-  // NO AB1805 alarms - AB1805 is only used for watchdog + RTC time sync.
-  // This approach works reliably on Photon2!
-
-  // In INTERMITTENT_KEEP_ALIVE mode during open hours on *cellular* devices,
-  // use network standby to avoid rapid reconnects that could trigger carrier
-  // blacklisting. On WiFi devices, standby is not applied.
-  bool useNetworkStandby = useNetworkStandbyEffective;
-
-  // -----------------------------------------------------------------------
-  // Minimal end-of-cycle observability (one compact line per wake cycle)
-  // -----------------------------------------------------------------------
-  {
-    measure.batteryState(BatterySampleContext::PreSleep);
-    const uint16_t qDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();
-    const float soc = PowerManager::instance().soc();
-    const uint16_t socTenths = (soc >= 0.0f && soc <= 100.0f) ? (uint16_t)(soc * 10.0f + 0.5f) : 0xFFFF;
-    const uint8_t battState = PowerManager::instance().batteryState();
-    const uint8_t isCharging = (battState == 0) ? 0xFF : ((battState == 2) ? 1 : 0); // 0=Unknown, 2=Charging
-
-    Observability::cycleStats().finalizeBeforeSleep(
-        millis(),
-        Particle.connected(),
-        Connectivity::isRadioPoweredOn(),
-        qDepth,
-        socTenths,
-        isCharging,
-        SystemConfig::get_lastConnection());
-
-    // Invariants (log-only): detect regressions without affecting behavior.
-    // Ceiling is derived from existing budgets and includes firmware update time.
-    const unsigned long awakeCeilingMs =
-        (unsigned long)ConnectivityPolicy::CONNECT_BUDGET_DEEP_MS +
-        (unsigned long)ConnectivityPolicy::FIRMWARE_UPDATE_MAX_MS +
-      (unsigned long)ConnectivityPolicy::OUTPUT_LEDGER_SYNC_TIMEOUT_MS +
-        (unsigned long)ConnectivityPolicy::DISCONNECT_MODEM_DEFAULT_SEC * 1000UL +
-        30000UL; // slack
-
-    // Debug builds may intentionally stay awake longer for diagnostics.
-    const bool allowCeilingOver = (DEV_BUILD != 0);
-    if (!allowCeilingOver && Observability::cycleStats().total_awake_ms > awakeCeilingMs) {
-      Log.warn("INV: awake_ms=%lu > ceiling_ms=%lu", (unsigned long)Observability::cycleStats().total_awake_ms,
-               (unsigned long)awakeCeilingMs);
-    }
-
-    if (!useNetworkStandby) {
-      if (Particle.connected() || Connectivity::isRadioPoweredOn()) {
-        Log.warn("INV: entering sleep with cloud=%d radioOn=%d (standby=0)",
-                 (int)Particle.connected(), (int)Connectivity::isRadioPoweredOn());
-      }
-    } else {
-      if (Particle.connected()) {
-        Log.warn("INV: entering sleep with cloud still connected (standby=1)");
-      }
-    }
-
-    // Connect duration should be within the selected budget when an attempt was made.
-    if (Observability::cycleStats().connect_attempt_type != Observability::WakeCycleStats::ConnectAttemptType::NONE &&
-        Observability::cycleStats().connect_budget_ms > 0 &&
-        Observability::cycleStats().connect_duration_ms > (Observability::cycleStats().connect_budget_ms + 1000UL)) {
-      Log.warn("INV: connect_ms=%lu > budget_ms=%lu", (unsigned long)Observability::cycleStats().connect_duration_ms,
-               (unsigned long)Observability::cycleStats().connect_budget_ms);
-    }
-
-    // One compact line for field parsing.
-    if (SystemConfig::get_verboseMode()) {
-      Log.info(
-        "CYCLE end awake=%lums conn=%s/%s/%lums svc=%lums td=%lums q=%d/%d/%d soc=%.1f%% chg=%d lastOk=%ld",
-          (unsigned long)Observability::cycleStats().total_awake_ms,
-          Observability::toString(Observability::cycleStats().connect_attempt_type),
-          Observability::toString(Observability::cycleStats().connect_result),
-          (unsigned long)Observability::cycleStats().connect_duration_ms,
-          (unsigned long)Observability::cycleStats().service_duration_ms,
-          (unsigned long)Observability::cycleStats().teardown_duration_ms,
-        (int)(Observability::cycleStats().publish_queue_depth_before_connect == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_before_connect),
-        (int)(Observability::cycleStats().publish_queue_depth_after_connect == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_after_connect),
-        (int)(Observability::cycleStats().publish_queue_depth_before_sleep == 0xFFFF ? -1 : (int)Observability::cycleStats().publish_queue_depth_before_sleep),
-          (double)(Observability::cycleStats().battery_soc_tenths == 0xFFFF ? -1.0 : ((double)Observability::cycleStats().battery_soc_tenths / 10.0)),
-        (int)(Observability::cycleStats().is_charging == 0xFF ? -1 : (int)Observability::cycleStats().is_charging),
-          (long)Observability::cycleStats().last_success_epoch);
-    }
-  }
-
-  // On WiFi platforms, ensure the radio is actually OFF before entering
-  // ULTRA_LOW_POWER. If the cloud/radio was left on, the device can flash
-  // green briefly on wake as WiFi attempts to reconnect.
-#if Wiring_WiFi
-  if (!useNetworkStandby) {
-    if (Particle.connected()) {
-      Connectivity::requestCloudDisconnectOnly();
-    }
-    if (WiFi.isOn()) {
-      constexpr unsigned long WIFI_OFF_GUARD_MAX_MS = 2000UL;
-      constexpr unsigned long WIFI_OFF_GUARD_RETRY_MS = 400UL;
-      const unsigned long nowMs = millis();
-
-      if (!wifiOffGuardActive) {
-        wifiOffGuardActive = true;
-        wifiOffGuardStartMs = nowMs;
-        wifiOffGuardLastRetryMs = 0;
-        wifiOffGuardRetries = 0;
-        Log.info("SLEEP: WiFi still on - starting bounded radio-off guard");
-      }
-
-      if (wifiOffGuardLastRetryMs == 0 || (nowMs - wifiOffGuardLastRetryMs) >= WIFI_OFF_GUARD_RETRY_MS) {
-        Connectivity::requestRadioPowerOff();
-        wifiOffGuardLastRetryMs = nowMs;
-        if (wifiOffGuardRetries < 255) {
-          wifiOffGuardRetries++;
-        }
-      }
-
-      unsigned long guardElapsedMs = nowMs - wifiOffGuardStartMs;
-      if (guardElapsedMs <= WIFI_OFF_GUARD_MAX_MS) {
-        thrashGuard.markProgress("WIFI_OFF_GUARD");
-        Particle.process();
-        return;
-      }
-
-      Log.warn("SLEEP: WiFi radio remained on after %lu ms (%u retries) - proceeding to sleep",
-               guardElapsedMs,
-               wifiOffGuardRetries);
-      wifiOffGuardActive = false;
-      wifiOffGuardStartMs = 0;
-      wifiOffGuardLastRetryMs = 0;
-      wifiOffGuardRetries = 0;
-    } else if (wifiOffGuardActive) {
-      unsigned long guardElapsedMs = millis() - wifiOffGuardStartMs;
-      if (SystemConfig::get_verboseMode()) {
-        Log.info("SLEEP: WiFi radio powered off before sleep (%lu ms)", guardElapsedMs);
-      }
-      wifiOffGuardActive = false;
-      wifiOffGuardStartMs = 0;
-      wifiOffGuardLastRetryMs = 0;
-      wifiOffGuardRetries = 0;
-    }
-  }
-#endif
-  
+// Returns true when the caller must return (all sleep attempts failed).
+bool sleepAndResume(int wakeInSeconds, bool useNetworkStandby, const char *sleepReason, WakeContext &wake) {
   const SensorWakeSource sensorWake = SensorManager::instance().activeSensor()->wakeSource();
   const bool sensorCanWake = (sensorWake.pin != PIN_INVALID);
   SystemSleepConfiguration ulpConfig;
@@ -1286,23 +825,23 @@ void handleSleepingState() {
 #if HAL_PLATFORM_CELLULAR
   if (useNetworkStandby) {
     if (result.error() == SYSTEM_ERROR_NONE) {
-      preserveStandbyAfterNormalReturn = true;
-      forceModemOffAfterStandbyFailure = false;
-      standbySleepFailureError = SYSTEM_ERROR_NONE;
+      standbyReturn.preserveAfterNormalReturn = true;
+      standbyReturn.forceModemOff = false;
+      standbyReturn.error = SYSTEM_ERROR_NONE;
       if (SystemConfig::get_verboseMode()) {
         Log.info("SLEEP: standby sleep returned normally; preserving modem standby");
       }
     } else {
-      preserveStandbyAfterNormalReturn = false;
-      forceModemOffAfterStandbyFailure = true;
-      standbySleepFailureError = (int)result.error();
+      standbyReturn.preserveAfterNormalReturn = false;
+      standbyReturn.forceModemOff = true;
+      standbyReturn.error = (int)result.error();
       Log.warn("SLEEP: standby sleep failed; forcing modem-off reason=sleep_error err=%d",
-               standbySleepFailureError);
+               standbyReturn.error);
     }
   } else {
-    preserveStandbyAfterNormalReturn = false;
-    forceModemOffAfterStandbyFailure = false;
-    standbySleepFailureError = SYSTEM_ERROR_NONE;
+    standbyReturn.preserveAfterNormalReturn = false;
+    standbyReturn.forceModemOff = false;
+    standbyReturn.error = SYSTEM_ERROR_NONE;
   }
 #endif
 
@@ -1367,7 +906,7 @@ void handleSleepingState() {
         
         // Should never reach here, but set ERROR_STATE as fallback
         transitionTo(ERROR_STATE, "sleep-all-attempts-failed");
-        return;
+        return true;
       }
     }
   }
@@ -1440,6 +979,7 @@ void handleSleepingState() {
   bool buttonWake = (wakePin == BUTTON_PIN);
   bool timerWake = !pirWake && !buttonWake;  // If no GPIO woke us, it's the timer
   const char *wakeReasonLabel = buttonWake ? "BUTTON" : (pirWake ? "PIR" : "TIMER");
+  wake = {pirWake, buttonWake, timerWake, wakeReasonLabel};
 
   // Observability: start of a new wake cycle (ULP return path).
   Observability::cycleStats().resetOnWake(millis());
@@ -1448,7 +988,12 @@ void handleSleepingState() {
   // modem, so mark the first post-wake sample for fuel-gauge stabilization now.
   measure.noteWakeFromLowPowerSleep();
   PowerDiagnostics::logPowerState("post-wake");
-  
+  return false;
+}
+
+} // namespace
+
+static void postWakeRouting(bool pirWake, bool buttonWake, bool timerWake, const char *wakeReasonLabel) {
   // LED will be turned on with proper timeout by PIR wake processing below
   // Don't turn it on here without timeout as it causes false LED timeout detection
 
@@ -1501,114 +1046,7 @@ void handleSleepingState() {
       }
     }
 
-    // Check if LED timeout expired FIRST (before processing new PIR wake)
-    // This ensures we don't immediately undo state changes from PIR processing
-    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
-      // LED timeout expired - debounce period elapsed without motion
-      const bool reportNow = reportsOccupancyChangesNow();
-      const OccupancyCloseResult closeResult = closeOccupancySessionSafely("sleep");
-      signalLED(false);  // Turn off LED
-      if (closeResult.valid) {
-        logUnoccupiedEvent("debounce", closeResult.sessionSeconds, closeResult.totalSeconds, reportNow);
-      }
-      
-      // Match the rest of the occupancy state machine: only KEEP_ALIVE and
-      // CONNECTED force an immediate report/connect on occupancy transitions.
-      if (reportNow && !closeResult.stillOpen) {
-        session.occupancyChangeTriggered = true;
-        transitionTo(REPORTING_STATE, "sleep-occupancy-debounce-report");
-        return;
-      }
-    }
-
-    // Process PIR wake events (after checking LED timeout above)
-    // If this wake was caused by the PIR interrupt, synthesize a single
-    // detection event so that the motion that woke the device is counted
-    // even if the ISR flag did not survive ULTRA_LOW_POWER sleep.
-    if (pirWake) {
-      if (SystemConfig::get_sensorMode() == SystemConfig::COUNTING) {
-        CurrentReadings::set_hourlyCount(CurrentReadings::get_hourlyCount() + 1);
-        CurrentReadings::set_dailyCount(CurrentReadings::get_dailyCount() + 1);
-        // WO-2026-08-29-002 item 8: lastCountTime has no consumers anywhere
-        // in this codebase (write-only telemetry field) - gating on
-        // isClockTrusted() changes only the recorded value, never control
-        // flow.
-        CurrentReadings::set_lastCountTime(isClockTrusted() ? Time.now() : 0);
-        signalLED(true, 1000);  // Flash for 1 second
-        Log.info("Count detected from PIR wake - Hourly: %d, Daily: %d",
-                 CurrentReadings::get_hourlyCount(), CurrentReadings::get_dailyCount());
-        if (Serial && Serial.isConnected()) {
-          Serial.printf("Count detected from PIR wake - Hourly: %d, Daily: %d\r\n",
-                        CurrentReadings::get_hourlyCount(), CurrentReadings::get_dailyCount());
-        }
-      } else if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY) {
-        // Occupancy mode: PIR wakes are expected behavior, not thrashing
-        thrashGuard.markProgress("PIR_WAKE_OCCUPANCY");
-
-        // If KEEP_ALIVE was temporarily disabled for low battery, refresh the
-        // battery policy on wake so recovered power can restore the intended
-        // occupancy behavior before we decide whether to report or sleep again.
-        // WO-2026-09-21 Step 4 (corrected same day): evaluate() then commit() -
-        // one of the four deliberate policy-application sites.
-        if (PowerConfig::get_lowBatteryMode()) {
-          const float soc = PowerManager::instance().soc();
-          float vcell = 0.0f;
-          const SensorManager::VcellSampleState vcellState =
-              SensorManager::instance().cachedBatteryVoltageState(vcell);
-          const BatteryHealth::SocTrust trust = SensorManager::instance().cachedSocTrust();
-          BatteryAuthority::commit(
-              BatteryAuthority::evaluate(soc, vcellState, vcell, trust, BatteryAuthority::currentTier()),
-              soc);
-        }
-        
-        if (!CurrentReadings::get_occupied()) {
-          CurrentReadings::set_occupied(true);
-          // WO-2026-08-29-002 item 8: deliberately NOT gated on
-          // isClockTrusted(). Unlike lastCountTime, occupancyStartTime's 0
-          // value is a load-bearing sentinel for two consumers:
-          // MyPersistentData.cpp's validate() treats occupied=true with
-          // occupancyStartTime==0 as corrupt state and forces occupied=false
-          // (a real state-machine side effect, not just a recorded value),
-          // and State_Modes.cpp computes `Time.now() - occupancyStartTime`
-          // for a logged duration, which would become a multi-decade garbage
-          // span if this were 0 while occupied. Writing Time.now() here even
-          // when untrusted preserves existing behavior; see the
-          // Implementation Report for the Chief Engineer's review.
-          CurrentReadings::set_occupancyStartTime(Time.now());
-          // Treat the PIR wake as an occupancy event for debounce purposes.
-          // If lastOccupancyEvent is left at 0, the debounce logic that uses
-          // millis()-based timing will immediately expire and mark UNOCCUPIED.
-          CurrentReadings::set_lastOccupancyEvent(millis());
-
-          // Keep LED on for the debounce window (sensor.setting1 is milliseconds).
-          uint32_t debounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
-          if (debounceMs == 0) {
-            debounceMs = Config::occupancyDebounceMsForRuntime();
-          }
-          signalLED(true, debounceMs);
-          const bool reportNow = reportsOccupancyChangesNow();
-          logOccupiedEvent("pir-wake", debounceMs / 1000UL, reportNow);
-          
-          // Match the rest of the occupancy state machine: only KEEP_ALIVE and
-          // CONNECTED force an immediate report/connect on occupancy transitions.
-          if (reportNow) {
-            session.occupancyChangeTriggered = true;
-            setAppBreadcrumb(5);
-            transitionTo(REPORTING_STATE, "sleep-pir-occupancy-report");
-            return;
-          }
-        } else {
-          // Already occupied - motion detected during debounce, restart timer
-          uint32_t debounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
-          if (debounceMs == 0) {
-            debounceMs = Config::occupancyDebounceMsForRuntime();
-          }
-          signalLED(true, debounceMs);  // Restart LED timer
-          logOccupiedEvent("pir-wake", debounceMs / 1000UL, false, true);
-        }
-        CurrentReadings::set_lastOccupancyEvent(millis());
-      }
-    }
+    if (processSleepWakeEvent(pirWake)) return;
 
     logWakeSummary(wakeReasonLabel);
 
@@ -1667,4 +1105,171 @@ void handleSleepingState() {
 
     transitionTo(IDLE_STATE, "sleep-wake-idle");
   }
+}
+
+// NOTE:
+// This file was split from StateHandlers.cpp as a mechanical refactor.
+// No behavioral changes were made.
+
+/**
+ * @brief SLEEPING_STATE: deep sleep between reporting intervals.
+ * ...
+ */
+// Firmware-update record owned by Generalized-Core-Counter.cpp (WO-2026-10-01-001 A).
+extern volatile bool firmwareUpdateInProgress;
+
+void handleSleepingState() {
+  setLoopStage(LOOP_STAGE_SLEEP_PREP);
+
+  // Zero-gated (not enteredState-gated): two of this function's real exit
+  // paths transition SLEEPING_STATE -> SLEEPING_STATE
+  // (sleep-timer-occupied-suppress-report, sleep-pir-return-to-sleep) - a
+  // real cycle ends and a new one begins, but the FSM `state` value doesn't
+  // change, so an enteredState-gated reset would never fire for the new
+  // cycle. This mirrors the existing cloudSyncStartMs pattern below.
+  maybeStartSleepPrepSpan(retainedLoopForensics.sleepPrepSpanStartMillis, millis());
+
+  bool enteredState = (state != oldState);
+
+  if (enteredState) {
+    setAppBreadcrumb(3);
+    publishStateTransition();
+    cloudGate.operationsCompleteLogged = false;  // Reset flag on state entry
+    cloudGate.gateWasBlocking = false;
+    cloudGate.lastGateStatusLogMs = 0;
+    cloudGate.lastGateBlockerMask = kGateBlockerUninitialized;
+    cloudGate.lastGateBlockerBeforeRelease = 0;
+    cloudGate.gateReleaseReasonKnown = false;
+    SleepTeardown::enter();
+  }
+
+  // Determine if we will use *effective* network standby for the upcoming sleep.
+  // Only cellular platforms actually apply standby; on WiFi, treat as disabled
+  // so disconnect logic doesn't wait for a radio state that won't change.
+  // Standby is only useful after a successful cloud session in the current
+  // wake cycle; if connect never succeeded, preserving the modem state buys
+  // nothing and can carry a bad NCP state into the next wake.
+  bool useNetworkStandbyRequested =
+      (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) &&
+      isWithinOpenHours();
+  bool useNetworkStandbyEffective = effectiveStandby(useNetworkStandbyRequested);
+
+  // If a ledger update (or time progression) moves the park into OPEN hours
+  // while we are in SLEEPING_STATE, abort sleeping immediately in CONNECTED
+  // mode so we stay awake/connected and resume counting.
+  //
+  // WO-2026-09-19 Step 3b: Clock::openness() != Closed, not
+  // isTimeValid()+isWithinOpenHours(). Unknown is treated as Open here,
+  // consistent with every other CONNECTED-mode site this step converts:
+  // abort the sleep and stay awake/connected so a resync can occur, rather
+  // than committing to a sleep the device can't actually justify.
+  if (PowerManager::instance().effectiveConnectionMode() == SystemConfig::CONNECTED && Clock::openness() != Clock::Openness::Closed) {
+    ensureSensorEnabled("SLEEP abort: CONNECTED+OPEN");
+    cloudGate.cloudSyncStartMs = 0;
+    transitionTo(IDLE_STATE, "sleep-abort-open-hours");
+    return;
+  }
+
+  // If we are connected and the publish queue is not yet in a sleep-safe
+  // state (events queued or a publish in progress), we will wait below in the
+  // unified cloud-operations gate (with a timeout budget) so we never wait
+  // indefinitely on a stuck publish.
+
+  // ********** Cloud Operations Sync Prerequisites (with timeout budget) **********
+  // Before disconnecting, ensure critical operations complete:
+  //   1) Publish queue drained
+  //   2) Ledgers synced from cloud
+  //   3) OTA updates checked
+  //   4) Webhook response received
+  // Use a timeout budget to prevent battery drain if operations hang.
+  // NOTE: This code is non-blocking at application level (Particle.process() called)
+  // but blocks state transition until prerequisites complete or timeout.
+
+  // ********** Non-blocking disconnect + modem power-down **********
+  // Device OS already manages the asynchronous cloud session teardown once
+  // Particle.disconnect() has been requested. Here, we keep application
+  // logic minimal: request cloud disconnect and radio-off once, then wait
+  // (bounded) until both cloud and modem are actually off before sleeping.
+
+  if (enteredState) {
+    cloudGate.cloudSyncBudgetMs = 0;
+    cloudGate.cloudSyncMaxQueueDepth = 0;
+    cloudGate.lastQueueDepth = 0xFFFF;
+#if Wiring_WiFi
+    wifiGuard.wifiOffGuardActive = false;
+    wifiGuard.wifiOffGuardStartMs = 0;
+    wifiGuard.wifiOffGuardLastRetryMs = 0;
+    wifiGuard.wifiOffGuardRetries = 0;
+#endif
+  }
+
+  SleepTeardown::guardLostTimestamp();
+
+  // Particle's reference pattern (STATE_SLEEP's first check): a firmware
+  // download in flight outranks sleep. Sit here on every pass until no
+  // teardown has been requested, so a `begin` delivered between loop passes is
+  // caught before the cloud disconnect / radio-off requests below, not after
+  // the transfer has already been lost (WO-2026-10-01-001 item A).
+  if (!SleepTeardown::disconnectRequested() && firmwareUpdateInProgress) {
+    cloudGate.cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
+    transitionTo(FIRMWARE_UPDATE_STATE, "firmware update in progress");
+    return;
+  }
+
+  // An occupancy change latched after the last wake decision (for example by
+  // the main-loop handler while already SLEEPING) reports before any
+  // sleep-or-suppress decision below can commit to sleep. Once this span has
+  // requested teardown it stays latched and reports on the first pass after
+  // the wake, so Report/Connect never starts while the disconnect is in flight.
+  if (session.occupancyChangeTriggered && !SleepTeardown::disconnectRequested()) {
+    cloudGate.cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
+    transitionTo(REPORTING_STATE, "occupancy change pending");
+    return;
+  }
+
+  if (cloudGatePass(useNetworkStandbyEffective)) return;
+
+  if (SleepTeardown::run(useNetworkStandbyRequested, useNetworkStandbyEffective, standbyReturn.forceModemOff, standbyReturn.error) != SleepTeardown::Result::READY) { return; }
+
+  setAppBreadcrumb(23); // BREADCRUMB_SLEEP_GATE_DONE (was stale literal 19, colliding with BREADCRUMB_REPORT_POST_LEDGER)
+
+  SleepPlan plan;
+  if (sleepPlan(plan)) return;
+  int wakeInSeconds = plan.wakeInSeconds;
+  const char *sleepReason = plan.sleepReason;
+  const bool overnightFallbackSleep = plan.overnightFallbackSleep;
+
+  hibernateAttempt(overnightFallbackSleep, wakeInSeconds);
+
+  if (nightlyHeapGuard(overnightFallbackSleep)) return;
+
+  // The sleep configuration is built fresh as a local at each sleep site
+  // (below), so GPIO selections cannot accumulate across calls.
+  setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START (was stale literal 20, colliding with BREADCRUMB_REPORT_EXIT)
+
+  // ********** WORKING SLEEP CONFIGURATION **********
+  // Based on Connected-Counter-Next which uses system timer + GPIO wake.
+  // NO AB1805 alarms - AB1805 is only used for watchdog + RTC time sync.
+  // This approach works reliably on Photon2!
+
+  // In INTERMITTENT_KEEP_ALIVE mode during open hours on *cellular* devices,
+  // use network standby to avoid rapid reconnects that could trigger carrier
+  // blacklisting. On WiFi devices, standby is not applied.
+  bool useNetworkStandby = useNetworkStandbyEffective;
+
+  // -----------------------------------------------------------------------
+  // Minimal end-of-cycle observability (one compact line per wake cycle)
+  // -----------------------------------------------------------------------
+  endOfCycleSummary(useNetworkStandby);
+
+  // On WiFi platforms, ensure the radio is actually OFF before entering
+  // ULTRA_LOW_POWER. If the cloud/radio was left on, the device can flash
+  // green briefly on wake as WiFi attempts to reconnect.
+#if Wiring_WiFi
+  if (wifiOffGuardPass(useNetworkStandby)) return;
+#endif
+  
+  WakeContext wake;
+  if (sleepAndResume(wakeInSeconds, useNetworkStandby, sleepReason, wake)) return;
+  postWakeRouting(wake.pirWake, wake.buttonWake, wake.timerWake, wake.wakeReasonLabel);
 }

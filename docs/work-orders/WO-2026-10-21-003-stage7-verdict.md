@@ -1,0 +1,41 @@
+# VERIFIED WITH CONCERNS
+
+**Reviewer:** Codex · **Model:** `gpt-5.6-sol` (probed 2026-10-20, §5) · **Reasoning:** high
+
+**Test interpreters:** **99/99** — 57 `.sh` suites via `zsh`, then 42 bare `.py` suites via `python3`, serial and one suite at a time. ARM builds used Device OS 6.4.1 Boron, GCC ARM 10.2.1, `-frandom-seed=p6`, and a distinct fresh object/output path for every build. Argon was not built.
+
+Review target: implementation commit `d9ba803f25efc6741d55703166c90147921af6ab` against parent `7485e5c6c1a3421f076073041ffa0c4da8d982de`; the parent's `src/` tree and `State_Sleep.cpp` blob are identical to S-3 tip `3efd9d819c1805f008cbc723be0e82df79ed1de0`. Current worktree tip `2587326` adds only Stage 6/result/dispatch documentation.
+
+| Check | Result | Evidence |
+|---|---|---|
+| 1. Transcript provenance and coverage | **PASS** | The fixture header names base `3efd9d8`; its parent-equivalent `src/` tree is `b91df18e…` and `State_Sleep.cpp` blob is `1e3513bf…`. Regeneration in a Git-backed detached worktree was byte-identical: 1,095 lines, file SHA-256 `5804c860…`, body SHA-256 `05df0357…`, 88/88 passes (81 release + 7 test-mode). The release table covers Open/Closed/Unknown × due/not × trusted/untrusted; night ≤0, normal and around/above 32,760 s; interval 0/nonzero and alignment offsets; COUNTING LED remaining/not and on/off; OCCUPANCY occupied/not, setting 0, and debounce below/at/above wake; heap around reset/warn thresholds overnight and in daytime/Unknown. The test-mode matrix contains 59/60/61 s below/at/above the 60 s cap plus long, clamped, refused-log and open controls; at the limit it remains 60 with no cap log, above it caps to 60. Base inline plan/guard spans come from `git show` and unique markers; current functions and handler call/unpack region come from unique markers; compiled copies are re-extracted and compared. Tampering produced `COPY_MISMATCH`. Built-in mutations catch the five previously unpinned properties. My own Git-backed `/1000→/100` debounce and deleted post-`onEnterSleep()` `signalLED(false)` mutants each produced `EQUIVALENCE_FAILED` with the expected transcript delta. |
+| 2. Moved blocks byte identity | **PASS** | Independent extraction gives plan 130→132 lines, with **9 blank lines on each side**. Its complete differences are two `return;→return true;` replacements and appended `plan = {wakeInSeconds, sleepReason, overnightFallbackSleep};` / `return false;`. Guard 27→28 lines has **2 blank lines on each side**; its complete differences are one `return;→return true;` and appended `return false;`. No other byte or blank-line difference exists in either moved block. |
+| 3. Call order and effects | **PASS** | `State_Sleep.cpp:994-1002` is exactly plan → unpack three fields → `hibernateAttempt` → heap guard, with immediate handler returns on either helper's true result. The only `plan.` reads are `wakeInSeconds`, `sleepReason`, and `overnightFallbackSleep` at `:996-998`; `parkOpenness`, `nightSleepSec`, and the plan's `intervalSec` remain helper locals, while wake code has its separate `intervalSec` at `:1352`. The reset path still calls `PowerDiagnostics::flushDiagBatch()` before `System.reset()` (`:507-511`), also frozen in that order in the transcript. No function static was added or moved, no `retained` token was added, and `State_Sleep.cpp` is the only changed `src/` file. |
+| 4. Flag build | **PASS** | Fresh Boron test-mode builds are `152868/1114/2212 → 152876/1114/2212`; `handleSleepingState` alone grows `0x152c→0x1534`. The extraction is inlined; the plan result's lifetime changes register/spill and cold-block scheduling under the flag-only cap/log path, adding 8 bytes without adding a symbol or changing the direct-call multiset. The compiler emitted the explicit test-mode warning in both builds. Fixture scenarios 59/60/61 pin below/at/above the limit, and the built-in dropped-cap mutant fails. |
+| 5. ELF and retained | **PASS** | Fresh release builds are identically sized at `151348/1114/2212`; all program symbols and sizes match, static-init stubs are 22/22, and the sole compiler-local name change is `CSWTCH.156→CSWTCH.158` at the same 0x40 size. Release code is **not byte-identical**: `.text` has 600 differing bytes, all within the unchanged-size `handleSleepingState` range; disassembly shows stack-slot allocation and basic/cold-block scheduling changes, with identical direct-call sequence. `.data` is byte-identical. The complete 0x98-byte `.backup` section is byte-identical (SHA-256 `adfe530f…`), with all 25 retained-range symbols at identical addresses: `retainedBoot` `0x2003f420`, hibernate fields `0x2003f480/488/48c/490`, signature `0x2003f494`. No `retained` keyword was added. |
+| 6. Re-anchored tests | **PASS** | Each of the four diffs retains every earlier assertion and adds/binds only what the move requires. `close_before_night_sleep_test.py` now extracts `sleepPlan`; `DailyBoundary::check→false` fails. `sleep_duration_consumes_openness_test.py` requires one derivation in the plan and none/read-none in the handler; an added handler derivation fails. `loop_stage_sleep_prep_exclusion_test.py` preserves the 17-transition total split 13 handler + 2 plan + 2 teardown (and 1 in `sleepAndResume`); an added plan transition fails. `nightly_heap_guard_flush_test.sh` extracts the whole bool helper, preserves flush/reset ordering, and adds true/false return checks; deleting the flush and separately resetting at the warn threshold both fail. A moved-token/test-reader scan found no other vacuous test: among older tests only unchanged `clock_trust_standard_structural_test.py` binds the plan's `Clock::isTrusted()` call, and an `isTimeValid()` mutant fails it. |
+| 7. Budget, complexity and suite | **CONCERN** | Hard rule is additions minus deletions across tracked `src/`, so moves cancel: `State_Sleep.cpp` 1,356→1,373, `+174/−157 = +17` net (**+14 nonblank**), within +20. Against main `0c565fa`: `src/` 22,306→22,368 (**+62**); tests excluding fixtures 28,893→32,212 (**+3,319**); fixtures 834→17,963 (**+17,129**); suites 91→99 (**+8**). S-4 alone is +17 / +667 / +1,095 / +2. The 88-scenario fixture is proportionate: it is 1.22× the estimate's upper bound, the seven flag scenarios are a small targeted matrix rather than a second replay, and every scenario freezes real behavior. Non-fixture test code is nevertheless 6.67× the +100 guideline and must be flagged. Full suite passed 99/99 serially. Golden payload fixture is unchanged, SHA-256 `07de1e19…`; S-1/S-2/S-3 fixtures are unchanged. `git diff --check d9ba803^ d9ba803` has only `State_Sleep.cpp:462`; the identical trailing-space line is inherited byte-for-byte from base line 930, so the stated waiver applies. |
+
+RETAINED OUTCOME: A
+
+## Findings
+
+### C1 — Low — non-fixture test implementation exceeds the guideline
+
+- **Observation:** `tests/sleep_plan_equivalence_test.{cpp,sh}:1`, `tests/sleep_plan_structural_test.py:1`, the four re-anchors and the fake extension total `+691/−24 = +667` non-fixture test lines, 6.67× the +100 guideline. The 1,095-line fixture is 195 lines above the 900-line estimate ceiling; the test-mode matrix is seven scenarios rather than about three.
+- **Inference:** The fixture and scenario count are proportionate to the branch surface and avoid S-3's duplicated-build problem, but the harness carries above-guideline maintenance cost. This is test-only and does not weaken equivalence evidence or shipped behavior.
+
+## Budget versus actual
+
+| Item | Budget/guideline | Actual |
+|---|---:|---:|
+| `src/` net | ≤ +20 hard | **+17** all lines; **+14** nonblank |
+| S-4 tests excluding fixture | +100 guideline | **+667 net** (`+691/−24`) |
+| S-4 fixture | 400–900 estimate | **1,095 lines**, 88 scenarios |
+| S-4 suites | baseline 97 | **99** (+2) |
+
+## Confirmations
+
+- The original worktree was clean before review. The implementation detached worktree remained clean after regeneration, builds and the full suite; the authorized verdict file is the only final change in the original worktree.
+- All builds and mutations were confined to review-created Git-backed detached worktrees or `build-tmp/wo20261021-003-stage7/`. Only review-created scratch was removed.
+- No commit, push, stash, reset, checkout/restore, device, network or AWS access occurred. Only Boron was built.

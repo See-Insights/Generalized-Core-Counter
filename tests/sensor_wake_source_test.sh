@@ -11,6 +11,13 @@ python3 - "$src_dir" "$work" <<'PY'
 import re, sys
 src, out = sys.argv[1:3]
 sleep = open(f"{src}/state/State_Sleep.cpp").read()
+# WO-2026-10-21-001: the statements live in sleepAndResume(); the handler's unpack line
+# (bool pirWake = wake.pirWake;) is outside the extraction scope and must not match.
+fi = sleep.find("bool sleepAndResume(")
+if fi < 0 or sleep.count("bool sleepAndResume(") != 1: sys.exit("EXTRACT_FAILED: sleepAndResume() not found once")
+fe = sleep.find("\n}\n", fi)
+if fe < 0: sys.exit("EXTRACT_FAILED: end of sleepAndResume() not found")
+sleep = sleep[fi:fe + 3]
 for name, rx in {"sensor_wake": r"const SensorWakeSource sensorWake =[^;]*;\s*const bool sensorCanWake =[^;]*;",
                  "wake_pin": r"\w+ wakePin = result\.wakeupPin\(\);",
                  "wake_reason": r"const char \*wakeReturnReason =[^;]*;", "pirwake": r"bool pirWake =[^;]*;"}.items():

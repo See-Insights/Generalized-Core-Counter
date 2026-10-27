@@ -35,6 +35,61 @@ extract_braced_block() {
   ' "$file"
 }
 
+# Order of the guard, the cloud-operations gate call (cloudGatePass) and SleepTeardown::run( inside
+# handleSleepingState(), read from the real source: the first match each, skipping block comments,
+# whole-line comments and trailing comments (S-1 C1).
+sleep_order_of() {
+  awk '
+    /^void handleSleepingState\(\) \{/ { inside = 1; next }
+    inside && /^}/ { exit }
+    !inside { next }
+    {
+      line = $0
+      if (inblock) {
+        e = index(line, "*/")
+        if (!e) next
+        line = substr(line, e + 2)
+        inblock = 0
+      }
+      while ((s = index(line, "/*")) > 0) {
+        e = index(substr(line, s + 2), "*/")
+        if (!e) { line = substr(line, 1, s - 1); inblock = 1; break }
+        line = substr(line, 1, s - 1) " " substr(line, s + e + 3)
+      }
+      sub(/\/\/.*$/, "", line)
+    }
+    !g && index(line, "if (!SleepTeardown::disconnectRequested() && firmwareUpdateInProgress) {") { print NR, "guard"; g = 1 }
+    !c && index(line, "cloudGatePass(") { print NR, "gate"; c = 1 }
+    !t && index(line, "SleepTeardown::run(") { print NR, "teardown"; t = 1 }
+  ' "$1" | sort -n | awk '{ print $2 }'
+}
+sleep_order="$(sleep_order_of "$repo_root/src/state/State_Sleep.cpp")"
+if [[ "${(j:,:)${(f)sleep_order}}" != "guard,gate,teardown" ]]; then
+  echo "FAIL: handleSleepingState() must read the firmware guard, then cloudGatePass(, then SleepTeardown::run( (found: ${(j:,:)${(f)sleep_order}})" >&2
+  exit 1
+fi
+
+# Mutation: the guard moved below cloudGatePass( must change the order and fail the check above.
+mutant="$(mktemp "${TMPDIR:-/tmp}/firmware_update_dwell_mutant.XXXXXX")"
+python3 - "$repo_root/src/state/State_Sleep.cpp" "$mutant" <<'PY'
+import re, sys
+text = open(sys.argv[1]).read()
+guard = re.search(r"  if \(!SleepTeardown::disconnectRequested\(\) && firmwareUpdateInProgress\) \{\n.*?\n  \}\n\n", text, re.S)
+call = "  if (cloudGatePass(useNetworkStandbyEffective)) return;\n"
+if not guard or text.count(call) != 1:
+    sys.exit("MUTATION_NOT_APPLIED")
+text = text.replace(guard.group(0), "")
+text = text.replace(call, call + guard.group(0))
+open(sys.argv[2], "w").write(text)
+PY
+if [[ "${(j:,:)${(f)$(sleep_order_of "$mutant")}}" == "guard,gate,teardown" ]]; then
+  echo "FAIL: moving the firmware guard below cloudGatePass( was not detected" >&2
+  rm -f "$mutant"
+  exit 1
+fi
+rm -f "$mutant"
+echo "OK (mutation): the guard moved below cloudGatePass( is detected"
+
 {
   cat <<'CPP'
 #include <cassert>
@@ -129,10 +184,11 @@ static const unsigned long firmwareUpdateMaxMs =
 
 typedef int system_event_t;
 
-// ----- Sleep-gate surrounding state (mirrors State_Sleep.cpp's statics) ------
+// ----- Sleep-gate surrounding state (mirrors State_Sleep.cpp's cloudGate struct) ------
 
 bool disconnectRequested = false;
-unsigned long cloudSyncStartMs = 0;
+namespace SleepTeardown { bool disconnectRequested() { return ::disconnectRequested; } }
+struct { unsigned long cloudSyncStartMs = 0; } cloudGate;
 int teardownRequests = 0;   // any cloud-disconnect / radio-off request
 bool cloudGateWaiting = false; // the cloud-operations gate is still blocking
 
@@ -146,29 +202,39 @@ CPP
     "void firmwareUpdateHandler(system_event_t event, int param) {"
   echo
   echo "// ===== Sleep-gate check extracted verbatim from src/state/State_Sleep.cpp ====="
-  echo "// Wrapped in the surrounding order of handleSleepingState(): the check runs"
-  echo "// first, then the cloud-operations gate (which returns while it blocks), then"
-  echo "// the first teardown request."
+  echo "// Wrapped in the order the guard, the cloud-operations gate and the teardown"
+  echo "// call (SleepTeardown::run) have in handleSleepingState() in the real source."
   echo "void sleepGatePass() {"
-  extract_braced_block "$repo_root/src/state/State_Sleep.cpp" \
-    "if (!disconnectRequested && firmwareUpdateInProgress) {"
-  cat <<'CPP'
-  if (Particle.connected() && !disconnectRequested) {
-    if (cloudSyncStartMs == 0) {
-      cloudSyncStartMs = millis();
+  for piece in ${(f)sleep_order}; do
+    case "$piece" in
+      guard)
+        extract_braced_block "$repo_root/src/state/State_Sleep.cpp" \
+          "if (!SleepTeardown::disconnectRequested() && firmwareUpdateInProgress) {"
+        ;;
+      gate)
+        cat <<'CPP'
+  if (Particle.connected() && !disconnectRequested) {  // stands in for cloudGatePass(
+    if (cloudGate.cloudSyncStartMs == 0) {
+      cloudGate.cloudSyncStartMs = millis();
     }
     if (cloudGateWaiting) {
       return; // Stay in SLEEPING_STATE until complete or timeout
     }
-    cloudSyncStartMs = 0;
+    cloudGate.cloudSyncStartMs = 0;
   }
+CPP
+        ;;
+      teardown)
+        cat <<'CPP'
   if (!disconnectRequested) {
-    teardownRequests++;   // Connectivity::requestFullDisconnectAndRadioOff()
+    teardownRequests++;   // SleepTeardown::run(): disconnect / radio-off request
     disconnectRequested = true;
   }
-}
 CPP
-
+        ;;
+    esac
+  done
+  echo "}"
   echo
   echo "// ===== Extracted verbatim from src/state/State_Connect.cpp ====="
   extract_braced_block "$repo_root/src/state/State_Connect.cpp" \
@@ -189,7 +255,7 @@ static void resetWorld() {
   session.awaitingWebhookResponse = false;
   session.webhookAwaitStartMs = 0;
   disconnectRequested = false;
-  cloudSyncStartMs = 0;
+  cloudGate.cloudSyncStartMs = 0;
   teardownRequests = 0;
   cloudGateWaiting = false;
 }
@@ -294,7 +360,7 @@ int main() {
   assert(teardownRequests == 0);
   assert(transitions.back().reason == "firmware update in progress");
   // The gate timer was cleared so a later return to sleep starts cleanly.
-  assert(cloudSyncStartMs == 0);
+  assert(cloudGate.cloudSyncStartMs == 0);
 
   // --- 4. Progress keeps the device in the state well past five minutes in
   //        total, and each new activity stamp is reported to ThrashGuard.

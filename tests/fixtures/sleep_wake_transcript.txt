@@ -1,0 +1,1545 @@
+# Frozen output of the pre-change post-wake routing (handler region after the wake unpack, with the wake-event processing inside it): WO-2026-10-22-001 (Sleep S-6).
+# Base commit: e6d3e69
+# Scenarios: 143; passes: 143
+# Summary (scenarios passes TRANSITIONS NONE distinct-events): 143 143 143 0 31
+# Body sha256: af9dc4a512fc59f33e16878acbf304b391c3a6afcb5278a39ff494496b67970b
+# Generated once by extracting the region by marker text from e6d3e69:src/state/State_Sleep.cpp (git show),
+# wrapping it in tests/sleep_wake_equivalence_test.cpp against tests/stubs/sleep_teardown, and running mode a.
+BUILD release
+S0 button counting open
+  in wake=BUTTON mode=0 conn=0 open=1 connected=0 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY BUTTON open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-wake-button
+  OUT trans=1 serviceRequest=1 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S1 button counting closed
+  in wake=BUTTON mode=0 conn=0 open=0 connected=0 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY BUTTON open=0 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-wake-button
+  OUT trans=1 serviceRequest=1 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S2 button occupancy open
+  in wake=BUTTON mode=1 conn=0 open=1 connected=0 low=0 openness=0 clock=1 serial=0 occ=1 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY BUTTON open=1 ready=1 occ=1 led=0s
+    TRANSITION 4 sleep-wake-button
+  OUT trans=1 serviceRequest=1 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=0 led=0/0
+S3 button occupancy closed
+  in wake=BUTTON mode=1 conn=0 open=0 connected=0 low=0 openness=0 clock=1 serial=0 occ=1 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY BUTTON open=0 ready=1 occ=1 led=0s
+    TRANSITION 4 sleep-wake-button
+  OUT trans=1 serviceRequest=1 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=0 led=0/0
+S4 timer open CONNECTED connected
+  in wake=TIMER mode=0 conn=0 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S5 timer open CONNECTED disconnected
+  in wake=TIMER mode=0 conn=0 open=1 connected=0 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 5 sleep-open-hours-reconnect
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S6 timer open INTERMITTENT connected
+  in wake=TIMER mode=0 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S7 timer open INTERMITTENT disconnected
+  in wake=TIMER mode=0 conn=1 open=1 connected=0 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S8 timer open DISCONNECTED connected
+  in wake=TIMER mode=0 conn=2 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S9 timer open DISCONNECTED disconnected
+  in wake=TIMER mode=0 conn=2 open=1 connected=0 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S10 timer open KEEP_ALIVE connected
+  in wake=TIMER mode=0 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S11 timer open KEEP_ALIVE disconnected
+  in wake=TIMER mode=0 conn=3 open=1 connected=0 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S12 timer closed CONNECTED connected
+  in wake=TIMER mode=0 conn=0 open=0 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    WAKESUMMARY TIMER open=0 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S13 timer closed CONNECTED disconnected
+  in wake=TIMER mode=0 conn=0 open=0 connected=0 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    WAKESUMMARY TIMER open=0 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S14 timer closed INTERMITTENT connected
+  in wake=TIMER mode=0 conn=1 open=0 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    WAKESUMMARY TIMER open=0 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S15 timer closed INTERMITTENT disconnected
+  in wake=TIMER mode=0 conn=1 open=0 connected=0 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    WAKESUMMARY TIMER open=0 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S16 timer closed DISCONNECTED connected
+  in wake=TIMER mode=0 conn=2 open=0 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    WAKESUMMARY TIMER open=0 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S17 timer closed DISCONNECTED disconnected
+  in wake=TIMER mode=0 conn=2 open=0 connected=0 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    WAKESUMMARY TIMER open=0 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S18 timer closed KEEP_ALIVE connected
+  in wake=TIMER mode=0 conn=3 open=0 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    WAKESUMMARY TIMER open=0 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S19 timer closed KEEP_ALIVE disconnected
+  in wake=TIMER mode=0 conn=3 open=0 connected=0 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    WAKESUMMARY TIMER open=0 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S20 timer occupancy empty CONNECTED report-not-due
+  in wake=TIMER mode=1 conn=0 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S21 timer occupancy empty CONNECTED report-due
+  in wake=TIMER mode=1 conn=0 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S22 timer occupancy empty INTERMITTENT report-not-due
+  in wake=TIMER mode=1 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S23 timer occupancy empty INTERMITTENT report-due
+  in wake=TIMER mode=1 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S24 timer occupancy empty DISCONNECTED report-not-due
+  in wake=TIMER mode=1 conn=2 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S25 timer occupancy empty DISCONNECTED report-due
+  in wake=TIMER mode=1 conn=2 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S26 timer occupancy empty KEEP_ALIVE report-not-due
+  in wake=TIMER mode=1 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S27 timer occupancy empty KEEP_ALIVE report-due
+  in wake=TIMER mode=1 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S28 timer occupancy occupied CONNECTED report-not-due
+  in wake=TIMER mode=1 conn=0 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=1 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=0 led=0/0
+S29 timer occupancy occupied CONNECTED report-due
+  in wake=TIMER mode=1 conn=0 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=1 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=0 led=0/0
+S30 timer occupancy occupied INTERMITTENT report-not-due
+  in wake=TIMER mode=1 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=1 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=0 led=0/0
+S31 timer occupancy occupied INTERMITTENT report-due
+  in wake=TIMER mode=1 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=1 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=0 led=0/0
+S32 timer occupancy occupied DISCONNECTED report-not-due
+  in wake=TIMER mode=1 conn=2 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=1 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=0 led=0/0
+S33 timer occupancy occupied DISCONNECTED report-due
+  in wake=TIMER mode=1 conn=2 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=1 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=0 led=0/0
+S34 timer occupancy occupied KEEP_ALIVE report-not-due
+  in wake=TIMER mode=1 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=1 led=0s
+    TRANSITION 0 sleep-timer-occupied-suppress-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=0 led=0/0
+S35 timer occupancy occupied KEEP_ALIVE report-due
+  in wake=TIMER mode=1 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=1 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=0 led=0/0
+S36 timer counting led-expired open
+  in wake=TIMER mode=0 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=1/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    LED on=0 ms=0
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S37 timer counting led-running open
+  in wake=TIMER mode=0 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=1/400 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=1/400
+S38 timer counting led-off open
+  in wake=TIMER mode=0 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S39 timer counting led-expired closed
+  in wake=TIMER mode=0 conn=1 open=0 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=1/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    WAKESUMMARY TIMER open=0 ready=1 occ=0 led=0s
+    LED on=0 ms=0
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S40 timer counting led-running closed
+  in wake=TIMER mode=0 conn=1 open=0 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=1/400 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    WAKESUMMARY TIMER open=0 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=1/400
+S41 timer counting led-off closed
+  in wake=TIMER mode=0 conn=1 open=0 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    WAKESUMMARY TIMER open=0 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S42 pir counting open CONNECTED last=same-interval
+  in wake=PIR mode=0 conn=0 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 2 sleep-wake-idle
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S43 pir counting open CONNECTED last=due-not-overdue
+  in wake=PIR mode=0 conn=0 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 2 sleep-wake-idle
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S44 pir counting open CONNECTED last=exactly-overdue
+  in wake=PIR mode=0 conn=0 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6400 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 4 sleep-pir-overdue-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S45 pir counting open CONNECTED last=never
+  in wake=PIR mode=0 conn=0 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=0 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 2 sleep-wake-idle
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S46 pir counting open INTERMITTENT last=same-interval
+  in wake=PIR mode=0 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S47 pir counting open INTERMITTENT last=due-not-overdue
+  in wake=PIR mode=0 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S48 pir counting open INTERMITTENT last=exactly-overdue
+  in wake=PIR mode=0 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6400 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 4 sleep-pir-overdue-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S49 pir counting open INTERMITTENT last=never
+  in wake=PIR mode=0 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=0 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S50 pir counting open DISCONNECTED last=same-interval
+  in wake=PIR mode=0 conn=2 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S51 pir counting open DISCONNECTED last=due-not-overdue
+  in wake=PIR mode=0 conn=2 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S52 pir counting open DISCONNECTED last=exactly-overdue
+  in wake=PIR mode=0 conn=2 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6400 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 4 sleep-pir-overdue-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S53 pir counting open DISCONNECTED last=never
+  in wake=PIR mode=0 conn=2 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=0 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S54 pir counting open KEEP_ALIVE last=same-interval
+  in wake=PIR mode=0 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S55 pir counting open KEEP_ALIVE last=due-not-overdue
+  in wake=PIR mode=0 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S56 pir counting open KEEP_ALIVE last=exactly-overdue
+  in wake=PIR mode=0 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6400 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 4 sleep-pir-overdue-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S57 pir counting open KEEP_ALIVE last=never
+  in wake=PIR mode=0 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=0 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S58 pir counting closed CONNECTED last=same-interval
+  in wake=PIR mode=0 conn=0 open=1 connected=1 low=0 openness=1 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 2 sleep-wake-idle
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S59 pir counting closed CONNECTED last=due-not-overdue
+  in wake=PIR mode=0 conn=0 open=1 connected=1 low=0 openness=1 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 2 sleep-wake-idle
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S60 pir counting closed INTERMITTENT last=same-interval
+  in wake=PIR mode=0 conn=1 open=1 connected=1 low=0 openness=1 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S61 pir counting closed INTERMITTENT last=due-not-overdue
+  in wake=PIR mode=0 conn=1 open=1 connected=1 low=0 openness=1 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S62 pir counting closed DISCONNECTED last=same-interval
+  in wake=PIR mode=0 conn=2 open=1 connected=1 low=0 openness=1 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S63 pir counting closed DISCONNECTED last=due-not-overdue
+  in wake=PIR mode=0 conn=2 open=1 connected=1 low=0 openness=1 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S64 pir counting closed KEEP_ALIVE last=same-interval
+  in wake=PIR mode=0 conn=3 open=1 connected=1 low=0 openness=1 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S65 pir counting closed KEEP_ALIVE last=due-not-overdue
+  in wake=PIR mode=0 conn=3 open=1 connected=1 low=0 openness=1 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S66 pir counting unknown CONNECTED last=same-interval
+  in wake=PIR mode=0 conn=0 open=1 connected=1 low=0 openness=2 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 2 sleep-wake-idle
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S67 pir counting unknown CONNECTED last=due-not-overdue
+  in wake=PIR mode=0 conn=0 open=1 connected=1 low=0 openness=2 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 2 sleep-wake-idle
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S68 pir counting unknown INTERMITTENT last=same-interval
+  in wake=PIR mode=0 conn=1 open=1 connected=1 low=0 openness=2 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S69 pir counting unknown INTERMITTENT last=due-not-overdue
+  in wake=PIR mode=0 conn=1 open=1 connected=1 low=0 openness=2 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S70 pir counting unknown DISCONNECTED last=same-interval
+  in wake=PIR mode=0 conn=2 open=1 connected=1 low=0 openness=2 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S71 pir counting unknown DISCONNECTED last=due-not-overdue
+  in wake=PIR mode=0 conn=2 open=1 connected=1 low=0 openness=2 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S72 pir counting unknown KEEP_ALIVE last=same-interval
+  in wake=PIR mode=0 conn=3 open=1 connected=1 low=0 openness=2 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S73 pir counting unknown KEEP_ALIVE last=due-not-overdue
+  in wake=PIR mode=0 conn=3 open=1 connected=1 low=0 openness=2 clock=1 serial=0 occ=0 led=0/0 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S74 pir counting untrusted clock
+  in wake=PIR mode=0 conn=1 open=1 connected=1 low=0 openness=0 clock=0 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=0
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=0 occ=0 start=0 lastEvt=0 led=1/1000
+S75 pir counting trusted clock, serial up
+  in wake=PIR mode=0 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=1 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    SERIAL Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S76 pir counting untrusted clock, serial up
+  in wake=PIR mode=0 conn=1 open=1 connected=1 low=0 openness=0 clock=0 serial=1 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=0
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    SERIAL Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=0 occ=0 start=0 lastEvt=0 led=1/1000
+S77 pir counting closed hours
+  in wake=PIR mode=0 conn=1 open=0 connected=1 low=0 openness=1 clock=1 serial=0 occ=0 led=1/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=0 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S78 pir counting count wraps
+  in wake=PIR mode=0 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=65535 daily=65535 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    SET hourlyCount=0
+    SET dailyCount=0
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 0, Daily: 0
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=0 daily=0 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S79 pir occupancy empty led-expired CONNECTED
+  in wake=PIR mode=1 conn=0 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=1/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    CLOSE sleep at=10000 valid=1 stillOpen=0
+    LED on=0 ms=0
+    OCCEVT unoccupied reason=debounce session=120s total=4000s report=1
+    TRANSITION 4 sleep-occupancy-debounce-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S80 pir occupancy empty led-expired INTERMITTENT
+  in wake=PIR mode=1 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=1/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    CLOSE sleep at=10000 valid=1 stillOpen=0
+    LED on=0 ms=0
+    OCCEVT unoccupied reason=debounce session=120s total=4000s report=0
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=0
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S81 pir occupancy empty led-expired DISCONNECTED
+  in wake=PIR mode=1 conn=2 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=1/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    CLOSE sleep at=10000 valid=1 stillOpen=0
+    LED on=0 ms=0
+    OCCEVT unoccupied reason=debounce session=120s total=4000s report=0
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=0
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S82 pir occupancy empty led-expired KEEP_ALIVE
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=1/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    CLOSE sleep at=10000 valid=1 stillOpen=0
+    LED on=0 ms=0
+    OCCEVT unoccupied reason=debounce session=120s total=4000s report=1
+    TRANSITION 4 sleep-occupancy-debounce-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S83 pir occupancy empty led-running CONNECTED
+  in wake=PIR mode=1 conn=0 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=1/90000 set1=45000 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=45000
+    OCCEVT occupied reason=pir-wake led=45s report=1 reset=0
+    CRUMB 5
+    TRANSITION 4 sleep-pir-occupancy-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/45000
+S84 pir occupancy empty led-running INTERMITTENT
+  in wake=PIR mode=1 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=1/90000 set1=45000 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=45000
+    OCCEVT occupied reason=pir-wake led=45s report=0 reset=0
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=45s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/45000
+S85 pir occupancy empty led-running DISCONNECTED
+  in wake=PIR mode=1 conn=2 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=1/90000 set1=45000 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=45000
+    OCCEVT occupied reason=pir-wake led=45s report=0 reset=0
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=45s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/45000
+S86 pir occupancy empty led-running KEEP_ALIVE
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=1/90000 set1=45000 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=45000
+    OCCEVT occupied reason=pir-wake led=45s report=1 reset=0
+    CRUMB 5
+    TRANSITION 4 sleep-pir-occupancy-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/45000
+S87 pir occupancy empty led-off CONNECTED
+  in wake=PIR mode=1 conn=0 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=1 reset=0
+    CRUMB 5
+    TRANSITION 4 sleep-pir-occupancy-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S88 pir occupancy empty led-off INTERMITTENT
+  in wake=PIR mode=1 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=0
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S89 pir occupancy empty led-off DISCONNECTED
+  in wake=PIR mode=1 conn=2 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=0
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S90 pir occupancy empty led-off KEEP_ALIVE
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=1 reset=0
+    CRUMB 5
+    TRANSITION 4 sleep-pir-occupancy-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S91 pir occupancy occupied led-expired CONNECTED
+  in wake=PIR mode=1 conn=0 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=1/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    CLOSE sleep at=10000 valid=1 stillOpen=0
+    LED on=0 ms=0
+    OCCEVT unoccupied reason=debounce session=120s total=4000s report=1
+    TRANSITION 4 sleep-occupancy-debounce-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=0 start=8000 lastEvt=0 led=0/0
+S92 pir occupancy occupied led-expired INTERMITTENT
+  in wake=PIR mode=1 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=1/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    CLOSE sleep at=10000 valid=1 stillOpen=0
+    LED on=0 ms=0
+    OCCEVT unoccupied reason=debounce session=120s total=4000s report=0
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=0
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S93 pir occupancy occupied led-expired DISCONNECTED
+  in wake=PIR mode=1 conn=2 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=1/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    CLOSE sleep at=10000 valid=1 stillOpen=0
+    LED on=0 ms=0
+    OCCEVT unoccupied reason=debounce session=120s total=4000s report=0
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=0
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S94 pir occupancy occupied led-expired KEEP_ALIVE
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=1/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    CLOSE sleep at=10000 valid=1 stillOpen=0
+    LED on=0 ms=0
+    OCCEVT unoccupied reason=debounce session=120s total=4000s report=1
+    TRANSITION 4 sleep-occupancy-debounce-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=0 start=8000 lastEvt=0 led=0/0
+S95 pir occupancy occupied led-running CONNECTED
+  in wake=PIR mode=1 conn=0 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=1/90000 set1=45000 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=45000
+    OCCEVT occupied reason=pir-wake led=45s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=45s
+    TRANSITION 2 sleep-wake-idle
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/45000
+S96 pir occupancy occupied led-running INTERMITTENT
+  in wake=PIR mode=1 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=1/90000 set1=45000 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=45000
+    OCCEVT occupied reason=pir-wake led=45s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=45s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/45000
+S97 pir occupancy occupied led-running DISCONNECTED
+  in wake=PIR mode=1 conn=2 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=1/90000 set1=45000 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=45000
+    OCCEVT occupied reason=pir-wake led=45s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=45s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/45000
+S98 pir occupancy occupied led-running KEEP_ALIVE
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=1/90000 set1=45000 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=45000
+    OCCEVT occupied reason=pir-wake led=45s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=45s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/45000
+S99 pir occupancy occupied led-off CONNECTED
+  in wake=PIR mode=1 conn=0 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 2 sleep-wake-idle
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S100 pir occupancy occupied led-off INTERMITTENT
+  in wake=PIR mode=1 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S101 pir occupancy occupied led-off DISCONNECTED
+  in wake=PIR mode=1 conn=2 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S102 pir occupancy occupied led-off KEEP_ALIVE
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S103 pir occupancy closed empty CONNECTED
+  in wake=PIR mode=1 conn=0 open=0 connected=1 low=0 openness=1 clock=1 serial=0 occ=0 led=1/60000 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=1 reset=0
+    CRUMB 5
+    TRANSITION 4 sleep-pir-occupancy-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S104 pir occupancy closed empty INTERMITTENT
+  in wake=PIR mode=1 conn=1 open=0 connected=1 low=0 openness=1 clock=1 serial=0 occ=0 led=1/60000 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=0
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=0 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S105 pir occupancy closed empty DISCONNECTED
+  in wake=PIR mode=1 conn=2 open=0 connected=1 low=0 openness=1 clock=1 serial=0 occ=0 led=1/60000 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=0
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=0 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S106 pir occupancy closed empty KEEP_ALIVE
+  in wake=PIR mode=1 conn=3 open=0 connected=1 low=0 openness=1 clock=1 serial=0 occ=0 led=1/60000 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=1 reset=0
+    CRUMB 5
+    TRANSITION 4 sleep-pir-occupancy-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S107 pir occupancy closed occupied CONNECTED
+  in wake=PIR mode=1 conn=0 open=0 connected=1 low=0 openness=1 clock=1 serial=0 occ=1 led=1/60000 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=0 ready=1 occ=1 led=300s
+    TRANSITION 2 sleep-wake-idle
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S108 pir occupancy closed occupied INTERMITTENT
+  in wake=PIR mode=1 conn=1 open=0 connected=1 low=0 openness=1 clock=1 serial=0 occ=1 led=1/60000 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=0 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S109 pir occupancy closed occupied DISCONNECTED
+  in wake=PIR mode=1 conn=2 open=0 connected=1 low=0 openness=1 clock=1 serial=0 occ=1 led=1/60000 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=0 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S110 pir occupancy closed occupied KEEP_ALIVE
+  in wake=PIR mode=1 conn=3 open=0 connected=1 low=0 openness=1 clock=1 serial=0 occ=1 led=1/60000 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=0 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S111 pir occupancy empty INTERMITTENT setting1=0
+  in wake=PIR mode=1 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=0
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S112 pir occupancy empty INTERMITTENT setting1=20000
+  in wake=PIR mode=1 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=20000 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=20000
+    OCCEVT occupied reason=pir-wake led=20s report=0 reset=0
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=20s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/20000
+S113 pir occupancy empty KEEP_ALIVE setting1=0
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=1 reset=0
+    CRUMB 5
+    TRANSITION 4 sleep-pir-occupancy-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S114 pir occupancy empty KEEP_ALIVE setting1=20000
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=20000 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=20000
+    OCCEVT occupied reason=pir-wake led=20s report=1 reset=0
+    CRUMB 5
+    TRANSITION 4 sleep-pir-occupancy-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/20000
+S115 pir occupancy occupied KEEP_ALIVE open report-not-due
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=1/30000 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S116 pir occupancy occupied KEEP_ALIVE open report-due
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=1/30000 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 4 sleep-pir-overdue-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S117 pir occupancy occupied KEEP_ALIVE closed report-not-due
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=0 openness=1 clock=1 serial=0 occ=1 led=1/30000 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S118 pir occupancy occupied KEEP_ALIVE closed report-due
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=0 openness=1 clock=1 serial=0 occ=1 led=1/30000 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S119 pir occupancy occupied KEEP_ALIVE unknown report-not-due
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=0 openness=2 clock=1 serial=0 occ=1 led=1/30000 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S120 pir occupancy occupied KEEP_ALIVE unknown report-due
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=0 openness=2 clock=1 serial=0 occ=1 led=1/30000 set1=0 last=6401 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 4 sleep-pir-overdue-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S121 pir occupancy led-expired INTERMITTENT close not valid
+  in wake=PIR mode=1 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=1/0 set1=0 last=7300 hourly=4 daily=9 close=0/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    CLOSE sleep at=10000 valid=0 stillOpen=0
+    LED on=0 ms=0
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S122 pir occupancy led-expired KEEP_ALIVE close not valid
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=1/0 set1=0 last=7300 hourly=4 daily=9 close=0/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    CLOSE sleep at=10000 valid=0 stillOpen=0
+    LED on=0 ms=0
+    TRANSITION 4 sleep-occupancy-debounce-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=0 led=0/0
+S123 pir occupancy led-expired INTERMITTENT session still open
+  in wake=PIR mode=1 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=1/0 set1=0 last=7300 hourly=4 daily=9 close=1/1 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    CLOSE sleep at=10000 valid=1 stillOpen=1
+    LED on=0 ms=0
+    OCCEVT unoccupied reason=debounce session=120s total=4000s report=0
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S124 pir occupancy led-expired KEEP_ALIVE session still open
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=1 led=1/0 set1=0 last=7300 hourly=4 daily=9 close=1/1 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    CLOSE sleep at=10000 valid=1 stillOpen=1
+    LED on=0 ms=0
+    OCCEVT unoccupied reason=debounce session=120s total=4000s report=1
+    PROGRESS PIR_WAKE_OCCUPANCY
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S125 low battery timer CONNECTED vcell known, trust trusted
+  in wake=TIMER mode=0 conn=0 open=1 connected=1 low=1 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    BATAUTH evaluate soc=41.5 vcellState=0 vcell=3.90 trust=0 prev=2
+    BATAUTH commit tier=2 trust=0 state=0 soc=41.5
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S126 low battery timer CONNECTED vcell invalid, trust suspect
+  in wake=TIMER mode=0 conn=0 open=1 connected=1 low=1 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=1 trust=1
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    BATAUTH evaluate soc=41.5 vcellState=1 vcell=3.90 trust=1 prev=2
+    BATAUTH commit tier=2 trust=1 state=1 soc=41.5
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S127 low battery timer KEEP_ALIVE vcell known, trust trusted
+  in wake=TIMER mode=0 conn=3 open=1 connected=1 low=1 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    BATAUTH evaluate soc=41.5 vcellState=0 vcell=3.90 trust=0 prev=2
+    BATAUTH commit tier=2 trust=0 state=0 soc=41.5
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S128 low battery timer KEEP_ALIVE vcell invalid, trust suspect
+  in wake=TIMER mode=0 conn=3 open=1 connected=1 low=1 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=1 trust=1
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    BATAUTH evaluate soc=41.5 vcellState=1 vcell=3.90 trust=1 prev=2
+    BATAUTH commit tier=2 trust=1 state=1 soc=41.5
+    WAKESUMMARY TIMER open=1 ready=1 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S129 low battery pir counting CONNECTED vcell known, trust trusted
+  in wake=PIR mode=0 conn=0 open=1 connected=1 low=1 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    BATAUTH evaluate soc=41.5 vcellState=0 vcell=3.90 trust=0 prev=2
+    BATAUTH commit tier=2 trust=0 state=0 soc=41.5
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 2 sleep-wake-idle
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S130 low battery pir counting CONNECTED vcell invalid, trust suspect
+  in wake=PIR mode=0 conn=0 open=1 connected=1 low=1 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=1 trust=1
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    BATAUTH evaluate soc=41.5 vcellState=1 vcell=3.90 trust=1 prev=2
+    BATAUTH commit tier=2 trust=1 state=1 soc=41.5
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 2 sleep-wake-idle
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S131 low battery pir counting KEEP_ALIVE vcell known, trust trusted
+  in wake=PIR mode=0 conn=3 open=1 connected=1 low=1 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    BATAUTH evaluate soc=41.5 vcellState=0 vcell=3.90 trust=0 prev=2
+    BATAUTH commit tier=2 trust=0 state=0 soc=41.5
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S132 low battery pir counting KEEP_ALIVE vcell invalid, trust suspect
+  in wake=PIR mode=0 conn=3 open=1 connected=1 low=1 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=1 trust=1
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    BATAUTH evaluate soc=41.5 vcellState=1 vcell=3.90 trust=1 prev=2
+    BATAUTH commit tier=2 trust=1 state=1 soc=41.5
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S133 low battery pir occupancy CONNECTED vcell known, trust trusted
+  in wake=PIR mode=1 conn=0 open=1 connected=1 low=1 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    BATAUTH evaluate soc=41.5 vcellState=0 vcell=3.90 trust=0 prev=2
+    BATAUTH commit tier=2 trust=0 state=0 soc=41.5
+    PROGRESS PIR_WAKE_OCCUPANCY
+    BATAUTH evaluate soc=41.5 vcellState=0 vcell=3.90 trust=0 prev=2
+    BATAUTH commit tier=2 trust=0 state=0 soc=41.5
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=1 reset=0
+    CRUMB 5
+    TRANSITION 4 sleep-pir-occupancy-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S134 low battery pir occupancy CONNECTED vcell invalid, trust suspect
+  in wake=PIR mode=1 conn=0 open=1 connected=1 low=1 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=1 trust=1
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    BATAUTH evaluate soc=41.5 vcellState=1 vcell=3.90 trust=1 prev=2
+    BATAUTH commit tier=2 trust=1 state=1 soc=41.5
+    PROGRESS PIR_WAKE_OCCUPANCY
+    BATAUTH evaluate soc=41.5 vcellState=1 vcell=3.90 trust=1 prev=2
+    BATAUTH commit tier=2 trust=1 state=1 soc=41.5
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=1 reset=0
+    CRUMB 5
+    TRANSITION 4 sleep-pir-occupancy-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S135 low battery pir occupancy KEEP_ALIVE vcell known, trust trusted
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=1 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    BATAUTH evaluate soc=41.5 vcellState=0 vcell=3.90 trust=0 prev=2
+    BATAUTH commit tier=2 trust=0 state=0 soc=41.5
+    PROGRESS PIR_WAKE_OCCUPANCY
+    BATAUTH evaluate soc=41.5 vcellState=0 vcell=3.90 trust=0 prev=2
+    BATAUTH commit tier=2 trust=0 state=0 soc=41.5
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=1 reset=0
+    CRUMB 5
+    TRANSITION 4 sleep-pir-occupancy-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S136 low battery pir occupancy KEEP_ALIVE vcell invalid, trust suspect
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=1 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=1 trust=1
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    BATAUTH evaluate soc=41.5 vcellState=1 vcell=3.90 trust=1 prev=2
+    BATAUTH commit tier=2 trust=1 state=1 soc=41.5
+    PROGRESS PIR_WAKE_OCCUPANCY
+    BATAUTH evaluate soc=41.5 vcellState=1 vcell=3.90 trust=1 prev=2
+    BATAUTH commit tier=2 trust=1 state=1 soc=41.5
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=1 reset=0
+    CRUMB 5
+    TRANSITION 4 sleep-pir-occupancy-report
+  OUT trans=1 serviceRequest=0 occChange=1 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S137 low battery pir occupancy occupied
+  in wake=PIR mode=1 conn=3 open=1 connected=1 low=1 openness=0 clock=1 serial=0 occ=1 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=2 trust=2
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    BATAUTH evaluate soc=41.5 vcellState=2 vcell=3.90 trust=2 prev=2
+    BATAUTH commit tier=2 trust=2 state=2 soc=41.5
+    PROGRESS PIR_WAKE_OCCUPANCY
+    BATAUTH evaluate soc=41.5 vcellState=2 vcell=3.90 trust=2 prev=2
+    BATAUTH commit tier=2 trust=2 state=2 soc=41.5
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=1
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=1 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=8000 lastEvt=61000 led=1/300000
+S138 low battery pir occupancy closed hours
+  in wake=PIR mode=1 conn=1 open=0 connected=1 low=1 openness=1 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    PROGRESS PIR_WAKE_OCCUPANCY
+    BATAUTH evaluate soc=41.5 vcellState=0 vcell=3.90 trust=0 prev=2
+    BATAUTH commit tier=2 trust=0 state=0 soc=41.5
+    SET occupied=1
+    SET occupancyStartTime=10000
+    SET lastOccupancyEvent=61000
+    LED on=1 ms=300000
+    OCCEVT occupied reason=pir-wake led=300s report=0 reset=0
+    SET lastOccupancyEvent=61000
+    WAKESUMMARY PIR open=0 ready=1 occ=1 led=300s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=1 start=10000 lastEvt=61000 led=1/300000
+S139 low battery off, open hours closed pir
+  in wake=PIR mode=0 conn=1 open=0 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=1 vcell=0 trust=0
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=0 ready=1 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S140 timer sensor not ready
+  in wake=TIMER mode=0 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=0 vcell=0 trust=0
+    SENSOR onExitSleep
+    SENSOR initializeFromConfig
+    MEASURE batteryState 3
+    WAKESUMMARY TIMER open=1 ready=0 occ=0 led=0s
+    TRANSITION 4 sleep-timer-report
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+S141 pir sensor not ready
+  in wake=PIR mode=0 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=0 vcell=0 trust=0
+    SENSOR onExitSleep
+    SENSOR initializeFromConfig
+    MEASURE batteryState 3
+    SET hourlyCount=5
+    SET dailyCount=10
+    SET lastCountTime=10000
+    LED on=1 ms=1000
+    LOG INFO Count detected from PIR wake - Hourly: 5, Daily: 10
+    WAKESUMMARY PIR open=1 ready=0 occ=0 led=1s
+    TRANSITION 0 sleep-pir-return-to-sleep
+  OUT trans=1 serviceRequest=0 occChange=0 hourly=5 daily=10 lastCount=10000 occ=0 start=0 lastEvt=0 led=1/1000
+S142 button sensor not ready
+  in wake=BUTTON mode=0 conn=1 open=1 connected=1 low=0 openness=0 clock=1 serial=0 occ=0 led=0/0 set1=0 last=7300 hourly=4 daily=9 close=1/0 ready=0 vcell=0 trust=0
+    SENSOR onExitSleep
+    MEASURE batteryState 3
+    WAKESUMMARY BUTTON open=1 ready=0 occ=0 led=0s
+    TRANSITION 4 sleep-wake-button
+  OUT trans=1 serviceRequest=1 occChange=0 hourly=4 daily=9 lastCount=0 occ=0 start=0 lastEvt=0 led=0/0
+SCENARIOS 143 PASSES 143 TRANSITIONS 143 NONE 0 DISTINCT_EVENTS 31
+EVENT BATAUTH commit tier=# trust=# state=# soc=#
+EVENT BATAUTH evaluate soc=# vcellState=# vcell=# trust=# prev=#
+EVENT CLOSE sleep at=# valid=# stillOpen=#
+EVENT CRUMB #
+EVENT LED on=# ms=#
+EVENT LOG INFO Count detected from PIR wake # Hourly: #, Daily: #
+EVENT MEASURE batteryState #
+EVENT OCCEVT occupied reason=pir#wake led=#s report=# reset=#
+EVENT OCCEVT unoccupied reason=debounce session=#s total=#s report=#
+EVENT PROGRESS PIR_WAKE_OCCUPANCY
+EVENT SENSOR initializeFromConfig
+EVENT SENSOR onExitSleep
+EVENT SERIAL Count detected from PIR wake # Hourly: #, Daily: #
+EVENT SET dailyCount=#
+EVENT SET hourlyCount=#
+EVENT SET lastCountTime=#
+EVENT SET lastOccupancyEvent=#
+EVENT SET occupancyStartTime=#
+EVENT SET occupied=#
+EVENT TRANSITION # sleep#occupancy#debounce#report
+EVENT TRANSITION # sleep#open#hours#reconnect
+EVENT TRANSITION # sleep#pir#occupancy#report
+EVENT TRANSITION # sleep#pir#overdue#report
+EVENT TRANSITION # sleep#pir#return#to#sleep
+EVENT TRANSITION # sleep#timer#occupied#suppress#report
+EVENT TRANSITION # sleep#timer#report
+EVENT TRANSITION # sleep#wake#button
+EVENT TRANSITION # sleep#wake#idle
+EVENT WAKESUMMARY BUTTON open=# ready=# occ=# led=#s
+EVENT WAKESUMMARY PIR open=# ready=# occ=# led=#s
+EVENT WAKESUMMARY TIMER open=# ready=# occ=# led=#s
+REASON sleep-occupancy-debounce-report 5
+REASON sleep-open-hours-reconnect 1
+REASON sleep-pir-occupancy-report 12
+REASON sleep-pir-overdue-report 6
+REASON sleep-pir-return-to-sleep 60
+REASON sleep-timer-occupied-suppress-report 1
+REASON sleep-timer-report 41
+REASON sleep-wake-button 5
+REASON sleep-wake-idle 12

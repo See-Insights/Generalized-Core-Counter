@@ -185,10 +185,25 @@ if idle_consumer_present:
 
 # --- State_Sleep.cpp: the blocks of handleSleepingState(), in source order -----
 sfn = sleep.find("void handleSleepingState() {")
-decl = sleep.find("static bool disconnectRequested = false;", sfn)
-reset_end = sleep.find('Log.warn("SLEEP: disconnectRequested latched without timestamp', decl)
-teardown_site = sleep.find("disconnectRequested = true;", decl)
-wake_site = sleep.find("bool pirWake = sensorCanWake && (wakePin == sensorWake.pin);", sfn)
+decl = sfn
+reset_end = sleep.find("SleepTeardown::guardLostTimestamp();", decl)
+teardown_site = sleep.find("if (SleepTeardown::run(", decl)
+wake_site = sleep.find("if (sleepAndResume(", sfn)
+sar = sleep.find("bool sleepAndResume(")
+if sleep.text.count("bool sleepAndResume(") != 1:
+    die("State_Sleep.cpp: sleepAndResume() not found once")
+sar_end = sleep.text.find("\n}\n", sar)
+if sleep.text.count("bool pirWake = sensorCanWake && (wakePin == sensorWake.pin);") != 1 or \
+        "bool pirWake = sensorCanWake && (wakePin == sensorWake.pin);" not in sleep.text[sar:sar_end]:
+    die("sleepAndResume() lost the pirWake classification")
+# WO-2026-10-22-001: the handler passes the wake classification to postWakeRouting(), once, after sleepAndResume().
+route_call = "postWakeRouting(wake.pirWake, wake.buttonWake, wake.timerWake, wake.wakeReasonLabel);"
+if sleep.text.count(route_call) != 1 or sleep.text.find(route_call) < wake_site:
+    die("the handler's postWakeRouting( call must follow the sleepAndResume( call, once, with the wake fields in order")
+route = sleep.find("static void postWakeRouting(bool pirWake, bool buttonWake, bool timerWake, const char *wakeReasonLabel) {")
+route_end = sleep.close_of(sleep.open_after(route))
+if sleep.text.count("processSleepWakeEvent(") != 1 or not route < sleep.find("if (processSleepWakeEvent(pirWake)) return;", route) < route_end:
+    die("postWakeRouting() must call processSleepWakeEvent(pirWake) once, and return when it transitions")
 
 sleep_segments = []
 pend_idx = sleep.find("if (session.occupancyChangeTriggered", sfn, required=False)
@@ -198,35 +213,41 @@ sleep_below_reset = 0
 if pend_idx >= 0:
     ps, pe = sleep.stmt("if (session.occupancyChangeTriggered", sfn)
     emit("extracted_sleep_pending.inc", sleep, ps, pe)
-    sleep_consumer_gated = int("!disconnectRequested" in sleep.text[ps:ps + 80])
+    sleep_consumer_gated = int("!SleepTeardown::disconnectRequested()" in sleep.text[ps:ps + 100])
     sleep_below_reset = int(pend_idx > reset_end)
     sleep_segments.append((ps, '#include "extracted_sleep_pending.inc"'))
-gate_site = sleep.find("if (Particle.connected() && !disconnectRequested) {", decl)
+# The gate lives in cloudGatePass(): its wait condition is the extracted guard below, and the handler's
+# call to it is the site the pending-change exit must precede.
+gate_fn = sleep.find("bool cloudGatePass(bool useNetworkStandbyEffective) {")
+gate_fn_end = sleep.close_of(sleep.open_after(gate_fn))
+gate_guard = sleep.find("if (Particle.connected() && !SleepTeardown::disconnectRequested()) {", gate_fn)
+if not gate_fn < gate_guard < gate_fn_end or gate_fn_end > sfn:
+    die("cloudGatePass() must hold the connected && !disconnectRequested wait, ahead of handleSleepingState()")
+gate_site = sleep.find_code("cloudGatePass(", sfn)
+sleep_before_gate = int(pend_idx >= 0 and pend_idx < gate_site)
 sleep_segments.append((gate_site, "if (!modelGate()) return;  // model: the cloud-ops gate wait"))
 sleep_segments.append((teardown_site, "if (!modelTeardown()) return;  // model: teardown request or wait"))
 sleep_segments.append((wake_site, "modelSleep();  // model: System.sleep() returns"))
 
-s, e = sleep.stmt("if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {", sfn)
-emit("extracted_sleep_wake_end.inc", sleep, s, e)
-sleep_segments.append((s, '#include "extracted_sleep_wake_end.inc"'))
-pir = sleep.find('thrashGuard.markProgress("PIR_WAKE_OCCUPANCY")', sfn)
-s, e = sleep.stmt("if (!CurrentReadings::get_occupied()) {", pir, with_else=True)
-emit("extracted_sleep_wake_start.inc", sleep, s, e)
-sleep_segments.append((s, 'if (pirWake) {\n#include "extracted_sleep_wake_start.inc"\n}'))
-s, e = sleep.stmt("if (timerWake) {", sfn)
+# The wake path is postWakeRouting(): the wake event (State_Modes.cpp's processSleepWakeEvent(), extracted whole
+# and called where postWakeRouting() calls it) and the timer-wake block, in the function's source order.
+s, e = modes.stmt("bool processSleepWakeEvent(bool pirWake) {")
+emit("extracted_modes_wake_event.inc", modes, s, e)
+route_segments = []
+call_idx = sleep.find("if (processSleepWakeEvent(pirWake)) return;", route)
+route_segments.append((call_idx, "if (processSleepWakeEvent(pirWake)) return;"))
+s, e = sleep.stmt("if (timerWake) {", route)
 emit("extracted_sleep_timer.inc", sleep, s, e)
-sleep_segments.append((s, '#include "extracted_sleep_timer.inc"'))
-write("sleep_pass.inc", "\n".join(code for _, code in sorted(sleep_segments)))
+route_segments.append((s, '#include "extracted_sleep_timer.inc"'))
+write("sleep_pass.inc", "\n".join(code for _, code in sorted(sleep_segments) + sorted(route_segments)))
 
-# Before every standby-teardown request, every System.sleep() and every
-# sleep-or-suppress decision.
+# Before every standby-teardown request, every System.sleep() and the post-wake routing (every sleep-or-suppress
+# decision lives in it, and it is only called after sleepAndResume()).
 decision_offsets = [
-    sleep.find_code("System.sleep(", sfn),
-    sleep.find_code("Connectivity::request", sfn),
-    sleep.find('"sleep-timer-occupied-suppress-report"', sfn),
-    sleep.find('"sleep-pir-return-to-sleep"', sfn),
-    sleep.find('"sleep-timer-report"', sfn),
-    sleep.find('closeOccupancySessionSafely("sleep")', sfn),
+    sleep.find_code("sleepAndResume(", sfn),
+    sleep.find_code("hibernateAttempt(", sfn),
+    sleep.find_code("SleepTeardown::run(", sfn),
+    sleep.find(route_call, sfn),
 ]
 sleep_order_ok = int(pend_idx >= 0 and all(pend_idx < f for f in decision_offsets))
 
@@ -303,6 +324,7 @@ print(f"-DSLEEP_CONSUMER_PRESENT={sleep_consumer_present}")
 print(f"-DSLEEP_CONSUMER_BELOW_RESET={sleep_below_reset}")
 print(f"-DSLEEP_CONSUMER_GATED={sleep_consumer_gated}")
 print(f"-DSLEEP_CONSUMER_BEFORE_SLEEP_DECISIONS={sleep_order_ok}")
+print(f"-DSLEEP_CONSUMER_BEFORE_CLOUD_GATE={sleep_before_gate}")
 print(f"-DIDLE_CONSUMER_PRESENT={idle_consumer_present}")
 print(f"-DIDLE_CONSUMER_AFTER_OCCUPANCY_BLOCK={idle_order_ok}")
 print(f"-DREPORT_TAKE_AFTER_PUBLISH_BEFORE_EXITS={report_take_ok}")
@@ -389,8 +411,8 @@ PY
   echo "OK (mutation): '$name' caught by /$expect/ ($(grep -c '^FAIL:' "$dir/run.log") failed checks, e.g. $(grep -m1 -E "^FAIL: .*($expect)" "$dir/run.log" | cut -c1-110))"
 }
 
-sleep_pending='  if (session.occupancyChangeTriggered && !disconnectRequested) {
-    cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
+sleep_pending='  if (session.occupancyChangeTriggered && !SleepTeardown::disconnectRequested()) {
+    cloudGate.cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
     transitionTo(REPORTING_STATE, "occupancy change pending");
     return;
   }
@@ -428,9 +450,9 @@ mutate_and_expect_failure "flag take moved below the early exits" "norepeat:" "s
 " "$entry_take  if (!Particle.connected()) {
 "
 mutate_and_expect_failure "sleep check ignores disconnectRequested" "teardown:" "state/State_Sleep.cpp" \
-  "if (session.occupancyChangeTriggered && !disconnectRequested) {" "if (session.occupancyChangeTriggered) {"
+  "if (session.occupancyChangeTriggered && !SleepTeardown::disconnectRequested()) {" "if (session.occupancyChangeTriggered) {"
 mutate_and_expect_failure "mid-gate exit keeps the gate timer" "midgate:" "state/State_Sleep.cpp" \
-  "    cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
+  "    cloudGate.cloudSyncStartMs = 0; // leaving mid-gate: a later return starts its gate cleanly
     transitionTo(REPORTING_STATE, \"occupancy change pending\");" \
   "    transitionTo(REPORTING_STATE, \"occupancy change pending\");"
 mutate_and_expect_failure "sleep check moved below suppress" "soak:" "state/State_Sleep.cpp" \
@@ -438,6 +460,47 @@ mutate_and_expect_failure "sleep check moved below suppress" "soak:" "state/Stat
   "    // For PIR wakes, check if reporting is also due (opportunistic reporting)
 " "$sleep_pending    // For PIR wakes, check if reporting is also due (opportunistic reporting)
 "
+mutate_and_expect_failure "sleep check moved below cloudGatePass" "cloud gate|midgate:" "state/State_Sleep.cpp" \
+  "$sleep_pending" "" \
+  "  if (cloudGatePass(useNetworkStandbyEffective)) return;
+" "  if (cloudGatePass(useNetworkStandbyEffective)) return;
+$sleep_pending"
+# WO-2026-10-21-004: the teardown marker is the handler's SleepTeardown::run( call (the Wi-Fi guard's radio
+# requests now live in wifiOffGuardPass()), so a check moved below the teardown must still fail.
+mutate_and_expect_failure "sleep check moved below the teardown" "sits before System.sleep\\(\\)|teardown:" "state/State_Sleep.cpp" \
+  "$sleep_pending" "" \
+  "  setAppBreadcrumb(23); // BREADCRUMB_SLEEP_GATE_DONE" "$sleep_pending  setAppBreadcrumb(23); // BREADCRUMB_SLEEP_GATE_DONE"
+mutate_and_expect_failure "sleep check moved below sleepAndResume" "soak:" "state/State_Sleep.cpp" \
+  "$sleep_pending" "" \
+  "  WakeContext wake;
+  if (sleepAndResume(wakeInSeconds, useNetworkStandby, sleepReason, wake)) return;
+" "  WakeContext wake;
+  if (sleepAndResume(wakeInSeconds, useNetworkStandby, sleepReason, wake)) return;
+$sleep_pending"
+# WO-2026-10-22-001: the wake's LED-timeout close must run before the PIR event is processed.
+mutate_and_expect_failure "PIR event processed before the LED-timeout close" "wake pir\\+end:" "state/State_Modes.cpp" \
+  "    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {" \
+  "    if (false) {" \
+  "        CurrentReadings::set_lastOccupancyEvent(millis());
+      }
+    }
+  return false;
+}" \
+  "        CurrentReadings::set_lastOccupancyEvent(millis());
+      }
+    }
+    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
+      const bool reportNow = reportsOccupancyChangesNow();
+      const OccupancyCloseResult closeResult = closeOccupancySessionSafely(\"sleep\");
+      signalLED(false);
+      if (reportNow && !closeResult.stillOpen) {
+        session.occupancyChangeTriggered = true;
+        transitionTo(REPORTING_STATE, \"sleep-occupancy-debounce-report\");
+        return true;
+      }
+    }
+  return false;
+}"
 mutate_and_expect_failure "connected clear restored, entry take removed" "norepeat:" "state/State_Report.cpp" \
   "$entry_take" "  const bool occupancyChangeTriggered = session.occupancyChangeTriggered;
 " \

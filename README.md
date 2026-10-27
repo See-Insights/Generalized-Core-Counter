@@ -8,7 +8,7 @@ This repository includes key documentation files that contributors and AI coding
 
 # Generalized-Core-Counter
 
-**Version:** v44-DeviceOS660 | **Latest:** Device OS 6.4.1 to 6.6.0; no application change
+**Version:** v46-SleepSplit | **Latest:** Sleep half of Step 6 (S-1 to S-6); no intended behavior change
 
 Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v14 release packages cloud recovery tuning and release-safe logging cleanup without changing the existing production power, sleep, connectivity, watchdog, ledger, or PMIC behavior.
 

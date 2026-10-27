@@ -47,7 +47,8 @@ CONFIGURED_READERS = {
 
 EFFECTIVE_READERS = {
     "state/State_Connect.cpp": 1,
-    "state/State_Sleep.cpp": 8,
+    "state/State_Sleep.cpp": 6,
+    "state/SleepTeardown.cpp": 2,
     "state/State_Idle.cpp": 6,
     "state/State_Report.cpp": 2,
     "state/State_Error.cpp": 1,
@@ -135,7 +136,8 @@ if f'name("lowBatteryMode").value({DERIVED})' not in status or RAW in status:
 
 RAW_GATES = {
     "Generalized-Core-Counter.cpp": 1,
-    "state/State_Sleep.cpp": 2,
+    "state/State_Sleep.cpp": 1,
+    "state/State_Modes.cpp": 1,
 }
 for rel, expected in RAW_GATES.items():
     found = sources.get(rel, "").count(f"if ({RAW})")

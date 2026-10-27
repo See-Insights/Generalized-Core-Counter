@@ -16,6 +16,27 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v46-SleepSplit] - 2026-10-23
+
+### Changed
+
+- **No intended behavior change.** v46 should report, wake, reset and sleep exactly like v45 (Device OS 6.6.0). It is the sleep half of Step 6: `handleSleepingState()` was split into named functions (1,492 → 155 lines), proven by frozen-transcript tests rather than by the bench (PRs #128, #130, #131, #132, #136, #139).
+  - **S-1:** the modem teardown moved to its own module (`SleepTeardown`).
+  - **S-2 to S-5:** the sleep execution and standby-return fields, the cloud-operations gate, the sleep plan with the nightly heap guard, and the pre-sleep summary with the Wi-Fi-off guard became in-file functions.
+  - **S-6:** the wake-event processing (the LED-timeout session close and the PIR-wake counting) moved to `State_Modes.cpp`, and the post-wake routing became one function.
+- **Nothing to expect on the first boot after this update:** no stored or retained layout changed (P-0's one-time reset was v45's).
+
+## [v45-PowerSplit] - 2026-10-21
+
+### Changed
+
+- **No intended behavior change.** v45 should report, wake, reset and sleep exactly like v44 (Device OS 6.6.0). It is the power half of Step 6, seven moves (P-0 to P-6, PRs #110, #112, #114, #116, #118, #123, #124):
+  - **Code moved to its own modules:** the loop forensics and awake watchdog (P-1), the connectivity failsafe (P-2), report publishing and the daily cleanup (P-3), the clock and hibernate helpers (P-4) and the modem-health latch (P-5). The main file goes from 2,719 to 1,492 lines.
+  - **Duplicates and dead code removed (P-6):** the power-source codes and the PMIC fault masks are defined once, and three unused items are gone (two labels and an unread capability field).
+  - **P-0 pins the layout of the retained memory** so later changes cannot silently shift it.
+- **First boot after this update:** the boot-storm and breadcrumb values reset once (P-0 pins their memory layout), so the first status shows breadcrumb 0. That is expected.
+- **The ThrashGuard diagnostic counters read wrong once** on the first boot after this update (report-only, P-0).
+
 ## [v44-DeviceOS660] - 2026-10-17
 
 ### Changed
