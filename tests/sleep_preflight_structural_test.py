@@ -272,7 +272,22 @@ if prefix_of(sleep) != prefix_of(base_sleep):
     fail("the includes differ from the base")
 if gate_of(sleep).rstrip("\n") != gate_of(base_sleep).rstrip("\n"):
     fail("the cloudGate struct or cloudGatePass() (S-3) differ from the base")
-if plan_of(sleep) != plan_of(base_sleep):
+# WO-2026-10-25-001: the occupied branch's wake at the LED time left is the one intended change to the S-4 plan; it is
+# mapped back to the base text so every other byte is still compared (sleep_plan_structural_test.py owns the new text).
+OCC_NEW = (
+    "      const uint32_t remaining = signalLEDTimeRemaining();  // 0 when expired or no valid time\n"
+    "      if (remaining > 0) {\n"
+    "        const int untilDeadline = (int)remaining + 1;  // wake just after the deadline\n"
+    "        if (untilDeadline < wakeInSeconds) wakeInSeconds = untilDeadline;\n"
+    "      } else if (debounceSeconds < (uint32_t)wakeInSeconds) {\n"
+    "        wakeInSeconds = (int)debounceSeconds;  // no deadline known: the full debounce\n"
+    "      }\n")
+OCC_BASE = ("      if (debounceSeconds < (uint32_t)wakeInSeconds) {\n"
+            "        wakeInSeconds = (int)debounceSeconds;\n"
+            "      }\n")
+if plan_of(sleep).count(OCC_NEW) != 1:
+    fail("the occupied branch of sleepPlan() (WO-2026-10-25-001) is not the expected text")
+if plan_of(sleep).replace(OCC_NEW, OCC_BASE) != plan_of(base_sleep):
     fail("struct SleepPlan, sleepPlan(), hibernateAttempt() or nightlyHeapGuard() (S-4) differ from the base")
 
 # The moved blocks and the handler are byte-identical to the base apart from the listed edits.

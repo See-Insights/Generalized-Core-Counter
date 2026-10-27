@@ -40,6 +40,19 @@ SUMMARY_END = "  // On WiFi platforms"
 WIFI_START = "#if Wiring_WiFi\n  if (!useNetworkStandby) {"
 WIFI_END = "  }\n#endif\n  \n  WakeContext wake;"
 PLAN_TAIL = "  plan = {wakeInSeconds, sleepReason, overnightFallbackSleep};\n  return false;\n"
+# WO-2026-10-25-001: the occupied branch's wake is the only intended difference from the base plan block; it is
+# mapped back to the base text, so every other byte of the plan is still compared.
+OCC_NEW = (
+    "      const uint32_t remaining = signalLEDTimeRemaining();  // 0 when expired or no valid time\n"
+    "      if (remaining > 0) {\n"
+    "        const int untilDeadline = (int)remaining + 1;  // wake just after the deadline\n"
+    "        if (untilDeadline < wakeInSeconds) wakeInSeconds = untilDeadline;\n"
+    "      } else if (debounceSeconds < (uint32_t)wakeInSeconds) {\n"
+    "        wakeInSeconds = (int)debounceSeconds;  // no deadline known: the full debounce\n"
+    "      }\n")
+OCC_BASE = ("      if (debounceSeconds < (uint32_t)wakeInSeconds) {\n"
+            "        wakeInSeconds = (int)debounceSeconds;\n"
+            "      }\n")
 PLAN_START = "  // WO-2026-09-19 Step 3b: the behavioral core of this step."
 GUARD_START = "  // Before a long overnight\n"
 END = "  // The sleep configuration is built fresh"
@@ -131,6 +144,9 @@ def normalized(code):
     if not plan.endswith(PLAN_TAIL) or not guard.endswith("  return false;\n"):
         return None, None, None
     plan = plan[:-len(PLAN_TAIL)].replace("return true;", "return;")
+    if plan.count(OCC_NEW) != 1:
+        return None, None, None
+    plan = plan.replace(OCC_NEW, OCC_BASE)
     guard = guard[:-len("  return false;\n")].replace("return true;", "return;")
     handler = body_of(code, "void handleSleepingState()")
     if handler.count(PLAN_CALL) != 1 or handler.count(GUARD_CALL) != 1 or handler.count(ROUTE_CALL) != 1:
