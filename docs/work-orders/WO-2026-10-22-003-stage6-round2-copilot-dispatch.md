@@ -1,0 +1,15 @@
+AGENT: Copilot · MODEL: claude-sonnet-5.5 · REASONING: medium
+AUTHORIZATION SCOPE: as in `WO-2026-10-22-003-stage6-copilot-dispatch.md`, narrowed. **Edit only:** `tests/persisted_layout_preservation_test.py` and, in `src/MyPersistentData.h`, **comments only** (the two lines named below). No other file; no commits/pushes/checkout/stash/reset; scratch `build-tmp/wo20261022-003-stage6r2/` (remove only it). `src/` budget: net ≤ +2 (comments); tests: net ≤ +60.
+
+# Stage 6 round 2: WO-2026-10-22-003, fix Stage 7 round 1 (NOT VERIFIED; `WO-2026-10-22-003-stage7-verdict.md`)
+
+The layout, the 11 deletions and the ELF/suite results passed. The **freeze guard** does not meet its contract; fix it:
+
+1. **F1 (High): fail closed.** `persisted_layout_preservation_test.py:70,98–99` recognizes one declaration grammar and silently skips anything else, so `bool stage7AppendedTailPadding = false;` appended to `CurrentData` is not counted and hides in tail padding. Accept an optional initializer (`= …`, `{…}`) and **fail the test on any non-comment, non-blank line inside a record class body that ends in `;` at member scope and is not a recognized member, access label, method declaration or using/static const** (print the line). Also compare the parsed member count to the frozen count (51/5/17) so a skipped member can't pass.
+2. **F2 (High): identity, not only position.** The frozen table must record, per member, `(name, type, offset, size)`; **live members must match by exact name and type**, so swapping `openTime`/`closeTime` or renaming a live member fails. **Only members named `reserved*` in the frozen table** (the 11 retired slots plus `reservedFloat0`/`reservedByte0` as they appear) may be renamed, and then only to another `reserved*` name of the same type, offset and size. (`reservedByte0` is used by the `enableHibernateSleep` accessors: keep it exactly as the header has it.)
+3. **F3 (Low, comments only):** `src/MyPersistentData.h:116–118` (SysData: "Once you've added a field you cannot add fields (except at the end)…") and the "Appended per the persistent-layout append-only contract" comment near `:174` must say the records are **frozen: no field is appended while a rollback target reads them (WO-2026-10-22-003)**. Edit the comment text only; no code.
+
+## Verify (all required)
+- **Mutations in `git worktree add --detach` copies, each must FAIL:** the F1 tail-padding append to `CurrentData`; the same append to `SysData` and `SensorData`; an initialized member with `{}`; swap `openTime`/`closeTime`; rename a live member (`lastReport`→`lastReport2`); append a field; widen a reserved slot; move a member; bump a version or magic. **Must PASS:** rename `reservedBool0`→`reservedBoolX`; the clean tree.
+- Full suite N/N (baseline 91), serial; golden unchanged. No ARM rebuild needed (comments and tests only), but state `git diff --stat -- src` and that code lines in `src/` are unchanged.
+- Report (≤ 150 lines): the guard design, mutation table, line counts, suite, deviations, model used.

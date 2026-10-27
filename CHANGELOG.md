@@ -16,6 +16,16 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v46-SleepSplit] - 2026-10-23
+
+### Changed
+
+- **No intended behavior change.** v46 should report, wake, reset and sleep exactly like v45 (Device OS 6.6.0). It is the sleep half of Step 6: `handleSleepingState()` was split into named functions (1,492 → 155 lines), proven by frozen-transcript tests rather than by the bench (PRs #128, #130, #131, #132, #136, #139).
+  - **S-1:** the modem teardown moved to its own module (`SleepTeardown`).
+  - **S-2 to S-5:** the sleep execution and standby-return fields, the cloud-operations gate, the sleep plan with the nightly heap guard, and the pre-sleep summary with the Wi-Fi-off guard became in-file functions.
+  - **S-6:** the wake-event processing (the LED-timeout session close and the PIR-wake counting) moved to `State_Modes.cpp`, and the post-wake routing became one function.
+- **Nothing to expect on the first boot after this update:** no stored or retained layout changed (P-0's one-time reset was v45's).
+
 ## [v45-PowerSplit] - 2026-10-21
 
 ### Changed

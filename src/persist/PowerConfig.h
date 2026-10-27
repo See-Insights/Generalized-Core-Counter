@@ -28,8 +28,6 @@ bool get_solarPowerMode();
 void set_solarPowerMode(bool value);
 
 /// Legacy flag - kept for storage compatibility.
-bool get_lowPowerMode();
-void set_lowPowerMode(bool value);
 
 bool get_lowBatteryMode();
 void set_lowBatteryMode(bool value);

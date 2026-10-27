@@ -111,8 +111,6 @@ void set_verboseMode(bool value);
 uint16_t get_verboseTimeoutMin();
 void set_verboseTimeoutMin(uint16_t value);
 
-time_t get_verboseModeStartTime();
-void set_verboseModeStartTime(time_t value);
 
 bool get_serialConnected();
 void set_serialConnected(bool value);
@@ -145,12 +143,6 @@ void set_lastTimeSync(time_t value);
 
 // *************** Operating modes ***************
 
-/// Legacy sysStatus-level sensor type, kept only for the persisted layout.
-/// Sensor creation reads SensorSettings::get_sensorType() (the
-/// /usr/sensor.dat field, which the ledgers write) - Finding 3 requires the
-/// two stay distinct.
-uint8_t get_sensorType();
-void set_sensorType(uint8_t value);
 
 uint8_t get_sensorMode();
 void set_sensorMode(uint8_t value);
@@ -164,8 +156,6 @@ void set_reportingMode(uint8_t value);
 uint8_t get_samplingMode();
 void set_samplingMode(uint8_t value);
 
-bool get_disconnectedMode();
-void set_disconnectedMode(bool value);
 
 bool get_enableHibernateSleep();
 void set_enableHibernateSleep(bool value);
