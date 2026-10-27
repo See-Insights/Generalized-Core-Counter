@@ -415,8 +415,10 @@ verification.
 
 #### Mandatory: local toolchain build
 
-Every change must be built with the **local Device OS toolchain**, not only the
-Particle cloud compiler. Both, before Stage 7 can pass.
+Every change must be built with the **local Device OS toolchain** before Stage 7
+can pass. The Particle cloud compile is **not** a per-change check (changed
+2026-10-25, Chip): it runs once per release, on the release branch head (see
+"Release gate: the Particle cloud compile", below).
 
 The two use different include-search orders. A source file can compile cleanly in
 the cloud and fail locally — or the reverse — so a cloud build passing is **not**
@@ -448,6 +450,39 @@ device.
 
 The general lesson, which is the same one behind the linkage check above:
 **verifying with an instrument that cannot see the failure is not verification.**
+
+#### Release gate: the Particle cloud compile (once per release)
+
+*Standing rule, Chip, 25 Oct 2026. It replaces the earlier rule that every change
+needed both a local and a cloud build.*
+
+- **When:** once per release, on the **release branch head**: `particle compile
+  boron . --target <Device OS version of the release>` (for example `--target
+  6.6.0`), run by Claude Code (Codex's sandbox has no network). It covers **every
+  WO in that release**; no WO or PR needs its own cloud compile.
+- **Record:** the result, with **flash and RAM**, goes in the release record
+  (the release WO, `docs/work-orders/<date>-vNN-release-and-soak.md`, and the
+  release PR body), beside the `.bin` size and sha256 of §13
+  (j). The compile must be of the head that is uploaded, not an earlier commit.
+- **What stays per change:** the local ARM build above, with a fresh
+  `BUILD_PATH_BASE`, and the linkage check (`nm` on the symbolised ELF). A WO's
+  Stage 7 does not wait for the cloud.
+- **If the service is down at release time:** record that (the date, the error
+  text, and a control build of the previous release if one was tried), and
+  **release from the verified local build** as usual (§13 (j)). Do not hold the
+  release for it; retry once the service is back and add the numbers to the
+  record.
+- **Why a release gate and not a per-change one:** the cloud compile exists for the
+  risk in §12.5 (item 5): a library both vendored in `lib/` and listed in
+  `project.properties` can be replaced by the registry copy in a cloud build, so
+  the shipped binary can differ from the local one. That risk concerns the
+  **shipped release**, and one compile of the release head covers it. The
+  include-order collision that the local build catches (above) is a per-change
+  risk, so the local build stays per change. A per-change cloud gate also turns a
+  Particle service failure into a block on every WO: on 25 Oct 2026
+  `particle compile boron --target 6.6.0` timed out ("Compiler timed out or
+  encountered an error", about 2 minutes, no diagnostics) on the candidate of
+  WO-2026-10-25-001 and, as a control, on the unmodified base.
 
 #### Mandatory: retirement replacement check
 
@@ -507,7 +542,7 @@ codex exec -m <model> -c model_reasoning_effort="<level>" -s workspace-write \
   -o docs/work-orders/<WO>-stage7-verdict.md - < docs/work-orders/<WO>-stage7-codex-dispatch.md
 ```
 
-`codex review --uncommitted` is not used: it rejects custom instructions (CLI 0.154.0). Codex's sandbox has no network, so Claude Code runs the Particle cloud compile separately and records the result.
+`codex review --uncommitted` is not used: it rejects custom instructions (CLI 0.154.0). Codex's sandbox has no network, so the Particle cloud compile (a release-head check, once per release; see "Release gate" in §3) is run by Claude Code, not in Stage 7.
 
 **Copilot** (Stage 6) is dispatched with its CLI, `copilot -p`:
 
@@ -702,7 +737,7 @@ Added after WO-2026-09-25-001, where three review rounds grew a restoration of a
 3. **A size budget in every dispatch.** Each dispatch states the expected size of the change (lines of `src/` and `lib/`, and tests). Going over the budget means stopping and reporting, not continuing. **Don't compress code to meet a budget:** no combined declarations, packed lines, or dropped braces to save a line. Write the code as the surrounding code would, and report an honest overage instead. (Added 2026-10-02 after WO-2026-10-02-002, where two declarations were joined on one line to land on the budget.)
    **Record budget versus actual.** Every WO's closing record includes a table with one row per item: budget, raised to (if raised, with its recorded reason), and actual net `src/` lines (tests listed separately). Review the tables every few WOs: a kind of change that keeps going over points to a structural problem, not just a budget to raise.
 4. **The two-round rule.** If two implementation rounds each add new mechanisms, or two rounds pass without VERIFIED, stop. The architect and the user restate the goal in plain language before any third round. **Exception (2026-10-08):** if the second round's verdict is NOT VERIFIED only on edge cases that are not regressions against main, the architect may accept them at Stage 8. The closing record then says "NOT VERIFIED, accepted by the architect" and gives the reason. Any new finding goes to the recovery plan, not into a third round.
-5. **Verify the binary, not the source, for anything involving vendored libraries.** A library that is both vendored in `lib/` and listed in `project.properties` may be replaced by the registry copy in a cloud build. Confirm the change is present in the binary that will be flashed (disassembly, symbols, or strings), not only in the source tree. Local and cloud builds may use different library copies. Bench-test the build type the fleet will receive.
+5. **Verify the binary, not the source, for anything involving vendored libraries.** A library that is both vendored in `lib/` and listed in `project.properties` may be replaced by the registry copy in a cloud build. Confirm the change is present in the binary that will be flashed (disassembly, symbols, or strings), not only in the source tree. Local and cloud builds may use different library copies. Bench-test the build type the fleet will receive. The cloud compile that checks this runs once per release, on the release branch head (§3, "Release gate").
 6. **Read `resetReasonData` before attributing any reason-140 reset.** Its code (`src/ResetCause.h`) says which part of the firmware reset the device.
 
 ## 13. Working rules adopted 7–8 October 2026
@@ -758,7 +793,7 @@ Step 0 ends with STOP or PROCEED. It stops if the estimate is over budget, or if
 **(h) Every verification step names its environment:**
 - the host test suite;
 - the local ARM toolchain build (with its `BUILD_PATH_BASE`);
-- the Particle cloud compile;
+- the Particle cloud compile (once per release, on the release branch head; §3);
 - a bench device (by name);
 - the fleet.
 
