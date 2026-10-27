@@ -90,7 +90,5 @@ void set_batteryState(uint8_t value);
 float get_internalTempC();
 void set_internalTempC(float value);
 
-float get_externalTempC();
-void set_externalTempC(float value);
 
 }  // namespace CurrentReadings

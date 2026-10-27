@@ -127,13 +127,10 @@ void sysStatusData::initialize() {
     Log.info(message);
     if (Particle.connected()) publishDiagnosticSafe("Mode", message, PRIVATE);
     Log.info("Loading system defaults");
-    sysStatus.set_structuresVersion(2);
     sysStatus.set_verboseMode(false);
     sysStatus.set_lowBatteryMode(false);
     sysStatus.set_solarPowerMode(FIELD_BUILD ? true : false);
-    sysStatus.set_lowPowerMode(false);          // Legacy flag - kept for storage compatibility
     sysStatus.set_timeZoneStr(Config::DEFAULT_TIMEZONE);
-    sysStatus.set_sensorType(1);                // PIR sensor
     sysStatus.set_openTime(Config::DEFAULT_OPEN_HOUR);
     sysStatus.set_closeTime(Config::DEFAULT_CLOSE_HOUR);
     sysStatus.set_reportingInterval(Config::DEFAULT_REPORT_INTERVAL_SEC);
@@ -146,7 +143,6 @@ void sysStatusData::initialize() {
     sysStatus.set_reportingMode(SystemConfig::SCHEDULED);                  // Default to scheduled reporting
     sysStatus.set_samplingMode(SystemConfig::INTERRUPT);                   // Default to interrupt-driven
     sysStatus.set_verboseTimeoutMin(60);                                   // Default 60 min verbose timeout
-    sysStatus.set_verboseModeStartTime(0);                                 // Verbose mode not active
     sysStatus.set_connectAttemptBudgetSec(Config::DEFAULT_CONNECT_ATTEMPT_BUDGET_SEC);
     sysStatus.set_cloudDisconnectBudgetSec(Config::DEFAULT_CLOUD_DISCONNECT_BUDGET_SEC);
     sysStatus.set_modemOffBudgetSec(Config::DEFAULT_MODEM_OFF_BUDGET_SEC);
@@ -163,14 +159,6 @@ void sysStatusData::initialize() {
     sysStatus.set_lastWatchdogSource((uint8_t)RecoveryState::WATCHDOG_SOURCE_DEVICE_OS);
 }
 
-uint8_t sysStatusData::get_structuresVersion() const {
-    return getValue<uint8_t>(offsetof(SysData, structuresVersion));
-}
-
-void sysStatusData::set_structuresVersion(uint8_t value) {
-    setValue<uint8_t>(offsetof(SysData, structuresVersion), value);
-}
-
 bool sysStatusData::get_verboseMode() const {
     return getValue<bool>(offsetof(SysData,verboseMode));
 }
@@ -184,13 +172,6 @@ bool sysStatusData::get_solarPowerMode() const  {
 }
 void sysStatusData::set_solarPowerMode(bool value) {
     setValue<bool>(offsetof(SysData, solarPowerMode), value);
-}
-
-bool sysStatusData::get_lowPowerMode() const  {
-    return getValue<bool>(offsetof(SysData,lowPowerMode ));
-}
-void sysStatusData::set_lowPowerMode(bool value) {
-    setValue<bool>(offsetof(SysData, lowPowerMode), value);
 }
 
 bool sysStatusData::get_lowBatteryMode() const  {
@@ -263,33 +244,12 @@ void sysStatusData::set_lastHookResponse(time_t value) {
     setValue<time_t>(offsetof(SysData, lastHookResponse), value);
 }
 
-uint8_t sysStatusData::get_sensorType() const  {
-    return getValue<uint8_t>(offsetof(SysData,sensorType));
-}
-void sysStatusData::set_sensorType(uint8_t value) {
-    setValue<uint8_t>(offsetof(SysData, sensorType), value);
-}
-
-bool sysStatusData::get_updatesPending() const  {
-    return getValue<bool>(offsetof(SysData,updatesPending));
-}
-void sysStatusData::set_updatesPending(bool value) {
-    setValue<bool>(offsetof(SysData,updatesPending), value);
-}  
-
 uint16_t sysStatusData::get_reportingInterval() const  {
     return getValue<uint16_t>(offsetof(SysData,reportingInterval));
 }
 void sysStatusData::set_reportingInterval(uint16_t value) {
     setValue<uint16_t>(offsetof(SysData, reportingInterval), value);
 }
-
-bool sysStatusData::get_disconnectedMode() const  {
-    return getValue<bool>(offsetof(SysData,disconnectedMode));
-}
-void sysStatusData::set_disconnectedMode(bool value) {
-    setValue<bool>(offsetof(SysData,disconnectedMode), value);
-}  
 
 bool sysStatusData::get_serialConnected() const  {
     return getValue<bool>(offsetof(SysData,serialConnected));
@@ -347,13 +307,6 @@ uint16_t sysStatusData::get_verboseTimeoutMin() const {
 }
 void sysStatusData::set_verboseTimeoutMin(uint16_t value) {
     setValue<uint16_t>(offsetof(SysData,verboseTimeoutMin), value);
-}
-
-time_t sysStatusData::get_verboseModeStartTime() const {
-    return getValue<time_t>(offsetof(SysData,verboseModeStartTime));
-}
-void sysStatusData::set_verboseModeStartTime(time_t value) {
-    setValue<time_t>(offsetof(SysData,verboseModeStartTime), value);
 }
 
 uint16_t sysStatusData::get_connectAttemptBudgetSec() const {
@@ -776,37 +729,6 @@ void currentStatusData::initialize() {
     updateHash();
 }
 
-uint16_t currentStatusData::get_faceNumber() const {
-    return getValue<uint16_t>(offsetof(CurrentData, faceNumber));
-}
-
-void currentStatusData::set_faceNumber(uint16_t value) {
-    setValue<uint16_t>(offsetof(CurrentData, faceNumber), value);
-}
-
-uint16_t currentStatusData::get_faceScore() const {
-    return getValue<uint16_t>(offsetof(CurrentData, faceScore));
-}
-
-void currentStatusData::set_faceScore(uint16_t value) {
-    setValue<uint16_t>(offsetof(CurrentData, faceScore), value);
-}
-uint16_t currentStatusData::get_gestureType() const {
-    return getValue<uint16_t>(offsetof(CurrentData, gestureType));
-}
-
-void currentStatusData::set_gestureType(uint16_t value) {
-    setValue<uint16_t>(offsetof(CurrentData, gestureType), value);
-}
-
-uint16_t currentStatusData::get_gestureScore() const {
-    return getValue<uint16_t>(offsetof(CurrentData, gestureScore));
-}
-
-void currentStatusData::set_gestureScore(uint16_t value) {
-    setValue<uint16_t>(offsetof(CurrentData, gestureScore), value);
-}
-
 time_t currentStatusData::get_lastCountTime() const {
     return getValue<time_t>(offsetof(CurrentData, lastCountTime));
 }
@@ -821,14 +743,6 @@ float currentStatusData::get_internalTempC() const {
 
 void currentStatusData::set_internalTempC(float value) {
     setValue<float>(offsetof(CurrentData, internalTempC), value);
-}
-
-float currentStatusData::get_externalTempC() const {
-    return getValue<float>(offsetof(CurrentData, externalTempC));
-}
-
-void currentStatusData::set_externalTempC(float value) {
-    setValue<float>(offsetof(CurrentData, externalTempC), value);
 }
 
 int8_t currentStatusData::get_alertCode() const {
@@ -1012,8 +926,6 @@ void set_verboseMode(bool value) { sysStatus.set_verboseMode(value); }
 uint16_t get_verboseTimeoutMin() { return sysStatus.get_verboseTimeoutMin(); }
 void set_verboseTimeoutMin(uint16_t value) { sysStatus.set_verboseTimeoutMin(value); }
 
-time_t get_verboseModeStartTime() { return sysStatus.get_verboseModeStartTime(); }
-void set_verboseModeStartTime(time_t value) { sysStatus.set_verboseModeStartTime(value); }
 
 bool get_serialConnected() { return sysStatus.get_serialConnected(); }
 void set_serialConnected(bool value) { sysStatus.set_serialConnected(value); }
@@ -1042,8 +954,6 @@ void set_lastDailyCleanup(time_t value) { sysStatus.set_lastDailyCleanup(value);
 time_t get_lastTimeSync() { return sysStatus.get_lastTimeSync(); }
 void set_lastTimeSync(time_t value) { sysStatus.set_lastTimeSync(value); }
 
-uint8_t get_sensorType() { return sysStatus.get_sensorType(); }
-void set_sensorType(uint8_t value) { sysStatus.set_sensorType(value); }
 
 uint8_t get_sensorMode() { return sysStatus.get_sensorMode(); }
 void set_sensorMode(uint8_t value) { sysStatus.set_sensorMode(value); }
@@ -1057,8 +967,6 @@ void set_reportingMode(uint8_t value) { sysStatus.set_reportingMode(value); }
 uint8_t get_samplingMode() { return sysStatus.get_samplingMode(); }
 void set_samplingMode(uint8_t value) { sysStatus.set_samplingMode(value); }
 
-bool get_disconnectedMode() { return sysStatus.get_disconnectedMode(); }
-void set_disconnectedMode(bool value) { sysStatus.set_disconnectedMode(value); }
 
 bool get_enableHibernateSleep() { return sysStatus.get_enableHibernateSleep(); }
 void set_enableHibernateSleep(bool value) { sysStatus.set_enableHibernateSleep(value); }
@@ -1171,8 +1079,6 @@ namespace PowerConfig {
 bool get_solarPowerMode() { return sysStatus.get_solarPowerMode(); }
 void set_solarPowerMode(bool value) { sysStatus.set_solarPowerMode(value); }
 
-bool get_lowPowerMode() { return sysStatus.get_lowPowerMode(); }
-void set_lowPowerMode(bool value) { sysStatus.set_lowPowerMode(value); }
 
 bool get_lowBatteryMode() { return sysStatus.get_lowBatteryMode(); }
 void set_lowBatteryMode(bool value) { sysStatus.set_lowBatteryMode(value); }
@@ -1231,7 +1137,5 @@ void set_batteryState(uint8_t value) { current.set_batteryState(value); }
 float get_internalTempC() { return current.get_internalTempC(); }
 void set_internalTempC(float value) { current.set_internalTempC(value); }
 
-float get_externalTempC() { return current.get_externalTempC(); }
-void set_externalTempC(float value) { current.set_externalTempC(value); }
 
 }  // namespace CurrentReadings

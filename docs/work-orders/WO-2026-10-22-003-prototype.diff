@@ -1,0 +1,391 @@
+diff --git a/src/MyPersistentData.cpp b/src/MyPersistentData.cpp
+index 88f8016..8362a8f 100644
+--- a/src/MyPersistentData.cpp
++++ b/src/MyPersistentData.cpp
+@@ -127,13 +127,10 @@ void sysStatusData::initialize() {
+     Log.info(message);
+     if (Particle.connected()) publishDiagnosticSafe("Mode", message, PRIVATE);
+     Log.info("Loading system defaults");
+-    sysStatus.set_structuresVersion(2);
+     sysStatus.set_verboseMode(false);
+     sysStatus.set_lowBatteryMode(false);
+     sysStatus.set_solarPowerMode(FIELD_BUILD ? true : false);
+-    sysStatus.set_lowPowerMode(false);          // Legacy flag - kept for storage compatibility
+     sysStatus.set_timeZoneStr(Config::DEFAULT_TIMEZONE);
+-    sysStatus.set_sensorType(1);                // PIR sensor
+     sysStatus.set_openTime(Config::DEFAULT_OPEN_HOUR);
+     sysStatus.set_closeTime(Config::DEFAULT_CLOSE_HOUR);
+     sysStatus.set_reportingInterval(Config::DEFAULT_REPORT_INTERVAL_SEC);
+@@ -146,7 +143,6 @@ void sysStatusData::initialize() {
+     sysStatus.set_reportingMode(SystemConfig::SCHEDULED);                  // Default to scheduled reporting
+     sysStatus.set_samplingMode(SystemConfig::INTERRUPT);                   // Default to interrupt-driven
+     sysStatus.set_verboseTimeoutMin(60);                                   // Default 60 min verbose timeout
+-    sysStatus.set_verboseModeStartTime(0);                                 // Verbose mode not active
+     sysStatus.set_connectAttemptBudgetSec(Config::DEFAULT_CONNECT_ATTEMPT_BUDGET_SEC);
+     sysStatus.set_cloudDisconnectBudgetSec(Config::DEFAULT_CLOUD_DISCONNECT_BUDGET_SEC);
+     sysStatus.set_modemOffBudgetSec(Config::DEFAULT_MODEM_OFF_BUDGET_SEC);
+@@ -163,14 +159,6 @@ void sysStatusData::initialize() {
+     sysStatus.set_lastWatchdogSource((uint8_t)RecoveryState::WATCHDOG_SOURCE_DEVICE_OS);
+ }
+ 
+-uint8_t sysStatusData::get_structuresVersion() const {
+-    return getValue<uint8_t>(offsetof(SysData, structuresVersion));
+-}
+-
+-void sysStatusData::set_structuresVersion(uint8_t value) {
+-    setValue<uint8_t>(offsetof(SysData, structuresVersion), value);
+-}
+-
+ bool sysStatusData::get_verboseMode() const {
+     return getValue<bool>(offsetof(SysData,verboseMode));
+ }
+@@ -186,13 +174,6 @@ void sysStatusData::set_solarPowerMode(bool value) {
+     setValue<bool>(offsetof(SysData, solarPowerMode), value);
+ }
+ 
+-bool sysStatusData::get_lowPowerMode() const  {
+-    return getValue<bool>(offsetof(SysData,lowPowerMode ));
+-}
+-void sysStatusData::set_lowPowerMode(bool value) {
+-    setValue<bool>(offsetof(SysData, lowPowerMode), value);
+-}
+-
+ bool sysStatusData::get_lowBatteryMode() const  {
+     return getValue<bool>(offsetof(SysData, lowBatteryMode));
+ }
+@@ -263,20 +244,6 @@ void sysStatusData::set_lastHookResponse(time_t value) {
+     setValue<time_t>(offsetof(SysData, lastHookResponse), value);
+ }
+ 
+-uint8_t sysStatusData::get_sensorType() const  {
+-    return getValue<uint8_t>(offsetof(SysData,sensorType));
+-}
+-void sysStatusData::set_sensorType(uint8_t value) {
+-    setValue<uint8_t>(offsetof(SysData, sensorType), value);
+-}
+-
+-bool sysStatusData::get_updatesPending() const  {
+-    return getValue<bool>(offsetof(SysData,updatesPending));
+-}
+-void sysStatusData::set_updatesPending(bool value) {
+-    setValue<bool>(offsetof(SysData,updatesPending), value);
+-}  
+-
+ uint16_t sysStatusData::get_reportingInterval() const  {
+     return getValue<uint16_t>(offsetof(SysData,reportingInterval));
+ }
+@@ -284,13 +251,6 @@ void sysStatusData::set_reportingInterval(uint16_t value) {
+     setValue<uint16_t>(offsetof(SysData, reportingInterval), value);
+ }
+ 
+-bool sysStatusData::get_disconnectedMode() const  {
+-    return getValue<bool>(offsetof(SysData,disconnectedMode));
+-}
+-void sysStatusData::set_disconnectedMode(bool value) {
+-    setValue<bool>(offsetof(SysData,disconnectedMode), value);
+-}  
+-
+ bool sysStatusData::get_serialConnected() const  {
+     return getValue<bool>(offsetof(SysData,serialConnected));
+ }
+@@ -349,13 +309,6 @@ void sysStatusData::set_verboseTimeoutMin(uint16_t value) {
+     setValue<uint16_t>(offsetof(SysData,verboseTimeoutMin), value);
+ }
+ 
+-time_t sysStatusData::get_verboseModeStartTime() const {
+-    return getValue<time_t>(offsetof(SysData,verboseModeStartTime));
+-}
+-void sysStatusData::set_verboseModeStartTime(time_t value) {
+-    setValue<time_t>(offsetof(SysData,verboseModeStartTime), value);
+-}
+-
+ uint16_t sysStatusData::get_connectAttemptBudgetSec() const {
+     return getValue<uint16_t>(offsetof(SysData,connectAttemptBudgetSec));
+ }
+@@ -776,37 +729,6 @@ void currentStatusData::initialize() {
+     updateHash();
+ }
+ 
+-uint16_t currentStatusData::get_faceNumber() const {
+-    return getValue<uint16_t>(offsetof(CurrentData, faceNumber));
+-}
+-
+-void currentStatusData::set_faceNumber(uint16_t value) {
+-    setValue<uint16_t>(offsetof(CurrentData, faceNumber), value);
+-}
+-
+-uint16_t currentStatusData::get_faceScore() const {
+-    return getValue<uint16_t>(offsetof(CurrentData, faceScore));
+-}
+-
+-void currentStatusData::set_faceScore(uint16_t value) {
+-    setValue<uint16_t>(offsetof(CurrentData, faceScore), value);
+-}
+-uint16_t currentStatusData::get_gestureType() const {
+-    return getValue<uint16_t>(offsetof(CurrentData, gestureType));
+-}
+-
+-void currentStatusData::set_gestureType(uint16_t value) {
+-    setValue<uint16_t>(offsetof(CurrentData, gestureType), value);
+-}
+-
+-uint16_t currentStatusData::get_gestureScore() const {
+-    return getValue<uint16_t>(offsetof(CurrentData, gestureScore));
+-}
+-
+-void currentStatusData::set_gestureScore(uint16_t value) {
+-    setValue<uint16_t>(offsetof(CurrentData, gestureScore), value);
+-}
+-
+ time_t currentStatusData::get_lastCountTime() const {
+     return getValue<time_t>(offsetof(CurrentData, lastCountTime));
+ }
+@@ -823,14 +745,6 @@ void currentStatusData::set_internalTempC(float value) {
+     setValue<float>(offsetof(CurrentData, internalTempC), value);
+ }
+ 
+-float currentStatusData::get_externalTempC() const {
+-    return getValue<float>(offsetof(CurrentData, externalTempC));
+-}
+-
+-void currentStatusData::set_externalTempC(float value) {
+-    setValue<float>(offsetof(CurrentData, externalTempC), value);
+-}
+-
+ int8_t currentStatusData::get_alertCode() const {
+     return getValue<int8_t>(offsetof(CurrentData, alertCode));
+ }
+@@ -1012,8 +926,6 @@ void set_verboseMode(bool value) { sysStatus.set_verboseMode(value); }
+ uint16_t get_verboseTimeoutMin() { return sysStatus.get_verboseTimeoutMin(); }
+ void set_verboseTimeoutMin(uint16_t value) { sysStatus.set_verboseTimeoutMin(value); }
+ 
+-time_t get_verboseModeStartTime() { return sysStatus.get_verboseModeStartTime(); }
+-void set_verboseModeStartTime(time_t value) { sysStatus.set_verboseModeStartTime(value); }
+ 
+ bool get_serialConnected() { return sysStatus.get_serialConnected(); }
+ void set_serialConnected(bool value) { sysStatus.set_serialConnected(value); }
+@@ -1042,8 +954,6 @@ void set_lastDailyCleanup(time_t value) { sysStatus.set_lastDailyCleanup(value);
+ time_t get_lastTimeSync() { return sysStatus.get_lastTimeSync(); }
+ void set_lastTimeSync(time_t value) { sysStatus.set_lastTimeSync(value); }
+ 
+-uint8_t get_sensorType() { return sysStatus.get_sensorType(); }
+-void set_sensorType(uint8_t value) { sysStatus.set_sensorType(value); }
+ 
+ uint8_t get_sensorMode() { return sysStatus.get_sensorMode(); }
+ void set_sensorMode(uint8_t value) { sysStatus.set_sensorMode(value); }
+@@ -1057,8 +967,6 @@ void set_reportingMode(uint8_t value) { sysStatus.set_reportingMode(value); }
+ uint8_t get_samplingMode() { return sysStatus.get_samplingMode(); }
+ void set_samplingMode(uint8_t value) { sysStatus.set_samplingMode(value); }
+ 
+-bool get_disconnectedMode() { return sysStatus.get_disconnectedMode(); }
+-void set_disconnectedMode(bool value) { sysStatus.set_disconnectedMode(value); }
+ 
+ bool get_enableHibernateSleep() { return sysStatus.get_enableHibernateSleep(); }
+ void set_enableHibernateSleep(bool value) { sysStatus.set_enableHibernateSleep(value); }
+@@ -1171,8 +1079,6 @@ namespace PowerConfig {
+ bool get_solarPowerMode() { return sysStatus.get_solarPowerMode(); }
+ void set_solarPowerMode(bool value) { sysStatus.set_solarPowerMode(value); }
+ 
+-bool get_lowPowerMode() { return sysStatus.get_lowPowerMode(); }
+-void set_lowPowerMode(bool value) { sysStatus.set_lowPowerMode(value); }
+ 
+ bool get_lowBatteryMode() { return sysStatus.get_lowBatteryMode(); }
+ void set_lowBatteryMode(bool value) { sysStatus.set_lowBatteryMode(value); }
+@@ -1231,7 +1137,5 @@ void set_batteryState(uint8_t value) { current.set_batteryState(value); }
+ float get_internalTempC() { return current.get_internalTempC(); }
+ void set_internalTempC(float value) { current.set_internalTempC(value); }
+ 
+-float get_externalTempC() { return current.get_externalTempC(); }
+-void set_externalTempC(float value) { current.set_externalTempC(value); }
+ 
+ }  // namespace CurrentReadings
+diff --git a/src/MyPersistentData.h b/src/MyPersistentData.h
+index 73be215..1cf124f 100644
+--- a/src/MyPersistentData.h
++++ b/src/MyPersistentData.h
+@@ -119,10 +119,10 @@ public:
+ 		// Your fields go here. Once you've added a field you cannot add fields
+ 		// (except at the end), insert fields, remove fields, change size of a field.
+ 		// Doing so will cause the data to be corrupted!
+-		uint8_t structuresVersion;                        // Version of the data structures (system and data)
++		uint8_t reservedUint8_0;                   // Reserved: was structuresVersion; kept to preserve the stored layout
+ 		bool verboseMode;                                 // Turns on extra messaging
+ 		bool solarPowerMode;                              // Powered by a solar panel or utility power
+-  		bool lowPowerMode;                                // Does the device need to run disconnected to save battery
++  		bool reservedBool0;                     // Reserved: was lowPowerMode; kept to preserve the stored layout
+ 		bool lowBatteryMode;                              // Is the battery level so low that we can no longer connect
+ 		uint8_t resetCount;                               // reset count of device (0-256)
+ 		char timeZoneStr[39];							  // String for the timezone - https://developer.ibm.com/technologies/systems/articles/au-aix-posix/
+@@ -132,13 +132,13 @@ public:
+ 		time_t lastConnection;                     		  // Last time we successfully connected to Particle
+ 		time_t lastHookResponse;                   		  // Last time we got a valid Webhook response
+ 		uint16_t lastConnectionDuration;                  // How long - in seconds - did it take to last connect to the Particle cloud
+-		uint8_t sensorType;                               // What is the sensor type - 0-Pressure Sensor, 1-PIR Sensor
+-		bool updatesPending;                              // Has there been a change to the sysStatus that we need to effect 
++		uint8_t reservedUint8_1;                   // Reserved: was sensorType; kept to preserve the stored layout
++		bool reservedBool1;                     // Reserved: was updatesPending; kept to preserve the stored layout
+ 		uint16_t reportingInterval;                       // How often do we report in to the Particle cloud - in seconds
+-		bool disconnectedMode;                            // Are we in disconnected mode - this is used to prevent the device from trying to connect to the Particle cloud - for Development and testing purposes
++		bool reservedBool2;                     // Reserved: was disconnectedMode; kept to preserve the stored layout
+ 		bool serialConnected;							  // Is the serial port connected - used to determine if we should wait for a serial connection before starting the device
+ 		uint16_t verboseTimeoutMin;                       // Minutes before verbose mode auto-disables (0 = no timeout)
+-		time_t verboseModeStartTime;                      // Timestamp when verbose mode was enabled (0 = not active)
++		time_t reservedTime0;                     // Reserved: was verboseModeStartTime; kept to preserve the stored layout
+ 		time_t lastDailyCleanup;                           // Last time dailyCleanup() successfully ran
+ 		time_t lastTimeSync;                               // Last time we synced time from Particle cloud
+ 		
+@@ -219,18 +219,12 @@ public:
+ 	 * 
+ 	 */
+ 
+-	uint8_t get_structuresVersion() const ;
+-	void set_structuresVersion(uint8_t value);
+-
+ 	bool get_verboseMode() const;
+ 	void set_verboseMode(bool value);
+ 
+ 	bool get_solarPowerMode() const;
+ 	void set_solarPowerMode(bool value);
+ 
+-	bool get_lowPowerMode() const;
+-	void set_lowPowerMode(bool value);
+-
+ 	bool get_lowBatteryMode() const;
+ 	void set_lowBatteryMode(bool value);
+ 
+@@ -266,18 +260,9 @@ public:
+ 	time_t get_alertTimestampNode() const;
+ 	void set_alertTimestampNode(time_t value);
+ 
+-	uint8_t get_sensorType() const;
+-	void set_sensorType(uint8_t value);
+-
+-	bool get_updatesPending() const;
+-	void set_updatesPending(bool value);
+-
+ 	uint16_t get_reportingInterval() const;
+ 	void set_reportingInterval(uint16_t value);
+ 
+-	bool get_disconnectedMode() const;
+-	void set_disconnectedMode(bool value);
+-
+ 	bool get_serialConnected() const;
+ 	void set_serialConnected(bool value);
+ 
+@@ -304,9 +289,6 @@ public:
+ 	uint16_t get_verboseTimeoutMin() const;
+ 	void set_verboseTimeoutMin(uint16_t value);
+ 
+-	time_t get_verboseModeStartTime() const;
+-	void set_verboseModeStartTime(time_t value);
+-
+ 	uint16_t get_connectAttemptBudgetSec() const;
+ 	void set_connectAttemptBudgetSec(uint16_t value);
+ 
+@@ -674,13 +656,13 @@ public:
+ 		// (except at the end), insert fields, remove fields, change size of a field.
+ 		// Doing so will cause the data to be corrupted!
+ 		// You may want to keep a version number in your data.
+-		uint16_t faceNumber;                            // number of faces counted
+-		uint16_t faceScore;							  	// Score of the face counted
+-		uint16_t gestureType;                           // Gesure observed
+-		uint16_t gestureScore;                          // faceNumber to the object in cm
++		uint16_t reservedUint16_0;                  // Reserved: was faceNumber; kept to preserve the stored layout
++		uint16_t reservedUint16_1;                  // Reserved: was faceScore; kept to preserve the stored layout
++		uint16_t reservedUint16_2;                  // Reserved: was gestureType; kept to preserve the stored layout
++		uint16_t reservedUint16_3;                  // Reserved: was gestureScore; kept to preserve the stored layout
+ 		time_t lastCountTime;							// Last time a count was made
+ 		float internalTempC;                            // Enclosure temperature in degrees C
+-		float externalTempC;							// Temp Sensor at the ultrasonic device
++		float reservedFloat1;                    // Reserved: was externalTempC; kept to preserve the stored layout
+ 		uint8_t alertCode;								// Current Alert Code
+ 		time_t lastAlertTime;
+ 		float stateOfCharge;                            // Battery charge level
+@@ -722,27 +704,12 @@ public:
+ 	 * 
+ 	 */
+ 
+-	uint16_t get_faceNumber() const;
+-	void set_faceNumber(uint16_t value);
+-
+-	uint16_t get_faceScore() const;
+-	void set_faceScore(uint16_t value);
+-
+-	uint16_t get_gestureType() const;
+-	void set_gestureType(uint16_t value);
+-
+-	uint16_t get_gestureScore() const;
+-	void set_gestureScore(uint16_t value);
+-
+ 	time_t get_lastCountTime() const;
+ 	void set_lastCountTime(time_t value);
+ 
+ 	float get_internalTempC() const ;
+ 	void set_internalTempC(float value);
+ 
+-	float get_externalTempC() const ;
+-	void set_externalTempC(float value);
+-
+ 	int8_t get_alertCode() const;
+ 	void set_alertCode(int8_t value);
+ 
+diff --git a/src/persist/CurrentReadings.h b/src/persist/CurrentReadings.h
+index 0d68de7..4ce6e89 100644
+--- a/src/persist/CurrentReadings.h
++++ b/src/persist/CurrentReadings.h
+@@ -90,7 +90,5 @@ void set_batteryState(uint8_t value);
+ float get_internalTempC();
+ void set_internalTempC(float value);
+ 
+-float get_externalTempC();
+-void set_externalTempC(float value);
+ 
+ }  // namespace CurrentReadings
+diff --git a/src/persist/PowerConfig.h b/src/persist/PowerConfig.h
+index 49b6911..0ec4798 100644
+--- a/src/persist/PowerConfig.h
++++ b/src/persist/PowerConfig.h
+@@ -28,8 +28,6 @@ bool get_solarPowerMode();
+ void set_solarPowerMode(bool value);
+ 
+ /// Legacy flag - kept for storage compatibility.
+-bool get_lowPowerMode();
+-void set_lowPowerMode(bool value);
+ 
+ bool get_lowBatteryMode();
+ void set_lowBatteryMode(bool value);
+diff --git a/src/persist/SystemConfig.h b/src/persist/SystemConfig.h
+index 0cc60cd..3bbdd57 100644
+--- a/src/persist/SystemConfig.h
++++ b/src/persist/SystemConfig.h
+@@ -111,8 +111,6 @@ void set_verboseMode(bool value);
+ uint16_t get_verboseTimeoutMin();
+ void set_verboseTimeoutMin(uint16_t value);
+ 
+-time_t get_verboseModeStartTime();
+-void set_verboseModeStartTime(time_t value);
+ 
+ bool get_serialConnected();
+ void set_serialConnected(bool value);
+@@ -145,12 +143,6 @@ void set_lastTimeSync(time_t value);
+ 
+ // *************** Operating modes ***************
+ 
+-/// Legacy sysStatus-level sensor type, kept only for the persisted layout.
+-/// Sensor creation reads SensorSettings::get_sensorType() (the
+-/// /usr/sensor.dat field, which the ledgers write) - Finding 3 requires the
+-/// two stay distinct.
+-uint8_t get_sensorType();
+-void set_sensorType(uint8_t value);
+ 
+ uint8_t get_sensorMode();
+ void set_sensorMode(uint8_t value);
+@@ -164,8 +156,6 @@ void set_reportingMode(uint8_t value);
+ uint8_t get_samplingMode();
+ void set_samplingMode(uint8_t value);
+ 
+-bool get_disconnectedMode();
+-void set_disconnectedMode(bool value);
+ 
+ bool get_enableHibernateSleep();
+ void set_enableHibernateSleep(bool value);
