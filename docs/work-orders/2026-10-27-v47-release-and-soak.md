@@ -16,13 +16,12 @@ Ship #142 (Step 7 P7-A: the stored layout frozen, dead accessors removed, no beh
 - **Suite:** 106/106 on the release head, serial (sh via zsh, py via python3).
 - **Release gate, Particle cloud compile (§3): not completed.** `particle compile boron . --target 6.6.0` failed on this head after about 2 minutes ("Compiler timed out or encountered an error", no diagnostics), as it did on 25-26 Oct for WO-2026-10-25-001's candidate and the unmodified v46 base. **Per the gate: recorded; release from the verified local build.** Retry before the upload; if it passes, add its flash and RAM here.
 
-## 2. Roles, the interval, and the plan (decision needed from Chip: lock timing)
+## 2. Roles, the interval, and the plan (Plan B chosen by Chip, 27 Oct)
 
 - **Dev-09** (e00fce68399ee6244a963935) is the **item 20 test device.** **Chip set its `timing.reportingIntervalSec` to 1800 on 27 Oct at about 01:00Z while it runs v46** (reports at :00 and :30; Device ledger `device-settings`, `timing.reportingIntervalSec`; the serial line is `Config: Reporting interval -> 1800s`). Its sessions currently start at :00:35, :20:36 and :40:36 and close at :10:06, :30:26 and :50:05, so each **:20 session spans the :30 report**. That makes today's v46 data the **control**: a v46 day with spanning sessions at the same interval and phase as the v47 test. The interval stays 1800 for the whole soak and is restored (3600, `Config.h`) by Chip when the soak ends.
 - **Dev-14** (e00fce688e592afaf23ac4fb) is the **bad-antenna stress case until 31 Oct** (Dev-09's old antenna): judge its sleep path, payload, serial `session=` values and report delivery; exclude its connect metrics (`connecttime`, `ConnSummary`, alerts 31/40/15 from failed connects). A failsafe stage-2 or stage-3 reset on Dev-14 after the 22:00 SGT close (14:00-16:00Z) is the **designed #151 behavior** (record it; not a failure). A gap of 3 h or more outside the overnight close is a possible item-18 recurrence: record it and change nothing. Its breadcrumb-28 events stay on the recovery item 14 watch.
 - **Is the control valid? (check before locking):** the Tuesday 27 Oct 14:33Z run (job `227cf4fa`) reports Dev-09's report-spanning sessions on v46 at 1800. **The control is valid if at least 8 sessions span a :30 report and credit 12 or more minutes.** Whether a :20 session spans the :30 report depends on the day's exerciser phase (it needs the last pulse at :25:02 or later, i.e. a start at :20:32 or later; today's :20:36 start has only about 5 s of margin), so categorize every session by observed overlap (occ=1 before and occ=0 after a report), never by clock phase. If the control fails, stop and ask the architect (a different interval is the fallback); do not lock.
-- **Plan B (recommended, if the control is valid): lock both devices to v47 after the Tuesday run.** Chip uploads v47 and locks Dev-09 and Dev-14 on Tue 27 Oct after 14:33Z; the OTA lands at the nightly 22:00Z wake (the flash completes within the hour, as on 25 Oct); Wed 28 Oct SGT is a mixed day; **Thu 29 Oct SGT is the first full v47 day** (the Dev-09 v47 days Thu and Fri 30 against its v46@1800 control on Tue). Decision Fri 30 Oct, before Chip is back.
-- **Plan A (if Chip prefers a full control day):** keep Dev-09 on v46 at 1800 through Wed 28 Oct SGT, lock after the Wed 14:33Z run, first full v47 day Fri 30 Oct, decision Sat 31 Oct.
+- **Plan B (chosen by Chip, 27 Oct; the name `v47-PersistFreeze` is approved).** **Chip uploads v47 on 27 Oct (checking 152,610 B and the sha256 against #158) and locks Dev-09 and Dev-14 to v47 on the night of 27 Oct, after the 14:33Z run confirms the control** (at least 8 spanning sessions at 12 minutes or more on v46 at 1800; if it does not, nothing is locked). They take it at the nightly 22:00Z wake (the flash completes within the hour, as on 25 Oct), so **Wed 28 Oct SGT is the first (nearly) full v47 day** (its first hour is v46: report it split by firmware). The **24 h grading runs from each device's own first v47 boot** (status reset 70, `v47-PersistFreeze`; about Thu 29 Oct 08:20 KST = Wed 28 ~23:20Z). **Decision Thu 29 Oct**, after the 24 h grading and the Thu 29 14:30Z run. (Plan A, a full extra v46 control day, is not used.)
 - **Default and fleet:** v47 is **not** set as the product default during the soak; Dev-09 and Dev-14 only (the Dev-09 and Dev-14 lock, KEEP_ALIVE, no other config changes).
 
 ## 3. Checks, per device (as the v46 soak §2)
@@ -47,18 +46,19 @@ Per session category (normal / **report-spanning** = occ=1 before and occ=0 afte
 
 Set v47 as the product default (recheck size and sha256 against Particle); merge #158; the fleet health check about 24 h later (the v46 check's format, `2026-10-28-v46-fleet-health-check` or the v44 WO as the model). Dev-09 and Dev-14 stay locked for the next release. Restore Dev-09's `timing.reportingIntervalSec` to its normal value (Chip, after the soak).
 
-## 6. Schedule (Plan B; SGT = UTC+8; to be confirmed by Chip's lock time)
+## 6. Schedule (Plan B; SGT = UTC+8)
 
 | When | Step | Who |
 |---|---|---|
-| Tue 27 Oct 14:33Z | v46 day 2 and the **control check** (job `227cf4fa`): is the control valid? | Claude Code |
-| after that run | Upload v47 (`/Users/chipmc/Downloads/v47-PersistFreeze-boron.bin`, 152,610 B, sha256 `a1c14ba1…ba61a13`), lock Dev-09 and Dev-14 to v47, **do not set it as the default** | **Chip** |
-| Tue 27 Oct ~22:00-23:00Z | The OTA at the nightly wake (reset 70, `v47-PersistFreeze`) | automatic |
+| Tue 27 Oct (done) | v47 uploaded to the product (not locked, not the default) | **Chip** |
+| Tue 27 Oct 14:33Z | v46 day 2 and the **control check** (job `227cf4fa`): at least 8 report-spanning sessions at 12+ min on v46 at 1800? | Claude Code |
+| after that run (night of 27 Oct) | **Lock Dev-09 and Dev-14 to v47** if the control is valid; do not set it as the default | **Chip** |
+| Tue 27 Oct 22:00Z | The OTA at the nightly wake (reset 70, `v47-PersistFreeze`); the flash completes within the hour | automatic |
 | Wed 28 Oct 00:40Z | v46 fleet health check (job `9b8a67aa`) | Claude Code |
-| Wed 28 Oct 14:33Z | v47 day 1 (mixed day for Dev-09, SGT 28 Oct) and the first-boot check | Claude Code |
-| Wed 28 Oct ~23:20Z | 24 h grading from Dev-09's first v47 boot (Dev-14 on its sleep path) | Claude Code (Sonnet subagent) |
-| Thu 29 Oct 14:33Z | v47 day 2 (the first full v47 day) and the item 20 comparison against the v46 control | Claude Code |
-| Fri 30 Oct | **Decision** on v47 as the product default and the release PR | **Chip** |
+| **Wed 28 Oct 14:30Z** | **v47 day 1** (SGT 28 Oct; first hour v46) and the first-boot check; **report-spanning sessions should now be about 570 s, 9 or 10 min**, against the v46 control | Claude Code (Sonnet subagent) |
+| **Wed 28 Oct ~23:20Z** (Thu 29 08:20 KST) | **24 h grading from each device's first v47 boot** (Dev-09 against its v46@1800 control; Dev-14 on its sleep path) | Claude Code (Sonnet subagent) |
+| **Thu 29 Oct 14:30Z** | **v47 day 2** and the comparison with the control | Claude Code |
+| Thu 29 Oct | **Decision** on v47 as the product default and #158 | **Chip** |
 
 The jobs are session-only (Claude Code's session); if it ends, paste the relays at the stated time. All reads need `AWS_PROFILE=particle-admin`; an expired SSO token stops a job with "token needed". The relays follow the v46 WO §5 (the baseline script call `--dates <SGT day> --tz SGT-8 --open 6 --close 22 --debounce-ms 300000`, per-category report, Dev-14 rules), with the categories of §4.
 
