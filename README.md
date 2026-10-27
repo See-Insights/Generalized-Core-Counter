@@ -8,7 +8,7 @@ This repository includes key documentation files that contributors and AI coding
 
 # Generalized-Core-Counter
 
-**Version:** v46-SleepSplit | **Latest:** Sleep half of Step 6 (S-1 to S-6); no intended behavior change
+**Version:** v47-PersistFreeze | **Latest:** Failsafe acts when openness is Unknown (item 18), occupied sleep wakes at the time left in the debounce (item 20), stored layout frozen (P7-A)
 
 Generalized-Core-Counter is a Particle firmware core for low-power outdoor sensor deployments that need flexible sensing modes, field-safe connectivity behavior, and durable configuration management. The v14 release packages cloud recovery tuning and release-safe logging cleanup without changing the existing production power, sleep, connectivity, watchdog, ledger, or PMIC behavior.
 
