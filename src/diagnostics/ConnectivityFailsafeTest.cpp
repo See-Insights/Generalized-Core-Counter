@@ -156,7 +156,7 @@ FailsafeDeferReason currentFailsafeEligibilityReason() {
   const time_t now = Time.now();
   const time_t openedAt = DailyBoundary::todayAt(SystemConfig::get_openTime());
   const time_t ageBase = (openedAt > lastConnection) ? openedAt : lastConnection;
-  if (Clock::openness() == Clock::Openness::Open && now > ageBase) {
+  if (Clock::openness() != Clock::Openness::Closed && now > ageBase) {
     const time_t connectionAgeSec = now - ageBase;
     uint8_t currentStage = RecoveryState::get_connectivityRecoveryStage();
     if (currentStage > 3) {
