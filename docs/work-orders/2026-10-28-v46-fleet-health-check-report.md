@@ -2,7 +2,7 @@
 
 **WO / format:** `2026-10-22-v44-fleet-health-check.md` and its report, with v46 (`v46-SleepSplit`, Device OS 6.6.0) in place of v44; Chip's ruling of 26 Oct (job `9b8a67aa`). **Grader:** a Sonnet subagent (read-only; S3 `Ubidots-Sensor-Hook-v1`, `status`, `watchdog`, `hibernate_wake` for 23-28 Oct, hooks to 02:03:42Z 28 Oct, plus the Particle CLI). Claude Code spot-checked the headline numbers in S3 with its own pull (§13 (j)): the PCKL2 watchdog file and status, Trail02's four status events, and MAFC-2's first v46 boot. Nothing was changed in AWS, on a device, or in the product.
 
-**Ruling (architect, 28 Oct): v46 is healthy on the fleet, with two WATCHES (see "Rulings" at the end).** Grader's verdict as graded: two FINDINGS by the letter, neither a loss of data. PCKL2: one breadcrumb-28 sleep watchdog on v46 (27 Oct 15:00:50Z). Trail02: two reset 40 (power down) on v46, new in this window. The other seven US devices PASS.** (Trail02's "new in this window" is corrected below: it has nine reset-40 events since June.)
+**Ruling (architect, 28 Oct): v46 is healthy on the fleet; PCKL2 is a WATCH and Trail02 is the device's power path (see "Rulings" at the end).** Grader's verdict as graded: two FINDINGS by the letter, neither a loss of data. PCKL2: one breadcrumb-28 sleep watchdog on v46 (27 Oct 15:00:50Z). Trail02: two reset 40 (power down) on v46, new in this window. The other seven US devices PASS.** (Trail02's "new in this window" is corrected below: it has nine reset-40 events since June.)
 
 ## Windows
 
@@ -50,4 +50,4 @@ The exact product-default time (no CLI query); Court1's CONSERVING state and whe
 
 **v46 is healthy on the fleet, with two watches.**
 1. **PCKL2's breadcrumb-28: WATCH, not a regression.** Pre-existing on that device (last-watchdog breadcrumb 28 before v46), the known in-`System.sleep()` stall (#113, recovery item 14), and single events are noise at a background rate of about 0.1 per 1,000. **Escalates on a second PCKL2 event, or on a fleet v46 rate of 3 or more events and above 0.2 per 1,000 over a week.**
-2. **Trail02's reset 40 ×2: WATCH, likely the power path** (a power-down, no failsafe so no firmware stage 3; the gauge jump is a re-estimate). The reset-40 history before 23 Oct (above) was pulled as asked: nine events since June, seven before the window, so it recurs. **Chip is asking whether anyone was working on Trail02 on 27 Oct** (open).
+2. **Trail02's reset 40 ×2: not v46; the device's power path; a low-priority hardware item (corrected ruling, 28 Oct).** The history above shows reset 40 recurring on Trail02 since 20 Jul across firmware versions (`20.0-dev`, v24, v38, v46): nine events, no failsafe, no `watchdogResetCount` change. It is the device's power path (a power-down; the gauge jump is a re-estimate), not something v46 introduced. This replaces the earlier "WATCH" for this item. **Chip's 27 Oct question (whether anyone was working on Trail02) is closed.**
