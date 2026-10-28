@@ -42,15 +42,17 @@ def write(root, sub, name, ts, payload, pub_delay=400):
         json.dump(env, f)
 
 
-def run(credit_s=330, drop=None, reset=False, base=BASE, tz="UTC0", h=7, no_ts=False, date="2026-10-21"):
+def run(credit_s=330, drop=None, reset=False, base=BASE, tz="UTC0", h=7, no_ts=False, date="2026-10-21", carry=0, post=False):
     tmp, T0 = tempfile.mkdtemp(), base + h * 3600 + 54 * 60 + 30
     # published_at lags the payload timestamp by 400 s, so using it as the phase moves every close
-    reps, cum = [(T0, 1, 0)], 0
+    reps, cum = [(T0, 1, carry)], 0
     for k in range(6):
         if not (reset and k == 2):
             cum += credit_s
-        reps.append((T0 + 330 + 1200 * k + 60, 0, int(cum // 60)))
-    reps.append((base + (h + 3) * 3600 + 30, 0, int(cum // 60)))
+        reps.append((T0 + 330 + 1200 * k + 60, 0, int(cum // 60) + carry))
+    reps.append((base + (h + 3) * 3600 + 30, 0, int(cum // 60) + carry))
+    if post:  # a post-close session (recovery item 10): the day resets to 0 and then credits 7
+        reps += [(base + (h + 3) * 3600 + 150, 1, 0), (base + (h + 3) * 3600 + 470, 0, 7)]
     if no_ts:
         write(tmp, "hooks", "nots", T0 - 1800, {"occupancy": 1, "dailyoccupancy": 0, "cyc": 0})
     for i, (ts, occ, daily) in enumerate(r for j, r in enumerate(reps) if j != drop):
@@ -93,6 +95,9 @@ def main():
     bad += check("reset day", (day["measured"], float(day["error"]), day["error_pct"], day["flags"]),
                  ("27", -6.0, "-18.1818", "reset"))
     bad += check("reset window", win[2], -5.5)
+    out, day, win = run(carry=5, post=True)
+    bad += check("carry-in and post-close ignored", (day["measured"], day["expected"], float(day["error"]), day["flags"], len(win)),
+                 ("33", "33.0", 0.0, "", 7))
     rule = "EST5EDT,M3.2.0/2:00:00,M11.1.0/2:00:00"
     for tz, b, h, date in (("SGT-8", BASE - 8 * 3600, 7, "2026-10-21"), (rule, BASE + 4 * 3600, 20, "2026-10-21"),
                            (rule, DEC + 5 * 3600, 20, "2026-12-09")):
