@@ -48,6 +48,6 @@ The exact product-default time (no CLI query); Court1's CONSERVING state and whe
 
 ## Rulings (architect, 28 Oct)
 
-**v46 is healthy on the fleet, with two watches.**
+**v46 is healthy on the fleet, with one watch (PCKL2) and one low-priority hardware item (Trail02).**
 1. **PCKL2's breadcrumb-28: WATCH, not a regression.** Pre-existing on that device (last-watchdog breadcrumb 28 before v46), the known in-`System.sleep()` stall (#113, recovery item 14), and single events are noise at a background rate of about 0.1 per 1,000. **Escalates on a second PCKL2 event, or on a fleet v46 rate of 3 or more events and above 0.2 per 1,000 over a week.**
 2. **Trail02's reset 40 ×2: not v46; the device's power path; a low-priority hardware item (corrected ruling, 28 Oct).** The history above shows reset 40 recurring on Trail02 since 20 Jul across firmware versions (`20.0-dev`, v24, v38, v46): nine events, no failsafe, no `watchdogResetCount` change. It is the device's power path (a power-down; the gauge jump is a re-estimate), not something v46 introduced. This replaces the earlier "WATCH" for this item. **Chip's 27 Oct question (whether anyone was working on Trail02) is closed.**
