@@ -66,6 +66,17 @@ bool isTrusted() { return trusted; }
 Openness openness() { return opennessValue; }
 }  // namespace Clock
 
+// WO-2026-10-29-002: the last close boundary, as DailyBoundary::check() reports it.
+namespace DailyBoundary {
+struct Result {
+  bool due;
+  time_t boundary;
+  uint8_t close;
+};
+time_t boundaryValue = 0;
+Result check(time_t) { return {false, boundaryValue, 0}; }
+}  // namespace DailyBoundary
+
 namespace Config {
 bool configValid = true;
 uint32_t occupancyDebounceMsForRuntime() { return 300000UL; }
@@ -133,6 +144,7 @@ struct {
 } thrashGuard;
 
 #include "extracted_predicate.inc"
+#include "extracted_gate.inc"
 #include "extracted_close_1.inc"
 #include "extracted_close_2.inc"
 #include "extracted_close_3.inc"
@@ -615,6 +627,160 @@ void testConnectedEndToEnd() {
   CHECK(state == IDLE_STATE && !session.occupancyChangeTriggered, "connected end to end: settled in Idle");
 }
 
+// --- WO-2026-10-29-002: occupancy ends at the close ------------------------------
+// "close:" checks. The boundary is 300 s before "now"; a session that started 600 s ago was open at it.
+constexpr time_t kSinceBoundary = 300;
+
+void armClosed(const ModeCase &m, Clock::Openness o) {
+  arm(m);
+  Clock::opennessValue = o;
+  DailyBoundary::boundaryValue = Time.nowValue - kSinceBoundary;
+}
+
+// A session open at the close, debounce already expired, as the awake loop finds it.
+void openAtCloseDebounceExpired() {
+  CurrentReadings::set_occupied(true);
+  CurrentReadings::set_occupancyStartTime(Time.nowValue - 600);
+  CurrentReadings::set_lastOccupancyEvent(millisValue);
+  millisValue += kDebounceMs + 1000;
+  ledOn = true;
+  ledRemainingSec = 0;
+}
+
+void testEndsAtClose() {
+  for (const ModeCase &m : kModes) {
+    // The cleanup's explicit-boundary close credits to the boundary and ends the session.
+    armClosed(m, Clock::Openness::Closed);
+    CurrentReadings::set_occupied(true);
+    CurrentReadings::set_occupancyStartTime(Time.nowValue - 600);
+    closeOccupancySessionSafely("daily-cleanup", DailyBoundary::boundaryValue);
+    CHECK_MODE(m, !CurrentReadings::get_occupied() && CurrentReadings::get_totalOccupiedSeconds() == 300,
+               "close: a session open at the close is credited to the close and ended");
+
+    // Awake detection after the close: nothing starts, nothing is credited.
+    armClosed(m, Clock::Openness::Closed);
+    sensorEvent = true;
+    loopOnce();
+    CHECK_MODE(m, !CurrentReadings::get_occupied() && !ledOn && !session.occupancyChangeTriggered &&
+                      state == IDLE_STATE && !anyOccupancyReport(),
+               "close: an awake detection after the close starts nothing");
+    CHECK_MODE(m, CurrentReadings::get_totalOccupiedSeconds() == 0, "close: an awake detection adds nothing");
+
+    // ... and does not extend a session still open (no debounce restart).
+    armClosed(m, Clock::Openness::Closed);
+    CurrentReadings::set_occupied(true);
+    CurrentReadings::set_occupancyStartTime(Time.nowValue - 100);
+    CurrentReadings::set_lastOccupancyEvent(millisValue - 5000);
+    sensorEvent = true;
+    loopOnce();
+    CHECK_MODE(m, CurrentReadings::get_lastOccupancyEvent() == millisValue - 5000,
+               "close: an awake detection does not extend an open session");
+
+    // A PIR wake after the close: nothing starts.
+    armClosed(m, Clock::Openness::Closed);
+    state = SLEEPING_STATE;
+    wakeKind = WAKE_PIR;
+    sleepPass();
+    CHECK_MODE(m, !CurrentReadings::get_occupied() && !ledOn && !session.occupancyChangeTriggered && !anyOccupancyReport(),
+               "close: a PIR wake after the close starts nothing");
+    CHECK_MODE(m, CurrentReadings::get_totalOccupiedSeconds() == 0, "close: a PIR wake adds nothing");
+
+    // ... and does not extend a session still open.
+    armClosed(m, Clock::Openness::Closed);
+    CurrentReadings::set_occupied(true);
+    CurrentReadings::set_occupancyStartTime(Time.nowValue - 100);
+    CurrentReadings::set_lastOccupancyEvent(millisValue - 5000);
+    ledOn = true;
+    ledRemainingSec = 60000;
+    state = SLEEPING_STATE;
+    wakeKind = WAKE_PIR;
+    sleepPass();
+    CHECK_MODE(m, CurrentReadings::get_lastOccupancyEvent() == millisValue - 5000 && ledRemainingSec == 60000,
+               "close: a PIR wake does not extend an open session");
+
+    // A debounce that expires after the boundary credits only to the boundary.
+    armClosed(m, Clock::Openness::Closed);
+    openAtCloseDebounceExpired();
+    loopOnce();
+    CHECK_MODE(m, !CurrentReadings::get_occupied() && CurrentReadings::get_totalOccupiedSeconds() == 300,
+               "close: an awake debounce expiring after the boundary credits only to the boundary");
+    armClosed(m, Clock::Openness::Closed);
+    openAtCloseDebounceExpired();
+    state = SLEEPING_STATE;
+    wakeKind = WAKE_OTHER;
+    sleepPass();
+    CHECK_MODE(m, !CurrentReadings::get_occupied() && CurrentReadings::get_totalOccupiedSeconds() == 300,
+               "close: a wake debounce expiring after the boundary credits only to the boundary");
+
+    // The next day starts at 0: after the cleanup's zeroing, a whole night of detections adds nothing.
+    armClosed(m, Clock::Openness::Closed);
+    for (int i = 0; i < 5; ++i) {
+      sensorEvent = true;
+      loopOnce();
+      Time.nowValue += 60;
+      millisValue += 60000;
+    }
+    CHECK_MODE(m, CurrentReadings::get_totalOccupiedSeconds() == 0 && !CurrentReadings::get_occupied(),
+               "close: the next day's first report shows dailyoccupancy 0");
+
+    // closeHour == 24: the session carried across midnight starts at the boundary (start == boundary). Detections
+    // 00:00-06:00 are ignored and it ends on its debounce with normal credit: debounce expiry minus the boundary.
+    constexpr time_t kExpirySec = (kDebounceMs + 1000) / 1000;
+    armClosed(m, Clock::Openness::Closed);
+    CurrentReadings::set_occupied(true);
+    CurrentReadings::set_occupancyStartTime(DailyBoundary::boundaryValue);
+    CurrentReadings::set_lastOccupancyEvent(millisValue);
+    ledOn = true;
+    ledRemainingSec = 60000;
+    sensorEvent = true;
+    loopOnce();
+    CHECK_MODE(m, CurrentReadings::get_lastOccupancyEvent() == millisValue && CurrentReadings::get_occupied(),
+               "close: close 24: a detection does not extend the carried session");
+    millisValue += kDebounceMs + 1000;
+    Time.nowValue += kExpirySec;
+    ledOn = true;
+    ledRemainingSec = 0;
+    loopOnce();
+    CHECK_MODE(m, !CurrentReadings::get_occupied() && CurrentReadings::get_totalOccupiedSeconds() == kSinceBoundary + kExpirySec,
+               "close: close 24: the carried session ends on its debounce with credit from the boundary");
+
+    // A session with start == boundary is not clamped; one with start < boundary is, to the boundary.
+    armClosed(m, Clock::Openness::Closed);
+    CurrentReadings::set_occupied(true);
+    CurrentReadings::set_occupancyStartTime(DailyBoundary::boundaryValue);
+    closeOccupancySessionSafely("clamp-test", Time.nowValue);
+    CHECK_MODE(m, CurrentReadings::get_totalOccupiedSeconds() == kSinceBoundary,
+               "close: a session with start == boundary is not clamped");
+    armClosed(m, Clock::Openness::Closed);
+    CurrentReadings::set_occupied(true);
+    CurrentReadings::set_occupancyStartTime(DailyBoundary::boundaryValue - 1);
+    closeOccupancySessionSafely("clamp-test", Time.nowValue + 1000);
+    CHECK_MODE(m, CurrentReadings::get_totalOccupiedSeconds() == 1,
+               "close: a session with start < boundary is clamped to the boundary");
+
+    // Open (0-24 sites are never Closed) and Unknown (untrusted clock): behaviour unchanged.
+    const Clock::Openness unchanged[] = {Clock::Openness::Open, Clock::Openness::Unknown};
+    for (const Clock::Openness o : unchanged) {
+      const char *who = (o == Clock::Openness::Open) ? "open" : "unknown";
+      armClosed(m, o);
+      sensorEvent = true;
+      loopOnce();
+      CHECK_MODE(m, CurrentReadings::get_occupied(), std::string("close: ") + who + ": an awake detection starts a session");
+      armClosed(m, o);
+      state = SLEEPING_STATE;
+      wakeKind = WAKE_PIR;
+      sleepPass();
+      CHECK_MODE(m, CurrentReadings::get_occupied(), std::string("close: ") + who + ": a PIR wake starts a session");
+      armClosed(m, o);
+      openAtCloseDebounceExpired();
+      Time.nowValue += (kDebounceMs + 1000) / 1000;
+      loopOnce();
+      CHECK_MODE(m, !CurrentReadings::get_occupied() && CurrentReadings::get_totalOccupiedSeconds() == 600 + (kDebounceMs + 1000) / 1000,
+                 std::string("close: ") + who + ": the debounce close is not clamped");
+    }
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -646,7 +812,7 @@ int main() {
   testNoRepeat();
   testConnectedReportsOnce();
   testConnectedEndToEnd();
-
+  testEndsAtClose();
   if (failures != 0) {
     std::cerr << failures << " check(s) failed\n";
     return 1;

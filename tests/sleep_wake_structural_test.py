@@ -119,6 +119,18 @@ def problems_in(sleep, modes, header):
 
 sleep, modes, header = SLEEP.read_text(), MODES.read_text(), HEADER.read_text()
 
+# WO-2026-10-29-002: the two occupancy-after-close gates are the only intended State_Modes.cpp change versus the S-6
+# base; they are mapped back to the base text so the S-6 equivalence checks below still compare like with like.
+GATE_AWAKE = ("  // loop() always runs first so the sensor flag is consumed; a detection after the close is ignored.\n"
+              "  if (SensorManager::instance().loop() && !occupancyIgnoredWhenClosed()) {\n")
+GATE_WAKE = ("        if (occupancyIgnoredWhenClosed()) {\n"
+             '          Log.info("OCCUPANCY pir-wake ignored: closed");\n'
+             "          return false;\n"
+             "        }\n")
+if modes.count(GATE_AWAKE) != 1 or modes.count(GATE_WAKE) != 1:
+    fail("State_Modes.cpp must carry exactly the two WO-2026-10-29-002 occupancy-after-close gates")
+modes = modes.replace(GATE_AWAKE, "  if (SensorManager::instance().loop()) {\n", 1).replace(GATE_WAKE, "", 1)
+
 # ---- probes: every check fires on a text that breaks it -------------------------------------------------
 event_body = body_of(modes, EVENT_SIG)
 probes = {

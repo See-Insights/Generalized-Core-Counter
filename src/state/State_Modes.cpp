@@ -62,7 +62,8 @@ void handleCountingMode() {
  */
 void handleOccupancyMode() {
   // Check if sensor has new data
-  if (SensorManager::instance().loop()) {
+  // loop() always runs first so the sensor flag is consumed; a detection after the close is ignored.
+  if (SensorManager::instance().loop() && !occupancyIgnoredWhenClosed()) {
     // Sensor detected presence
     if (!CurrentReadings::get_occupied()) {
       // Transition from unoccupied to occupied
@@ -206,6 +207,10 @@ bool processSleepWakeEvent(bool pirWake) {
       } else if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY) {
         // Occupancy mode: PIR wakes are expected behavior, not thrashing
         thrashGuard.markProgress("PIR_WAKE_OCCUPANCY");
+        if (occupancyIgnoredWhenClosed()) {
+          Log.info("OCCUPANCY pir-wake ignored: closed");
+          return false;
+        }
 
         // If KEEP_ALIVE was temporarily disabled for low battery, refresh the
         // battery policy on wake so recovered power can restore the intended
