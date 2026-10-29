@@ -2,7 +2,7 @@
 
 PROJECT_NAME           = "Generalized-Core-Counter"
 PROJECT_BRIEF          = "Particle-based generalized core counter firmware"
-PROJECT_NUMBER         = "v46-SleepSplit"
+PROJECT_NUMBER         = "v47-PersistFreeze"
 
 # Where to put generated docs
 OUTPUT_DIRECTORY       = docs

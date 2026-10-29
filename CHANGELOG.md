@@ -16,6 +16,15 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v47-PersistFreeze] - 2026-10-27
+
+### Changed
+
+- **Two intended behavior changes (both small); everything else should behave like v46** (Device OS 6.6.0).
+  - **The connectivity failsafe now acts when the clock's state is unknown (recovery item 18, PR #151).** After a restart during a cloud blackout the clock is untrusted and its open/closed state is Unknown, and the failsafe used to return without acting, so a device could stay dark until someone power-cycled it. Now Unknown counts as open; only a known Closed still skips it. The stage timings, cooldown and jitter are unchanged.
+  - **An occupied device now wakes when the debounce actually ends (recovery item 20, PR #155).** After a wake that was not a motion pulse (the hourly report), it used to sleep another full debounce, so the end of the session was noticed late and the late time was credited (12-13 min instead of 9.5 on the bench). Now it sleeps only the time left, plus 1 s; with no known deadline it keeps the full debounce. The `Wake: ... led=` log field now shows the real seconds left (it always read 0).
+  - **The stored layout is frozen (Step 7 P7-A, PR #142). No behavior change.** Code for stored fields nothing uses was removed; each field's bytes stay in place as a reserved slot, so the three stored records keep their sizes (272, 36 and 88 B) and v45 and v46 read the same files after a downgrade. **Nothing to expect on the first boot.**
+
 ## [v46-SleepSplit] - 2026-10-23
 
 ### Changed
