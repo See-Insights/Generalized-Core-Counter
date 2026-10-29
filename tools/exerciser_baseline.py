@@ -78,6 +78,8 @@ def parse_args(argv):
     ap.add_argument("--pulses", type=int, default=10)
     ap.add_argument("--spacing-s", type=float, default=30)
     ap.add_argument("--phase-offset-s", type=float, default=0, help="added to T0")
+    ap.add_argument("--close-grace-s", type=float, default=60,
+                    help="reports later than close + this are post-close (recovery item 10) and ignored")
     ap.add_argument("--exclude", nargs="*", default=[], help="START..END local ISO datetimes")
     ap.add_argument("--csv", help="write rows to this file")
     return ap.parse_args(argv)
@@ -109,7 +111,7 @@ def main(argv=None):
         d0 = datetime.fromisoformat(day)
         at = lambda days=0, hours=0: local_epoch(d0 + timedelta(days=days, hours=hours))
         open_t, close_t = at(hours=a.open), at(hours=a.close)
-        reps = [r for r in hooks if at() <= r["ts"] < at(1)
+        reps = [r for r in hooks if at() <= r["ts"] < min(at(1), close_t + a.close_grace_s)
                 and r["d"].get("dailyoccupancy") is not None]
         first = next((r for r in reps if r["d"].get("occupancy") == 1 and r["ts"] >= open_t), None)
         if not first:
@@ -136,7 +138,9 @@ def main(argv=None):
                               e=m - x, flags=wf))
         if any("reset" in w["flags"] for w in dwins):
             flags.append("reset")
-        measured, expected = reps[-1]["d"]["dailyoccupancy"], len(closes) * credit / 60
+        # per-report increments: a carry-in from the previous day's post-close session is not this day's credit
+        measured = sum(max(c["d"]["dailyoccupancy"] - p["d"]["dailyoccupancy"], 0) for p, c in zip(reps, reps[1:]))
+        expected = len(closes) * credit / 60
         wins += dwins
         days.append(dict(label=day, fw=reps[-1]["fw"], m=measured, x=expected, e=measured - expected,
                          n=len(closes), flags=flags))
