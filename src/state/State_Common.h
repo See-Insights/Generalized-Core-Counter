@@ -11,6 +11,7 @@
 #include "state/StateHandlers.h"
 #include "state/StateMachine.h"
 #include "time/Clock.h"
+#include "time/DailyBoundary.h"
 
 /**
  * @file State_Common.h
@@ -56,6 +57,10 @@ inline bool reportsOccupancyChangesNow() {
 	const uint8_t mode = PowerManager::instance().effectiveConnectionMode();
 	return mode == SystemConfig::INTERMITTENT_KEEP_ALIVE || mode == SystemConfig::CONNECTED;
 }
+
+/// WO-2026-10-29-002: occupancy ends at the daily close. `== Closed` only:
+/// Unknown (untrusted clock) and 0-24 sites (never Closed) behave as before.
+inline bool occupancyIgnoredWhenClosed() { return Clock::openness() == Clock::Openness::Closed; }
 
 /**
  * @brief Reasons the long-duration connectivity failsafe intentionally deferred action.
@@ -349,6 +354,12 @@ inline OccupancyCloseResult closeOccupancySessionSafely(const char *path, time_t
 	}
 	const time_t now = Time.now();
 	const time_t start = CurrentReadings::get_occupancyStartTime();
+	// WO-2026-10-29-002: credit no later than the last close boundary. The
+	// daily-cleanup call passes that same boundary, so it is unchanged.
+	if (occupancyIgnoredWhenClosed()) {
+		const time_t boundary = DailyBoundary::check(now).boundary;
+		if (start < boundary) closeAt = std::min(closeAt, boundary);
+	}
 	// WO-2026-10-04-001 item B3: the first trusted close of a session that was
 	// already open at boot credits no later than this boot started, and no
 	// later than one debounce past the last evidence the session was open.

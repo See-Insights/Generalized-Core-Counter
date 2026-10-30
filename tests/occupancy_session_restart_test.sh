@@ -178,7 +178,20 @@ int8_t get_alertCode() { return alertCode; }
 namespace Clock {
 bool trusted = true;
 bool isTrusted() { return trusted; }
+// WO-2026-10-29-002: this test runs a normal-hours-Open site; the close-hour gate has its own test
+// (occupancy_report_by_mode_test).
+enum class Openness { Open, Closed, Unknown };
+Openness openness() { return Openness::Open; }
 }  // namespace Clock
+
+namespace DailyBoundary {
+struct Result {
+  bool due;
+  time_t boundary;
+  uint8_t close;
+};
+Result check(time_t) { return {false, 0, 0}; }
+}  // namespace DailyBoundary
 
 namespace SystemConfig {
 enum ConnectionMode { CONNECTED = 0, DISCONNECTED_KEEP_ALIVE = 2, INTERMITTENT_KEEP_ALIVE = 3 };
@@ -236,6 +249,8 @@ CPP
   echo ""
   echo "// ===== Extracted verbatim from src/state/State_Common.h ====="
   extract_braced_block "$common_src" "inline bool reportsOccupancyChangesNow() {"
+  echo ""
+  extract_braced_block "$common_src" "inline bool occupancyIgnoredWhenClosed() {"
   echo ""
   extract_braced_block "$common_src" "struct OccupancyCloseResult {"
   echo ""

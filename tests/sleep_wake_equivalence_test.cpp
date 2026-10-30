@@ -62,6 +62,9 @@ inline bool reportDueThisInterval() {
   const time_t lastReport = SystemConfig::get_lastReport();
   return lastReport == 0 || Time.now() / interval != lastReport / interval;
 }
+// WO-2026-10-29-002: the after-close gate is a deliberate change from the S-6 base. This table freezes the base
+// behaviour of the move, so the gate is held off here; tests/occupancy_ends_at_close_test.sh drives it for real.
+inline bool occupancyIgnoredWhenClosed() { return false; }
 inline bool reportsOccupancyChangesNow() {
   const uint8_t mode = PowerManager::instance().effectiveConnectionMode();
   return mode == SystemConfig::INTERMITTENT_KEEP_ALIVE || mode == SystemConfig::CONNECTED;

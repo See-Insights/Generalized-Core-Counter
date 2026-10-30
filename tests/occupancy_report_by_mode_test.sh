@@ -151,6 +151,8 @@ report = Src("state/State_Report.cpp")
 # --- State_Common.h: the predicate and the real close/debounce helpers --------
 s, e = common.stmt("inline bool reportsOccupancyChangesNow() {")
 emit("extracted_predicate.inc", common, s, e)
+s, e = common.stmt("inline bool occupancyIgnoredWhenClosed() {")
+emit("extracted_gate.inc", common, s, e)
 s, e = common.stmt("struct OccupancyCloseResult {", semicolon=True)
 emit("extracted_close_1.inc", common, s, e)
 s, e = common.stmt("inline uint32_t occupancyDebounceMs() {")
@@ -510,5 +512,26 @@ mutate_and_expect_failure "connected clear restored, entry take removed" "norepe
 " \
   '    transitionTo(IDLE_STATE, "already connected");' '    session.occupancyChangeTriggered = false;
     transitionTo(IDLE_STATE, "already connected");'
+
+gate_old="return Clock::openness() == Clock::Openness::Closed;"
+# WO-2026-10-29-002: occupancy ends at the close.
+mutate_and_expect_failure "gate removed" "close: (an awake detection after|a PIR wake after)" "state/State_Common.h" \
+  "$gate_old" "return false;"
+mutate_and_expect_failure "gate on != Open" "close: unknown:" "state/State_Common.h" \
+  "$gate_old" "return Clock::openness() != Clock::Openness::Open;"
+mutate_and_expect_failure "awake gate site removed" "close: an awake detection after" "state/State_Modes.cpp" \
+  "if (SensorManager::instance().loop() && !occupancyIgnoredWhenClosed()) {" "if (SensorManager::instance().loop()) {"
+mutate_and_expect_failure "wake gate site removed" "close: a PIR wake after" "state/State_Modes.cpp" \
+  "        if (occupancyIgnoredWhenClosed()) {
+          Log.info(\"OCCUPANCY pir-wake ignored: closed\");
+          return false;
+        }
+" ""
+mutate_and_expect_failure "credit clamp dropped" "close: (an awake|a wake) debounce expiring after the boundary" "state/State_Common.h" \
+  "		if (start < boundary) closeAt = std::min(closeAt, boundary);" "		(void)boundary;"
+mutate_and_expect_failure "clamp without start < boundary" "close: (close 24|a session with start == boundary)" "state/State_Common.h" \
+  "if (start < boundary) closeAt" "closeAt"
+mutate_and_expect_failure "clamp with start <= boundary" "close: (close 24|a session with start == boundary)" "state/State_Common.h" \
+  "if (start < boundary) closeAt" "if (start <= boundary) closeAt"
 
 echo "occupancy_report_by_mode_test: clean run passed and all mutations detected"
