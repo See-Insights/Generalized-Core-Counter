@@ -16,6 +16,14 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v48-OccupancyEndsAtClose] - 2026-10-31
+
+### Changed
+
+- **One intended behavior change; everything else should behave like v47** (Device OS 6.6.0).
+  - **Occupancy ends at the close (recovery item 10, PR #166).** On a normal-hours site (`openHour` < `closeHour`, not 0-24) a session open at the close is credited up to the close and ended by it, and no detection between the close and the next opening starts a session or adds credit, awake or on a wake. The next day starts at 0. Before this, a device still awake after the close added sessions to the already-zeroed counter and they landed in the next day's total (+5 to +7 min on the bench). 0-24 sites keep splitting sessions at the boundary, Unknown openness behaves as before, and COUNTING mode is unchanged. **Expect:** the first report each morning reads `dailyoccupancy` 0.
+  - The stored layout is unchanged; nothing to expect on the first boot.
+
 ## [v47-PersistFreeze] - 2026-10-27
 
 ### Changed

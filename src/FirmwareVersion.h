@@ -15,9 +15,9 @@
 #define FIRMWARE_VERSION_H
 
 /** @brief Particle Product integer version (must be an integer). */
-#define FIRMWARE_PRODUCT_VERSION 47
+#define FIRMWARE_PRODUCT_VERSION 48
 
 /** @brief Current firmware release string. */
-inline const char* FIRMWARE_VERSION = "v47-PersistFreeze";
+inline const char* FIRMWARE_VERSION = "v48-OccupancyEndsAtClose";
 
 #endif /* FIRMWARE_VERSION_H */
