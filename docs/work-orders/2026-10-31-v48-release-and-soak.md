@@ -23,7 +23,9 @@ v48 is also the gate for the main waves of the legacy-occupancy migration (WO-20
 
 ## 2. Roles and plan
 
-- **Dev-09** (e00fce68399ee6244a963935) and **Dev-14** (e00fce688e592afaf23ac4fb) are the soak devices, locked to v48 by Chip. Dev-09's `timing.reportingIntervalSec` stays 3600. Dev-14 keeps the bad-antenna rules from the v47 WO §2 (judge its sleep path and payload; exclude its connect metrics; a failsafe stage-2/3 reset after the 22:00 SGT close is the designed #151 behavior).
+- **Dev-09** (e00fce68399ee6244a963935) and **Dev-14** (e00fce688e592afaf23ac4fb) are the soak devices, locked to v48 by Chip. Dev-09's `timing.reportingIntervalSec` stays 3600. **Antenna swap (Chip, about 09:36Z 31 Oct, 17:36 SGT): Dev-14's bad antenna (Dev-09's old one) was replaced with a new one.** Dev-14 is no longer the bad-antenna stress case, so **from v48 its connect metrics count again** (`connecttime`, `ConnSummary`, alerts 31/40/15, connect failures), judged like Dev-09's; the v47-WO exclusions no longer apply. Anything before 09:36Z 31 Oct (all of v47) stays on the old antenna and is not compared with v48 on connect metrics.
+  - **Antenna check (from Dev-14's next connects after 09:36Z; Claude Code, read-only):** `sig=` in the serial `ConnSummary` lines is back to Dev-09's level (about `/29` quality; Dev-09's recent values are the reference, read them the same day), and connect failures stop (no `ConnSummary: fail`, no 660 s `CELLULAR_ACQUIRE` timeouts, no failsafe stage 2/3 from a connectivity silence). If `sig=` stays near the old values or failures continue, record it and tell Chip (the antenna or its connector).
+  - A failsafe stage-2/3 reset after the 22:00 SGT close remains the designed #151 behavior (record it; not a failure).
 - **Anchor** every job on each device's actual first v48 boot (status reset 70, `v48-OccupancyEndsAtClose`; exclude the OTA-interrupted session).
 - Pilot devices (Vaughan-002, OCCUPANCY-LAB-01, ChurchSt-2) are not part of this soak and stay on v47.
 - Not set as the product default during the soak.
