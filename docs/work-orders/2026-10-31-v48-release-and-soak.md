@@ -14,9 +14,12 @@ v48 is also the gate for the main waves of the legacy-occupancy migration (WO-20
 ## 1. Release PR (branch `release/v48`)
 
 - `src/` differs from v47 (`f624c15`) only by #166 (`State_Common.h`, `State_Modes.cpp`, net +16) and the version string. Release commit: `FirmwareVersion.h` (48, `v48-OccupancyEndsAtClose`), `CHANGELOG.md`, `README.md`, `Doxyfile`.
-- **Suite:** run with zsh for the `.sh` tests and python3 for the `.py` tests, serial. Result in the release PR.
-- **Local build (§3, mandatory per change): not yet done.** Boron, Device OS 6.6.0, fresh `BUILD_PATH_BASE`, `-frandom-seed=$$@`. Record `app.bin` size and sha256, `strings` for `v48-OccupancyEndsAtClose`, and `particle binary inspect` (firmware version 48, system module 6600). v47 was 152,610 B (sha256 `a1c14ba1…61a13`); expect about +16 lines of code.
-- **Release gate, Particle cloud compile (§3):** retry `particle compile boron . --target 6.6.0`; it timed out on the v46 and v47 heads. If it fails the same way, record it and release from the verified local build.
+- **Suite:** run with zsh for the `.sh` tests and python3 for the `.py` tests, serial. Result: 107/107 on the release head.
+- **Local build (§3, mandatory per change), 31 Oct:** Boron, Device OS 6.6.0, fresh `BUILD_PATH_BASE`, `EXTRA_CFLAGS=-frandom-seed=$$@`, built from a `git archive` of the release head (`release/v48`, before this WO edit). `app.bin` **152,722 B** (v47: 152,610 B, +112), **sha256 `2aa44eb2f303e6c07b13e040283a97c77bcd9e3b8d85a559dc9a21035fd60da8`**, text/data/bss 151604/1114/2200 (v47: 151492/1114/2200). `.backup` section **152 B**, as v47; `src/` has no `retained` change since v47 (`git diff f624c15 origin/main -- src` has no `retained` line). `strings`: `v48-OccupancyEndsAtClose` once. `particle binary inspect`: CRC ok (7e59bca4), compiled for boron, product version 48, depends on system module 1 at version 6600. The file: `/Users/chipmc/Downloads/v48-OccupancyEndsAtClose-boron.bin`. The sha256 is not reproducible across builds (v47 WO), so upload this file and compare Particle's size and sha256 with the numbers above, §13 (j).
+- **Release gate, Particle cloud compile (§3), 31 Oct: not completed; the service failed.**
+  - The full tree: `Compile failed: Compile input not allowed` (a different error from before; it listed 368 files including `tests/`, `docs/` and `tools/`).
+  - Only `src/`, `lib/` and `project.properties`: `Compile failed: Compiler timed out or encountered an error` after 2 min with no diagnostics, as on the v46 and v47 heads. **No flash or RAM numbers.**
+  - **Per the gate: recorded; release from the verified local build.** Retry once more before the upload and add the numbers here if it passes.
 
 ## 2. Roles and plan
 
@@ -36,8 +39,12 @@ v48 is also the gate for the main waves of the legacy-occupancy migration (WO-20
 ## 4. The item 10 test: pass criteria
 
 Use the baseline script's per-category report (`--dates <SGT day> --tz SGT-8 --open 6 --close 22 --debounce-ms 300000`, #163) plus the hook increments.
-- **PASS:** on each full v48 day, the **first report after the 06:00 open reads `dailyoccupancy` 0** on both devices, with no post-close carry-in in the script's per-report increments; the **last session before 22:00 is credited to the close** (about 9.5 min if it was a full session, less if cut by the close); normal sessions stay within the v45-v47 spread (about 9.55 min).
-- **FINDING (holds the rollout):** any non-zero first-of-day `dailyoccupancy`; any session credited after the close; a payload difference; a breadcrumb-28 watchdog on Dev-09; a missing report not explained by a failed connect.
+- **PASS needs all of:**
+  1. On each full v48 day, the **first report after the 06:00 open reads `dailyoccupancy` 0** on both devices, with no post-close carry-in in the script's per-report increments.
+  2. The **last session before 22:00 is credited to the close** (about 9.5 min if it was a full session, less if cut by the close).
+  3. **Normal sessions at about 9.55 min,** within the v45-v47 spread (9.54-9.58).
+  4. **The standard health checks (§3) are clean:** resets (only the one reset 70 at the OTA, and reset types as v47), breadcrumb-28 watchdogs (none on Dev-09; Dev-14 stays on the item 14 watch), item 18 gaps (a gap of 3 h or more outside the overnight close is recorded; hook gaps of 4 h or more are the normal 7-8 h night gap ending in a normal report), payload (same keys and order as v47), and missing reports (none not explained by a failed connect).
+- **FINDING (holds the rollout):** any non-zero first-of-day `dailyoccupancy`; any session credited after the close; normal sessions outside the v45-v47 spread; a payload difference; a breadcrumb-28 watchdog on Dev-09; an item 18 gap on Dev-09; a missing report not explained by a failed connect.
 - **Not testable remotely:** the 0-24 and Unknown-openness cases (host tests cover them, Stage 7 checked them).
 
 ## 5. Default (if both pass)
