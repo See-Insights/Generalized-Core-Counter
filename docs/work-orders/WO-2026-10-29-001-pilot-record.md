@@ -25,7 +25,10 @@ Same Ubidots device, history unbroken, the v47 payload keys present (same keys a
 - **ChurchSt-2: PASS.** One reset 70, no loop; hourly reports at 11, 12 and 13Z; `cyc - slp` = 1 each; battery 85.6%, 4.03 V, Charging at 13:00Z; `connecttime` 25 s then 1 s.
 - **OCCUPANCY-LAB-01: open.** Reset 70 once, no loop, one report (12:00Z, `cyc` 2, `slp` 1, `connecttime` 10 s). **No 13:00Z or 14:00Z report (checked 14:04Z).** Battery **36.14%**, 3.71 V, "Not Charging" at 12:00Z, below §10's bar of about 40%.
   - **Probable cause (INF, from source): a battery-tier interval change, not a miss.** `BatteryBackoff::calculateTier` gives `TIER_CRITICAL` for 35% <= SoC < 50% (`src/cloud/BatteryBackoffPolicy.h:32-34`) and `intervalMultiplier(TIER_CRITICAL)` is 4 (`:45-57`), so the 3600 s base becomes 14,400 s on epoch-aligned boundaries (`State_Report.cpp:255-259`). 12:00Z is such a boundary (1793534402 s / 14,400 = 124,551.0); the next are **16:00Z and 20:00Z**. The tier is not in the payload or `status`, so this stays INF until the 16:00Z report. If a report is missing at 16:00Z, it is a genuine miss.
-  - **Tracking (architect):** `battery` and `key1` through today's daylight (does it charge?): reports expected at 16:00Z and 20:00Z, plus 00:00Z and 04:00Z; Chip will report on the panel.
+  - **Accepted (architect, 1 Nov): judge LAB-01 against its tier's interval, 4x at 35-50% (every 4 h on the epoch boundaries), not hourly. A missing 16:00Z report would be a real miss.**
+  - **Tracking:** record `battery` and `key1` at each daylight report (16:00Z, 20:00Z; then 00:00Z and 04:00Z) to see whether it charges. **If it climbs out of the tier (to 50% or more it is CONSERVING, 2x; to 75% or more, with the hysteresis at 70-75%, HEALTHY, hourly), confirm the reports resume at the shorter interval by themselves, with no touch** (`BatteryBackoffPolicy.h:19-41,45-57`).
+  - **A useful case:** LAB-01 is **exercising the low-battery reporting path in the field**, with a real device on a real panel. Record it as such; do not treat the 4 h gap as a pilot failure.
+  - **Open question to Chip:** LAB-01's panel (angle, shade, whether it has charged since the move). Until he answers, the SoC trend is the only evidence.
 
 ## Next
 - 24 h checks: ChurchSt-2 about 10:02Z and LAB-01 about 11:01Z on 2 Nov; 72 h per §10.
