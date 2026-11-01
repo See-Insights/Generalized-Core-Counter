@@ -1,6 +1,6 @@
 # WO-2026-11-01-001: AB1805 native-driver spike on Dev-14 (unmerged bench build)
 
-**Author:** Claude Code, 1 Nov 2026, from the architect's consolidated rulings (Step 0 report `WO-2026-10-31-001-step0-report.md`, "Rulings"); the architect may amend · **Status:** DRAFT, stop for the architect before building
+**Author:** Claude Code, 1 Nov 2026, from the architect's consolidated rulings (Step 0 report `WO-2026-10-31-001-step0-report.md`, "Rulings"); the architect may amend · **Status:** APPROVED with amendments (architect, 1 Nov; see "Approved amendments")
 **Branch:** `spike/ab1805-native-driver`, from the then-current `main`. **Never merged, never released, never uploaded to the product.** Flashed to Dev-14 over laptop USB only.
 **Workflow:** `AI_DEVELOPMENT_WORKFLOW.md` §3 Stage 4 (investigation), §13 (c), (j)
 
@@ -8,11 +8,19 @@
 
 Prove on real hardware that Device OS's built-in AM18x5 driver can do every job `AB1805_RK` does for GCC, using the fleet-wide configuration the rulings fixed, and gather the facts the switch WO and recovery item 21 need. The spike answers questions; it ships nothing.
 
+## Approved amendments (architect, 1 Nov)
+
+1. **Dev-14 is unlocked and marked as a development device for the spike** so Particle does not push v48 over the spike build (P3 needs the cloud). **Re-lock it to v48 after the restore.**
+2. **Run P7 first** (v48's vendored `deepPowerDown()` on a serial command): it answers whether today's fleet stage 3 powers down.
+3. **No meter:** the P6/P7 pass is the modem LED dark, the device offline for the timed period, and a timer boot with a power-on reset reason. A USB meter's current reading is preferred if Chip has one.
+4. **P8 is skipped;** the spike report records it as skipped.
+5. **Hands:** Chip, in Singapore, with Dev-14. Start from Tue 3 Nov after the v48 verdict. (This closes the location question below.)
+
 ## Start condition
 
 - **After the v48 soak ends, from Tue 3 Nov** (the v48 verdict on Dev-09 and Dev-14 is in; Dev-14 is released from the lock).
 - Chip at the bench with Dev-14, laptop USB, a way to see the power rail and the modem (below), and the SIM/antenna as they are.
-- **Open for Chip (location):** Dev-14 has been the Singapore bench device. The USB, power-rail and 8-hour steps need someone with hands on it; confirm who and where before this WO is scheduled.
+- Location and hands: Chip, in Singapore (amendment 5).
 
 ## The configuration under test (ruled)
 
@@ -51,6 +59,8 @@ Prove on real hardware that Device OS's built-in AM18x5 driver can do every job 
 - Pass: **each wake lands within 5 s of the request** (Dev-14's GCC wakes show err 1 s, `hibernate_wake` `err`), and the second is not an immediate stale-alarm wake. If the second wake fires early or never: stop, record it, and the architect decides (a narrow raw-status operation or a Device OS fix).
 - Record: both `actual - req` values, the wake reason each time, whether the alarm flag needed clearing.
 
+**Order: P7 first, then P1-P6.** (Amendment 2.)
+
 **P6. A timed `POWER_OFF`, on the power rail and the modem.**
 - Step: sleep with `POWER_OFF` and a 10-minute timer, powered from a bench supply or a USB power meter with a battery in; watch the rail and the modem (a current reading or its status LED) from the request to the wake.
 - Pass: the rail current drops to the chip-only level (not the MCU's sleep level) during the off period, the modem is off, and the device boots at the timer (within 10 s of 10 minutes). **This is the observation the log line cannot give.**
@@ -60,7 +70,7 @@ Prove on real hardware that Device OS's built-in AM18x5 driver can do every job 
 - Step: on a v48 build (the vendored `deepPowerDown()`), call it from a serial command on the same rig and watch the same rail and modem.
 - Pass/record: does the device actually power down, or fall through to `System.reset()`? This settles the PWGT-key suspicion (INF in Step 0) on real hardware.
 
-**P8. RC fallback (if possible).**
+**P8. RC fallback. SKIPPED (amendment 4); the report records it as skipped.**
 - Step: with the chip bound, stress the crystal (a brief cold-spray or the crystal damped by a probe, Chip's judgment and risk) and boot.
 - Record: the clock-source and oscillator-event status on RC fallback. **Optional; skipped if it risks the board.** A skipped P8 is stated plainly.
 
