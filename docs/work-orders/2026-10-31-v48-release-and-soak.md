@@ -73,4 +73,10 @@ All reads need `AWS_PROFILE=particle-admin`; an expired SSO token stops a job.
 
 ## Result
 
-(to be filled in by the grader)
+**Day run 1 (partial v48 day, SGT 1 Nov; Claude Code, run late at 23:44Z 1 Nov from S3 hooks, status and serial; the 14:33Z run did not fire).** First v48 boots (status reset 70): **Dev-09 02:51:37Z, Dev-14 02:52:18Z** on 1 Nov, so 1 Nov is a partial v48 day; the first full v48 day is 2 Nov. The baseline script's per-window table is not meaningful for 1 Nov (the exerciser phase changed at 04:52Z, and the day includes v47 hours).
+- **Item 10:** first report after the 06:00 open (22:00Z) reads `dailyoccupancy` **0** on both (Dev-09 22:02:02Z, Dev-14 22:00:53Z). Dev-09's last session (13:53-14:00Z) was credited **+7 min to the close** (466 at 14:00:40Z); Dev-14's last session ended 13:50Z (457) and nothing counted after. **No report between 14:00Z and 22:00Z on either device.**
+- **Normal sessions (hook increments from 02:55Z to the close):** Dev-09 **9.58 min** (33 sessions, 14 x 9 and 19 x 10, excluding the +7), Dev-14 **9.55** (33; 15 x 9, 18 x 10). Inside the v45-v47 9.54-9.58.
+- **Health:** only the reset 70 at the OTA and the 22:00Z hibernate wake (reset 30); `watchdogResetCount` unchanged (Dev-09 46, Dev-14 127); alerts 0; failsafe stage 0; payload keys and order as v47.
+- **Item 20 hardware test (Dev-09 exerciser reset to :52 at 04:52Z): PASS, no FINDING.** Nine :52 sessions (04:52Z to 12:52Z) each spanned the :00 report (occupied before it, unoccupied after, total held across it) and were credited **9, 10, 9, 9, 9, 10, 10, 9, 10 min**; the one with a surviving serial close line (07:02:36Z) read 577 s. No spanning session at 12 min or more. (The 13:52 session was cut by the 14:00Z close: +7.) Serial lines are patchy, so the exact seconds are mostly unavailable.
+- **Dev-14 antenna, full SGT day (22:00Z 31 Oct to 14:00Z 1 Nov): confirmed.** 101 connects, 0 slow recoveries (22 before the swap), quality 12 or lower 1 of 101, median 29 (Dev-09 33), no `ConnSummary: fail`, no failsafe event. One slow connect at 23:04Z (223 s, stage 2, `sig=78/33`) and Dev-09 one at 22:01Z (76 s, stage 1): to watch on 2 Nov.
+- **Still to do:** the 24 h grading (anchored on each first boot, 02:51Z and 02:52Z on 2 Nov) and the first full v48 day (2 Nov).
