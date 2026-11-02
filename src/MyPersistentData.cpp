@@ -779,6 +779,7 @@ static int getAlertSeverity(int8_t code) {
         case 18: // state machine thrash detected (ThrashGuard)
         case 20: // PMIC thermal shutdown (critical battery/charging fault)
         case 21: // PMIC charge timeout / stuck charging
+        case 22: // PMIC USB Not Charging 2 h (charge latch)
             return 3; // critical
 
         // Watchdog/external reset represents actual lost execution - the

@@ -51,6 +51,7 @@ void resetPmic(PMIC &pmic) {
   pmic.disableChargingCallCount = 0;
   pmic.enableChargingCallCount = 0;
   pmic.setWatchdogCallCount = 0;
+  pmic.readPowerOnCallCount = 0;
 }
 
 void resetCurrent() {
@@ -86,7 +87,7 @@ void testIndependentInputFaultIsNotSuppressedByCoincidentNtcFault() {
     pmic.faultRegQueue[0] = pmic.faultRegQueue[1] = 0x11;
     pmic.faultCallCount = 0;
     PmicFaultMonitor::pollAndRemediate(pmic, /*safeToCharge=*/false, /*battState=*/0,
-                                        /*powerSource=*/0, /*chargeDisableConfigVerified=*/false);
+                                        /*powerSource=*/0, /*chargeDisableConfigVerified=*/false, /*vcell=*/3.9f);
     g_testMillis += 10;
   }
 
@@ -122,7 +123,7 @@ void testNoFaultBranchCompletesInProgressRemediationBeforeClearing() {
   pmic.faultRegQueue[0] = pmic.faultRegQueue[1] = 0x30; // CHRG_FAULT=0x03 << 4
   for (int i = 0; i < 3; i++) {
     PmicFaultMonitor::pollAndRemediate(pmic, /*safeToCharge=*/true, /*battState=*/0,
-                                        /*powerSource=*/0, /*chargeDisableConfigVerified=*/false);
+                                        /*powerSource=*/0, /*chargeDisableConfigVerified=*/false, /*vcell=*/3.9f);
     // Only reset the fault-read cursor for the next call (so getFault() is
     // read fresh) - NOT the cumulative disable/enable call counters, which
     // this test needs to observe across the whole sequence.
@@ -146,7 +147,7 @@ void testNoFaultBranchCompletesInProgressRemediationBeforeClearing() {
   pmic.faultCallCount = 0;
   pmic.faultRegQueue[0] = pmic.faultRegQueue[1] = 0x00; // no fault
   PmicFaultMonitor::pollAndRemediate(pmic, /*safeToCharge=*/true, /*battState=*/0,
-                                      /*powerSource=*/0, /*chargeDisableConfigVerified=*/false);
+                                      /*powerSource=*/0, /*chargeDisableConfigVerified=*/false, /*vcell=*/3.9f);
 
   // The fix must have advanced the in-progress cycle's phase (calling
   // enableCharging() to complete it) rather than merely dropping the state -
@@ -171,7 +172,7 @@ void testFaultRegisterIsReadTwiceAndOred() {
 
   const PmicFaultMonitor::Registers regs =
       PmicFaultMonitor::pollAndRemediate(pmic, /*safeToCharge=*/true, /*battState=*/0,
-                                          /*powerSource=*/0, /*chargeDisableConfigVerified=*/false);
+                                          /*powerSource=*/0, /*chargeDisableConfigVerified=*/false, /*vcell=*/3.9f);
 
   assert(pmic.faultCallCount == 2); // both reads actually happened
   assert(((regs.faultReg & 0x30) >> 4) == 0x01); // OR'd result carries the second read's fault
@@ -195,7 +196,7 @@ void driveToLevel1Phase1(PMIC &pmic) {
   pmic.faultRegQueue[0] = pmic.faultRegQueue[1] = 0x30; // CHRG_FAULT=0x03 << 4
   for (int i = 0; i < 3; i++) {
     PmicFaultMonitor::pollAndRemediate(pmic, /*safeToCharge=*/true, /*battState=*/0,
-                                        /*powerSource=*/0, /*chargeDisableConfigVerified=*/false);
+                                        /*powerSource=*/0, /*chargeDisableConfigVerified=*/false, /*vcell=*/3.9f);
     pmic.faultCallCount = 0;
     pmic.faultRegQueue[0] = pmic.faultRegQueue[1] = 0x30;
     g_testMillis += 10;
@@ -229,7 +230,7 @@ void testNoFaultBranchFreezesLevel1WhileUnsafeThenResumes() {
     pmic.faultCallCount = 0;
     pmic.faultRegQueue[0] = pmic.faultRegQueue[1] = 0x00; // clear fault reads
     PmicFaultMonitor::pollAndRemediate(pmic, /*safeToCharge=*/false, /*battState=*/0,
-                                        /*powerSource=*/0, /*chargeDisableConfigVerified=*/true);
+                                        /*powerSource=*/0, /*chargeDisableConfigVerified=*/true, /*vcell=*/3.9f);
     // Requirement 1: PMIC must NOT be enabled while unsafe.
     assert(pmic.enableChargingCallCount == enableBefore);
     // Requirement 3: sequence retains its owner - no phantom restart of
@@ -244,7 +245,7 @@ void testNoFaultBranchFreezesLevel1WhileUnsafeThenResumes() {
   pmic.faultCallCount = 0;
   pmic.faultRegQueue[0] = pmic.faultRegQueue[1] = 0x00;
   PmicFaultMonitor::pollAndRemediate(pmic, /*safeToCharge=*/true, /*battState=*/0,
-                                      /*powerSource=*/0, /*chargeDisableConfigVerified=*/false);
+                                      /*powerSource=*/0, /*chargeDisableConfigVerified=*/false, /*vcell=*/3.9f);
   assert(pmic.enableChargingCallCount == enableBefore + 1);
   assert(pmic.disableChargingCallCount == 1); // still no phantom re-arm/restart
 }
@@ -259,14 +260,14 @@ void driveToLevel2Phase1(PMIC &pmic) {
   pmic.faultRegQueue[0] = pmic.faultRegQueue[1] = 0x20; // CHRG_FAULT=0x02 << 4 (thermal)
   for (int i = 0; i < 2; i++) {
     PmicFaultMonitor::pollAndRemediate(pmic, /*safeToCharge=*/false, /*battState=*/0,
-                                        /*powerSource=*/0, /*chargeDisableConfigVerified=*/false);
+                                        /*powerSource=*/0, /*chargeDisableConfigVerified=*/false, /*vcell=*/3.9f);
     pmic.faultCallCount = 0;
     pmic.faultRegQueue[0] = pmic.faultRegQueue[1] = 0x20;
     g_testMillis += 10;
   }
   for (int i = 0; i < 2; i++) {
     PmicFaultMonitor::pollAndRemediate(pmic, /*safeToCharge=*/true, /*battState=*/0,
-                                        /*powerSource=*/0, /*chargeDisableConfigVerified=*/false);
+                                        /*powerSource=*/0, /*chargeDisableConfigVerified=*/false, /*vcell=*/3.9f);
     pmic.faultCallCount = 0;
     pmic.faultRegQueue[0] = pmic.faultRegQueue[1] = 0x20;
     g_testMillis += 10;
@@ -289,7 +290,7 @@ void testNoFaultBranchFreezesLevel2WhileUnsafeThenResumesWithWatchdog() {
   pmic.faultCallCount = 0;
   pmic.faultRegQueue[0] = pmic.faultRegQueue[1] = 0x00; // clear fault reads
   PmicFaultMonitor::pollAndRemediate(pmic, /*safeToCharge=*/false, /*battState=*/0,
-                                      /*powerSource=*/0, /*chargeDisableConfigVerified=*/true);
+                                      /*powerSource=*/0, /*chargeDisableConfigVerified=*/true, /*vcell=*/3.9f);
   assert(pmic.enableChargingCallCount == enableBefore); // still frozen
   assert(pmic.setWatchdogCallCount == 0); // watchdog only set on actual resume
   assert(pmic.disableChargingCallCount == 1); // sequence not abandoned/restarted
@@ -297,10 +298,299 @@ void testNoFaultBranchFreezesLevel2WhileUnsafeThenResumesWithWatchdog() {
   pmic.faultCallCount = 0;
   pmic.faultRegQueue[0] = pmic.faultRegQueue[1] = 0x00;
   PmicFaultMonitor::pollAndRemediate(pmic, /*safeToCharge=*/true, /*battState=*/0,
-                                      /*powerSource=*/0, /*chargeDisableConfigVerified=*/false);
+                                      /*powerSource=*/0, /*chargeDisableConfigVerified=*/false, /*vcell=*/3.9f);
   assert(pmic.enableChargingCallCount == enableBefore + 1); // resumed, completed exactly once
   assert(pmic.setWatchdogCallCount == 1); // watchdog armed on level-2 resume
   assert(pmic.disableChargingCallCount == 1);
+}
+
+// --- WO-2026-11-02-001 (Amendment 1): fault-free USB "Not Charging" latch.
+// Driven through the production pollAndRemediate(); its latch state is
+// function-local static, so each scenario walks fresh windows sequentially. ---
+
+constexpr unsigned long kH = 3600000UL;
+constexpr unsigned long kSettleGap = 25UL * kH; // > the 24 h attempt limit and the 1 h cooldown
+constexpr uint8_t kUsbNotCharging = 0x44;       // REG08: VBUS=USB host, Not Charging, power good
+
+struct LatchInput {
+  uint8_t status = kUsbNotCharging;
+  uint8_t fault = 0;
+  float vcell = 3.75f;
+  bool safe = true;
+  int source = 2; // USB host
+};
+
+// One pollAndRemediate() at time t. True if this poll fired the latch
+// (raised alert 22 and requested a cycle).
+bool latchPoll(PMIC &pmic, unsigned long t, const LatchInput &in = LatchInput()) {
+  g_testMillis = t;
+  pmic.faultRegQueue[0] = in.fault;
+  pmic.faultRegQueue[1] = in.fault;
+  pmic.faultCallCount = 0;
+  pmic.systemStatusValue = in.status;
+  const int raisedBefore = testCurrent.raiseAlertCallCount;
+  PmicFaultMonitor::pollAndRemediate(pmic, in.safe, /*battState=*/0, in.source,
+                                      /*chargeDisableConfigVerified=*/false, in.vcell);
+  return testCurrent.raiseAlertCallCount > raisedBefore && testCurrent.lastRaisedAlertCode == 22;
+}
+
+// Breaks the latch timer, lets any requested cycle run to completion
+// (phase 0, then re-enable after 500 ms) and returns a start time past the
+// 24 h attempt limit and the 1 h cooldown: a fresh latch window.
+unsigned long freshWindow(PMIC &pmic, unsigned long t) {
+  LatchInput off;
+  off.status = 0x00; // no input
+  latchPoll(pmic, t, off);
+  latchPoll(pmic, t + 600UL, off);
+  latchPoll(pmic, t + 1200UL, off);
+  return t + kSettleGap;
+}
+
+// Stuck from t0: no action before 2 h, exactly one at 2 h.
+void assertFiresAtTwoHours(PMIC &pmic, unsigned long t0, const LatchInput &in) {
+  assert(!latchPoll(pmic, t0, in));
+  assert(!latchPoll(pmic, t0 + 2 * kH - 1, in));
+  assert(latchPoll(pmic, t0 + 2 * kH, in));
+}
+
+void assertNeverFires(PMIC &pmic, unsigned long t0, const LatchInput &in) {
+  for (unsigned long t = t0; t <= t0 + 3 * kH; t += kH / 2) assert(!latchPoll(pmic, t, in));
+}
+
+// 2 h boundary (>=), one cycle, then the 24 h per-attempt limit while the
+// condition stays continuously true.
+void testLatchBoundaryAndAttemptLimit(PMIC &pmic, unsigned long t0) {
+  const LatchInput stuck;
+  assertFiresAtTwoHours(pmic, t0, stuck);
+  const unsigned long fired = t0 + 2 * kH;
+  assert(pmic.readPowerOnCallCount == 1); // REG01 read once, for the one Log.warn
+  assert(!latchPoll(pmic, fired + 1, stuck)); // cycle phase 0
+  assert(pmic.disableChargingCallCount == 1);
+  assert(!latchPoll(pmic, fired + 600UL, stuck)); // re-enable completes the cycle
+  assert(pmic.enableChargingCallCount == 1);
+  assert(!latchPoll(pmic, fired + 2 * kH, stuck)); // cooldown over, 24 h limit holds
+  assert(!latchPoll(pmic, fired + 24 * kH - 1, stuck));
+  assert(latchPoll(pmic, fired + 24 * kH, stuck));
+  assert(pmic.readPowerOnCallCount == 2);
+}
+
+// Voltage clause is only < 4.05 V: no lower bound (a deeply discharged cell
+// still qualifies), 4.05 V excluded.
+void testLatchVoltageThreshold(PMIC &pmic, unsigned long &t) {
+  LatchInput in;
+  in.vcell = 4.049f;
+  assertFiresAtTwoHours(pmic, t, in);
+  t = freshWindow(pmic, t + 2 * kH + 1);
+  in.vcell = 2.0f;
+  assertFiresAtTwoHours(pmic, t, in);
+  t = freshWindow(pmic, t + 2 * kH + 1);
+  in.vcell = 4.05f;
+  assertNeverFires(pmic, t, in);
+  t = freshWindow(pmic, t + 3 * kH + 1);
+}
+
+// USB gating: corrected USB source AND VBUS 1/2. VBUS=2 (adapter) qualifies;
+// raw VBUS=USB with a non-USB corrected source (VIN, battery) never does.
+void testLatchUsbGating(PMIC &pmic, unsigned long &t) {
+  LatchInput in;
+  in.status = 0x84; // VBUS=adapter
+  assertFiresAtTwoHours(pmic, t, in);
+  t = freshWindow(pmic, t + 2 * kH + 1);
+  in.status = kUsbNotCharging;
+  in.source = 3; // USB adapter
+  assertFiresAtTwoHours(pmic, t, in);
+  t = freshWindow(pmic, t + 2 * kH + 1);
+  for (int source : {1, 5, -1}) { // VIN, battery, unknown
+    in.source = source;
+    assertNeverFires(pmic, t, in);
+    t = freshWindow(pmic, t + 3 * kH + 1);
+  }
+}
+
+// Each clause breaking once (at +1 h) restarts the timer: no action at the
+// original 2 h mark, one action 2 h after the clause is restored.
+void testLatchEachClauseBreakResetsTimer(PMIC &pmic, unsigned long &t) {
+  for (int clause = 0; clause < 13; clause++) {
+    LatchInput bad;
+    switch (clause) {
+      case 0: bad.status = 0x04; break;  // no VBUS
+      case 1: bad.status = 0xC4; break;  // OTG is not input
+      case 2: bad.status = 0x40; break;  // power not good
+      case 3: bad.status = 0x54; break;  // Pre-charge
+      case 4: bad.status = 0x64; break;  // Fast
+      case 5: bad.status = 0x74; break;  // Done
+      case 6: bad.status = 0x46; break;  // thermal regulation
+      case 7: bad.fault = 0x10; break;   // CHRG_FAULT
+      case 8: bad.fault = 0x08; break;   // BAT_FAULT
+      case 9: bad.vcell = 4.05f; break;
+      case 10: bad.safe = false; break;
+      case 11: bad.source = 1; break;    // corrected source VIN
+      case 12: bad.status = 0x84; bad.source = 5; break; // VBUS adapter, source battery
+    }
+    const LatchInput good;
+    assert(!latchPoll(pmic, t, good));
+    assert(!latchPoll(pmic, t + kH, bad));
+    assert(!latchPoll(pmic, t + kH + 1, good));
+    assert(!latchPoll(pmic, t + 2 * kH, good));
+    assert(!latchPoll(pmic, t + 3 * kH, good));
+    assert(latchPoll(pmic, t + 3 * kH + 1, good));
+    t = freshWindow(pmic, t + 3 * kH + 2);
+  }
+}
+
+// millis() wrap-around: the timer straddles the unsigned long wrap (host
+// unsigned long is 64-bit, so this wraps at 2^64; the device wraps at 2^32 -
+// both rely on the same modular unsigned subtraction).
+void testLatchAcrossMillisWrap(PMIC &pmic) {
+  const unsigned long t0 = ~0UL - kH / 2; // 30 min before the wrap
+  assertFiresAtTwoHours(pmic, t0, LatchInput());
+  assert(t0 + 2 * kH < t0); // the firing time really is past the wrap
+}
+
+void testLatchScenario() {
+  PMIC pmic;
+  resetPmic(pmic);
+  resetCurrent();
+  unsigned long t = 1000UL;
+  testLatchBoundaryAndAttemptLimit(pmic, t);
+  t = freshWindow(pmic, t + 26 * kH + 1);
+  testLatchVoltageThreshold(pmic, t);
+  testLatchUsbGating(pmic, t);
+  testLatchEachClauseBreakResetsTimer(pmic, t);
+  testLatchAcrossMillisWrap(pmic);
+}
+
+// Alert 22 (not 21) is raised; it stays while Not Charging persists and is
+// cleared by the existing "charging resumed, codes 20-23" clear once the
+// charger reports Pre-charge, Fast or Done.
+void testLatchAlert22ClearsWhenChargingResumes() {
+  PMIC pmic;
+  resetPmic(pmic);
+  resetCurrent();
+  unsigned long t = 1000UL;
+  const LatchInput stuck;
+  for (uint8_t resumed : {0x54, 0x64, 0x74}) { // Pre-charge, Fast, Done
+    const int raisedBefore = testCurrent.raiseAlertCallCount;
+    assertFiresAtTwoHours(pmic, t, stuck);
+    assert(testCurrent.alertCodeValue == 22 && testCurrent.lastRaisedAlertCode == 22);
+    assert(testCurrent.raiseAlertCallCount == raisedBefore + 1);
+    const unsigned long fired = t + 2 * kH;
+    latchPoll(pmic, fired + 1, stuck);      // phase 0
+    latchPoll(pmic, fired + 600UL, stuck);  // re-enable
+    latchPoll(pmic, fired + 1200UL, stuck); // still Not Charging
+    assert(testCurrent.alertCodeValue == 22);
+    LatchInput charging;
+    charging.status = resumed;
+    latchPoll(pmic, fired + 1800UL, charging);
+    assert(testCurrent.alertCodeValue == 0);
+    assert(testCurrent.raiseAlertCallCount == raisedBefore + 1);
+    t = fired + kSettleGap;
+  }
+  assert(pmic.disableChargingCallCount == 3 && pmic.enableChargingCallCount == 3);
+}
+
+// The legacy alert-21 clear is unchanged: cleared on any no-fault poll
+// whose charge status is not Fast (2) - including Not Charging - and the
+// latch never raises or holds 21.
+void testAlert21ClearUnchanged() {
+  PMIC pmic;
+  resetPmic(pmic);
+  resetCurrent();
+  LatchInput in;
+  in.source = 1; // keep the latch out of it
+  unsigned long t = 1000UL;
+  in.status = 0x64; // Fast keeps 21
+  testCurrent.alertCodeValue = 21;
+  latchPoll(pmic, t++, in);
+  assert(testCurrent.alertCodeValue == 21);
+  for (uint8_t status : {0x44, 0x54, 0x74}) { // Not Charging, Pre-charge, Done clear 21
+    testCurrent.alertCodeValue = 21;
+    in.status = status;
+    latchPoll(pmic, t++, in);
+    assert(testCurrent.alertCodeValue == 0);
+  }
+  assert(testCurrent.raiseAlertCallCount == 0);
+}
+
+// A latch request inside the 1 h cooldown after a remediation attempt does
+// not start a second cycle: an immediate charge-fault reset that reads back
+// clear leaves the mature latch timer running, so without the cooldown the
+// latch would cycle charging on that same poll.
+void testLatchHonoursRemediationCooldown() {
+  PMIC pmic;
+  resetPmic(pmic);
+  resetCurrent();
+  const unsigned long t0 = 1000UL;
+  const LatchInput stuck;
+  assert(!latchPoll(pmic, t0, stuck));
+  assert(!latchPoll(pmic, t0 + kH, stuck));
+
+  // At the 2 h mark: CHRG_FAULT on the first read pair, clear after the
+  // immediate reset's re-read (stub returns faultRegQueue[1] from then on).
+  const unsigned long reset = t0 + 2 * kH;
+  g_testMillis = reset;
+  pmic.faultRegQueue[0] = 0x10;
+  pmic.faultRegQueue[1] = 0x00;
+  pmic.faultCallCount = 0;
+  pmic.systemStatusValue = kUsbNotCharging;
+  PmicFaultMonitor::pollAndRemediate(pmic, true, 0, 2, false, 3.75f);
+  assert(pmic.faultCallCount == 4); // immediate reset ran and re-read
+  assert(pmic.disableChargingCallCount == 1 && pmic.enableChargingCallCount == 1);
+  assert(testCurrent.raiseAlertCallCount == 0);
+
+  assert(!latchPoll(pmic, reset + 1, stuck));
+  assert(!latchPoll(pmic, reset + kH / 2, stuck));
+  assert(!latchPoll(pmic, reset + kH, stuck)); // cooldown is "more than 1 h"
+  assert(pmic.disableChargingCallCount == 1); // no second cycle started
+  assert(latchPoll(pmic, reset + kH + 1, stuck));
+  assert(!latchPoll(pmic, reset + kH + 2, stuck));
+  assert(pmic.disableChargingCallCount == 2);
+}
+
+// Fires the latch from t0 and completes its cycle with a Pre-charge poll
+// (chargeStatus 1) while the cycle is still running. Returns the completion
+// time (the cooldown start).
+unsigned long fireLatchAndResumeDuringCycle(PMIC &pmic, unsigned long t0) {
+  assertFiresAtTwoHours(pmic, t0, LatchInput());
+  const unsigned long fired = t0 + 2 * kH;
+  const int disableBefore = pmic.disableChargingCallCount;
+  const int enableBefore = pmic.enableChargingCallCount;
+  latchPoll(pmic, fired + 1, LatchInput()); // phase 0
+  assert(pmic.disableChargingCallCount == disableBefore + 1);
+  LatchInput charging;
+  charging.status = 0x54; // Pre-charge, while the cycle runs
+  latchPoll(pmic, fired + 600UL, charging);
+  assert(pmic.enableChargingCallCount == enableBefore + 1); // cycle completed on this poll
+  assert(testCurrent.alertCodeValue == 22);
+  return fired + 600UL;
+}
+
+// Charging resuming while the latch's own cycle runs must not leave a
+// counter behind: (i) a later Not Charging poll keeps alert 22, and (ii) a
+// later first real charge fault still needs 2 consecutive faults before a
+// level-1 cycle starts.
+void testLatchResumeDuringCycleLeavesNoCounter() {
+  PMIC pmic;
+  resetPmic(pmic);
+  resetCurrent();
+  const LatchInput stuck;
+  unsigned long done = fireLatchAndResumeDuringCycle(pmic, 1000UL);
+  latchPoll(pmic, done + 600UL, stuck);
+  assert(testCurrent.alertCodeValue == 22); // (i)
+  LatchInput charging;
+  charging.status = 0x54;
+  latchPoll(pmic, done + 1200UL, charging);
+  assert(testCurrent.alertCodeValue == 0); // no cycle running: cleared on the same call
+
+  done = fireLatchAndResumeDuringCycle(pmic, freshWindow(pmic, done + 1800UL));
+  LatchInput fault = stuck;
+  fault.fault = 0x20; // thermal CHRG_FAULT: no immediate reset
+  const int disableBefore = pmic.disableChargingCallCount;
+  latchPoll(pmic, done + kH + 1, fault); // first sighting, past the cooldown
+  latchPoll(pmic, done + kH + 2, fault); // second: requests level 1
+  assert(pmic.disableChargingCallCount == disableBefore); // (ii)
+  latchPoll(pmic, done + kH + 3, fault); // phase 0
+  assert(pmic.disableChargingCallCount == disableBefore + 1);
 }
 
 } // namespace
@@ -328,8 +618,23 @@ int main(int argc, char **argv) {
     case 5:
       testNoFaultBranchFreezesLevel2WhileUnsafeThenResumesWithWatchdog();
       break;
+    case 6:
+      testLatchScenario();
+      break;
+    case 7:
+      testLatchAlert22ClearsWhenChargingResumes();
+      break;
+    case 8:
+      testAlert21ClearUnchanged();
+      break;
+    case 9:
+      testLatchHonoursRemediationCooldown();
+      break;
+    case 10:
+      testLatchResumeDuringCycleLeavesNoCounter();
+      break;
     default:
-      fprintf(stderr, "usage: %s <1|2|3|4|5>\n", argv[0]);
+      fprintf(stderr, "usage: %s <1-10>\n", argv[0]);
       return 2;
   }
   printf("pmic_fault_monitor_test: scenario %d passed\n", scenario);
