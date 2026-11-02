@@ -6,7 +6,7 @@
 
 ## Plain goal
 
-OCCUPANCY-LAB-01 (USB powered, v47) read "Not Charging" at 36.14%, `vc` 3.71-3.75 V, from 12:00 to 15:00Z on 1 Nov; after the 15:30:04Z failsafe stage-2 reset it read "Charging" at 4.18 V by 15:59:55Z (recovery item 22, USB case). Trail02 (solar) needed a power cycle. **This Step 0 answers whether firmware can clear such a state by itself:** what GCC configures in the PMIC and charger, what an MCU reset re-applies, what the charger's safety timer and fault states do, and whether a "power present, not charging, not full for N hours: re-initialize the charger" check is worth its lines. No code, no device change.
+OCCUPANCY-LAB-01 (USB powered, v47) read "Not Charging" at 36.14%, `vc` 3.71-3.75 V, from 12:00 to 15:00Z on 1 Nov, on a good, untouched USB supply (Chip's confirmation: the SoC did not move after USB was restored until a reset); after the 15:30:04Z failsafe stage-2 reset it read "Charging" at 4.18 V by 15:59:55Z (recovery item 22, USB case). Trail02 (solar) needed a power cycle. **This Step 0 answers whether firmware can clear such a state by itself:** what GCC configures in the PMIC and charger, what an MCU reset re-applies, what the charger's safety timer and fault states do, and whether a "power present, not charging, not full for N hours: re-initialize the charger" check is worth its lines. No code, no device change.
 
 ## Questions (OBS = observed in source, INF = inferred, UNKNOWN; cite file:line)
 
