@@ -1,6 +1,6 @@
 # WO-2026-11-01-002: can GCC re-apply the charger when power is present and the battery is not charging? Step 0 (read-only)
 
-**Author:** Claude Code, 1 Nov 2026, from the architect's instruction on recovery item 22 (extended to USB units); the architect may amend · **Status:** QUEUED, **HELD until Chip adds the BQ24195 datasheet to `docs/datasheets`** (architect, 1 Nov); not dispatched
+**Author:** Claude Code, 1 Nov 2026, from the architect's instruction on recovery item 22 (extended to USB units); the architect may amend · **Status:** DONE 2 Nov (datasheet added by Chip; Codex run 02:00Z); report `WO-2026-11-01-002-step0-report.md`
 **Branch:** `docs/2026-10-31-pmic-fault-latch-item` (PR #168), report added there
 **Workflow:** `AI_DEVELOPMENT_WORKFLOW.md` §3 Stage 4 (independent investigation); §13 (c), (j)
 
