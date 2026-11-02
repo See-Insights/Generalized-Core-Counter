@@ -1,6 +1,6 @@
-# WO-2026-11-02-002: an untrusted SoC must not push a healthy unit into CRITICAL (recovery item 23 sub-finding; v49 must-fix, gates wave 1)
+# (WITHDRAWN) WO-2026-11-02-002: an untrusted SoC must not push a healthy unit into CRITICAL (recovery item 23 sub-finding; v49 must-fix, gates wave 1)
 
-**Author:** Claude Code, 2 Nov 2026, DRAFT for the architect's review · **Status:** DRAFT (no dispatch)
+**Author:** Claude Code, 2 Nov 2026, DRAFT for the architect's review · **Status:** WITHDRAWN (architect, 2 Nov: the 4x interval at about 48% is by design; PowerTier.cpp:27-29 already falls back to the voltage estimate). Kept as the trace; not dispatched.
 **Branch:** `wo/2026-11-02-002-untrusted-soc-tier`, from `main`
 **Workflow:** `AI_DEVELOPMENT_WORKFLOW.md` §3 Stages 5-7; §5 (battery/power logic is safety-relevant: Copilot top model, Codex top model); §13 (c), (j)
 **Budget:** `src/` at most **+15 net**, hard. Stop and report rather than trim style.
