@@ -1,7 +1,7 @@
-# WO-2026-11-02-004: a timezone stored by ConfigApply must reach the running LocalTime (recovery item 25; v49 must-fix, gates wave 1)
+# WO-2026-11-02-003: a timezone stored by ConfigApply must reach the running LocalTime (recovery item 25; v49 must-fix, gates wave 1)
 
 **Author:** Claude Code, 2 Nov 2026, DRAFT for the architect's review · **Status:** DRAFT (no dispatch)
-**Branch:** `wo/2026-11-02-004-timezone-running-clock`, from `main`
+**Branch:** `wo/2026-11-02-003-timezone-running-clock`, from `main`
 **Workflow:** `AI_DEVELOPMENT_WORKFLOW.md` §3 Stages 5-7; §5 (time and boundaries: Codex `gpt-5.6-sol`, xhigh); §13 (c), (j)
 **Budget:** `src/` at most **+10 net**, hard. Stop and report rather than trim style.
 **Agents (architect, 2 Nov):** Stage 6 Copilot standard model, medium. Stage 7 Codex `gpt-5.6-sol`, xhigh, a new output file per round, **at most two rounds**.
