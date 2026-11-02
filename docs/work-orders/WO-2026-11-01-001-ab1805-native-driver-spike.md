@@ -31,6 +31,7 @@ Prove on real hardware that Device OS's built-in AM18x5 driver can do every job 
 - A copy of the then-current `main` with `AB1805_RK` removed from the wake, time, watchdog and power-off paths and the native driver in its place, only as far as each proof needs. Diagnostics may be `Log` lines; the payload, `retained` layout and persisted layout stay untouched.
 - A build flag or serial command per proof so Chip can run them one at a time. The exact shape is Claude Code's, listed in the spike report.
 - **Time API:** implement both `TimeClass(TimeSource::EXTERNAL)` and `hal_rtc_*` with the external source for get/set, run proof 2 on each, and **recommend one** for the switch WO.
+- **Boot clock measurement (architect, 2 Nov; evidence for recovery items 19 and 21):** log, in the spike build only, the **RTC time at boot against the first cloud sync**: the external RTC and system `Time.now()` at the end of `setup()` (before any sync), and the same two plus the offset at the first successful sync (`ClockResync`). A log line and observation only: no behavior change, no payload or persisted-layout change. Recorded with P1 and P2 results; ChurchSt-2 and LAB-01 `startup.epoch` read 41 and 59 minutes after their first status (unexplained, 2 Nov).
 - Budget: no `src/` line limit (unmerged), but the spike report states the net lines a switch would need.
 
 ## Proofs and bench steps (each: expected result, pass, what to record)
