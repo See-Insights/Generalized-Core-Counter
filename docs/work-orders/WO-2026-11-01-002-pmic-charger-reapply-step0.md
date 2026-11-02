@@ -1,6 +1,6 @@
 # WO-2026-11-01-002: can GCC re-apply the charger when power is present and the battery is not charging? Step 0 (read-only)
 
-**Author:** Claude Code, 1 Nov 2026, from the architect's instruction on recovery item 22 (extended to USB units); the architect may amend · **Status:** QUEUED, not dispatched
+**Author:** Claude Code, 1 Nov 2026, from the architect's instruction on recovery item 22 (extended to USB units); the architect may amend · **Status:** QUEUED, **HELD until Chip adds the BQ24195 datasheet to `docs/datasheets`** (architect, 1 Nov); not dispatched
 **Branch:** `docs/2026-10-31-pmic-fault-latch-item` (PR #168), report added there
 **Workflow:** `AI_DEVELOPMENT_WORKFLOW.md` §3 Stage 4 (independent investigation); §13 (c), (j)
 
@@ -17,7 +17,9 @@ OCCUPANCY-LAB-01 (USB powered, v47) read "Not Charging" at 36.14%, `vc` 3.71-3.7
 5. **`PmicFaultMonitor` on a non-fault "Not Charging".** Which states it escalates on (alerts 20/21/23; the soft cycle after 2 faulty polls; the PMIC power cycle after 3; the 1 h cooldown; the immediate reset gated on a USB-backed input and `powerGood`), and whether "Not Charging" with power present and no fault bit is seen at all. LAB-01's `status` showed `pmicAnomalyCount` 0.
 6. **The candidate check.** Draft: *power present (USB-backed input and `powerGood`), not charging, not full, for N hours: re-initialize the charger (the existing level-1 soft cycle, or a charger register reset)*. Give: the inputs it would read (all already sampled?), the state it needs (a retained counter would touch the persisted layout: say so and propose a RAM-only design), where it would run, the choice of N against LAB-01's 3.5 h, the false-positive cases (a full battery reads "Not Charging" too; a hot pack; a weak supply), the alert it would raise, and the **line cost in `src/`** with the arithmetic. Check the +20 net-lines budget per WO.
 7. **Test shape.** What host test would pin it, and the bench step for a USB unit (Chip's hands) without breaking the battery.
-8. **Stop decision.** STOP if firmware cannot re-apply the charger at all, or the check cannot be told from a full battery. Otherwise PROCEED to a design WO.
+8. **Fuel-gauge re-estimate (architect, 1 Nov).** Can a charger re-init also trigger a fuel-gauge re-estimate (the MAX17043/Device OS quick start; find which gauge the board has and the Device OS call, with file:line)? At what `src/` line cost, and is it safe while charging (a re-estimate during charge reads the terminal voltage above the true open-circuit voltage: say what SoC it would produce and whether the existing `SocTrust` charging allowance covers it)? LAB-01's gauge stayed at 36-40% at 4.13-4.21 V until a power cycle re-estimated it at 92.28% (recovery item 23).
+9. **Item 23 arithmetic check (no separate Step 0).** Verify from the knot table (`src/power/BatteryHealth.cpp:19-32`) that the resting estimate at 4.13 V is 93%, the residual against 40.46% is about -52, and `Untrusted` applies at 28 points while charging (`:36-44,94-102`), so `BatteryTierGuard::socForTier` (`src/reporting/BatteryTierGuard.cpp:5-10`) used the voltage-derived SoC; and at 3.71-3.75 V the estimate is 31-35%, `Trusted`. Cite file:line for each number. List the SoC consumers that read the raw gauge (the reported `battery`, and any outside `BatteryAuthority`).
+10. **Stop decision.** STOP if firmware cannot re-apply the charger at all, or the check cannot be told from a full battery. Otherwise PROCEED to a design WO.
 
 ## Evidence (Claude Code, read-only, before dispatch)
 
@@ -34,4 +36,4 @@ OCCUPANCY-LAB-01 (USB powered, v47) read "Not Charging" at 36.14%, `vc` 3.71-3.7
 ## Output and budget
 
 - A report of at most 150 lines (`WO-2026-11-01-002-step0-report.md`), committed on the branch above, then stop for the architect.
-- 0 `src/` lines. Standing rules: read-only; `retained` RAM and the persisted layout are untouched.
+- 0 `src/` lines in this Step 0. **The eventual fix, the charger re-init check and the gauge re-estimate together, stays within +20 net `src/` lines.** Standing rules: read-only; `retained` RAM and the persisted layout are untouched.
