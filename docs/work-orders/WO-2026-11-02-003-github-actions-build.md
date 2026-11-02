@@ -1,4 +1,4 @@
-# WO-2026-11-02-004 — Build and test in GitHub Actions
+# WO-2026-11-02-003 — Build and test in GitHub Actions
 
 **Status:** APPROVED by the architect; Chip authorizes the dispatch.
 **Governing sections:** `AI_DEVELOPMENT_WORKFLOW.md` §3 Stage 6 (implementation) and Stage 7 (independent verification, "Mandatory: local toolchain build"); §5 model routing; §7 access and security controls; §10 (host shell tests run under zsh).
