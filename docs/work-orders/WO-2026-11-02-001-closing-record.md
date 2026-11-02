@@ -1,6 +1,6 @@
 # WO-2026-11-02-001: closing record
 
-Work Order and Amendment 1: `WO-2026-11-02-001-usb-charge-latch-recovery.md` (on PR #168 with the Step 0; Amendment 1 is in Chip's checkout and goes in with #168 or this PR's merge order, Chip's call).
+Work Order and Amendment 1: `WO-2026-11-02-001-usb-charge-latch-recovery.md` (on PR #168 with the Step 0, including Amendment 1).
 
 ## Closing record (2 Nov 2026)
 
@@ -23,4 +23,6 @@ Work Order and Amendment 1: `WO-2026-11-02-001-usb-charge-latch-recovery.md` (on
 
 **Controller checks:** the pmic host test passed 3 of 3 runs and the structural test passed on the round-1 tree, and the pmic test passed twice more on the round-3 tree; Copilot's full suite passed 108/108 each round (Codex's sandbox cannot compile, so it judged by inspection). Row 22 wording checked against the code by the controller (2 h window and 24 h gate P:397-409, the clear P:363-379, strict-greater arbitration `MyPersistentData.cpp:817`).
 
-**Not done / follow-ups:** the gauge quick-start (item 23), solar units, and the release vehicle are out of scope; the release vehicle (candidate v49) is Chip's decision. A bench test on a USB unit (Chip's hands) is still to be run.
+**Release vehicle (Chip, 2 Nov):** v49, alongside the binding-delete guard, after the AB1805 spike.
+
+**Not done / follow-ups:** the gauge quick-start (item 23), solar units, and the release vehicle are out of scope; the release vehicle is decided above. A bench test on a USB unit (Chip's hands) is still to be run.
