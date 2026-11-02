@@ -33,3 +33,15 @@ Not decided. Candidate: v49 alongside the binding-delete guard, after the AB1805
 
 ## Out of scope
 Gauge quick-start; solar units; changes to the fault-driven toggle path; failsafe changes.
+
+## Amendment 1 (2026-11-02, after Stage 7 round 1 NOT VERIFIED)
+**Goal restated:** a USB unit that has good power but is stuck at "Not Charging" for 2 h gets one charging toggle per 24 h, an alert, and one register log line. Nothing more.
+
+1. **Raise alert 22, not 21.** 22 is unused, and it already sits in the "charging resumed, codes 20–23" clear (`alert-codes.md` row 22; P:369–371), so it clears when charging resumes with no new clear code. Add its severity entry (3, matching 20 and 21). **Restore the alert-21 clear to the original `regs.chargeStatus != 2` exactly.** Stage 7 must confirm the 20–23 clear fires on Pre-charge, Fast and Done.
+2. **USB gating:** use the existing corrected-source test (the `usbBackedFaultContext` expression: `activeInputProfile` / `isUsbBackedSource(...)`), hoisted so both paths share it, AND VBUS status. Raw VBUS alone is not enough (VIN can read as USB).
+3. **Request the level-1 cycle through the existing path and honour its 1 h cooldown;** don't write the remediation fields directly.
+4. **Drop** the `vcell = 99.0f` default parameter (update the test calls) and the `vcell > 2.5f` bound.
+5. **Normal style:** no comma statements, no one-line struct.
+6. **Docs in the same PR:** `docs/reference/alert-codes.md` row 22 (meaning, raise site, severity, clear) and row 21 unchanged apart from line references.
+
+**Budget raised: `src/` +30 hard (was +20).** Reason: the reformat and the severity entry. If round 2 can't fit +30, stop and report rather than trimming style.
