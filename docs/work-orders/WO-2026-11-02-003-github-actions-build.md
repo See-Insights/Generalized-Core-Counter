@@ -36,3 +36,14 @@ Source: https://docs.particle.io/firmware/best-practices/github-actions/
 2. **Local vs cloud:** the guide's tradeoff (the buildpack adds ~30–60 s of setup; a token switches to the cloud compiler) doesn't change our choice. We build on the runner, with no token.
 3. **Before dispatch:** confirm GitHub Actions is enabled for the See-Insights organization (the guide notes organizations can disable it).
 4. **Phase 2, not in this WO:** `flash-device-action` to Dev-14 / Dev-09 for bench runs (needs a `devices:update` API-user token and development-marked devices), and `firmware-upload-action` to product 42131 on a release tag (needs `firmware:create`). Both need Chip's decision; tokens only in GitHub secrets, minimal scope, never in the repo.
+
+## Amendment 2 (2026-11-02) — least privilege for any Particle token given to GitHub (Chip's direction)
+Sources: https://docs.particle.io/getting-started/cloud/cloud-api/#api-users ; https://docs.particle.io/firmware/best-practices/github-actions/ ; https://github.com/particle-iot/firmware-upload-action
+1. **Phase 1 (this WO): no Particle token at all.** Compiling on the runner needs none.
+2. **Phase 2, if Chip approves it:**
+   - **Only product API users, never a human user token.** One API user per function, scoped to product 42131 only, each with a single scope:
+     - upload: `firmware:create` only. `firmware-upload-action` uploads only; it does not release or trigger OTA. **CI never gets the right to release or set a default**: Chip does that in the console.
+     - bench flashing: `devices:update` only, and only if an API user works for it. The Particle guide says `flash-device-action` needs a user-level token with the device claimed to the account; the upload action's README says an API-user token with `devices:update` can flash test devices. Resolve that conflict before phase 2. **If only a user token works, CI doesn't flash.**
+   - **Storage:** GitHub Actions secrets only, attached to a GitHub Environment that requires Chip's approval, and used only by tag-triggered jobs on this repo. Never available to pull-request jobs (forks). Never in the repo, logs or command-line arguments.
+   - **Lifetime:** API-user tokens don't expire, so rotate them on a schedule (proposed: quarterly) and immediately on any suspected exposure. Delete an API user when its job is retired.
+3. Record each API user (name, product, scope, created, last rotated) in `docs/notes/`, without the token.
