@@ -29,3 +29,10 @@ Once CI is green and at parity on **3 consecutive PRs**, the cloud-compile gate 
 
 ## Out of scope
 Release automation (flashing, tagging, product uploads); the Particle cloud compiler; any `src/` or test change.
+
+## Amendment 1 (2026-11-02, after review of Particle's GitHub Actions guide)
+Source: https://docs.particle.io/firmware/best-practices/github-actions/
+1. **Action versions:** the guide uses `compile-action@v1`; we keep the SHA pin (public repo) with `# v1.x.y` in a comment. Its examples use `actions/checkout@v3` and `actions/upload-artifact@v3`, which are out of date; use the current major versions (`@v4` or later), also SHA-pinned.
+2. **Local vs cloud:** the guide's tradeoff (the buildpack adds ~30–60 s of setup; a token switches to the cloud compiler) doesn't change our choice. We build on the runner, with no token.
+3. **Before dispatch:** confirm GitHub Actions is enabled for the See-Insights organization (the guide notes organizations can disable it).
+4. **Phase 2, not in this WO:** `flash-device-action` to Dev-14 / Dev-09 for bench runs (needs a `devices:update` API-user token and development-marked devices), and `firmware-upload-action` to product 42131 on a release tag (needs `firmware:create`). Both need Chip's decision; tokens only in GitHub secrets, minimal scope, never in the repo.
