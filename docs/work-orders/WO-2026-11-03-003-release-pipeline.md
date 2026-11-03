@@ -44,3 +44,8 @@ Copilot, standard model, medium. Codex Stage 7: `gpt-5.6-sol`, **high** (securit
 - **Part B:** the upload's title and description are that tag message (title = tag name plus the first line, description = the rest), so the Particle firmware entry matches the GitHub Release text.
 - **Part A consequence:** the GitHub Release created by the release job uses the same annotated tag message as its notes (today's job writes only "Tag, commit"). A lightweight tag is rejected. This is a round-2 change to Part A (read the message with `git for-each-ref --format='%(contents)' refs/tags/$TAG` after checking `objecttype` is `tag`; the checkout must fetch tags). Its line cost counts against the Part A budget, which Stage 7 round 1 found already used up (+60 of +60): the architect's budget ruling is needed with the token-scoping decision.
 - **Start condition for Part B:** Chip confirms the `firmware:create` API user's token is stored in the `particle-42131` Environment. Until then Part B does not start.
+
+## Amendment 2 (Chip, 3 Nov): the Part B API user exists
+- Product-42131 API user with **only `firmware:create`** (name relayed as `github-firmware-upload`), registered in `docs/notes/particle-api-users-register.md` (no token). Its token is the `PARTICLE_ACCESS_TOKEN` secret of the `particle-42131` Environment (required reviewer Chip; `v*` tags only).
+- **Part B starts after the Stage 7 round-2 verdict on Part A** (Part A round 1 was NOT VERIFIED; round 2 waits for the token-scoping, line-budget and #177-merge rulings).
+- **If an upload fails on scope, report the exact scope the error names. No broader scopes** are granted to make it work.
