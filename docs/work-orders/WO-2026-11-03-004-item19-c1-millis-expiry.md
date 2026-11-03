@@ -43,3 +43,11 @@ Revert the PR; v48 behavior returns; no data to migrate.
 1. Is the 1 s margin kept as in WO-2026-10-25-001, or should the predicate return the exact remaining and the caller add the margin?
 2. Does `lastOccupancyEvent` need a name change (it is persisted, boot-cleared `millis()`), or stay as is (zero layout change)? Recommendation: stay.
 3. Confirm C1 is to ship in v50 only if C2 does (C1 alone fixes nothing in the field).
+
+## Amendment 1 (architect rulings, 3 Nov) — status: APPROVED to dispatch
+1. **The predicate returns the time to expiry** (`debounceRemainingMs()`, 0 when expired); **the caller (the sleep plan) adds the 1 s margin.** The awake path and the wake close use the raw value.
+2. **Keep the name `lastOccupancyEvent`** (zero layout change).
+3. **C1 may merge when verified, but releases only with C2, in v50** (the PR is marked "do not release before C2"; the product default is not changed by C1 alone).
+4. **Acceptance adds:** re-pass the **item-20 :52 straddle bench test** (the exerciser phase that puts one 570 s session across the hourly :00 report; v45 credited 12-13 min instead of 9.5; the sleep must wake at the time left, not the full 300 s). That bench test is run by Chip on Dev-09/Dev-14 after Stage 7; the PR states it as pending until then.
+5. **PRs:** the drafts have no PR of their own; this WO goes with its implementation PR.
+6. Agents and budget unchanged: Copilot standard/medium; Codex `gpt-5.6-sol` xhigh, §4 SHA rule, at most two rounds; `src/` ≤ +16.
