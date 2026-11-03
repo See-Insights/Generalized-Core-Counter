@@ -5,14 +5,39 @@
 # Release notes go to CHANGELOG.md only; they are no longer built into the binary.
 #
 # Usage:
-#   ./bump_version.sh v28-CloseBeforeSleep "New feature release"
+#   ./bump_version.sh v49.1-SomeName "New feature release"
 #
 # Notes:
 # - This script is tailored for macOS (uses BSD sed with -i '').
 # - Escapes values for safe use in sed replacement.
-# - Derives PRODUCT_VERSION from the version ("v28-CloseBeforeSleep" -> 28)
+# - Derives PRODUCT_VERSION from the version: v<major>.<iteration>[-name] ->
+#   major * 100 + iteration ("v49.1-SomeName" -> 4901). The legacy dotless
+#   form ("v28-CloseBeforeSleep" -> 28) still works.
 
 set -euo pipefail
+
+# Derive the integer PRODUCT_VERSION from the version string.
+#   v<major>.<iteration>[-name]  ->  major * 100 + iteration  (1-2 digits each)
+#                                    "v49.1-Foo" -> 4901, "v48.90" -> 4890
+#   v<NN>-<name>   LEGACY, no dot ->  NN   ("v28-CloseBeforeSleep" -> 28)
+#   v<NN>          LEGACY, bare   ->  NN   ("v49" -> 49)
+# Anything else is rejected. Prints the integer; returns 1 on rejection.
+derive_product_version() {
+  local re_new='^v([0-9]{1,2})\.([0-9]{1,2})(-.+)?$'
+  local re_legacy='^v([0-9]{1,2})(-.+)?$'
+  if [[ "$1" =~ $re_new ]]; then
+    echo $((10#${BASH_REMATCH[1]} * 100 + 10#${BASH_REMATCH[2]}))
+  elif [[ "$1" =~ $re_legacy ]]; then
+    echo $((10#${BASH_REMATCH[1]}))
+  else
+    return 1
+  fi
+}
+
+# Test hook: tests/bump_version_scheme_test.sh sources only the function above.
+if [ "${BUMP_VERSION_SOURCE_ONLY:-}" = "1" ]; then
+  return 0 2>/dev/null || exit 0
+fi
 
 if [ "$#" -lt 2 ]; then
   echo "Usage: $0 <version> <release-notes>"
@@ -23,13 +48,8 @@ VERSION="$1"
 shift
 NOTES="$*"
 
-# Extract the integer PRODUCT_VERSION from the version string. Handles both
-# the bare/point form ("4.00" -> 4, "4" -> 4) and the current release naming
-# ("v28-CloseBeforeSleep" -> 28).
-PRODUCT_VERSION_INT="$(printf '%s' "$VERSION" | sed -E 's/^v//; s/[.-].*$//')"
-
-if ! printf '%s' "$PRODUCT_VERSION_INT" | grep -Eq '^[0-9]+$'; then
-  echo "Error: cannot derive an integer PRODUCT_VERSION from '$VERSION'"
+if ! PRODUCT_VERSION_INT="$(derive_product_version "$VERSION")"; then
+  echo "Error: '$VERSION' is not v<major>.<iteration>[-name] (1-2 digits each; legacy: v<NN>[-name])"
   exit 1
 fi
 

@@ -226,23 +226,22 @@ The firmware uses two distinct version identifiers:
 - Defined in `src/FirmwareVersion.h` as `FIRMWARE_PRODUCT_VERSION`
 - Required by Particle's cloud firmware management system
 - Must be an integer (e.g., 19, 20, 21)
-- Should be incremented when starting a new firmware release line
+- Equals major × 100 + iteration of the release tag (v49.1 → 4901); every iteration gets its own value
 - Used by `PRODUCT_VERSION()` macro in the main firmware file
 
 ## Human-Readable Version (String)
 
 - Defined in `src/Version.cpp` as `FIRMWARE_VERSION`
-- Human-readable string (e.g., "19", "19.1", "19.2", "20.0")
+- Human-readable string `v<major>.<iteration>[-name]` (e.g., "v49.1-Name")
 - Used for logging, status reporting, cloud status, and user documentation
-- Point releases (e.g., 19.1, 19.2, 19.3) typically share the same PRODUCT_VERSION
-- Allows tracking bug fixes and minor updates within a release line
+- Each iteration (v49.1, v49.2, ...) has its own PRODUCT_VERSION; the iteration that passes its soak is the release, with no rebuild
 
 ## Version Update Process
 
 Use `bump_version.sh` to update version metadata:
 
 ```bash
-./bump_version.sh 20 "New feature release"
+./bump_version.sh v49.1-Name "New feature release"
 ```
 
 This script automatically updates:
@@ -261,7 +260,7 @@ Increment `FIRMWARE_PRODUCT_VERSION` (the Particle integer version) when:
 - Preparing for fleet-wide OTA deployments
 - Moving to a new Device OS version
 
-Keep `FIRMWARE_PRODUCT_VERSION` stable for point releases containing:
+`FIRMWARE_PRODUCT_VERSION` changes with every iteration (major × 100 + iteration), including for:
 
 - Bug fixes
 - Minor improvements
