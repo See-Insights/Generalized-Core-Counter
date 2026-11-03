@@ -43,3 +43,11 @@ Revert the PR; v48/C1 behavior returns; no data to migrate (nothing persisted ch
 2. Does every untrusted piece close raise an occupancy-change report (more reports on a pulsed site while untrusted), or only the first and the last? Recommendation: every close, as a trusted close does, so counts stay consistent.
 3. Do you want a counter or log field for "straddlers dropped" (one per reboot while untrusted) so the loss is visible in the field? It costs lines; recommendation: the log line only.
 4. Day assignment for a piece that spans local midnight while untrusted: the existing boundary path closes it (point 5). Confirm no extra rule.
+
+## Amendment 1 (architect rulings, 3 Nov) — status: APPROVED; dispatch after C1 passes Stage 7
+1. **A piece opened untrusted stays on `millis()` until it closes,** even if trust returns before it closes (change-list point 3 stands).
+2. **An untrusted close behaves exactly like a trusted close, including the occupancy-change report** (point 6 stands: the same report call, every close).
+3. **No counter.** One `Log.info` line when a straddler's pre-boot part is dropped (inside the ≤ +16 budget); the per-credit log line of point 6 stays only if the budget allows, otherwise the straddler line wins.
+4. **No extra midnight rule:** credit goes to the **day current at close**. No daily boundary is due while the clock is untrusted, so the boundary path never sees an untrusted-open piece (point 5's boundary sentence is replaced by this rule; Step 0 confirms that `DailyBoundary::check()` is trust-gated).
+5. **Sequence:** C2 builds on C1's predicate (`debounceRemainingMs()`). **Dispatch C2 only after C1 (WO-2026-11-03-004) has passed Stage 7** and its branch is merged into this one. C1 may merge when verified; neither releases before v50.
+6. Agents and budget unchanged: Copilot standard/medium; Codex `gpt-5.6-sol` xhigh, §4 SHA rule, at most two rounds; `src/` ≤ +16. No PR for the draft; the WO goes with its implementation PR.
