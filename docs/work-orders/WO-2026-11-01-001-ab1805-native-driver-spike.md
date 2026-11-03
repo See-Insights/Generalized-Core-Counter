@@ -95,3 +95,10 @@ Prove on real hardware that Device OS's built-in AM18x5 driver can do every job 
 - No change to any other device. Dev-09, the pilot devices and the fleet stay on their firmware.
 - `retained` RAM and the persisted layout are untouched.
 - The spike build never goes to a product, a release, or the Particle cloud as a firmware upload.
+
+## Amendment 5 (3 Nov 2026, architect ruling; amends ruling 3): P5 is two 4-hour hibernates
+**Reason:** Chip leaves for the airport before 13:30 on 4 Nov, so two 8-hour hibernates (about 17 h) cannot finish with him present. **The 8-hour night proof moves to the v50 bench soak,** which covers two real nights.
+- **P5 step/pass:** the same, with `P5_HIBERNATE_SEC` = 14,400 s (4 h) per hibernate instead of 28,800 s; 10 minutes awake with cloud on between them. Pass is unchanged: each wake within 5 s of the request, and the second is not an immediate or early stale-alarm wake.
+- **Build:** `spike/src/spike.cpp:21` `P5_HIBERNATE_SEC` 28800 → 14400, no other change (the spike's `p5` takes no duration argument). Local toolchain build (Device OS 6.6.0, fresh scratch dir): 26,746 bytes; `arm-none-eabi-objdump` of `startP5Round` shows `mov.w r3, #14400` at `0xb4496`; `nm` has `startP5Round(unsigned char)` and `saveRec()`. Binary: `~/Downloads/spike-2026-11-03/ab1805-spike-p5-4h.bin` (SHA-256 `134331b49f5fee26e47ec549d9c7d8316fd03dadd03349cfacd6d3d89a4bd1d3`); the original 8 h `ab1805-spike.bin` is kept.
+- **Run plan:** Chip runs it from about 21:00 SGT (13:00Z): wake 1 about 17:00Z, second hibernate about 17:10Z, wake 2 about 21:10Z. Restore (`unbind`, `reboot`, `status` bound=0, flash `v48-restore.bin`, re-lock Dev-14 to v48, unmark development) happens before Chip leaves.
+- **Coverage lost:** an 8 h alarm is not exercised by this spike; the v50 bench soak covers it.
