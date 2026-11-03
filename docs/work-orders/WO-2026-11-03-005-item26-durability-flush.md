@@ -47,3 +47,10 @@ Revert the PR; v48 behavior returns; no data to migrate.
 1. Where does the function live (`persist/` header vs a new `src/` file)? Recommendation: beside `SystemConfig::flushNow()`.
 2. Thrash tier 3 and the Error state raise an alert code and reset in the same pass: confirm the alert code's store (`RecoveryState`, in `sysStatus` or `current`?) is one of the three stores flushed (Step 0 must confirm).
 3. Does the failsafe keep its own `SystemConfig::flushNow()` call as well (belt and braces) or only the new one? Recommendation: only the new one, called after the stage record.
+
+## Amendment 1 (architect rulings, 3 Nov) — status: APPROVED to dispatch
+1. **`flushAllBeforeReset()` lives in `State_Error`** (declared in the state header the other reset sites already include; defined in `src/state/State_Error.cpp`). Sites that cannot see it today include that header; no new file.
+2. **Alert codes are in the `current` store, which is flushed;** the alert is **written before** the flush (thrash tier 3's alert 18, the Error alert). Step 0 of this WO confirms the store by reading `RecoveryState::set_alertCode`.
+3. **The failsafe's `SystemConfig::flushNow()` is replaced by the new call** (after the stage/action/count record is written), not kept as well.
+4. **Provisional time limits accepted** (each store 250 ms, queue 2 s); the bench measures them and the WO records the figures.
+5. **PRs:** no PR for the draft; this WO goes with its implementation PR. Agents and budget unchanged: Copilot standard/medium; Codex `gpt-5.6-sol` xhigh, §4 SHA rule, at most two rounds; `src/` ≤ +20.
