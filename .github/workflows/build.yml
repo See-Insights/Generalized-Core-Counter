@@ -2,6 +2,8 @@ name: build
 
 on:
   push:
+    branches: ['**']
+    tags: ['v*']
   pull_request:
 
 permissions:
@@ -10,6 +12,8 @@ permissions:
 jobs:
   host-tests:
     runs-on: ubuntu-latest
+    outputs:
+      tests: ${{ steps.tests.outputs.result }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -32,6 +36,7 @@ jobs:
       - name: Install zsh
         run: sudo apt-get install -y zsh
       - name: Run host tests (sh via zsh, py via python3)
+        id: tests
         env:
           TMPDIR: ${{ runner.temp }}
           DEVICE_OS_ROOT: ${{ github.workspace }}/device-os-6.4.1
@@ -46,6 +51,7 @@ jobs:
             if python3 "$t"; then pass=$((pass+1)); else failed+=("$t"); fi
           done
           echo "$pass/$total (sh via zsh, py via python3)" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "result=$pass/$total" >> "$GITHUB_OUTPUT"
           if [ "${#failed[@]}" -gt 0 ]; then
             printf 'FAILED: %s\n' "${failed[@]}"
             exit 1
@@ -79,3 +85,57 @@ jobs:
             ${{ steps.compile.outputs.firmware-path }}
             ${{ steps.compile.outputs.target-path }}/*.elf
           if-no-files-found: error
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: [host-tests, firmware]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # this job only: gh release create
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+      TESTS: ${{ needs.host-tests.outputs.tests }}
+    steps:
+      - name: Require tag v<major>.<iteration>
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+$ ]] || { echo "::error::tag '$TAG' is not v<major>.<iteration>"; exit 1; }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: firmware-boron
+          path: fw
+      - run: npm install -g particle-cli@3.52.4
+      - name: Name, version guard, Release
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v([0-9]+)\.([0-9]+)$ ]]
+          major=$((10#${BASH_REMATCH[1]})); iter=$((10#${BASH_REMATCH[2]}))
+          want=$((major * 100 + iter))
+          os=$(sed -n 's/^deviceOS=//p' project.properties)
+          short=${GITHUB_SHA::7}
+          [ "$iter" -le 99 ] || { echo "::error::iteration $iter exceeds 99"; exit 1; }
+          [ "$(find fw -name '*.bin' | wc -l)" -eq 1 ] || { echo "::error::expected exactly one .bin"; exit 1; }
+          name="gcc-v$major.$iter-boron-dos$os-$short.bin"
+          mv "$(find fw -name '*.bin')" "$name"
+          sha256sum "$name" > "$name.sha256"
+          inspect=$(particle binary inspect "$name")
+          got=$(sed -n 's/.*firmware for product id [0-9]* at version \([0-9]*\).*/\1/p' <<<"$inspect")
+          [ "$got" = "$want" ] || { echo "::error::embedded version '$got' != $want from tag $TAG; no Release created"; exit 1; }
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::a Release for $TAG already exists; not modifying it"; exit 1
+          fi
+          gh release create "$TAG" "$name" "$name.sha256" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "$TAG" --notes "Tag $TAG, commit $short"
+          {
+            echo "### Release $TAG"
+            echo "- run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "- commit: $GITHUB_SHA"
+            echo "- bin: $name ($(stat -c%s "$name") bytes)"
+            echo "- sha256: $(cut -d' ' -f1 "$name.sha256")"
+            echo "- embedded version: $got"
+            echo "- host tests: $TESTS"
+            echo "- buildpack image digest: see the firmware job summary"
+          } >> "$GITHUB_STEP_SUMMARY"

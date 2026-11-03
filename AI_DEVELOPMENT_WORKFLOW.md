@@ -510,6 +510,17 @@ After the architect's Stage 8 review, Claude Code commits the verified implement
 
 ### Stage 9 — Release and feedback
 
+Release pipeline (WO-2026-11-03-003):
+
+1. **Triggers.** Push/PR: build, test, artifact. Tag `v<major>.<iteration>` (e.g. `v49.2`): build, name, and publish a GitHub Release with the `.bin` and `.sha256`. Promotion to the fleet stays a console action by Chip. CI never flashes devices and never releases firmware.
+2. **Who.** Claude Code creates release-candidate tags when a WO set is ready. Uploads to product 42131 need Chip's approval via a GitHub Environment. Pinning and setting the default: Chip only.
+3. **Version scheme.** `PRODUCT_VERSION` = major × 100 + iteration (v49.1 → 4901). The iteration that passes its soak is the release; no rebuild. The `FirmwareVersion.h` string reads `v49.<n>-<name>`. The release job fails, and creates no Release, if the embedded version differs.
+4. **One build ships.** CI builds it; the bench soaks that CI-built `.bin`. The local build remains a mandatory Stage 7 check and is never shipped.
+5. **Naming.** `gcc-v<major>.<iteration>-<platform>-dos<deviceOS>-<shortsha>.bin` plus `.sha256`, e.g. `gcc-v49.2-boron-dos6.6.0-1b3edd4.bin`.
+6. **Bench testing on sleeping devices.** Upload the test build to 42131 and pin only bench devices; the cloud delivers it at the next connect. Serial-Pi flashing: not now.
+
+Success report (job summary of the release job): run link, commit SHA, `.bin` name, size in bytes, SHA-256, embedded version, host-test count (`N/N`), buildpack image digest (in the firmware job summary).
+
 After an authorized release, Claude Code monitors the defined telemetry window (read-only) and compares:
 
 - Failure rate before and after the change
