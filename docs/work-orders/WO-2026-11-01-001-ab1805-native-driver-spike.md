@@ -102,3 +102,22 @@ Prove on real hardware that Device OS's built-in AM18x5 driver can do every job 
 - **Build:** `spike/src/spike.cpp:21` `P5_HIBERNATE_SEC` 28800 → 14400, no other change (the spike's `p5` takes no duration argument). Local toolchain build (Device OS 6.6.0, fresh scratch dir): 26,746 bytes; `arm-none-eabi-objdump` of `startP5Round` shows `mov.w r3, #14400` at `0xb4496`; `nm` has `startP5Round(unsigned char)` and `saveRec()`. Binary: `~/Downloads/spike-2026-11-03/ab1805-spike-p5-4h.bin` (SHA-256 `134331b49f5fee26e47ec549d9c7d8316fd03dadd03349cfacd6d3d89a4bd1d3`); the original 8 h `ab1805-spike.bin` is kept.
 - **Run plan:** Chip runs it from about 21:00 SGT (13:00Z): wake 1 about 17:00Z, second hibernate about 17:10Z, wake 2 about 21:10Z. Restore (`unbind`, `reboot`, `status` bound=0, flash `v48-restore.bin`, re-lock Dev-14 to v48, unmark development) happens before Chip leaves.
 - **Coverage lost:** an 8 h alarm is not exercised by this spike; the v50 bench soak covers it.
+
+## Result record (4 Nov 2026; Dev-14 e00fce688e592afaf23ac4fb; source: `~/screenlog.0`, S3, controller reads)
+**P7 (vendored `deepPowerDown(120)`, chip unbound): PASS, it powers down** (architect verdict). Call at sys 1793708957; boot about 122 s later with `resetReason=20` (PIN_RESET), data 0, `bootSTATUS=0xff`, RTC at boot 0 (system time 946684809, invalid): a full power loss, and the stored session was lost. Record for wake classification: expect reason 20 after a deepPowerDown wake on this hardware (the AB1805 asserting nRST at power-up is a guess, not confirmed). LED/meter observation from Chip: not yet received. An earlier call at sys 1793708749 is in the log; only the second is treated as the P7 run. `~/spike-p7.log` is a 138-byte stub; `screenlog.0` holds the data.
+
+**P5 (as amended, Amendment 5: two 4 h native hibernates; `ab1805-spike-p5-4h.bin`):** both rounds ran; `phase=3 round=2 wakes=8` (DONE). Round 1 requested at ext RTC 1793710324 (12:52:04Z), due 1793724724. Both wakes: `reason=30` (`RESET_REASON_POWER_MANAGEMENT`, Device OS 6.6.0 header), `bootSTATUS=0x04` (AM18x5 alarm flag set).
+| Round | actual-req | uptime at RTC read |
+|---|---|---|
+| 1 | +27 s | 15,006 ms |
+| 2 | +31 s | 15,006 ms |
+- **No early or stale-alarm wake:** both errors are positive; wake 2 was not early or immediate.
+- **The +27/+31 s do not test the 5 s pass directly; the spike's measurement has two biases (inference):** (1) `setup()` waits up to 15 s for a USB serial connection (`waitFor(Serial.isConnected, 15000)`, `spike.cpp:233`) before reading the RTC, and nobody was connected, so both reads are at 15,006 ms; (2) the due time is `reqEpoch + reqSec` with `reqEpoch` taken before the cloud/modem teardown, and `System.sleep` starts later (round 1's log: request at uptime 274.66 s, muxer stopped at 285.98 s, about 11.3 s). Removing both gives about +0.7 s for round 1 (before Device OS time to `setup()`); round 2's teardown time was not logged (the same 11.3 s would give about +4.7 s), so round 2 within 5 s is unproven.
+- **Verdict for the architect:** no stale-alarm failure seen; timing within about 5 s likely for round 1, unproven for round 2. The 8 h proof moves to the v50 bench soak (Amendment 5), which should log wake error with GCC's own method.
+- The `spike` cloud events are not in the S3 archive (the event type is probably not forwarded, or was not published); nothing from Dev-14 reached the archive between 12:01Z and 23:37Z.
+
+**Boot-vs-first-sync RTC (P5 start boot):** external RTC valid at boot before the cloud (1793710057 at uptime 7.4 s; cloud connected 1.3 s later); the next `status` at millis 18,888 read 1793710068, i.e. 11.0 s of clock for 11.044 s of millis: no visible jump at first sync. The `FIRST SYNC:` line is not in the log.
+
+**Restore:** `unbind` returned 0 and the reboot showed `bound=0 present=0 ready=0`. `v48-restore.bin` flashed; S3 shows Dev-14's first status at 23:37:08Z with `fw_version` 48, `v48-OccupancyEndsAtClose`, resetReason 20, watchdogResetCount 127, alert 0, failsafeCount 0. The first hook is the boundary catch-up close (timestamp 1793714399000 = 13:59:59Z = 21:59:59 SGT, dailyoccupancy 405, cyc 1), as on ChurchSt-2. Console re-lock to v48 and the development-device unmark: Chip.
+
+**Not covered by this record:** P1-P4, P6 (and P8, skipped) have no evidence in the log reviewed here; none is claimed.
