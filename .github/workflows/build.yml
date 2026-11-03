@@ -72,6 +72,7 @@ jobs:
             echo "device-os-version: ${{ steps.compile.outputs.device-os-version }}"
             # The action's firmware-version output is unreliable (reported 24 for product version 48).
             echo "firmware-product-version: $(sed -n 's/^#define FIRMWARE_PRODUCT_VERSION *//p' src/FirmwareVersion.h)"
+            echo "buildpack-image: $(docker image inspect particle/buildpack-particle-firmware:${{ steps.props.outputs.os }}-boron --format '{{join .RepoDigests ","}}')"
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
