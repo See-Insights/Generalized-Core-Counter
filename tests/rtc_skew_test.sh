@@ -292,7 +292,9 @@ echo "Extracted the real isPlausibleEpoch() body verbatim from $clock_src"
 # 31,536,000s/year step).
 sweep_anchors=()
 for year in {2024..2034}; do
-  epoch=$(TZ=UTC date -j -f "%Y-%m-%d %H:%M:%S" "${year}-06-01 00:00:00" +%s)
+  # BSD/macOS date parses with -j -f; GNU date (CI) has no -j and uses -d.
+  epoch=$(TZ=UTC date -j -f "%Y-%m-%d %H:%M:%S" "${year}-06-01 00:00:00" +%s 2>/dev/null \
+    || TZ=UTC date -d "${year}-06-01 00:00:00" +%s)
   sweep_anchors+=("$epoch")
 done
 echo "Sweep anchors (2024-06-01 .. 2034-06-01, one per year): ${sweep_anchors[*]}"

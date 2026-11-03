@@ -47,3 +47,10 @@ Sources: https://docs.particle.io/getting-started/cloud/cloud-api/#api-users ; h
    - **Storage:** GitHub Actions secrets only, attached to a GitHub Environment that requires Chip's approval, and used only by tag-triggered jobs on this repo. Never available to pull-request jobs (forks). Never in the repo, logs or command-line arguments.
    - **Lifetime:** API-user tokens don't expire, so rotate them on a schedule (proposed: quarterly) and immediately on any suspected exposure. Delete an API user when its job is retired.
 3. Record each API user (name, product, scope, created, last rotated) in `docs/notes/`, without the token.
+
+## Amendment 3 (architect ruling, 3 Nov, after the first CI run: host-tests 100/107)
+1. `fetch-depth: 0` on the host-tests checkout only (the device-os sparse checkout stays shallow); workflow limit raised to **≤ 85 lines** (now 81).
+2. Test portability fixes are in scope (`src/` stays 0): `#include <cmath>` in `tests/report_payload_golden_test.cpp` (`NAN`/`INFINITY` are not declared transitively by libstdc++), and the portable epoch in `tests/rtc_skew_test.sh`.
+3. `rtc_skew_test.sh` diagnosis: line 295 used BSD `date -j -f`; GNU `date` has no `-j` (`date: invalid option -- 'j'`). Environmental, not a time-zone-data issue (`TZ=UTC` is set per call). Fix: try the BSD form, fall back to GNU `date -d`; the BSD anchors for 2024/2028/2034 equal the independently computed epochs. Never skipped.
+4. The five sleep equivalence tests failed (not skipped) on the depth-1 clone: reproduced locally with `git clone --depth 1` (the baseline-region extraction yields an empty include and clang errors); with a full clone all six pass. 107 vs 108: this branch has 61 sh + 46 py = 107 tests; the 108 in WO -004 is the same suite plus its new `default_timezone_test.sh` (62 sh).
+Verification unchanged: first green CI run at parity with the local build.
