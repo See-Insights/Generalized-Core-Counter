@@ -535,7 +535,7 @@ A Stage 7 (verification) dispatch adds a third line, naming exactly what is unde
 UNDER REVIEW: <branch> @ <full commit SHA>
 ```
 
-The work under review is therefore committed (locally is enough) before Stage 7 is dispatched. Each round has its own new dispatch file and its own new verdict file (see Commands).
+**Stage 6 output is committed to the WO branch before Stage 7** (unmerged; Copilot itself still leaves its changes uncommitted, and Claude Code commits them), so `UNDER REVIEW` always names a real commit, never a diff hash. Each round has its own new dispatch file and its own new verdict file (see Commands).
 
 For Copilot and Codex, the AUTHORIZATION SCOPE names the agent's own scratch directory (e.g. `build-tmp/<wo>-stage6/`), and its "not authorized" half includes "deleting anything you didn't create, including `build-tmp/` itself".
 
