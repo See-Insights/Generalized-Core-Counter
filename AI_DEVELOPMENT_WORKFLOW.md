@@ -529,6 +529,14 @@ AGENT: <Copilot|Codex> · MODEL: <id> · REASONING: <level>
 AUTHORIZATION SCOPE: <pre-authorized actions> / <explicitly not authorized>
 ```
 
+A Stage 7 (verification) dispatch adds a third line, naming exactly what is under review:
+
+```
+UNDER REVIEW: <branch> @ <full commit SHA>
+```
+
+**Stage 6 output is committed to the WO branch before Stage 7** (unmerged; Copilot itself still leaves its changes uncommitted, and Claude Code commits them), so `UNDER REVIEW` always names a real commit, never a diff hash. Each round has its own new dispatch file and its own new verdict file (see Commands).
+
 For Copilot and Codex, the AUTHORIZATION SCOPE names the agent's own scratch directory (e.g. `build-tmp/<wo>-stage6/`), and its "not authorized" half includes "deleting anything you didn't create, including `build-tmp/` itself".
 
 The body follows: the Work Order it serves (the binding spec), the branch and base commit, what to do, what to verify, and the report expected back.
@@ -539,8 +547,10 @@ The body follows: the Work Order it serves (the binding spec), the branch and ba
 
 ```
 codex exec -m <model> -c model_reasoning_effort="<level>" -s workspace-write \
-  -o docs/work-orders/<WO>-stage7-verdict.md - < docs/work-orders/<WO>-stage7-codex-dispatch.md
+  -o docs/work-orders/<WO>-stage7-r<N>-verdict.md - < docs/work-orders/<WO>-stage7-r<N>-codex-dispatch.md
 ```
+
+`<N>` is the round number. The names are never reused across rounds: fixed names caused a round-2 run to be fed the round-1 dispatch, and an `-o` file to be overwritten by a later message (3 Nov 2026). `-o` stores the agent's last message, so the dispatch asks for the complete verdict in the final message.
 
 `codex review --uncommitted` is not used: it rejects custom instructions (CLI 0.154.0). Codex's sandbox has no network, so the Particle cloud compile (a release-head check, once per release; see "Release gate" in §3) is run by Claude Code, not in Stage 7.
 
@@ -566,6 +576,8 @@ Every report from Copilot, Codex, or Claude Code states:
 
 - The model and reasoning level actually used. If Auto was used, what Auto picked.
 - The interpreter used for tests, e.g. `43/43 (sh via zsh, py via python3)`. See §10.
+
+A Codex verdict's first line quotes the `UNDER REVIEW` SHA. A missing or mismatched SHA invalidates the verdict: not counted as a round, archived, rerun.
 
 ### Records
 
