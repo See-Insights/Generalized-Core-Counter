@@ -38,3 +38,9 @@ In the workflow: never `pull_request_target`; secrets only in the Environment-ga
 ## Agents
 Copilot, standard model, medium. Codex Stage 7: `gpt-5.6-sol`, **high** (security-relevant workflow: tokens, permissions), new SHA-named round files per §4, at most two rounds. Verification also needs two live dry runs on a throwaway branch: (a) tag `v48.90` with the constant set to 4890 → a correctly named Release is created; (b) tag `v48.91` with the constant left at 4890 → the version guard fails the job and no Release is created. Delete both tags, the Release and the branch afterwards.
 
+
+## Amendment 1 (Chip, 3 Nov): release notes come from the annotated tag
+- Release tags are **annotated** (`git tag -a v<major>.<iteration>`), and the message is written from the WO closing records (what shipped, WO ids, soak result, build record: CI run id, `.bin` SHA-256, buildpack image digest).
+- **Part B:** the upload's title and description are that tag message (title = tag name plus the first line, description = the rest), so the Particle firmware entry matches the GitHub Release text.
+- **Part A consequence:** the GitHub Release created by the release job uses the same annotated tag message as its notes (today's job writes only "Tag, commit"). A lightweight tag is rejected. This is a round-2 change to Part A (read the message with `git for-each-ref --format='%(contents)' refs/tags/$TAG` after checking `objecttype` is `tag`; the checkout must fetch tags). Its line cost counts against the Part A budget, which Stage 7 round 1 found already used up (+60 of +60): the architect's budget ruling is needed with the token-scoping decision.
+- **Start condition for Part B:** Chip confirms the `firmware:create` API user's token is stored in the `particle-42131` Environment. Until then Part B does not start.
