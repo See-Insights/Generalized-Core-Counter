@@ -227,6 +227,7 @@ void setup();
 
 /// Forwards to sensorConfigData::loop().
 void loop();
+void flushNow();  // forwards to flush(true): synchronous forced write
 
 /**
  * @brief Forwards to sensorConfigData::validate() with the same size
