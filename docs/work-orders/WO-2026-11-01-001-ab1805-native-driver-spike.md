@@ -121,3 +121,6 @@ Prove on real hardware that Device OS's built-in AM18x5 driver can do every job 
 **Restore:** `unbind` returned 0 and the reboot showed `bound=0 present=0 ready=0`. `v48-restore.bin` flashed; S3 shows Dev-14's first status at 23:37:08Z with `fw_version` 48, `v48-OccupancyEndsAtClose`, resetReason 20, watchdogResetCount 127, alert 0, failsafeCount 0. The first hook is the boundary catch-up close (timestamp 1793714399000 = 13:59:59Z = 21:59:59 SGT, dailyoccupancy 405, cyc 1), as on ChurchSt-2. Console re-lock to v48 and the development-device unmark: Chip.
 
 **Not covered by this record:** P1-P4, P6 (and P8, skipped) have no evidence in the log reviewed here; none is claimed.
+
+## Ruling (architect, 4 Nov 2026): the provisional ruling is final
+**The AB1805 native-driver switch stays in v50.** The proof is **two real nights in the v50 bench soak, with serial attached** (so the wake lines, the boot clock-vs-first-sync reading and the pre-sleep teardown time are captured; the spike's P5 lacked them, see the result record above). **v50 soak checklist item:** attach serial for both nights; per wake record `actual - req` by GCC's own method, reset reason, AM18x5 STATUS at boot, and the teardown time before the sleep call. Fallback as planned if it fails. There is no v50 soak checklist file yet; this WO and the v50 release WO carry the item until one exists.
