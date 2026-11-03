@@ -101,6 +101,10 @@ inline void signalLED(bool on, uint32_t ms = 0) {
 }
 inline bool signalLEDStatus() { return ledOnNow; }
 inline uint32_t signalLEDTimeRemaining() { return ledRemainingNow; }
+// WO-2026-11-03-004: the wake close is now a deliberate change from the S-6 base (the millis predicate, not the
+// LED). This table freezes the base behaviour of the move, so the fake keeps the base's LED criterion here;
+// tests/debounce_expiry_c1_test.sh drives the real predicate.
+inline uint32_t debounceRemainingMs() { return ledRemainingNow == 0 ? 0 : 1; }
 
 inline void logWakeSummary(const char *reason) {
   sim::emit("WAKESUMMARY %s open=%d ready=%d occ=%d led=%lus", reason, (int)isWithinOpenHours(),

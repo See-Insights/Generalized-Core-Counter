@@ -326,6 +326,24 @@ inline uint32_t occupancyDebounceMs() {
 }
 
 /**
+ * @brief Milliseconds until the occupancy debounce expires (0 when expired).
+ *
+ * @details The single debounce-expiry predicate, on millis() and
+ *          lastOccupancyEvent only (no wall clock). A zero lastOccupancyEvent
+ *          (boot clear) re-arms to now so it never expires immediately.
+ */
+inline uint32_t debounceRemainingMs() {
+	uint32_t last = CurrentReadings::get_lastOccupancyEvent();
+	if (last == 0) {
+		last = millis();
+		CurrentReadings::set_lastOccupancyEvent(last);
+	}
+	const uint32_t elapsed = millis() - last;
+	const uint32_t debounceMs = occupancyDebounceMs();
+	return elapsed >= debounceMs ? 0 : debounceMs - elapsed;
+}
+
+/**
  * @brief Safely closes the current occupancy session and guards wrapped time math.
  *
  * Unsigned subtraction of closeAt - occupancyStartTime can wrap into a huge

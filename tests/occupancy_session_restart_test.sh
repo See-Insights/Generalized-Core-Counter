@@ -256,6 +256,8 @@ CPP
   echo ""
   extract_braced_block "$common_src" "inline uint32_t occupancyDebounceMs() {"
   echo ""
+  extract_braced_block "$common_src" "inline uint32_t debounceRemainingMs() {"
+  echo ""
   extract_braced_block "$common_src" \
     "inline OccupancyCloseResult closeOccupancySessionSafely(const char *path, time_t closeAt = Time.now()) {"
 
