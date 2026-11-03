@@ -1,0 +1,81 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0  # equivalence tests compare against historical commits
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          repository: particle-iot/device-os
+          ref: 533fe47b1d420c8c766c488471ee34256727b49e # v6.4.1
+          path: device-os-6.4.1
+          sparse-checkout: |
+            system/inc
+            hal/inc
+            hal/shared
+            hal/src/gcc
+            wiring/inc
+            services/inc
+            dynalib/inc
+      - name: Install zsh
+        run: sudo apt-get install -y zsh
+      - name: Run host tests (sh via zsh, py via python3)
+        env:
+          TMPDIR: ${{ runner.temp }}
+          DEVICE_OS_ROOT: ${{ github.workspace }}/device-os-6.4.1
+        run: |
+          pass=0; total=0; failed=()
+          for t in tests/*.sh; do
+            total=$((total+1))
+            if zsh "$t"; then pass=$((pass+1)); else failed+=("$t"); fi
+          done
+          for t in tests/*.py; do
+            total=$((total+1))
+            if python3 "$t"; then pass=$((pass+1)); else failed+=("$t"); fi
+          done
+          echo "$pass/$total (sh via zsh, py via python3)" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "${#failed[@]}" -gt 0 ]; then
+            printf 'FAILED: %s\n' "${failed[@]}"
+            exit 1
+          fi
+
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read Device OS version from project.properties
+        id: props
+        run: echo "os=$(sed -n 's/^deviceOS=//p' project.properties)" >> "$GITHUB_OUTPUT"
+      - name: Compile (on the runner; no Particle token, no auto-version)
+        id: compile
+        uses: particle-iot/compile-action@3b6e15e99da59d074120f854a71659d4c81f092c # v1.0.7
+        with:
+          particle-platform-name: boron
+          device-os-version: ${{ steps.props.outputs.os }}
+      - name: Job summary
+        run: |
+          {
+            echo "device-os-version: ${{ steps.compile.outputs.device-os-version }}"
+            echo "firmware-version: ${{ steps.compile.outputs.firmware-version }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: firmware-boron
+          path: |
+            ${{ steps.compile.outputs.firmware-path }}
+            ${{ steps.compile.outputs.target-path }}/*.elf
+          if-no-files-found: error
