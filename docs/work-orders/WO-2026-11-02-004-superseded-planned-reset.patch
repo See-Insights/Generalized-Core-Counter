@@ -1,0 +1,112 @@
+diff --git a/src/ResetCause.h b/src/ResetCause.h
+index 07af856..59c0f5a 100644
+--- a/src/ResetCause.h
++++ b/src/ResetCause.h
+@@ -20,4 +20,5 @@ enum ResetCause : uint32_t {
+   RESET_CAUSE_SLEEP_ATTEMPTS_EXHAUSTED = 5,///< All sleep attempts failed
+   RESET_CAUSE_ERROR_STATE_SOFT = 6,        ///< ERROR_STATE soft reset
+   RESET_CAUSE_OUT_OF_MEMORY = 7,           ///< out of memory
++  RESET_CAUSE_TIMEZONE_CHANGE = 8,         ///< ConfigApply stored a changed timezone
+ };
+diff --git a/src/cloud/ConfigApply.cpp b/src/cloud/ConfigApply.cpp
+index 42a1996..f203b85 100644
+--- a/src/cloud/ConfigApply.cpp
++++ b/src/cloud/ConfigApply.cpp
+@@ -1,12 +1,15 @@
+ #include "cloud/Cloud.h"
+ 
+ #include "../Config.h"
++#include "../ResetCause.h"
+ #include "power/ChargeInhibitPolicy.h"
+ #include "persist/PowerConfig.h"
+ #include "persist/SystemConfig.h"
+ 
+ namespace {
+ 
++bool timezoneStored = false;
++
+ bool getTopLevelMap(const LedgerData &ledger, const char *key, Variant &section) {
+     if (!ledger.has(key)) {
+         return false;
+@@ -141,12 +144,17 @@ bool Cloud::applyConfigurationFromLedger(const LedgerData &defaults, const Ledge
+     if (success) {
+         const bool anyChanged = sensorChanged || timingChanged || messagingChanged || modesChanged || reportingChanged || powerChanged;
+ 
+-        // Do not force synchronous storage flushes here; they can exceed the
+-        // 100 ms loop budget. Persistence is handled by SystemConfig::loop() and
+-        // SystemConfig::SensorSettings::loop() (called from the main loop).
++        // Do not force synchronous storage flushes here (they can exceed the
++        // 100 ms loop budget) except before the one-off timezone reset below;
++        // otherwise SystemConfig::loop() persists lazily.
+         SystemConfig::validateStoredData();
+         SystemConfig::SensorSettings::validateStoredData();
+ 
++        if (timezoneStored) {
++            SystemConfig::flushNow();
++            System.reset(RESET_CAUSE_TIMEZONE_CHANGE);
++        }
++
+         // Defer device-status publishing to Cloud::loop() so it doesn't
+         // execute inside CONNECTING_STATE or async callbacks.
+         if (anyChanged) {
+@@ -253,6 +261,7 @@ bool Cloud::applyTimingConfig(const LedgerData &defaults, const LedgerData &devi
+             if (strcmp(SystemConfig::get_timeZoneStrCStr(), timezone) != 0) {
+                 SystemConfig::set_timeZoneStr(timezone);
+                 Log.info("Config: Timezone -> %s", timezone);
++                timezoneStored = true;
+                 changed = true;
+             }
+         } else {
+diff --git a/tests/reset_cause_structural_test.py b/tests/reset_cause_structural_test.py
+index 442ff51..3690355 100644
+--- a/tests/reset_cause_structural_test.py
++++ b/tests/reset_cause_structural_test.py
+@@ -26,21 +26,27 @@ what can be pinned is the shape:
+ Comments are stripped before each check so prose mentioning `System.reset()`
+ cannot produce a false positive or a false negative.
+ """
++import os
+ import re
+ import sys
+ from pathlib import Path
+ 
+-REPO_ROOT = Path(__file__).resolve().parent.parent
++REPO_ROOT = Path(os.environ.get("RESET_CAUSE_ROOT") or Path(__file__).resolve().parent.parent)
+ SRC = REPO_ROOT / "src"
+ RESET_CAUSE_HEADER = SRC / "ResetCause.h"
+ MAIN = SRC / "Generalized-Core-Counter.cpp"
+ 
+-EXPECTED_SITE_COUNT = 7
++EXPECTED_SITE_COUNT = 8
+ 
+ # WO-2026-10-02-003 item B: the out-of-memory reset must carry its own code.
+ OOM_CAUSE_NAME = "RESET_CAUSE_OUT_OF_MEMORY"
+ OOM_CAUSE_VALUE = 7
+ 
++# WO-2026-11-02-004: a changed timezone stored by ConfigApply resets with its own code.
++TZ_CAUSE_NAME = "RESET_CAUSE_TIMEZONE_CHANGE"
++TZ_CAUSE_VALUE = 8
++TZ_SITE = SRC / "cloud" / "ConfigApply.cpp"
++
+ 
+ def fail(msg: str) -> None:
+     print(f"FAIL: {msg}", file=sys.stderr)
+@@ -131,6 +137,18 @@ def main() -> None:
+             "handler's reset must name itself (WO-2026-10-02-003 item B)"
+         )
+ 
++    # --- The timezone-change site carries code 8, in ConfigApply.cpp ----------
++    if declared.get(TZ_CAUSE_NAME) != TZ_CAUSE_VALUE:
++        fail(
++            f"ResetCause.h must declare {TZ_CAUSE_NAME} = {TZ_CAUSE_VALUE} "
++            f"(found {declared.get(TZ_CAUSE_NAME)!r})"
++        )
++    if used.get(TZ_CAUSE_NAME, "").split(":")[0] != str(TZ_SITE.relative_to(REPO_ROOT)):
++        fail(
++            f"the {TZ_CAUSE_NAME} reset must be issued from {TZ_SITE.relative_to(REPO_ROOT)} "
++            f"(found {used.get(TZ_CAUSE_NAME)!r}; WO-2026-11-02-004)"
++        )
++
+     # --- The startup status still publishes the code -------------------------
+     main_src = strip_comments(MAIN.read_text())
+     if "System.resetReasonData()" not in main_src:
