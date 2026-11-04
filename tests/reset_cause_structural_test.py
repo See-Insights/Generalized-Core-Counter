@@ -35,11 +35,15 @@ SRC = REPO_ROOT / "src"
 RESET_CAUSE_HEADER = SRC / "ResetCause.h"
 MAIN = SRC / "Generalized-Core-Counter.cpp"
 
-EXPECTED_SITE_COUNT = 7
+EXPECTED_SITE_COUNT = 8
 
 # WO-2026-10-02-003 item B: the out-of-memory reset must carry its own code.
 OOM_CAUSE_NAME = "RESET_CAUSE_OUT_OF_MEMORY"
 OOM_CAUSE_VALUE = 7
+
+# WO-2026-11-04-002: the Device OS RTC binding delete resets with its own code.
+BINDING_DELETE_CAUSE_NAME = "RESET_CAUSE_EXRTC_BINDING_DELETE"
+BINDING_DELETE_CAUSE_VALUE = 8
 
 
 def fail(msg: str) -> None:
@@ -130,6 +134,18 @@ def main() -> None:
             f"no System.reset() site passes {OOM_CAUSE_NAME}; the out-of-memory "
             "handler's reset must name itself (WO-2026-10-02-003 item B)"
         )
+
+    # --- The binding-delete site carries code 8, and the code is documented ---
+    if declared.get(BINDING_DELETE_CAUSE_NAME) != BINDING_DELETE_CAUSE_VALUE:
+        fail(
+            f"ResetCause.h must declare {BINDING_DELETE_CAUSE_NAME} = {BINDING_DELETE_CAUSE_VALUE} "
+            f"(found {declared.get(BINDING_DELETE_CAUSE_NAME)!r})"
+        )
+    if BINDING_DELETE_CAUSE_NAME not in used:
+        fail(f"no System.reset() site passes {BINDING_DELETE_CAUSE_NAME} (WO-2026-11-04-002)")
+    for name in declared:
+        if not re.search(rf"{name}\s*=\s*\d+,\s*///<\s*\S", RESET_CAUSE_HEADER.read_text()):
+            fail(f"{name} has no trailing `///<` description in ResetCause.h")
 
     # --- The startup status still publishes the code -------------------------
     main_src = strip_comments(MAIN.read_text())
