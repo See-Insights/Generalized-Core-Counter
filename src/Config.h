@@ -27,7 +27,8 @@ enum Source : uint8_t {
 	CONFIG_SOURCE_LEDGER = 2,
 };
 
-constexpr const char *DEFAULT_TIMEZONE = "UTC0";
+// Mirrors the product 42131 default time zone (Eastern).
+constexpr const char *DEFAULT_TIMEZONE = "EST5EDT,M3.2.0/2:00:00,M11.1.0/2:00:00";
 constexpr uint8_t DEFAULT_OPEN_HOUR = 6;
 constexpr uint8_t DEFAULT_CLOSE_HOUR = 22;
 constexpr uint16_t DEFAULT_REPORT_INTERVAL_SEC = 3600;
