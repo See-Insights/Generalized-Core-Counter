@@ -63,7 +63,7 @@ Three blockers; round 2 (the last) follows the fixes.
    - **Straddler:** the first predicate evaluation re-arms `lastOccupancyEvent`, so with no PIR after the reboot the straddler credits first-evaluation millis + 300 s, about **301 s** (not 236 s); a PIR before expiry gives last PIR since boot + 300 s. 236 s reproduces only with a 60 s debounce and PIRs to 176 s after boot. 536 s would mean a one-debounce fallback crept in (pre-boot part counted).
    - Item 15: if the persisted `occupied` is lost, there is no straddler and the credit is zero.
 
-## Amendment 3 (PROPOSED by the controller, 4 Nov 2026, after Stage 7 round 2; awaiting the architect's ruling): the bench pass rule is a formula on measured pieces
+## Amendment 3 (proposed by the controller, 4 Nov 2026, after Stage 7 round 2; **APPROVED by the architect, 4 Nov**): the bench pass rule is a formula on measured pieces
 Stage 7 round 2 (`WO-2026-11-03-006-stage7-r2-verdict.md`, NOT VERIFIED on `bb6e75d8`) verified the implementation (stale-field fix on every open/close path, wall checks confined to trusted pieces, 109/109, six independent mutants caught, linkage) and kept **one blocking acceptance-spec finding**: the fixed figures of Amendment 2 are nominal, not a deterministic pass rule. The straddler credits `floor((firstEvaluationMs − setupStartMs + 300000) / 1000)`, which is 301 s only when the setup-to-first-evaluation gap is 1,000-1,999 ms (setup can add up to 31.9 s of explicit delay, plus unbounded synchronous work that feeds the watchdog); bench sessions run 569-581 s, not exactly 570; `dailyoccupancy` is `floor(totalSeconds / 60)`.
 **Proposed pass rule (Dev-14, Chip):**
 - **Pre-boundary control:** `dailyoccupancy` equals `floor(S / 60)` where `S` is the sum of the first ten measured clean pieces (each from its `Occ` open and close log lines; expect 569-581 s each).
@@ -72,3 +72,6 @@ Stage 7 round 2 (`WO-2026-11-03-006-stage7-r2-verdict.md`, NOT VERIFIED on `bb6e
 - Nominal examples for ten or eleven exact 570 s pieces and a 1 s gap: 95 / 90 min before the boundary, 104 / 100 at the close report (v45 credited 205).
 - Fault pass also requires: a close in every 630 s gap (never one 20-minute session), and the straddler credits post-boot time only.
 **Disposition requested:** approve Amendment 3. Stage 7 then closes by architect ruling with no round 3: the code at `bb6e75d8` is verified; the only blocker was the bench criteria text.
+
+**Architect ruling (4 Nov): Amendment 3 approved.** The bench pass rule is a formula on measured pieces: `dailyoccupancy` = floor of the measured sum / 60 (control: ten measured clean pieces; fault: measured straddler + nine clean pieces; close report: add the measured eleventh piece); the straddler is about 301 s, and **about 536 s means a fallback crept in**; a close in every 630 s gap. **Stage 7 closes by architect ruling on `bb6e75d8` (code verified in round 2); no round 3.**
+**Hold (architect correction, 4 Nov): releases tag `main`, so C1 (WO-2026-11-03-004) and C2 do not merge until v49 is tagged.** Both PRs are held (draft, label "v50: merge after the v49 tag"); they ship in v50.
