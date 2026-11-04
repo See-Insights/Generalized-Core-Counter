@@ -125,6 +125,9 @@ void publishStateTransition();
  */
 void transitionTo(State newState, const char *reason);
 
+/// Forces current, sysStatus, sensor stores and the publish queue to flash; call just before a deliberate reset.
+void flushAllBeforeReset();
+
 /**
  * @brief Runs once-per-day maintenance work after time is available.
  */

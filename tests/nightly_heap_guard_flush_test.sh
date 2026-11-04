@@ -56,6 +56,9 @@ struct FakeSystem {
 
 FakeSystem System;
 
+// WO-2026-11-03-005: the stores and queue are flushed after the diagnostics batch, just before the reset.
+void flushAllBeforeReset() { callOrder.push_back("flushAllBeforeReset"); }
+
 namespace PowerDiagnostics {
 void flushDiagBatch() { callOrder.push_back("PowerDiagnostics::flushDiagBatch"); }
 } // namespace PowerDiagnostics
@@ -94,17 +97,19 @@ CPP
       cat <<'CPP'
   // ENABLE_DIAGNOSTICS_PUBLISH_MODE=1 build: flush must be called, and must
   // precede the reset.
-  assert(callOrder.size() == 2);
+  assert(callOrder.size() == 3);
   assert(callOrder[0] == "PowerDiagnostics::flushDiagBatch");
-  assert(callOrder[1] == "System.reset");
+  assert(callOrder[1] == "flushAllBeforeReset");
+  assert(callOrder[2] == "System.reset");
   std::cout << "Nightly heap-guard flush-before-reset test passed (flag=1)\n";
 CPP
     else
       cat <<'CPP'
   // ENABLE_DIAGNOSTICS_PUBLISH_MODE=0 (default/shipped) build: the flush
   // call site is compiled out entirely (fix #3), so only the reset happens.
-  assert(callOrder.size() == 1);
-  assert(callOrder[0] == "System.reset");
+  assert(callOrder.size() == 2);
+  assert(callOrder[0] == "flushAllBeforeReset");
+  assert(callOrder[1] == "System.reset");
   std::cout << "Nightly heap-guard reset-only test passed (flag=0)\n";
 CPP
     fi
