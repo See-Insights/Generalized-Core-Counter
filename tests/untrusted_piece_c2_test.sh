@@ -6,13 +6,14 @@
 # updateOccupancyState() are extracted from the sources and driven against
 # fakes: the Dev-09 replay (23-24 Oct), the reboot straddler (post-boot part
 # only), a piece that keeps millis() when trust returns, a trusted piece that is
-# unchanged, and a fresh piece after each close. The piece-open and boot sites
+# unchanged, a fresh piece after each close (both piece fields cleared at close
+# and set by every open path), and no wall-start check on a piece. The piece-open and boot sites
 # (not drivable without the whole application) are exact-text checks. Every
 # mutation in the WO must fail this test.
 set -euo pipefail
 
 repo_root="${0:A:h:h}"
-work="$repo_root/build-tmp/wo-2026-11-03-006-stage6/c2_test"
+work="$repo_root/build-tmp/wo-2026-11-03-006-stage6-r2/c2_test"
 mkdir -p "$work"
 src="$repo_root/src"
 
@@ -33,9 +34,9 @@ check_structure() {  # $1 = src root
   local r="$1" modes="$1/state/State_Modes.cpp" app="$1/Generalized-Core-Counter.cpp"
   local open_pair
   open_pair=$'session.occupancyStartMs = millis();\n'
-  python3 - "$modes" "$app" "$r/state/StateMachine.h" <<'PY'
+  python3 - "$modes" "$app" "$r/state/StateMachine.h" "$r/state/State_Report.cpp" <<'PY'
 import re, sys
-modes, app, sm = (open(p).read() for p in sys.argv[1:4])
+modes, app, sm, report = (open(p).read() for p in sys.argv[1:5])
 def need(cond, msg):
     if not cond:
         print("FAILED:", msg); sys.exit(1)
@@ -46,6 +47,9 @@ need(len(pat.findall(modes)) == 2, "both piece-open sites must set occupancyStar
 need("OCCUPANCY && (signalLEDStatus() || (session.pieceUntrusted && CurrentReadings::get_occupied())) && debounceRemainingMs() == 0" in modes, "the wake close must also fire for an open untrusted piece")
 # The reboot straddler: untrusted piece starting at boot (millis() 0), no B3 anchor for it.
 need("session.pieceUntrusted = CurrentReadings::get_occupied() && !Clock::isTrusted();" in app, "setup() must mark an open session at an untrusted boot as an untrusted piece")
+need("session.occupancyStartMs = millis();  // straddler" in app, "the boot restore must set occupancyStartMs = millis()")
+# The close==24 boundary reopen is a trusted piece: it sets both fields.
+need(re.search(r"set_occupancyStartTime\(std::max\(boundary, originalSessionStart\)\);\n\s*session\.occupancyStartMs = millis\(\); session\.pieceUntrusted = !Clock::isTrusted\(\);", report) is not None, "the boundary reopen must set occupancyStartMs = millis() and pieceUntrusted = !Clock::isTrusted()")
 need("session.occupancySessionBootAnchor = CurrentReadings::get_occupied() && !session.pieceUntrusted" in app, "the B3 boot anchor must stay for a trusted boot only")
 need("pre-boot part dropped" in app, "setup() must log the dropped straddler part")
 # RAM only.
@@ -154,6 +158,12 @@ void pir() {
   }
   CurrentReadings::lastEvt = millis();
 }
+// The close==24 boundary reopen in State_Report.cpp (text-checked): a trusted piece.
+void boundaryReopen() {
+  CurrentReadings::set_occupied(true);
+  CurrentReadings::set_occupancyStartTime(g_now);
+  session.occupancyStartMs = millis(); session.pieceUntrusted = !Clock::isTrusted();
+}
 // One loop pass per second of real time; epoch and millis() advance together.
 void run(long seconds) { for (long i = 0; i < seconds; ++i) { g_now += 1; g_millis += 1000; updateOccupancyState(); state = IDLE_STATE; } }
 void reset() {  // a reboot with a persisted open session: setup() clears lastEvt, millis() restarts
@@ -197,7 +207,7 @@ void testRebootStraddlerCreditsPostBootOnly() {
   assert(CurrentReadings::total == 301);
   assert(Log.count("Occ: untrusted piece credit=301") == 1);
 
-  // The WO's 236 s case: 60 s debounce, PIR pulses continue 176 s after the reboot.
+  // The 236 s case (only with a 60 s debounce, not the 300 s Dev-14 setting): 60 s debounce, PIR pulses continue 176 s after the reboot.
   world(60000);
   for (int i = 0; i < 11; ++i) { pir(); run(30); }       // 0..330 s, session open
   reset();
@@ -210,8 +220,15 @@ void testDev09Replay() {
   // Control: ten pieces close by 14:00 (the eleventh opens at 13:55:21), each its own 570 s.
   world(300000);
   for (int k = 0; k < 10; ++k) { session_of(10); gap(1200, 300); }
-  assert(CurrentReadings::total == 5700);                 // 95.0 min; v45 credited 205 min for this window
-  assert(CurrentReadings::total < 100 * 60);
+  assert(CurrentReadings::total == 5700);                 // pre-boundary checkpoint (14:00): 95.0 min; v45 credited 205 min
+  {  // the eleventh piece (opened 13:55:21) at the close report after trust returns past the boundary: full 570 s
+    session_of(10);
+    Clock::trusted = true; Clock::open = Clock::Openness::Closed; DailyBoundary::boundary = g_now - 9;
+    const OccupancyCloseResult r = closeOccupancySessionSafely("daily-cleanup", DailyBoundary::boundary);
+    assert(r.valid && r.sessionSeconds == 570);
+    assert(CurrentReadings::total == 6270);               // 104.5 min (payload 104)
+    Clock::open = Clock::Openness::Unknown;
+  }
   // Fault pass: reset 334 s into the first piece (after its last pulse at 270 s); the other nine are whole.
   world(300000);
   session_of(10);                                         // 300 s: pulses to 270 s, piece open
@@ -219,9 +236,14 @@ void testDev09Replay() {
   reset();
   gap(1200 - 334, 0);                                     // no PIR after the reboot: the straddler closes post-boot
   for (int k = 1; k < 10; ++k) { session_of(10); gap(1200, 300); }
-  assert(CurrentReadings::total == 301 + 9 * 570);        // 90.5 min, never the 205 of the merged span
+  assert(CurrentReadings::total == 301 + 9 * 570);        // pre-boundary: 5,431 s = 90.5 min, never the 205 of the merged span
   assert(Log.count("Occ: untrusted piece credit=301") == 1);
   assert(unoccupied == 10);
+  session_of(10);                                         // the eleventh piece, closed at the report after the boundary
+  Clock::trusted = true; Clock::open = Clock::Openness::Closed; DailyBoundary::boundary = g_now - 9;
+  assert(closeOccupancySessionSafely("daily-cleanup", DailyBoundary::boundary).sessionSeconds == 570);
+  assert(CurrentReadings::total == 6001);                 // 100.0 min (payload 100)
+  Clock::open = Clock::Openness::Unknown;
 }
 
 // Trust returns while the piece is open: the wall clock jumps, the credit stays on millis().
@@ -248,15 +270,53 @@ void testTrustedPieceUnchanged() {
   assert(Log.count("untrusted piece") == 0);
 }
 
+// Close clears both piece fields; the boundary reopen (a trusted piece) and a fresh open set them.
+void testClosedPieceClearsFieldsAndReopenSetsThem() {
+  world(300000);
+  pir(); run(400);
+  assert(!CurrentReadings::occupied && !session.pieceUntrusted && session.occupancyStartMs == 0);
+  Clock::trusted = true; g_millis += 12345;
+  boundaryReopen();
+  assert(CurrentReadings::occupied && !session.pieceUntrusted && session.occupancyStartMs == g_millis);
+  CurrentReadings::lastEvt = g_millis;
+  run(400);                                              // trusted: credits the wall span 0..300 + 100 elapsed
+  assert(!CurrentReadings::occupied && CurrentReadings::total == 300 + 300);
+  assert(Log.count("untrusted piece credit") == 1);      // only the first, untrusted piece used millis
+}
+
+// Wall-start checks belong to the trusted wall path only (a piece is wholly on millis()).
+void testPieceIgnoresWallStartChecks() {
+  world(300000);
+  pir(); run(60); pir();
+  Clock::trusted = true; g_now -= 36000;                 // ten-hour backward correction
+  run(1000);
+  assert(!CurrentReadings::occupied && CurrentReadings::total == 360);
+  world(300000);
+  pir(); run(60); pir();
+  CurrentReadings::occupancyStartTime = 0;               // zero wall start
+  Clock::trusted = true;
+  run(1000);
+  assert(!CurrentReadings::occupied && CurrentReadings::total == 360);
+  // A trusted piece with a backward step is still discarded; so is a trusted zero start.
+  world(300000);
+  Clock::trusted = true;
+  pir(); run(60); pir(); g_now -= 36000; run(1000);
+  assert(!CurrentReadings::occupied && CurrentReadings::total == 0 && Log.count("OccAnom") == 1);
+  world(300000);
+  Clock::trusted = true;
+  pir(); CurrentReadings::occupancyStartTime = 0; run(1000);
+  assert(!CurrentReadings::occupied && CurrentReadings::total == 0 && Log.count("OccAnom") == 1);
+}
+
 // A fresh piece after each close: its start is its own (millis and flag are not carried over).
 void testNextPieceStartsClean() {
   world(300000);
-  pir(); run(400);
+  pir(); const uint32_t before = session.occupancyStartMs; run(400);
   assert(!CurrentReadings::occupied && CurrentReadings::total == 300);
   run(5000);
-  const uint32_t before = session.occupancyStartMs;
-  pir(); run(400);
+  pir();
   assert(session.occupancyStartMs > before + 5000000UL);
+  run(400);
   assert(CurrentReadings::total == 600);                 // not 300 + 5300
 }
 
@@ -286,6 +346,8 @@ int main() {
   testRebootStraddlerCreditsPostBootOnly();
   testPieceOpenedUntrustedKeepsMillisWhenTrustReturns();
   testTrustedPieceUnchanged();
+  testClosedPieceClearsFieldsAndReopenSetsThem();
+  testPieceIgnoresWallStartChecks();
   testNextPieceStartsClean();
   testNoReportInQuietModes();
   testBoundaryCloseOfAnUntrustedPiece();
@@ -305,6 +367,7 @@ mutate() {  # name file old new
   rm -rf "$m"; mkdir -p "$m/state"
   cp "$src/state/State_Common.h" "$src/state/State_Modes.cpp" "$src/state/StateMachine.h" "$m/state/"
   cp "$src/Generalized-Core-Counter.cpp" "$m/"
+  cp "$src/state/State_Report.cpp" "$m/state/"
   python3 - "$m/$file" "$old" "$new" <<'PY'
 import sys
 p, old, new = sys.argv[1:]
@@ -339,5 +402,13 @@ mutate "drop the report call" state/State_Modes.cpp "if (reportNow && !closeResu
 mutate "reuse the old piece's start (awake open)" state/State_Modes.cpp $'\n      session.occupancyStartMs = millis();\n' $'\n'
 mutate "straddler not marked at boot" Generalized-Core-Counter.cpp "session.pieceUntrusted = CurrentReadings::get_occupied() && !Clock::isTrusted();" "session.pieceUntrusted = false;"
 mutate "wake close gated on the LED again" state/State_Modes.cpp "(signalLEDStatus() || (session.pieceUntrusted && CurrentReadings::get_occupied()))" "signalLEDStatus()"
+
+mutate "close leaves the piece start stale" state/State_Common.h "session.pieceUntrusted = false; session.occupancyStartMs = 0;" "session.pieceUntrusted = false;"
+mutate "close leaves the piece flag set" state/State_Common.h "session.pieceUntrusted = false; session.occupancyStartMs = 0;" "session.occupancyStartMs = 0;"
+mutate "boundary reopen without the piece fields" state/State_Report.cpp "      session.occupancyStartMs = millis(); session.pieceUntrusted = !Clock::isTrusted();  // trusted piece
+" ""
+mutate "boot restore without occupancyStartMs" Generalized-Core-Counter.cpp " session.occupancyStartMs = millis();  // straddler" "  // straddler"
+mutate "restore start==0 check for pieces" state/State_Common.h "bool invalid = !piece && (!timeValid || start == 0);" "bool invalid = (!timeValid && !piece) || start == 0;"
+mutate "restore start>now+5 check for pieces" state/State_Common.h "if (!piece && timeValid && start > now + 5) {" "if (timeValid && start > now + 5) {"
 
 print "untrusted_piece_c2_test: Dev-09 replay, straddler, trust-return, trusted-unchanged and all mutations detected"

@@ -395,7 +395,7 @@ inline OccupancyCloseResult closeOccupancySessionSafely(const char *path, time_t
 	bool durationComputable = false;
 	long long rawSessionSeconds = 0;
 	uint32_t sessionSeconds = 0;
-	bool invalid = (!timeValid && !piece) || start == 0;
+	bool invalid = !piece && (!timeValid || start == 0);
 
 	if (piece) {
 		rawSessionSeconds = (CurrentReadings::get_lastOccupancyEvent() - session.occupancyStartMs + occupancyDebounceMs()) / 1000UL;
@@ -413,7 +413,7 @@ inline OccupancyCloseResult closeOccupancySessionSafely(const char *path, time_t
 		durationComputable = true;
 	}
 
-	if (timeValid && start > now + 5) {
+	if (!piece && timeValid && start > now + 5) {
 		invalid = true;
 	}
 
@@ -451,7 +451,7 @@ inline OccupancyCloseResult closeOccupancySessionSafely(const char *path, time_t
 	}
 
 	CurrentReadings::set_occupied(false);
-	session.pieceUntrusted = false;
+	session.pieceUntrusted = false; session.occupancyStartMs = 0;
 	CurrentReadings::set_occupancyStartTime(0);
 	return result;
 }
