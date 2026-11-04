@@ -54,3 +54,12 @@ Revert the PR; v48 behavior returns; no data to migrate.
 3. **The failsafe's `SystemConfig::flushNow()` is replaced by the new call** (after the stage/action/count record is written), not kept as well.
 4. **Provisional time limits accepted** (each store 250 ms, queue 2 s); the bench measures them and the WO records the figures.
 5. **PRs:** no PR for the draft; this WO goes with its implementation PR. Agents and budget unchanged: Copilot standard/medium; Codex `gpt-5.6-sol` xhigh, §4 SHA rule, at most two rounds; `src/` ≤ +20.
+
+## Closing record (architect ruling, 4 Nov 2026): Stage 7 closes after round 1, no round 2
+Stage 7 round 1 (`WO-2026-11-03-005-stage7-r1-verdict.md`, Codex `gpt-5.6-sol` xhigh, 108/108 sh via zsh, py via python3, on `5e5e72e5f09f41efb61e10f3c7effccd286f5bcb`) returned NOT VERIFIED with two blockers. The architect closed both by ruling; no round 2.
+- **B1: accepted as a documented exception.** `writeQueueToFiles()` persists only `ramQueue` (`PublishQueuePosixRK.cpp:121`); an event already moved to `curEvent` when publishing starts (`:301`) is not written, so **at most one in-flight event can be lost per deliberate reset**. The library's own reset callback has the same gap (`:402`). **Fix, if `lib/` is ever touched: write `curEvent` too.** The change here keeps the WO's "no `lib/` change".
+- **B2: accepted as a note.** The queue's file path is built with `String` (`SequentialFileRK.cpp:127`, `realloc` in Device OS 6.6.0): a short allocation on a reset path with heap headroom (the heap guard resets at 45 KB). OOM is excluded from the flush by ruling.
+- **Budget:** `src/` +21 stands (the excess is the one-line doc comment on the declaration in `StateMachine.h:126`).
+- **What was verified:** the helper's order (C, S, N, then Q), all three facades, the seven call sites and nothing between flush and action, the exclusions (OOM, the two hardware watchdogs, the ApplicationWatchdog callback, HIBERNATE), no other deliberate-reset site missed, layouts and `lib/` unchanged, eight mutations caught, seven `bl flushAllBeforeReset()` and none in `loop()` (Stage 7 notes N1-N6).
+- **Not measured, bench (Chip, Dev-14):** flush durations against the proposed ceilings (250 ms per store, 2 s queue); reboot checks per site; two nightly hibernates and an OTA in progress. The PR states these as pending.
+- **Docs updated with this PR:** `docs/recovery-architecture.md` ("Deliberate resets and persistence"), `docs/reference/alert-codes.md` row 18, recovery plan item 26.
