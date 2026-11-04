@@ -26,6 +26,7 @@ void setup();
 
 /// Forwards to currentStatusData::loop() - deferred flush servicing.
 void loop();
+void flushNow();  // forwards to flush(true): synchronous forced write
 
 /**
  * @brief Zero the counts for a new day.

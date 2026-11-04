@@ -645,6 +645,7 @@ bool nightlyHeapGuard(bool overnightFallbackSleep) {
 #if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
       PowerDiagnostics::flushDiagBatch();
 #endif
+      flushAllBeforeReset();
       System.reset(RESET_CAUSE_SLEEP_HEAP_GUARD);
       return true;
     }
@@ -906,6 +907,7 @@ bool sleepAndResume(int wakeInSeconds, bool useNetworkStandby, const char *sleep
 #if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
         PowerDiagnostics::flushDiagBatch();
 #endif
+        flushAllBeforeReset();
         System.reset(RESET_CAUSE_SLEEP_ATTEMPTS_EXHAUSTED);
         
         // Should never reach here, but set ERROR_STATE as fallback
