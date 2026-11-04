@@ -172,8 +172,8 @@ jobs:
           [ "$(sha256sum "$bin" | cut -d' ' -f1)" = "$WANT_SHA" ] || { echo "::error::artifact SHA-256 differs from the firmware job's"; exit 1; }
           api=repos/$GITHUB_REPOSITORY/git; ref=$(gh api "$api/ref/tags/$TAG" --jq '.object.type + " " + .object.sha')
           [ "${ref%% *}" = tag ] || { echo "::error::$TAG is not an annotated tag"; exit 1; }
-          msg=$(gh api "$api/tags/${ref##* }" --jq .message); d=$(openssl rand -hex 8)
-          { echo "bin=$bin"; echo "version=$ver"; echo "title=$TAG: ${msg%%$'\n'*}"; echo "description<<$d"; tail -n +2 <<<"$msg"; echo "$d"; } >> "$GITHUB_OUTPUT"
+          msg=$(gh api "$api/tags/${ref##* }" --jq .message); d=$(openssl rand -hex 8); grep -qx -- '---' <<<"$msg" || { echo "::error::tag message has no --- line"; exit 1; }
+          { echo "bin=$bin"; echo "version=$ver"; echo "title=Development Release - $TAG"; echo "description<<$d"; sed '/^---$/,$d' <<<"$msg"; echo; echo "[GitHub Release]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG)"; echo "$d"; } >> "$GITHUB_OUTPUT"
       - uses: particle-iot/firmware-upload-action@9e393d6b362208488db91339ab72ee1d7e2e6ada # v1.0.4
         with: {particle-access-token: "${{ secrets.PARTICLE_ACCESS_TOKEN }}", firmware-path: "${{ steps.meta.outputs.bin }}", firmware-version: "${{ steps.meta.outputs.version }}",
           product-id: 42131, title: "${{ steps.meta.outputs.title }}", description: "${{ steps.meta.outputs.description }}"}
