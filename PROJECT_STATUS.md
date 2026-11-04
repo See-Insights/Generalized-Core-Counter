@@ -231,7 +231,7 @@ The firmware uses two distinct version identifiers:
 
 ## Human-Readable Version (String)
 
-- Defined in `src/Version.cpp` as `FIRMWARE_VERSION`
+- Defined in `src/FirmwareVersion.h` as `FIRMWARE_VERSION`
 - Human-readable string `v<major>.<iteration>[-name]` (e.g., "v49.1-Name")
 - Used for logging, status reporting, cloud status, and user documentation
 - Each iteration (v49.1, v49.2, ...) has its own PRODUCT_VERSION; the iteration that passes its soak is the release, with no rebuild
@@ -245,7 +245,7 @@ Use `bump_version.sh` to update version metadata:
 ```
 
 This script automatically updates:
-- `FIRMWARE_VERSION` and `FIRMWARE_RELEASE_NOTES` in `src/Version.cpp`
+- `FIRMWARE_VERSION` in `src/FirmwareVersion.h` (release notes go to `CHANGELOG.md`)
 - `FIRMWARE_PRODUCT_VERSION` in `src/FirmwareVersion.h`
 - Doxygen `PROJECT_NUMBER` in `Doxyfile`
 - Version header in `README.md`

@@ -62,10 +62,19 @@ jobs:
     outputs:
       sha256: ${{ steps.rec.outputs.sha256 }}
       digest: ${{ steps.rec.outputs.digest }}
+      os: ${{ steps.props.outputs.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Tag matches source FIRMWARE_PRODUCT_VERSION (before building)
+        if: github.ref_type == 'tag'
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF_NAME" =~ ^v([0-9]{1,2})\.([0-9]{1,2})$ ]] || { echo "::error::tag '$GITHUB_REF_NAME' is not v<major>.<iteration> (1-2 digits each)"; exit 1; }
+          want=$((10#${BASH_REMATCH[1]} * 100 + 10#${BASH_REMATCH[2]}))
+          got=$(sed -n 's/^#define FIRMWARE_PRODUCT_VERSION *//p' src/FirmwareVersion.h)
+          [ "$got" = "$want" ] || { echo "::error::source FIRMWARE_PRODUCT_VERSION '$got' != $want from tag $GITHUB_REF_NAME; not building"; exit 1; }
       - name: Read Device OS version from project.properties
         id: props
         run: echo "os=$(sed -n 's/^deviceOS=//p' project.properties)" >> "$GITHUB_OUTPUT"
@@ -75,14 +84,6 @@ jobs:
         with:
           particle-platform-name: boron
           device-os-version: ${{ steps.props.outputs.os }}
-      - name: Job summary
-        run: |
-          {
-            echo "device-os-version: ${{ steps.compile.outputs.device-os-version }}"
-            # The action's firmware-version output is unreliable (reported 24 for product version 48).
-            echo "firmware-product-version: $(sed -n 's/^#define FIRMWARE_PRODUCT_VERSION *//p' src/FirmwareVersion.h)"
-            echo "buildpack-image: $(docker image inspect particle/buildpack-particle-firmware:${{ steps.props.outputs.os }}-boron --format '{{join .RepoDigests ","}}')"
-          } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: firmware-boron
@@ -96,73 +97,58 @@ jobs:
           BIN: ${{ steps.compile.outputs.firmware-path }}
           OS: ${{ steps.props.outputs.os }}
         run: |
-          echo "sha256=$(sha256sum "$BIN" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-          echo "digest=$(docker image inspect "particle/buildpack-particle-firmware:$OS-boron" --format '{{join .RepoDigests ","}}')" >> "$GITHUB_OUTPUT"
-
-  inspect:
-    if: github.ref_type == 'tag'
-    needs: firmware
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      version: ${{ steps.v.outputs.version }}
-    steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: firmware-boron
-          path: fw
-      - name: Check SHA-256, read the embedded version (no token, no install scripts)
-        id: v
+          set -euo pipefail
+          sha=$(sha256sum "$BIN" | cut -d' ' -f1)
+          digest=$(docker image inspect "particle/buildpack-particle-firmware:$OS-boron" --format '{{join .RepoDigests ","}}')
+          [ -n "$digest" ] || { echo "::error::buildpack image has no RepoDigest; cannot record it"; exit 1; }
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - name: Job summary
         env:
-          WANT: ${{ needs.firmware.outputs.sha256 }}
+          DIGEST: ${{ steps.rec.outputs.digest }}
         run: |
-          bin=$(find fw -name '*.bin')  # more than one .bin makes the hash check below fail
-          [ "$(sha256sum "$bin" | cut -d' ' -f1)" = "$WANT" ] || { echo "::error::artifact SHA-256 differs from the firmware job's"; exit 1; }
-          npm install --prefix "$RUNNER_TEMP/pcli" --ignore-scripts particle-cli@3.52.4
-          out=$("$RUNNER_TEMP/pcli/node_modules/.bin/particle" binary inspect "$bin")
-          echo "version=$(sed -n 's/.*firmware for product id [0-9]* at version \([0-9]*\).*/\1/p' <<<"$out")" >> "$GITHUB_OUTPUT"
+          {
+            echo "device-os-version: ${{ steps.compile.outputs.device-os-version }}"
+            # The action's firmware-version output is unreliable (reported 24 for product version 48).
+            echo "firmware-product-version: $(sed -n 's/^#define FIRMWARE_PRODUCT_VERSION *//p' src/FirmwareVersion.h)"
+            echo "buildpack-image: $DIGEST"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   publish:
     if: github.ref_type == 'tag'
-    needs: [host-tests, firmware, inspect]
+    needs: [host-tests, firmware]
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # this job only; the token is in the env of the gh release create step alone
-    env:
-      TAG: ${{ github.ref_name }}
-      WANT_SHA: ${{ needs.firmware.outputs.sha256 }}
-      GOT_VER: ${{ needs.inspect.outputs.version }}
-      DIGEST: ${{ needs.firmware.outputs.digest }}
-      TESTS: ${{ needs.host-tests.outputs.tests }}
+      contents: write  # this job only; the token is in the env of the one Release step alone
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: firmware-boron
           path: fw
-      - name: Guards, name, checksum
+      - name: Guards and Release (the only step with the write token)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          WANT_SHA: ${{ needs.firmware.outputs.sha256 }}
+          OS: ${{ needs.firmware.outputs.os }}
+          DIGEST: ${{ needs.firmware.outputs.digest }}
+          TESTS: ${{ needs.host-tests.outputs.tests }}
         run: |
           set -euo pipefail
           [[ "$TAG" =~ ^v([0-9]{1,2})\.([0-9]{1,2})$ ]] || { echo "::error::tag '$TAG' is not v<major>.<iteration> (1-2 digits each)"; exit 1; }
           want=$((10#${BASH_REMATCH[1]} * 100 + 10#${BASH_REMATCH[2]}))
-          [ "$(git cat-file -t "refs/tags/$TAG")" = tag ] || { echo "::error::$TAG is not an annotated tag"; exit 1; }
-          [ "$(git rev-parse "$TAG^{commit}")" = "$GITHUB_SHA" ] || { echo "::error::$TAG no longer points at $GITHUB_SHA"; exit 1; }
           bin=$(find fw -name '*.bin')
+          [ -n "$bin" ] && [ "$(wc -l <<<"$bin")" -eq 1 ] || { echo "::error::expected exactly one .bin"; exit 1; }
           [ "$(sha256sum "$bin" | cut -d' ' -f1)" = "$WANT_SHA" ] || { echo "::error::artifact SHA-256 differs from the firmware job's"; exit 1; }
-          [ "$GOT_VER" = "$want" ] || { echo "::error::embedded version '$GOT_VER' != $want from tag $TAG; no Release created"; exit 1; }
-          name="gcc-$TAG-boron-dos$(sed -n 's/^deviceOS=//p' project.properties)-${GITHUB_SHA::7}.bin"
+          name="gcc-$TAG-boron-dos$OS-${GITHUB_SHA::7}.bin"
           mv "$bin" "$name"
           sha256sum "$name" > "$name.sha256"
-          echo "NAME=$name" >> "$GITHUB_ENV"
-      - name: Release (the only step with the write token)
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 && { echo "::error::a Release for $TAG already exists; not modifying it"; exit 1; }
-          gh release create "$TAG" "$NAME" "$NAME.sha256" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --notes-from-tag
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "::error::a Release for $TAG already exists; not modifying it"; exit 1; fi
+          [ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.type)" = tag ] || { echo "::error::$TAG is not an annotated tag"; exit 1; }
+          tagsha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha)
+          [ "$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tagsha" --jq .object.sha)" = "$GITHUB_SHA" ] || { echo "::error::$TAG no longer points at $GITHUB_SHA"; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/git/tags/$tagsha" --jq .message > "$RUNNER_TEMP/notes.txt"
+          gh release create "$TAG" "$name" "$name.sha256" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.txt"
           printf '%s\n' "### Release $TAG" "- run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
-            "- commit: $GITHUB_SHA" "- bin: $NAME ($(stat -c%s "$NAME") bytes)" "- sha256: $WANT_SHA" \
-            "- embedded version: $GOT_VER" "- host tests: $TESTS" "- buildpack image digest: $DIGEST" >> "$GITHUB_STEP_SUMMARY"
+            "- commit: $GITHUB_SHA" "- bin: $name ($(stat -c%s "$name") bytes)" "- sha256: $WANT_SHA" \
+            "- source version: $want" "- host tests: $TESTS" "- buildpack image digest: $DIGEST" >> "$GITHUB_STEP_SUMMARY"
