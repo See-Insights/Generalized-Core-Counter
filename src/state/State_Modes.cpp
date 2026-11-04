@@ -130,20 +130,7 @@ void updateOccupancyState() {
     return; // Nothing to do if not occupied
   }
 
-  // V3.23: Occupancy debounce timeout comes from sensor.setting1
-  const uint32_t debounceMs = occupancyDebounceMs();
-
-  uint32_t lastEvent = CurrentReadings::get_lastOccupancyEvent();
-  if (lastEvent == 0) {
-    // If this is 0 (for example, occupancy set from a PIR wake path that
-    // didn't update lastOccupancyEvent), we must not immediately expire.
-    lastEvent = millis();
-    CurrentReadings::set_lastOccupancyEvent(lastEvent);
-  }
-  uint32_t timeSinceLastEvent = millis() - lastEvent;
-
-  // Check if debounce timeout has expired
-  if (timeSinceLastEvent > debounceMs) {
+  if (debounceRemainingMs() == 0) {
     const bool reportNow = reportsOccupancyChangesNow();
     const OccupancyCloseResult closeResult = closeOccupancySessionSafely("modes");
     if (closeResult.valid) {
@@ -166,8 +153,8 @@ void updateOccupancyState() {
 bool processSleepWakeEvent(bool pirWake) {
     // Check if LED timeout expired FIRST (before processing new PIR wake)
     // This ensures we don't immediately undo state changes from PIR processing
-    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
-      // LED timeout expired - debounce period elapsed without motion
+    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDStatus() && debounceRemainingMs() == 0) {
+      // Debounce period elapsed without motion (the millis predicate, not the LED's wall deadline)
       const bool reportNow = reportsOccupancyChangesNow();
       const OccupancyCloseResult closeResult = closeOccupancySessionSafely("sleep");
       signalLED(false);  // Turn off LED
