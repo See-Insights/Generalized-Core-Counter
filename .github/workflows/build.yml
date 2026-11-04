@@ -73,7 +73,7 @@ jobs:
           set -euo pipefail
           [[ "$GITHUB_REF_NAME" =~ ^v([0-9]{1,2})\.([0-9]{1,2})$ ]] || { echo "::error::tag '$GITHUB_REF_NAME' is not v<major>.<iteration> (1-2 digits each)"; exit 1; }
           want=$((10#${BASH_REMATCH[1]} * 100 + 10#${BASH_REMATCH[2]}))
-          got=$(sed -n 's/^#define FIRMWARE_PRODUCT_VERSION *//p' src/FirmwareVersion.h)
+          got=$(echo FIRMWARE_PRODUCT_VERSION | cc -E -P -x c++ -include src/FirmwareVersion.h - | tail -n 1)  # the active macro, as the compiler sees it
           [ "$got" = "$want" ] || { echo "::error::source FIRMWARE_PRODUCT_VERSION '$got' != $want from tag $GITHUB_REF_NAME; not building"; exit 1; }
       - name: Read Device OS version from project.properties
         id: props
