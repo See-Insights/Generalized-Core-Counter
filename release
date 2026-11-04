@@ -15,7 +15,6 @@ fi
 
 VERSION=""
 RELEASE_NOTES=""
-DO_TAG=0
 DRY_RUN=0
 ALLOW_DIRTY=0
 
@@ -23,12 +22,8 @@ ALLOW_DIRTY=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help)
-      echo "Usage: ./release [--tag] [--dry-run] [--allow-dirty]"
+      echo "Usage: ./release [--dry-run] [--allow-dirty]"
       exit 0
-      ;;
-    --tag)
-      DO_TAG=1
-      shift
       ;;
     --dry-run)
       DRY_RUN=1
@@ -48,7 +43,7 @@ done
 echo "Interactive release"
 echo
 
-read -r -p "Version (e.g. 3.24): " VERSION
+read -r -p "Version (e.g. 49.1): " VERSION
 if [ -z "$VERSION" ]; then
   echo "Error: version is required" >&2
   exit 1
@@ -60,15 +55,6 @@ if [ -z "$RELEASE_NOTES" ]; then
   exit 1
 fi
 
-# If --tag wasn't passed, ask
-if [ "$DO_TAG" -eq 0 ]; then
-  read -r -p "Create git tag v${VERSION}? [y/N] " ANSWER
-  case "$ANSWER" in
-    y|Y|yes|YES) DO_TAG=1;;
-    *) DO_TAG=0;;
-  esac
-fi
-
 echo
 read -r -p "Continue? [y/N] " ANSWER
 case "$ANSWER" in
@@ -78,9 +64,6 @@ esac
 
 ARGS=()
 ARGS+=("--yes")
-if [ "$DO_TAG" -eq 1 ]; then
-  ARGS+=("--tag")
-fi
 if [ "$DRY_RUN" -eq 1 ]; then
   ARGS+=("--dry-run")
 fi

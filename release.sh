@@ -5,12 +5,13 @@
 #
 # Usage:
 #   ./release.sh <version> <release-notes...>
-#   ./release.sh --tag <version> <release-notes...>
-#   ./release.sh --yes --tag <version> <release-notes...>
+#   ./release.sh --yes <version> <release-notes...>
 #   ./release.sh --dry-run <version> <release-notes...>
 #
 # Notes:
 # - Uses bump_version.sh (macOS/BSD sed).
+# - Does not tag. Tag afterwards with git tag -a; the tag push starts the
+#   release workflow (the commit step prints the exact command).
 # - Allows dirty working tree by default (pass --require-clean to block).
 
 set -euo pipefail
@@ -18,7 +19,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
-DO_TAG=0
 ASSUME_YES=0
 DRY_RUN=0
 ALLOW_DIRTY=1
@@ -26,10 +26,9 @@ ALLOW_DIRTY=1
 usage() {
   cat <<'EOF'
 Usage:
-  ./release.sh [--yes] [--tag] [--dry-run] [--allow-dirty] [--require-clean] <version> <release-notes...>
+  ./release.sh [--yes] [--dry-run] [--allow-dirty] [--require-clean] <version> <release-notes...>
 
 Options:
-  --tag         Create annotated git tag v<version> and push it
   --yes         Skip confirmation prompt
   --dry-run     Print commands but do not change anything
   --allow-dirty Allow running even if git status is not clean
@@ -51,10 +50,6 @@ while [ "$#" -gt 0 ]; do
     -h|--help)
       usage
       exit 0
-      ;;
-    --tag)
-      DO_TAG=1
-      shift
       ;;
     --yes)
       ASSUME_YES=1
@@ -134,7 +129,6 @@ if [ -z "$UPSTREAM" ]; then
 fi
 
 COMMIT_MSG="Release ${VERSION}: ${RELEASE_NOTES}"
-TAG_NAME="v${VERSION}"
 
 if [ "$ASSUME_YES" -ne 1 ]; then
   echo "About to:"
@@ -143,10 +137,6 @@ if [ "$ASSUME_YES" -ne 1 ]; then
   echo "  - generate Doxygen docs (docs/html)"
   echo "  - git commit -m '${COMMIT_MSG}'"
   echo "  - git push (${UPSTREAM})"
-  if [ "$DO_TAG" -eq 1 ]; then
-    echo "  - git tag -a ${TAG_NAME}"
-    echo "  - git push --tags"
-  fi
   echo
   if ! read -r -p "Continue? [y/N] " ANSWER; then
     ANSWER=""
@@ -173,20 +163,11 @@ else
   echo "Nothing staged to commit; skipping commit." >&2
 fi
 
-# Step 5: tag (optional)
-# Step 5: tag (optional)
-if [ "$DO_TAG" -eq 1 ]; then
-  if git rev-parse -q --verify "refs/tags/${TAG_NAME}" >/dev/null; then
-    echo "Error: tag ${TAG_NAME} already exists." >&2
-    exit 1
-  fi
-  run git tag -a "$TAG_NAME" -m "$COMMIT_MSG"
-fi
-
-# Step 6: push
+# Step 5: push
 run git push
-if [ "$DO_TAG" -eq 1 ]; then
-  run git push --tags
-fi
 
+# The tag is v<major>.<iteration> only; any -name suffix stays out of it.
+TAG_VERSION="${VERSION#v}"
+TAG_VERSION="${TAG_VERSION%%-*}"
+echo "Tag the release with: git tag -a v${TAG_VERSION} -m \"${RELEASE_NOTES}\" && git push origin v${TAG_VERSION} (the tag push starts the release workflow)"
 echo "Done."
