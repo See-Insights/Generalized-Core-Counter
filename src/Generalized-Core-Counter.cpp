@@ -303,7 +303,9 @@ void setup() {
   if (ExternalTime.status().bound()) {
     const int r = ExternalTime.disable();
     Log.warn("AB1805: stored Device OS binding deleted (r=%d)", r);
-    if (r == 0) System.reset(RESET_CAUSE_EXRTC_BINDING_DELETE);
+    const bool ours = System.resetReason() == RESET_REASON_USER && System.resetReasonData() == RESET_CAUSE_EXRTC_BINDING_DELETE;
+    if (r == 0 && !ExternalTime.status().bound() && !ours) System.reset(RESET_CAUSE_EXRTC_BINDING_DELETE);
+    else if (ours && ExternalTime.status().bound()) Log.warn("AB1805: binding survived the delete");
   }
 
   ensureRetainedLoopForensicsInitialized();

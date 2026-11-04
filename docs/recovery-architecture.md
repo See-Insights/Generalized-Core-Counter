@@ -82,6 +82,8 @@ Important constraints:
 
 From v49, every deliberate reset or power-down first calls `flushAllBeforeReset()` (`State_Error.cpp`), which force-flushes the current-readings store (occupancy, `dailyoccupancy`, open-session state, alert codes), `sysStatus`, the sensor settings, and then the publish queue to its file queue. Sites: thrash tier 3, Error soft and hard, the nightly heap guard, sleep exhausted, and connectivity failsafe stages 2 and 3 (the stage, action and count are written first). Alert codes are in the current-readings store, so an alert raised just before the reset is saved.
 
+The RTC-binding delete at the top of `setup()` (reset data 8) is the one deliberate reset that does not flush (persistence is not initialised yet and nothing is open), and it is bounded to one reset per boot cause: a boot that the guard itself caused never resets again.
+
 Not flushed, by ruling: out of memory (immediate reset), the two hardware watchdogs and the software ApplicationWatchdog callback, and HIBERNATE.
 
 Known exception (WO-2026-11-03-005, architect 4 Nov): the publish queue's file write covers only the RAM list. **An event already handed to the publisher (`curEvent`) when a deliberate reset happens can be lost: at most one per reset.** The library's own reset callback has the same gap. The fix, if `lib/PublishQueuePosixRK` is ever touched, is to write `curEvent` too. The queue's file path is built with `String`, which allocates (short, on a path with heap headroom).
