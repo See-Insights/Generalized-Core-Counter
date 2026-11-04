@@ -162,6 +162,8 @@ def base_pieces(base_text):
 
 # ---- probes: every check fires on a text that breaks it -------------------------------------------------
 sleep = SLEEP.read_text()
+# WO-2026-11-03-005: the deliberate-reset flush call is the one intended addition; mapped back so every other byte is still compared.
+sleep = re.sub(r"^ *flushAllBeforeReset\(\);\n", "", sleep, flags=re.M)
 probes = {
     "a write outside the allowed places": sleep.replace("void handleSleepingState() {", "void probeFn() { cloudGate.lastQueueDepth = 1; }\nvoid handleSleepingState() {", 1),
     "a write in the handler beyond the reset sites": sleep.replace("  SleepTeardown::guardLostTimestamp();\n", "  SleepTeardown::guardLostTimestamp();\n  cloudGate.gateWasBlocking = true;\n", 1),

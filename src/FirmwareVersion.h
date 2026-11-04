@@ -4,9 +4,11 @@
  *
  * Both values are edited together by bump_version.sh and staged by release.sh:
  * - FIRMWARE_PRODUCT_VERSION: the integer Particle's firmware management uses
- *   with PRODUCT_VERSION(). Incremented when a new release line starts.
+ *   with PRODUCT_VERSION(): major * 100 + iteration (v49.1 -> 4901). Every
+ *   iteration is its own product version; the iteration that passes its soak
+ *   is the release, with no rebuild.
  * - FIRMWARE_VERSION: the human-readable string used for logging, status
- *   reporting and documentation. Point releases share a PRODUCT_VERSION.
+ *   reporting and documentation: v<major>.<iteration>[-name].
  *
  * Release notes are NOT here: they live in CHANGELOG.md, out of the binary.
  */
@@ -15,9 +17,9 @@
 #define FIRMWARE_VERSION_H
 
 /** @brief Particle Product integer version (must be an integer). */
-#define FIRMWARE_PRODUCT_VERSION 47
+#define FIRMWARE_PRODUCT_VERSION 48
 
 /** @brief Current firmware release string. */
-inline const char* FIRMWARE_VERSION = "v47-PersistFreeze";
+inline const char* FIRMWARE_VERSION = "v48-OccupancyEndsAtClose";
 
 #endif /* FIRMWARE_VERSION_H */

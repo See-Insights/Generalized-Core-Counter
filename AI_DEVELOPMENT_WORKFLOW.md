@@ -510,6 +510,22 @@ After the architect's Stage 8 review, Claude Code commits the verified implement
 
 ### Stage 9 — Release and feedback
 
+Release pipeline (WO-2026-11-03-003):
+
+1. **Triggers.** Push/PR: build, test, artifact. Tag `v<major>.<iteration>` (e.g. `v49.2`, created with `git tag -a`, not by `release.sh`): build, name, and publish a GitHub Release with the `.bin` and `.sha256`. Promotion to the fleet stays a console action by Chip. CI never flashes devices and never releases firmware.
+2. **Who.** Claude Code creates release-candidate tags (with `git tag -a`; `release.sh` does not tag) when a WO set is ready. Uploads to product 42131 need Chip's approval via a GitHub Environment. Pinning and setting the default: Chip only.
+3. **Version scheme.** `PRODUCT_VERSION` = major × 100 + iteration (v49.1 → 4901). The iteration that passes its soak is the release; no rebuild. The `FirmwareVersion.h` string reads `v49.<n>-<name>`. Before building, the firmware job checks that the source `FIRMWARE_PRODUCT_VERSION` equals tag major × 100 + iteration, and fails (no build, no Release) if not. The `publish` job fails, and creates no Release, if the `.bin` SHA-256 differs from the firmware job's.
+   Release checklist: before pinning, run `particle binary inspect <the .bin>` and confirm `firmware for product id 13 at version <major×100+iteration>`.
+4. **One build ships.** CI builds it; the bench soaks that CI-built `.bin`. The local build remains a mandatory Stage 7 check and is never shipped.
+5. **Naming.** `gcc-v<major>.<iteration>-<platform>-dos<deviceOS>-<shortsha>.bin` plus `.sha256`, e.g. `gcc-v49.2-boron-dos6.6.0-1b3edd4.bin`.
+6. **Bench testing on sleeping devices.** A device marked as a Development device ignores released firmware and version locks. Flash it directly over USB (or Console flash), or pin first and then un-mark it (un-marking can trigger an immediate OTA to the pinned version). Never rely on the pin alone for a Development-marked device. Serial-Pi flashing: not now.
+
+7. **Upload to product 42131 (Part B, `upload` job).** Runs on tags only, after `publish`, behind the GitHub Environment `particle-42131`: Chip approves each run. It re-checks the tag name, the single `.bin` and its SHA-256 against the firmware job, and that the tag is annotated, then runs the SHA-pinned `particle-iot/firmware-upload-action` (v1.0.4) with the `github-firmware-upload` product API user (scope `firmware:create` only; secret `PARTICLE_ACCESS_TOKEN`, used in that one step). Version = major × 100 + iteration; title = `<tag>: <first line of the tag message>`; description = the rest of the tag message. The job uploads only: no OTA, no release, no pin, no default. There is **no dry-run upload**: a test version would stay in the product's firmware list and the token cannot remove it, so verification is local (YAML, `bash -n`, `tests/release_upload_job_test.py`) and acceptance is the first real tag.
+   - **Post-tag Console check.** Console → product 42131 → Firmware shows the new version (major × 100 + iteration), the title (`<tag>: <first line>`) and the description (the rest of the tag message). If it does not, report to Chip: the token cannot remove a version; Chip deletes it in the Console.
+   - **Scope failures.** If an upload is refused for scope, record the exact scope named in the error in `docs/notes/particle-api-users-register.md` and report it. No broader scope is granted to make it work.
+
+Success report (job summary of the `publish` job): run link, commit SHA, `.bin` name, size in bytes, SHA-256, source version, host-test count (`N/N`), buildpack image digest (recorded by the firmware job).
+
 After an authorized release, Claude Code monitors the defined telemetry window (read-only) and compares:
 
 - Failure rate before and after the change
@@ -529,6 +545,14 @@ AGENT: <Copilot|Codex> · MODEL: <id> · REASONING: <level>
 AUTHORIZATION SCOPE: <pre-authorized actions> / <explicitly not authorized>
 ```
 
+A Stage 7 (verification) dispatch adds a third line, naming exactly what is under review:
+
+```
+UNDER REVIEW: <branch> @ <full commit SHA>
+```
+
+**Stage 6 output is committed to the WO branch before Stage 7** (unmerged; Copilot itself still leaves its changes uncommitted, and Claude Code commits them), so `UNDER REVIEW` always names a real commit, never a diff hash. Each round has its own new dispatch file and its own new verdict file (see Commands).
+
 For Copilot and Codex, the AUTHORIZATION SCOPE names the agent's own scratch directory (e.g. `build-tmp/<wo>-stage6/`), and its "not authorized" half includes "deleting anything you didn't create, including `build-tmp/` itself".
 
 The body follows: the Work Order it serves (the binding spec), the branch and base commit, what to do, what to verify, and the report expected back.
@@ -539,8 +563,10 @@ The body follows: the Work Order it serves (the binding spec), the branch and ba
 
 ```
 codex exec -m <model> -c model_reasoning_effort="<level>" -s workspace-write \
-  -o docs/work-orders/<WO>-stage7-verdict.md - < docs/work-orders/<WO>-stage7-codex-dispatch.md
+  -o docs/work-orders/<WO>-stage7-r<N>-verdict.md - < docs/work-orders/<WO>-stage7-r<N>-codex-dispatch.md
 ```
+
+`<N>` is the round number. The names are never reused across rounds: fixed names caused a round-2 run to be fed the round-1 dispatch, and an `-o` file to be overwritten by a later message (3 Nov 2026). `-o` stores the agent's last message, so the dispatch asks for the complete verdict in the final message.
 
 `codex review --uncommitted` is not used: it rejects custom instructions (CLI 0.154.0). Codex's sandbox has no network, so the Particle cloud compile (a release-head check, once per release; see "Release gate" in §3) is run by Claude Code, not in Stage 7.
 
@@ -566,6 +592,8 @@ Every report from Copilot, Codex, or Claude Code states:
 
 - The model and reasoning level actually used. If Auto was used, what Auto picked.
 - The interpreter used for tests, e.g. `43/43 (sh via zsh, py via python3)`. See §10.
+
+A Codex verdict's first line quotes the `UNDER REVIEW` SHA. A missing or mismatched SHA invalidates the verdict: not counted as a round, archived, rerun.
 
 ### Records
 

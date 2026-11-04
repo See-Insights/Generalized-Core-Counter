@@ -149,5 +149,6 @@ void ThrashGuard::loop(int currentState, uint32_t nowMs) {
   logTrip(currentState, noprogSec, lastTag_, 3, "reset");
   RecoveryState::raiseAlert(18);  // Alert 18: Severe thrash detected (tier 3 - reset)
   thrashResetCount++;
+  flushAllBeforeReset();
   System.reset(RESET_CAUSE_THRASH_TIER3);
 }

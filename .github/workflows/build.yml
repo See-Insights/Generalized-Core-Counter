@@ -1,0 +1,179 @@
+name: build
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    outputs:
+      tests: ${{ steps.tests.outputs.result }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0  # equivalence tests compare against historical commits
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          repository: particle-iot/device-os
+          ref: 533fe47b1d420c8c766c488471ee34256727b49e # v6.4.1
+          path: device-os-6.4.1
+          sparse-checkout: |
+            system/inc
+            hal/inc
+            hal/shared
+            hal/src/gcc
+            wiring/inc
+            services/inc
+            dynalib/inc
+      - name: Install zsh
+        run: sudo apt-get install -y zsh
+      - name: Run host tests (sh via zsh, py via python3)
+        id: tests
+        env:
+          TMPDIR: ${{ runner.temp }}
+          DEVICE_OS_ROOT: ${{ github.workspace }}/device-os-6.4.1
+        run: |
+          pass=0; total=0; failed=()
+          for t in tests/*.sh; do
+            total=$((total+1))
+            if zsh "$t"; then pass=$((pass+1)); else failed+=("$t"); fi
+          done
+          for t in tests/*.py; do
+            total=$((total+1))
+            if python3 "$t"; then pass=$((pass+1)); else failed+=("$t"); fi
+          done
+          echo "$pass/$total (sh via zsh, py via python3)" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "result=$pass/$total" >> "$GITHUB_OUTPUT"
+          if [ "${#failed[@]}" -gt 0 ]; then
+            printf 'FAILED: %s\n' "${failed[@]}"
+            exit 1
+          fi
+
+  firmware:
+    runs-on: ubuntu-latest
+    outputs:
+      sha256: ${{ steps.rec.outputs.sha256 }}
+      digest: ${{ steps.rec.outputs.digest }}
+      os: ${{ steps.props.outputs.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Tag matches source FIRMWARE_PRODUCT_VERSION (before building)
+        if: github.ref_type == 'tag'
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF_NAME" =~ ^v([0-9]{1,2})\.([0-9]{1,2})$ ]] || { echo "::error::tag '$GITHUB_REF_NAME' is not v<major>.<iteration> (1-2 digits each)"; exit 1; }
+          want=$((10#${BASH_REMATCH[1]} * 100 + 10#${BASH_REMATCH[2]}))
+          got=$(echo FIRMWARE_PRODUCT_VERSION | cc -E -P -x c++ -include src/FirmwareVersion.h - | tail -n 1)  # the active macro, as the compiler sees it
+          [ "$got" = "$want" ] || { echo "::error::source FIRMWARE_PRODUCT_VERSION '$got' != $want from tag $GITHUB_REF_NAME; not building"; exit 1; }
+      - name: Read Device OS version from project.properties
+        id: props
+        run: echo "os=$(sed -n 's/^deviceOS=//p' project.properties)" >> "$GITHUB_OUTPUT"
+      - name: Compile (on the runner; no Particle token, no auto-version)
+        id: compile
+        uses: particle-iot/compile-action@3b6e15e99da59d074120f854a71659d4c81f092c # v1.0.7
+        with:
+          particle-platform-name: boron
+          device-os-version: ${{ steps.props.outputs.os }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: firmware-boron
+          path: |
+            ${{ steps.compile.outputs.firmware-path }}
+            ${{ steps.compile.outputs.target-path }}/*.elf
+          if-no-files-found: error
+      - name: Record .bin SHA-256 and buildpack image digest
+        id: rec
+        env:
+          BIN: ${{ steps.compile.outputs.firmware-path }}
+          OS: ${{ steps.props.outputs.os }}
+        run: |
+          set -euo pipefail
+          sha=$(sha256sum "$BIN" | cut -d' ' -f1)
+          digest=$(docker image inspect "particle/buildpack-particle-firmware:$OS-boron" --format '{{join .RepoDigests ","}}')
+          [ -n "$digest" ] || { echo "::error::buildpack image has no RepoDigest; cannot record it"; exit 1; }
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - name: Job summary
+        env:
+          DIGEST: ${{ steps.rec.outputs.digest }}
+        run: |
+          {
+            echo "device-os-version: ${{ steps.compile.outputs.device-os-version }}"
+            # The action's firmware-version output is unreliable (reported 24 for product version 48).
+            echo "firmware-product-version: $(sed -n 's/^#define FIRMWARE_PRODUCT_VERSION *//p' src/FirmwareVersion.h)"
+            echo "buildpack-image: $DIGEST"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: [host-tests, firmware]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # this job only; the token is in the env of the one Release step alone
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: firmware-boron
+          path: fw
+      - name: Guards and Release (the only step with the write token)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          WANT_SHA: ${{ needs.firmware.outputs.sha256 }}
+          OS: ${{ needs.firmware.outputs.os }}
+          DIGEST: ${{ needs.firmware.outputs.digest }}
+          TESTS: ${{ needs.host-tests.outputs.tests }}
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v([0-9]{1,2})\.([0-9]{1,2})$ ]] || { echo "::error::tag '$TAG' is not v<major>.<iteration> (1-2 digits each)"; exit 1; }
+          want=$((10#${BASH_REMATCH[1]} * 100 + 10#${BASH_REMATCH[2]}))
+          bin=$(find fw -name '*.bin')
+          [ -n "$bin" ] && [ "$(wc -l <<<"$bin")" -eq 1 ] || { echo "::error::expected exactly one .bin"; exit 1; }
+          [ "$(sha256sum "$bin" | cut -d' ' -f1)" = "$WANT_SHA" ] || { echo "::error::artifact SHA-256 differs from the firmware job's"; exit 1; }
+          name="gcc-$TAG-boron-dos$OS-${GITHUB_SHA::7}.bin"
+          mv "$bin" "$name"
+          sha256sum "$name" > "$name.sha256"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "::error::a Release for $TAG already exists; not modifying it"; exit 1; fi
+          [ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.type)" = tag ] || { echo "::error::$TAG is not an annotated tag"; exit 1; }
+          tagsha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha)
+          [ "$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tagsha" --jq .object.sha)" = "$GITHUB_SHA" ] || { echo "::error::$TAG no longer points at $GITHUB_SHA"; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/git/tags/$tagsha" --jq .message > "$RUNNER_TEMP/notes.txt"
+          gh release create "$TAG" "$name" "$name.sha256" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.txt"
+          printf '%s\n' "### Release $TAG" "- run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            "- commit: $GITHUB_SHA" "- bin: $name ($(stat -c%s "$name") bytes)" "- sha256: $WANT_SHA" \
+            "- source version: $want" "- host tests: $TESTS" "- buildpack image digest: $DIGEST" >> "$GITHUB_STEP_SUMMARY"
+
+  upload:
+    if: github.ref_type == 'tag'
+    needs: [firmware, publish]
+    runs-on: ubuntu-latest
+    environment: particle-42131
+    permissions: {contents: read}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with: {name: firmware-boron, path: fw}
+      - id: meta
+        env: {GH_TOKEN: "${{ github.token }}", TAG: "${{ github.ref_name }}", WANT_SHA: "${{ needs.firmware.outputs.sha256 }}"}
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v([0-9]{1,2})\.([0-9]{1,2})$ ]] || { echo "::error::tag '$TAG' is not v<major>.<iteration>"; exit 1; }
+          ver=$((10#${BASH_REMATCH[1]} * 100 + 10#${BASH_REMATCH[2]})); bin=$(find fw -name '*.bin')
+          [ -n "$bin" ] && [ "$(wc -l <<<"$bin")" -eq 1 ] || { echo "::error::expected exactly one .bin"; exit 1; }
+          [ "$(sha256sum "$bin" | cut -d' ' -f1)" = "$WANT_SHA" ] || { echo "::error::artifact SHA-256 differs from the firmware job's"; exit 1; }
+          api=repos/$GITHUB_REPOSITORY/git; ref=$(gh api "$api/ref/tags/$TAG" --jq '.object.type + " " + .object.sha')
+          [ "${ref%% *}" = tag ] || { echo "::error::$TAG is not an annotated tag"; exit 1; }
+          msg=$(gh api "$api/tags/${ref##* }" --jq .message); d=$(openssl rand -hex 8)
+          { echo "bin=$bin"; echo "version=$ver"; echo "title=$TAG: ${msg%%$'\n'*}"; echo "description<<$d"; tail -n +2 <<<"$msg"; echo "$d"; } >> "$GITHUB_OUTPUT"
+      - uses: particle-iot/firmware-upload-action@9e393d6b362208488db91339ab72ee1d7e2e6ada # v1.0.4
+        with: {particle-access-token: "${{ secrets.PARTICLE_ACCESS_TOKEN }}", firmware-path: "${{ steps.meta.outputs.bin }}", firmware-version: "${{ steps.meta.outputs.version }}",
+          product-id: 42131, title: "${{ steps.meta.outputs.title }}", description: "${{ steps.meta.outputs.description }}"}

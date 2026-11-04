@@ -1012,6 +1012,7 @@ namespace SensorSettings {
 
 void setup() { sensorConfig.setup(); }
 void loop() { sensorConfig.loop(); }
+void flushNow() { sensorConfig.flush(true); }
 
 // sizeof(sensorConfigData), matching the pre-split sensorConfig.validate(sizeof(sensorConfig)).
 bool validateStoredData() { return sensorConfig.validate(sizeof(sensorConfigData)); }
@@ -1105,6 +1106,7 @@ namespace CurrentReadings {
 
 void setup() { current.setup(); }
 void loop() { current.loop(); }
+void flushNow() { current.flush(true); }
 void resetEverything(bool includeSensorTotals) { current.resetEverything(includeSensorTotals); }
 void revalidateOccupancyStartTimeIfTimeAvailable() { current.revalidateOccupancyStartTimeIfTimeAvailable(); }
 

@@ -170,6 +170,8 @@ namespace PowerDiagnostics {
 inline void logPowerState(const char *tag) { sim::emit("POWER %s", tag); }
 inline void flushDiagBatch() { sim::emit("POWER flushDiagBatch"); }
 }  // namespace PowerDiagnostics
+// WO-2026-11-03-005: unrecorded, so the frozen base-equivalence transcripts are unchanged (the flush order is tested in deliberate_reset_flush_test).
+inline void flushAllBeforeReset() {}
 namespace AwakeCycles {
 inline void recordSleepReturn(bool ok) { sim::emit("AWAKE recordSleepReturn %d", (int)ok); }
 }

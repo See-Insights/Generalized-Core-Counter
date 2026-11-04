@@ -42,3 +42,7 @@ loc-by-file.preview.txt
 # Local bench-only helpers
 /test_mode_macro.h
 /user-connectivity-test.h
+
+# Vendor datasheets stay local (public repo); our own datasheet notes go in docs/notes/
+/docs/datasheets/*.pdf
+/docs/datasheets/*.md

@@ -237,7 +237,9 @@ mutate_and_expect_diff "LED-defer transition dropped" '      transitionTo(IDLE_S
       return true;' "      return true;"
 mutate_and_expect_diff "flush before the reset dropped" "      PowerDiagnostics::flushDiagBatch();
 #endif
+      flushAllBeforeReset();
       System.reset(RESET_CAUSE_SLEEP_HEAP_GUARD);" "#endif
+      flushAllBeforeReset();
       System.reset(RESET_CAUSE_SLEEP_HEAP_GUARD);"
 mutate_and_expect_diff "test-mode cap dropped" "nightSleepSec = (int)ConnectivityPolicy::CONNECTIVITY_FAILSAFE_TEST_MAX_CLOSED_SLEEP_SEC;" "nightSleepSec = nightSleepSec;"
 mutate_and_expect_diff "guard called before the hibernate attempt" "  hibernateAttempt(overnightFallbackSleep, wakeInSeconds);

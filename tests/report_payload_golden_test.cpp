@@ -8,6 +8,7 @@
 // on the host below. NaN/Inf text is host libc.
 #include <cfloat>
 #include <clocale>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
