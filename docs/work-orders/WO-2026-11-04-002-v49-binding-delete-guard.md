@@ -3,7 +3,7 @@
 **Author:** Claude Code, 4 Nov 2026, DRAFT for the architect's review · **Status:** DRAFT; not dispatched
 **Branch:** `wo/2026-11-04-002-binding-delete-guard`, from `main`
 **Workflow:** `AI_DEVELOPMENT_WORKFLOW.md` §3 Stages 5-8; §4 (SHA rule); §5 (boot-time hardware ownership and time: Codex xhigh); §12; §13 (c), (j)
-**Target:** **v49**; the last item in v49's scope (RC1: #172 + item 25 + item 26 durability + this).
+**Target:** **v49**; the last item in v49's scope (RC1: #172 + item 25 + item 26 durability + this). **It gates the v49.1 tag** (architect, 4 Nov): the rest of v49 is merged on `main` (#176, #181; the release pipeline #180 and #183).
 **Budget:** `src/` at most **+10 net** (removals count). Stop and report rather than trim style.
 **Agents:** Stage 6 Copilot standard, medium. Stage 7 Codex `gpt-5.6-sol`, **xhigh**, `UNDER REVIEW` header, `-stage7-r<N>` files, at most two rounds.
 **Origin:** AB1805 native-driver Step 0 ruling 5 (`WO-2026-10-31-001-step0-report.md`): "v49 deletes any stored `EXRTC_CONFIG_DATA` at boot, so every rollback target is safe; the switch WO comes only after v49 is the default."
