@@ -224,9 +224,16 @@ DEBOUNCE_OLD = """  // V3.23: Occupancy debounce timeout comes from sensor.setti
   // Check if debounce timeout has expired
   if (timeSinceLastEvent > debounceMs) {"""
 LED_CLOSE_OLD = "signalLEDTimeRemaining() == 0 && signalLEDStatus()) {\n      // LED timeout expired - debounce period elapsed without motion"
-LED_CLOSE_NEW = "signalLEDStatus() && debounceRemainingMs() == 0) {\n      // Debounce period elapsed without motion (the millis predicate, not the LED's wall deadline)"
+LED_CLOSE_NEW = "(signalLEDStatus() || (session.pieceUntrusted && CurrentReadings::get_occupied())) && debounceRemainingMs() == 0) {\n      // Debounce period elapsed without motion (the millis predicate, not the LED's wall deadline)"
+# WO-2026-11-03-006: a piece's millis() start and trust flag are recorded where an occupancy session opens.
+def c2_open(text, pad, anchor):
+    lines = pad + "session.occupancyStartMs = millis();\n" + pad + "session.pieceUntrusted = !Clock::isTrusted();\n"
+    return text.replace(anchor, anchor + lines, 1)
+OPEN_AWAKE = "      CurrentReadings::set_occupancyStartTime(Time.now());\n"
+OPEN_WAKE = "          CurrentReadings::set_occupancyStartTime(Time.now());\n"
 if base_modes is not None:
     base_modes = base_modes.replace(DEBOUNCE_OLD, "  if (debounceRemainingMs() == 0) {").replace(LED_CLOSE_OLD, LED_CLOSE_NEW)
+    base_modes = c2_open(c2_open(base_modes, "      ", OPEN_AWAKE), "          ", OPEN_WAKE)
 cur_modes_head = modes[:modes.index("\nbool processSleepWakeEvent(bool pirWake) {")]
 added = [l for l in modes.splitlines(keepends=True) if l not in base_modes.splitlines(keepends=True)]
 head_added = [l for l in cur_modes_head.splitlines(keepends=True) if l not in base_modes.splitlines(keepends=True)]
@@ -254,7 +261,7 @@ if cur_region is None:
     fail("could not extract postWakeRouting() and processSleepWakeEvent()")
 a = base_sleep.index(BASE_REGION_START)
 b = base_sleep.index(BASE_REGION_END, a) + len(BASE_REGION_END)
-base_region = base_sleep[a:b].replace(LED_CLOSE_OLD, LED_CLOSE_NEW)
+base_region = c2_open(base_sleep[a:b].replace(LED_CLOSE_OLD, LED_CLOSE_NEW), "          ", OPEN_WAKE)
 if cur_region.rstrip("\n") != base_region.rstrip("\n"):
     fail("postWakeRouting() plus processSleepWakeEvent() differ from the base region beyond `return true;`/`return false;` "
          "and the call")

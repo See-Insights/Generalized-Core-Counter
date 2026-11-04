@@ -35,6 +35,8 @@ struct SessionState {
   bool awaitingWebhookResponse = false;
   bool occupancyChangeTriggered = false;
   bool serviceRequestTriggered = false;
+  uint32_t occupancyStartMs = 0;
+  bool pieceUntrusted = false;
 };
 inline SessionState session;
 

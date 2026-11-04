@@ -67,6 +67,8 @@ struct SessionState {
   uint32_t lastModemOffElapsedMs = 0;
   uint32_t lastTotalTeardownElapsedMs = 0;
   uint32_t failsafeDeferLogMask = 0;      // One-shot failsafe defer reasons logged this boot
+  uint32_t occupancyStartMs = 0;         // millis() when the current piece opened (0 = boot for a straddler)
+  bool pieceUntrusted = false;           // piece opened with an untrusted clock: credited on millis() until it closes
   time_t occupancySessionBootAnchor = 0; // max(start, lastReport) captured at boot for a session open across the restart; 0 = none
 };
 

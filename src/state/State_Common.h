@@ -361,11 +361,13 @@ inline OccupancyCloseResult closeOccupancySessionSafely(const char *path, time_t
 	// duration arithmetic below (now - start) must not run on an RTC-seeded-
 	// but-unconfirmed epoch, which can produce a wildly wrong session length.
 	const bool timeValid = Clock::isTrusted();
-	// WO-2026-10-04-001 item B2: an untrusted clock cannot credit a session.
-	// Keep it open, credit nothing, and re-arm the debounce so the close is
-	// retried one debounce later, instead of discarding the session and
-	// signalling an unoccupied transition that never happened.
-	if (!timeValid && occupied) {
+	// WO-2026-11-03-006: a piece opened untrusted is measured on millis() for its
+	// whole life (no wall clock, even if trust returns): credit its on-time up to
+	// the debounce expiry, then close it so the next PIR opens a new piece.
+	const bool piece = occupied && session.pieceUntrusted;
+	// WO-2026-10-04-001 item B2 (a trusted piece that loses trust): keep it open,
+	// credit nothing and re-arm the debounce.
+	if (!timeValid && occupied && !piece) {
 		CurrentReadings::set_lastOccupancyEvent(millis());
 		result.stillOpen = true;
 		return result;
@@ -393,9 +395,13 @@ inline OccupancyCloseResult closeOccupancySessionSafely(const char *path, time_t
 	bool durationComputable = false;
 	long long rawSessionSeconds = 0;
 	uint32_t sessionSeconds = 0;
-	bool invalid = !timeValid || start == 0;
+	bool invalid = (!timeValid && !piece) || start == 0;
 
-	if (timeValid && start != 0) {
+	if (piece) {
+		rawSessionSeconds = (CurrentReadings::get_lastOccupancyEvent() - session.occupancyStartMs + occupancyDebounceMs()) / 1000UL;
+		durationComputable = true;
+		Log.info("Occ: untrusted piece credit=%lld start=%lu", rawSessionSeconds, (unsigned long)session.occupancyStartMs);
+	} else if (timeValid && start != 0) {
 		time_t effectiveStart = start;
 		if (start > now && start <= now + 5) {
 			effectiveStart = now;
@@ -445,6 +451,7 @@ inline OccupancyCloseResult closeOccupancySessionSafely(const char *path, time_t
 	}
 
 	CurrentReadings::set_occupied(false);
+	session.pieceUntrusted = false;
 	CurrentReadings::set_occupancyStartTime(0);
 	return result;
 }
