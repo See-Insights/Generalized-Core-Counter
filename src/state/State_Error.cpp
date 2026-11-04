@@ -112,6 +112,13 @@ static int resolveErrorAction() {
 }
 
 // ERROR_STATE: Error supervisor: decide recovery action
+void flushAllBeforeReset() {
+  CurrentReadings::flushNow();
+  SystemConfig::flushNow();
+  SystemConfig::SensorSettings::flushNow();
+  PublishQueuePosix::instance().writeQueueToFiles();
+}
+
 void handleErrorState() {
   static unsigned long resetTimer = 0;
   static int resolution = 0;
@@ -156,6 +163,7 @@ void handleErrorState() {
     if (millis() - resetTimer > resetWait) {
       Log.info("ModemTeardown: radioOn=%d point=error-state-soft-reset", (int)Connectivity::isRadioPoweredOn());
       Log.info("Executing soft reset from ERROR_STATE");
+      flushAllBeforeReset();
       System.reset(RESET_CAUSE_ERROR_STATE_SOFT);
     }
     break;
@@ -166,6 +174,7 @@ void handleErrorState() {
     // avoid thrashing.
     if (millis() - resetTimer > resetWait) {
       Log.info("Executing deep power down from ERROR_STATE (alert=%d)", RecoveryState::get_alertCode());
+      flushAllBeforeReset();
       ab1805.deepPowerDown();
     }
     break;

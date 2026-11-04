@@ -179,6 +179,8 @@ def base_pieces(base_text):
 
 # ---- probes: every check fires on a text that breaks it -------------------------------------------------
 sleep = SLEEP.read_text()
+# WO-2026-11-03-005: the deliberate-reset flush call is the one intended addition; mapped back so every other byte is still compared.
+sleep = re.sub(r"^ *flushAllBeforeReset\(\);\n", "", sleep, flags=re.M)
 probes = {
     "the guard call before the hibernate attempt": sleep.replace(HIB + "\n" + GUARD_CALL, GUARD_CALL + "\n" + HIB, 1),
     "a second plan call": sleep.replace(HIB, "  { SleepPlan p2; sleepPlan(p2); }\n" + HIB, 1),

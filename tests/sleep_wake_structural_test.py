@@ -118,6 +118,8 @@ def problems_in(sleep, modes, header):
 
 
 sleep, modes, header = SLEEP.read_text(), MODES.read_text(), HEADER.read_text()
+# WO-2026-11-03-005: the deliberate-reset flush call is the one intended addition; mapped back so every other byte is still compared.
+sleep = re.sub(r"^ *flushAllBeforeReset\(\);\n", "", sleep, flags=re.M)
 
 # WO-2026-10-29-002: the two occupancy-after-close gates are the only intended State_Modes.cpp change versus the S-6
 # base; they are mapped back to the base text so the S-6 equivalence checks below still compare like with like.

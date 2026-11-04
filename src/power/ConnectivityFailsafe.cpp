@@ -83,7 +83,6 @@ void persistConnectivityFailsafeState(uint8_t stage, time_t actionTime, bool inc
       RecoveryState::set_connectivityRecoveryCount(count + 1);
     }
   }
-  SystemConfig::flushNow();
 }
 
 const char *failsafeDeferReasonNameLocal(FailsafeDeferReason reason) {
@@ -295,6 +294,7 @@ void connectivityFailsafeSupervisor() {
              batteryTierShortName(tier));
 #endif
     persistConnectivityFailsafeState(currentStage, now, false);
+    SystemConfig::flushNow();
     return;
   }
 
@@ -303,6 +303,7 @@ void connectivityFailsafeSupervisor() {
     persistConnectivityFailsafeState(2, now, true);
     Log.info("Failsafe: stage=2 action=system-reset age=%lds",
              (long)connectionAgeSec);
+    flushAllBeforeReset();
     System.reset(RESET_CAUSE_CONNECTIVITY_FAILSAFE);
     return;
   }
@@ -311,5 +312,6 @@ void connectivityFailsafeSupervisor() {
   persistConnectivityFailsafeState(3, now, true);
   Log.info("Failsafe: stage=3 action=deep-powerdown age=%lds",
            (long)connectionAgeSec);
+  flushAllBeforeReset();
   ab1805.deepPowerDown();
 }

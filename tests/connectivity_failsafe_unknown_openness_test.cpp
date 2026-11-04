@@ -35,6 +35,9 @@ time_t persistedAction = 0;
 // power-down does not return, so anything the supervisor persists after it is lost: the
 // stage must be on flash before the call (otherwise stage 2 could repeat on every boot).
 uint8_t persistedStageAtAction = 0;
+// WO-2026-11-03-005: flushAllBeforeReset() must run after the stage record and before the action.
+bool flushed = false;
+bool flushedAfterRecordBeforeAction = false;
 struct ActionStop {};  // thrown by the fakes: the real calls never return
 constexpr uint32_t FAKE_JITTER_SEC = 1000;
 } // namespace
@@ -64,6 +67,7 @@ time_t lastConnection = 0;
 time_t openTimeToday = 0;
 inline int get_openTime() { return 6; }
 inline time_t get_lastConnection() { return lastConnection; }
+inline void flushNow() {}
 } // namespace SystemConfig
 
 namespace DailyBoundary {
@@ -85,11 +89,11 @@ using PowerManager = PowerManagerFake;
 
 struct SystemFake {
   bool updatesPending() { return false; }
-  void reset(int) { lastActionTaken = RESET; ++actionCount; persistedStageAtAction = persistedStage; throw ActionStop{}; }
+  void reset(int) { flushedAfterRecordBeforeAction = flushed; lastActionTaken = RESET; ++actionCount; persistedStageAtAction = persistedStage; throw ActionStop{}; }
 } System;
 
 struct Ab1805Fake {
-  void deepPowerDown() { lastActionTaken = DEEP_POWER_DOWN; ++actionCount; persistedStageAtAction = persistedStage; throw ActionStop{}; }
+  void deepPowerDown() { flushedAfterRecordBeforeAction = flushed; lastActionTaken = DEEP_POWER_DOWN; ++actionCount; persistedStageAtAction = persistedStage; throw ActionStop{}; }
 } ab1805;
 
 struct TimeFake {
@@ -112,6 +116,8 @@ void persistConnectivityFailsafeState(uint8_t stage, time_t actionTime, bool) {
   persistedStage = stage;
   persistedAction = actionTime;
 }
+
+void flushAllBeforeReset() { flushed = (persistedStage != 0 && persistedAction != 0); }
 
 #include SUPERVISOR_BODY_H
 
@@ -142,6 +148,8 @@ Action run(const Scenario &s) {
   persistedStage = 0;
   persistedAction = 0;
   persistedStageAtAction = 0;
+  flushed = false;
+  flushedAfterRecordBeforeAction = false;
   try {
     connectivityFailsafeSupervisor();
   } catch (const ActionStop &) {
@@ -155,7 +163,7 @@ const char *name(Action a) {
 
 void check(const char *what, const Scenario &s, Action want, uint8_t wantStage = 0) {
   const Action got = run(s);
-  const bool stageOk = (want == NONE) || persistedStageAtAction == wantStage;
+  const bool stageOk = (want == NONE) || (persistedStageAtAction == wantStage && flushedAfterRecordBeforeAction);
   if (got == want && stageOk && actionCount == (want == NONE ? 0 : 1)) {
     printf("  ok   %-64s -> %s\n", what, name(got));
   } else {

@@ -58,6 +58,8 @@ def function_span(lines, signature):
 
 
 raw = SLEEP.read_text()
+# WO-2026-11-03-005: the deliberate-reset flush call is the one intended addition; mapped back so every other byte is still compared.
+raw = re.sub(r"^ *flushAllBeforeReset\(\);\n", "", raw, flags=re.M)
 code = strip_comments(raw)
 code_lines = code.split("\n")
 

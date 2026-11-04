@@ -205,6 +205,8 @@ def move_wifi_block(text):
 
 # ---- probes: every check fires on a text that breaks it -------------------------------------------------
 sleep = SLEEP.read_text()
+# WO-2026-11-03-005: the deliberate-reset flush call is the one intended addition; mapped back so every other byte is still compared.
+sleep = re.sub(r"^ *flushAllBeforeReset\(\);\n", "", sleep, flags=re.M)
 RESET = "    wifiGuard.wifiOffGuardRetries = 0;\n#endif\n  }"
 probes = {
     "a stray write to a guard field in the handler": sleep.replace("  SleepTeardown::guardLostTimestamp();\n", "  SleepTeardown::guardLostTimestamp();\n  wifiGuard.wifiOffGuardActive = true;\n", 1),
