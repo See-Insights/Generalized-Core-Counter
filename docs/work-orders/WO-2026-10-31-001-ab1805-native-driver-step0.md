@@ -59,3 +59,8 @@ GCC drives the carrier board's AB1805 (RTC, hardware watchdog, deep power-down) 
 
 - 0 `src/` lines.
 - The report: at most 150 lines, committed on the WO branch, then stop for the architect.
+
+## v50 record (architect rulings, 4 Nov 2026; from WO-2026-11-04-002 Amendment 1)
+- **The v50 switch WO removes or replaces the v49 binding-delete guard** (otherwise v50 would delete its own stored binding at every boot).
+- **v49 is the rollback floor, and v49 must be the fleet default before v50 ships.** v48 and earlier have no guard: a stored binding plus the vendored `AB1805_RK` is the two-owner hazard.
+- **v50 pre-ship checklist (bench, Chip), moved from the guard WO:** (1) binding present: flash `ab1805-spike.bin` (`bind`, reboot, `status` bound=1), then flash the v49 build: the deletion line once, the vendored AB1805 setup succeeds, cloud connects, no reset loop, no deletion line on the second boot; (2) rollback: flash the previous default over it and confirm a single owner; (3) the 8-hour hibernate proof and the serial-attached nights (spike WO Ruling).
