@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v49.1-DurableResets] - 2026-11-05
+
+### Changed
+
+- Eastern default timezone, durable deliberate resets, USB charge-latch recovery, RTC binding guard
+
 ## [v48-OccupancyEndsAtClose] - 2026-10-31
 
 ### Changed
