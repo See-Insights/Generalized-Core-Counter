@@ -35,3 +35,11 @@ Any change to `src/`, the persisted layout or `retained`; the failsafe ladder; t
 
 ## Approval record
 Architect: instructed 5 Nov to draft and, being read-only and touching no held branch, to dispatch now (Codex `gpt-5.6-sol` high, §3 Stage 4). Chip authorizes dispatch: per the relay of 5 Nov.
+
+## Part A result and architect's rulings (5 Nov 2026)
+Part A report: `WO-2026-11-05-006-step0-report-partA.md` (Codex `gpt-5.6-sol` high, main `41d9911`): **PROCEED**, candidate C, 17-20 `src/` lines if the S-set supplies the latch. **Rulings:**
+1. **Candidate C approved:** persisted last-sync epoch (`lastTimeSync`), **no layout change**; zero is the "no carry" value; withdrawal on a `correctionSec` over T, an invalid read or write, or the fault latch.
+2. **The "fault seen since bind" latch is owned by the S-set** (S1 if it fits, else an S4 of ≤ +10; S1 Amendment 2). I21 reads **only the boolean**. At callback registration an **RC-fallback `clockSource()` counts as "fault seen"**. **No persisted latch.**
+3. **First boot after the upgrade carries trust** from a recent sync (no migration marker).
+4. **Required test:** C2 regression (a piece opened while trusted, then trust withdrawn).
+5. **T waits for Part B** (the fleet `correctionSec` data); the I21 WO is drafted after it.
