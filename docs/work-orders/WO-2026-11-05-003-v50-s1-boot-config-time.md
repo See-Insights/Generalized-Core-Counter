@@ -47,3 +47,6 @@ Revert the S1 commit on the integration branch before the set merges. After the 
 3. **`ab1805.loop()` removal moves to S2** (it also services the chip watchdog S2 replaces).
 4. **Budget unchanged: `src/` ≤ +20 net.** The schema bump and the null writes are counted; if the total exceeds +20, stop and report the cut.
 5. Dispatch gate unchanged: Stage 6 starts only once v49.1 is the product default and C1/C2 have merged; S1 never merges to `main` alone.
+
+## Amendment 2 (architect rulings on I21 Part A, 5 Nov 2026) — the "fault seen since bind" latch
+The latch is **owned by the S-set: S1 if it fits, else an S4 of ≤ +10 `src/`**. It is a process-lifetime boolean (RAM, not persisted): set by an `ExternalTime.onEvent` oscillator-fault event, and **set at callback registration if `Am18x5.status().clockSource()` reports the RC fallback**. I21 reads only the boolean. Step 0 verifies the event enum and payload on 6.6.0 (Part A could not). The ≤ +20 budget is unchanged: **if the latch does not fit, stop and report; it becomes S4.**
