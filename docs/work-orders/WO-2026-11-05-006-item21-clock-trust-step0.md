@@ -43,3 +43,6 @@ Part A report: `WO-2026-11-05-006-step0-report-partA.md` (Codex `gpt-5.6-sol` hi
 3. **First boot after the upgrade carries trust** from a recent sync (no migration marker).
 4. **Required test:** C2 regression (a piece opened while trusted, then trust withdrawn).
 5. **T waits for Part B** (the fleet `correctionSec` data); the I21 WO is drafted after it.
+
+## Part B result and the architect's ruling on T (5 Nov 2026)
+Part B: `WO-2026-11-05-006-step0-fleet-data.md` (Sonnet subagent): healthy bench maximum 11 s (Dev-14, 115 syncs; Dev-09 27 syncs, max 5 s); Dev-11's four large values 596, 1372, 7570, 8557 s (first sign 596 s); no `correctionSec` in archived `status` files, serial logs for Dev-09 and Dev-14 only. **Ruling: T = 60 s, a named constant**; basis also includes ChurchSt-2's device-data ledger −14 s on 2 Nov (US unit); the RC-fallback case is covered by the fault latch. **Validation (not a blocker):** after v49 is the fleet default, read every 42131 device's device-data `correctionSec` once (read-only), record the spread in the I21 WO, and report any value reaching 30 s before v50.2. The I21 WO is `WO-2026-11-05-007-i21-clock-trust-carry.md` (draft, on `wo/2026-11-05-002-v50-ab1805-switch-draft`).
