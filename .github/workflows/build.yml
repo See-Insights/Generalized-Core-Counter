@@ -163,13 +163,13 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with: {name: firmware-boron, path: fw}
       - id: meta
-        env: {GH_TOKEN: "${{ github.token }}", TAG: "${{ github.ref_name }}", WANT_SHA: "${{ needs.firmware.outputs.sha256 }}"}
+        env: {GH_TOKEN: "${{ github.token }}", TAG: "${{ github.ref_name }}", WANT_SHA: "${{ needs.firmware.outputs.sha256 }}", OS: "${{ needs.firmware.outputs.os }}"}
         run: |
           set -euo pipefail
           [[ "$TAG" =~ ^v([0-9]{1,2})\.([0-9]{1,2})$ ]] || { echo "::error::tag '$TAG' is not v<major>.<iteration>"; exit 1; }
           ver=$((10#${BASH_REMATCH[1]} * 100 + 10#${BASH_REMATCH[2]})); bin=$(find fw -name '*.bin')
           [ -n "$bin" ] && [ "$(wc -l <<<"$bin")" -eq 1 ] || { echo "::error::expected exactly one .bin"; exit 1; }
-          [ "$(sha256sum "$bin" | cut -d' ' -f1)" = "$WANT_SHA" ] || { echo "::error::artifact SHA-256 differs from the firmware job's"; exit 1; }
+          [ "$(sha256sum "$bin" | cut -d' ' -f1)" = "$WANT_SHA" ] || { echo "::error::artifact SHA-256 differs from the firmware job's"; exit 1; }; new="$(dirname "$bin")/gcc-$TAG-boron-dos$OS-${GITHUB_SHA::7}.bin"; mv "$bin" "$new"; bin=$new
           api=repos/$GITHUB_REPOSITORY/git; ref=$(gh api "$api/ref/tags/$TAG" --jq '.object.type + " " + .object.sha')
           [ "${ref%% *}" = tag ] || { echo "::error::$TAG is not an annotated tag"; exit 1; }
           msg=$(gh api "$api/tags/${ref##* }" --jq .message); d=$(openssl rand -hex 8); grep -qx -- '---' <<<"$msg" || { echo "::error::tag message has no --- line"; exit 1; }
