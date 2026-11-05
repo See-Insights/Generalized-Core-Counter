@@ -102,7 +102,7 @@ void readRegisters(PMIC &pmic, PmicFaultMonitor::Registers &regs) {
 namespace PmicFaultMonitor {
 
 Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int powerSource,
-                            bool chargeDisableConfigVerified) {
+                            bool chargeDisableConfigVerified, float vcell) {
   static unsigned long lastRemediationAttempt = 0;
   static uint8_t remediationLevel = 0;       // 0=none, 1=soft reset, 2=power cycle
   static uint8_t consecutiveFaults = 0;
@@ -112,12 +112,27 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
   static unsigned long remediationPhaseStartMs = 0;
   static bool immediateResetConsumed = false;
   static uint8_t immediateResetFaultReg = 0;
+  static unsigned long latchSince = 0;       // USB Not Charging latch (WO-2026-11-02-001)
+  static unsigned long latchLastAttempt = 0;
+  static bool latchTiming = false;
+  static bool latchTried = false;
   constexpr unsigned long kRemediationCooldownMs = 3600000UL; // 1 hour
+
+  // Shared level-1/2 cycle request (fault path, charge latch); refused while one runs or in the 1 h cooldown.
+  auto requestRemediationCycle = [&](uint8_t level, unsigned long now) {
+    if (remediationInProgress || now - lastRemediationAttempt <= kRemediationCooldownMs) return false;
+    remediationInProgress = true;
+    remediationActiveLevel = level;
+    remediationPhase = 0;
+    return true;
+  };
 
   Registers regs;
   readRegisters(pmic, regs);
 
   const PowerReport &powerReport = PowerManager::instance().latestReport();
+  const bool usbBackedSource = powerReport.activeInputProfile == PowerInputProfile::UsbBench ||
+                               isUsbBackedSource(powerReport.reading.powerSource) || isUsbBackedSource(powerSource);
 
   // Immediate one-shot reset attempt: only when safe, USB-backed (a solar dip
   // is not fixed by toggling charging), not already tried for this exact
@@ -125,10 +140,7 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
   bool persistentAfterImmediateReset = false;
   if (regs.faultReg & kPmicChargeFaultMask) {
     const bool usbInputPresent = (regs.vbusStatus == 1 || regs.vbusStatus == 2 || regs.vbusStatus == 3);
-    const bool usbBackedFaultContext =
-        powerReport.activeInputProfile == PowerInputProfile::UsbBench ||
-        isUsbBackedSource(powerReport.reading.powerSource) || isUsbBackedSource(powerSource) ||
-        usbInputPresent;
+    const bool usbBackedFaultContext = usbBackedSource || usbInputPresent;
     const bool severeBatteryState = (battState == 5 || battState == 6);
     const uint8_t initialChargeFault = pmicChargeFaultCode(regs.faultReg);
     const bool alreadyAttempted = immediateResetConsumed && immediateResetFaultReg == regs.faultReg;
@@ -296,14 +308,10 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
 
         if (remediationLevel == 1) {
           Log.warn("PMIC: Attempting soft remediation - cycle charging (level 1)");
-          remediationInProgress = true;
-          remediationActiveLevel = 1;
-          remediationPhase = 0;
+          requestRemediationCycle(1, now);
         } else if (remediationLevel == 2) {
           Log.error("PMIC: Attempting aggressive remediation - power cycle reset (level 2)");
-          remediationInProgress = true;
-          remediationActiveLevel = 2;
-          remediationPhase = 0;
+          requestRemediationCycle(2, now);
         } else {
           Log.info("PMIC: Fault detected but remediation level 0 - monitoring only");
         }
@@ -329,7 +337,9 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
     // hold safeToCharge==false (e.g. a hot pack) with no PMIC fault at all.
     // advanceChargeCyclePhase() is passed safeToCharge and freezes the
     // sequence (no enableCharging(), state untouched) rather than advancing
-    // it while unsafe; see that function's contract above.
+    // it while unsafe; see that function's contract above. Alert 22 resolves
+    // once the charger leaves Not Charging: route it to the 20-23 clear below.
+    if (RecoveryState::get_alertCode() == 22 && regs.chargeStatus != 0 && consecutiveFaults == 0 && !remediationInProgress) consecutiveFaults = 1; // latch alert 22: only with no cycle running, so the 20-23 clear below resets this to 0 in this call
     if (remediationInProgress) {
       const unsigned long now = millis();
       const unsigned long waitMs = (remediationActiveLevel == 2) ? 1000UL : 500UL;
@@ -377,6 +387,25 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
       RecoveryState::set_alertCode(0);
       RecoveryState::set_lastAlertTime(0);
     }
+  }
+
+  // USB latch: corrected USB source + VBUS, stuck 2 h below 4.05 V -> one level-1 cycle per 24 h.
+  const unsigned long now = millis();
+  const bool chargeStuck = usbBackedSource && (regs.vbusStatus == 1 || regs.vbusStatus == 2) && regs.powerGood &&
+                           regs.chargeStatus == 0 && !(regs.faultReg & (kPmicChargeFaultMask | kPmicBatFaultMask)) &&
+                           vcell < 4.05f && !regs.thermalRegulation && safeToCharge;
+  if (!chargeStuck) {
+    latchTiming = false;
+  } else if (!latchTiming) {
+    latchTiming = true;
+    latchSince = now;
+  } else if (now - latchSince >= 7200000UL && (!latchTried || now - latchLastAttempt >= 86400000UL) &&
+             requestRemediationCycle(1, now)) {
+    Log.warn("PMIC: Not Charging 2h on USB REG01=0x%02x REG08=0x%02x REG09=0x%02x - cycling charging, alert 22",
+             (unsigned)pmic.readPowerONRegister(), (unsigned)regs.systemStatus, (unsigned)regs.faultReg);
+    RecoveryState::raiseAlert(22);
+    latchTried = true;
+    latchLastAttempt = now;
   }
 
   // BAT_FAULT (bit 3): battery overvoltage protection - a hardware condition,

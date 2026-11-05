@@ -716,7 +716,7 @@ bool SensorManager::batteryState(BatterySampleContext sampleContext) {
   PMIC pmic(true); // true = lock I2C during operations
   PmicFaultMonitor::Registers pmicRegs =
       PmicFaultMonitor::pollAndRemediate(pmic, safeToCharge, battState, powerSource,
-                                          chargeDisableConfigVerified());
+                                          chargeDisableConfigVerified(), vcell);
   byte faultReg = pmicRegs.faultReg;
   uint8_t vbusStatus = pmicRegs.vbusStatus;
   uint8_t chargeStatus = pmicRegs.chargeStatus;
