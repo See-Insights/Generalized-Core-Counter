@@ -500,6 +500,12 @@ Release pipeline (WO-2026-11-03-003):
    - **Post-tag Console check.** Console → product 42131 → Firmware shows the new version (major × 100 + iteration), the title (`Development Release - v<major>.<iteration>`) and the description (the tag message above `---` plus the GitHub Release link). If it does not, report to Chip: the token cannot remove a version; Chip deletes it in the Console.
    - **Scope failures.** If an upload is refused for scope, record the exact scope named in the error in `docs/notes/particle-api-users-register.md` and report it. No broader scope is granted to make it work.
 
+8. **Creating the release tag (Claude Code; after the bump PR is merged and the architect has seen the notes).** The tag is immutable once pushed (the ruleset blocks updates), so the message is checked before the push:
+   1. **Extract only the message:** `sed -n '/^=== TAG MESSAGE STARTS/,$p' docs/releases/v<major>.<iteration>-notes.md | tail -n +2 > <scratch>/v<major>.<iteration>-msg.md`.
+   2. **Tag the bump PR's merge commit with verbatim cleanup:** `git tag -a v<major>.<iteration> --cleanup=verbatim -F <scratch>/v<major>.<iteration>-msg.md <merge-SHA>`. The default cleanup strips the `##` headings as comments (tested: 5 headings become 0), so `--cleanup=verbatim` is required.
+   3. **Check before pushing:** `git cat-file -p v<major>.<iteration>` shows the first message line `## What changed since v…`, all `##` headings present, the `---` line exactly present, and no header text from the notes file (no "HOW THIS FILE IS USED", no "=== TAG MESSAGE STARTS"). Only then `git push origin v<major>.<iteration>`.
+   4. The tag message convention (Amendment 7): the part above the first `---` is the Particle description; everything is the GitHub Release body.
+
 Success report (job summary of the `publish` job): run link, commit SHA, `.bin` name, size in bytes, SHA-256, source version, host-test count (`N/N`), buildpack image digest (recorded by the firmware job).
 
 After an authorized release, Claude Code monitors the defined telemetry window (read-only) and compares:
