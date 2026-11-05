@@ -1,0 +1,47 @@
+# WO-2026-11-05-003: v50 piece S1 — boot, configuration and time on the built-in AM18x5 driver
+
+**Author:** Claude Code, 5 Nov 2026, DRAFT for the architect's review; not dispatched · **Status:** DRAFT
+**Parent:** `WO-2026-11-05-002-v50-ab1805-switch.md` (Plan B, rulings of 5 Nov); **Branch (when dispatched):** `wo/…-v50-s1-…` stacked on `integration/v50-ab1805`, from `main` after v49.1 is the product default and C1/C2 have merged
+**Workflow:** `AI_DEVELOPMENT_WORKFLOW.md` §3 Stages 5-8; §4 (SHA rule); §5 (boot-time hardware and time: Codex xhigh); §12; §13 (c), (j) · **Agents:** Stage 6 Copilot standard/medium; Stage 7 Codex `gpt-5.6-sol` **xhigh**, at most two rounds · **Budget:** `src/` at most **+20 net** (removals count); stop and report rather than trim style.
+**Dispatch gate:** only once v49.1 is the default (architect, 5 Nov). **S1 never merges to `main` alone** (merge as a set with S2 and S3).
+
+## Plain goal
+Let Device OS 6.6.0 own the carrier-board AB1805 for **boot, binding and time**: one fleet-wide configuration bound once with `Am18x5.enable()`, system time seeded by Device OS before `setup()`, and every application read or write of the external RTC going through `hal_rtc_*` with the external source. The vendored `AB1805_RK` object stays in the tree for S2 (alarm, watchdog, wake classification) and S3 (power-off) and is **not started** by S1. The clock-trust rule is unchanged. Motive: one owner of the chip (not a known defect: the vendored code works on Dev-14).
+
+## Rulings that bind this piece
+Configuration: `particle::Am18x5Configuration` with `Wire` (0x69), `.interruptPin(WKP)`, `.watchdogPin(D5)`, RC fallback on (`RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL`), always-on RC off. **The setter is `hal_rtc_set_time(HAL_RTC_SOURCE_EXTERNAL)`**, confirmed in Step 0 with a test, **or stop and name the alternative** (architect, 5 Nov). Reads: `hal_rtc_get_time(HAL_RTC_SOURCE_EXTERNAL)`; validity: `TimeClass(TimeSource::EXTERNAL).isValid()`. Clock trust unchanged until item 21.
+
+## The change (lines at the v49.1 tag; re-check every one at Step 0)
+1. **Replace the v49 guard and the vendored start.** Delete the binding-delete guard (`Generalized-Core-Counter.cpp:~301-309`) and `ab1805.withFOUT(WKP).setup()` (`:667`). In their place, once, early in `setup()` (before anything reads `Time`): build the fleet configuration and, **if `!ExternalTime.status().bound()`, call `Am18x5.enable(cfg)` and check the result** (log it; a failure continues the boot on the internal clock and records an error, never resets). A stored binding is not re-written. If the stored configuration differs from the fleet one, Step 0 decides between logging it and `disable()` + `enable()`; the default is **log only**. `D5` gets a logical constant beside `WKP` in `device_pinout.h` (`:~35-43`; there is none today).
+2. **Retire reset cause 8** (`ResetCause.h`, the v49 guard's cause): remove the enum value and its site check from `tests/reset_cause_structural_test.py` (the value stays reserved in a comment).
+3. **Startup oscillator snapshot** (`:684-691`, `startupOsc*` globals and the status/ClockDiagnostics payload): `usingRCOscillator()` → `Am18x5.status().clockSource()` and `getConfig().capabilities()` for AOS/FOS. The raw OSC register bytes (`startupOscStatusReg`, `startupOscCtrlReg`) cannot be read through the public API: **keep the payload keys and shape unchanged** and report the config/source-derived values (raw registers read 0) — see open question 2.
+4. **Time reads and writes.** `Clock.cpp:402-403` (`getRtcAsTime`, `setRtcFromSystem`) and the RTC-skew test hook (`:752-758`, `time/RtcSkewTest.h`) → small checked helpers over `hal_rtc_get_time`/`hal_rtc_set_time` (external source) that keep today's bool success semantics (a failed read or write is a failed attempt exactly as now); the write-back stays confirmed-success-only. `isRTCSet()` (`:868`, `HibernateEligibility.cpp:75`) and the RTC read at `HibernateEligibility.cpp:80` → the helpers / `TimeClass(EXTERNAL).isValid()`. The `#include "AB1805_RK.h"` in `Clock.cpp` goes.
+5. **Time seeding.** Device OS now seeds the system time from the chip before `setup()` (seen on the spike: the external RTC was valid at boot, before the cloud). The future-date clamp (`:~378`, which ran before `ab1805.setup()`), the "setup seeds Time" comments (`Clock.cpp:79`, `ClockTrust.h:16,108`, `MyPersistentData.h:631`, `CurrentReadings.h:47`) and any boot ordering that assumed `ab1805.setup()` seeds Time are re-read and corrected; no behavior change is intended.
+6. **Left alone on purpose:** `ab1805.loop()` (`:1174`), `setWDT` (`:809`), `classifyWake(reason, ab1805)` (`:789`), `interruptAtTime`/`stopWDT`/`resumeWDT` and both `deepPowerDown()` callers stay for S2/S3. With `setup()` gone, the vendored object's wake reason reads UNKNOWN and its `loop()` must stay inert until S2 removes it: Step 0 proves `loop()` is harmless without `setup()` (read `AB1805_RK.cpp`), or moves its removal into S1 and states the watchdog consequence.
+
+## Step 0 (read-only, inside Stage 6, before editing; stop and report if any answer breaks the plan)
+1. **The setter.** Read the Device OS 6.6.0 `hal_rtc_set_time` external path and `hal_rtc_get_time` (`hal/src/nRF52840/rtc_hal.cpp:93-130`, `exrtc_hal.cpp`): units, error codes, whether a write affects the system clock or only the chip, rounding to whole seconds. Write a **host test over the helper pair** (fake `hal_rtc_*`) pinning: success, read error, write error, a write then a read-back within 2 s. If the source contradicts the plan, **stop and name the alternative** (e.g. `TimeClass` with a setter, or a Device OS call). The hardware confirmation is the bench step 2 below (the spike binary's `settime <epoch> hal` command).
+2. **Seeding and the clamp.** What does Device OS put in `Time` before `setup()` when the chip is bound, and when it is not (first boot after the OTA, before `enable()`)? List every read of `Time` before the new bind call and every consumer of `Time.isValid()` at boot.
+3. **`enable()` semantics.** Result codes, what a repeat call does on a bound device, the readback API for the stored configuration (`getConfig()`), and whether `enable()` binds in the same boot (so that the first boot after v50 has a valid time source) or needs a reboot: the first-boot behaviour must be stated with file:line.
+4. **Payload contract.** The status/ledger fields fed by `startupOsc*` (`DeviceStatusPublisher`, `ClockDiagnostics`): confirm the keys, and the cloud-side consumers that read the raw registers (fleet-ops, the field-meanings reference), so open question 2 is decided on facts.
+5. **Count.** The net `src/` lines, per file; if over +20, stop and report the cut.
+
+## Tests (host; the real functions)
+Fakes for `Am18x5`/`ExternalTime`/`hal_rtc_*`: bind when unbound (config exactly the fleet one: Wire, WKP, D5, fallback capability); no re-bind when bound; enable failure continues the boot without a reset; stored-config mismatch is logged; helper success/error mapping; `Clock` write-back unchanged on success and failure (the existing Clock tests, expectations unchanged); RTC-skew hook; **no `ab1805.` call remains in S1-owned code** (structural: only the S2/S3 sites listed in item 6); reset cause 8 gone and `reset_cause_structural_test.py` consistent. Mutations (each must fail): enable unconditionally; skip the bound check; reset on enable failure; write via the wrong source; a wrong pin or missing fallback capability; leave `ab1805.setup()` in; keep the guard. `nm`/objdump on the local ELF: `Am18x5.enable` and `hal_rtc_*` referenced from `setup()`/`Clock`.
+
+## Bench (Chip, from 14 Nov; S1 is not benched alone: with `ab1805.setup()` gone, S2's wake classification and watchdog are inoperative — the integrated head carries the bench)
+1. First boot on an unbound device: one `enable()`, `status` shows bound/present/ready and the external clock source; the RTC valid at boot before the cloud; no reset. Second boot: no `enable()`.
+2. Setter: with the spike binary, `settime <epoch> hal`, then `time` shows the system, `TimeClass(EXTERNAL)` and `hal_rtc` readings within 1-2 s (confirms the `hal_rtc_set_time` path on hardware).
+3. A cloud sync: `ClockResync rtcUpdated=1`, `correctionSec` small, read back from the chip within 2 s; the skew hook (`skew 60`) produces and corrects a 60 s error.
+4. The status payload keys and order equal v49.1's.
+
+## Protected / not in scope
+S2 (alarm, watchdog, wake classification, `ab1805.loop()`), S3 (power-off), L, I21; the clock-trust rule, the failsafe, item 19; the persisted/`retained` layouts; M-SoM.
+
+## Rollback
+Revert the S1 commit on the integration branch before the set merges. After the set ships, rollback is to v49 (the guard deletes the stored binding).
+
+## Open questions for the architect
+1. If the stored configuration differs from the fleet one, is **log only** acceptable for v50.1 (every device is configured by this build, so a mismatch can only come from the spike or a future change)?
+2. **Raw oscillator registers in the status payload:** keep the keys and report config/source-derived values (raw bytes 0), or drop the two keys (a contract change for fleet-ops and the field-meanings reference)? Recommendation: keep the keys.
+3. Should `ab1805.loop()` leave in S1 or S2? Recommendation: S2, because it also services the watchdog that S2 replaces.
