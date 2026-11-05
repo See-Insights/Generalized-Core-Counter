@@ -416,9 +416,8 @@ verification.
 #### Mandatory: local toolchain build
 
 Every change must be built with the **local Device OS toolchain** before Stage 7
-can pass. The Particle cloud compile is **not** a per-change check (changed
-2026-10-25, Chip): it runs once per release, on the release branch head (see
-"Release gate: the Particle cloud compile", below).
+can pass. The Particle cloud compile is **not** a check at all since 5 Nov 2026:
+the release build is the CI build (see "Release gate: the CI build", below).
 
 The two use different include-search orders. A source file can compile cleanly in
 the cloud and fail locally — or the reverse — so a cloud build passing is **not**
@@ -451,38 +450,15 @@ device.
 The general lesson, which is the same one behind the linkage check above:
 **verifying with an instrument that cannot see the failure is not verification.**
 
-#### Release gate: the Particle cloud compile (once per release)
+#### Release gate: the CI build (once per release; replaces the Particle cloud compile, 5 Nov 2026)
 
-*Standing rule, Chip, 25 Oct 2026. It replaces the earlier rule that every change
-needed both a local and a cloud build.*
+*Standing rule, architect and Chip, 5 Nov 2026. It retires the cloud-compile release gate of 25 Oct 2026 (#156). Basis: WO-2026-11-02-003 acceptance, met by the CI-built v48 binary: product version and size parity with the local build (accepted +168 bytes of compiler inlining), the CI-built binary flashed to Dev-14 and soaked for 24 h (3-4 Nov 2026) with the same result as the console-uploaded v48 on Dev-09, and the live release-pipeline dry runs (v48.90 published, v48.91 refused).*
 
-- **When:** once per release, on the **release branch head**: `particle compile
-  boron . --target <Device OS version of the release>` (for example `--target
-  6.6.0`), run by Claude Code (Codex's sandbox has no network). It covers **every
-  WO in that release**; no WO or PR needs its own cloud compile.
-- **Record:** the result, with **flash and RAM**, goes in the release record
-  (the release WO, `docs/work-orders/<date>-vNN-release-and-soak.md`, and the
-  release PR body), beside the `.bin` size and sha256 of §13
-  (j). The compile must be of the head that is uploaded, not an earlier commit.
-- **What stays per change:** the local ARM build above, with a fresh
-  `BUILD_PATH_BASE`, and the linkage check (`nm` on the symbolised ELF). A WO's
-  Stage 7 does not wait for the cloud.
-- **If the service is down at release time:** record that (the date, the error
-  text, and a control build of the previous release if one was tried), and
-  **release from the verified local build** as usual (§13 (j)). Do not hold the
-  release for it; retry once the service is back and add the numbers to the
-  record.
-- **Why a release gate and not a per-change one:** the cloud compile exists for the
-  risk in §12.5 (item 5): a library both vendored in `lib/` and listed in
-  `project.properties` can be replaced by the registry copy in a cloud build, so
-  the shipped binary can differ from the local one. That risk concerns the
-  **shipped release**, and one compile of the release head covers it. The
-  include-order collision that the local build catches (above) is a per-change
-  risk, so the local build stays per change. A per-change cloud gate also turns a
-  Particle service failure into a block on every WO: on 25 Oct 2026
-  `particle compile boron --target 6.6.0` timed out ("Compiler timed out or
-  encountered an error", about 2 minutes, no diagnostics) on the candidate of
-  WO-2026-10-25-001 and, as a control, on the unmodified base.
+- **CI is the only release build.** The tag-triggered workflow builds on the runner (Device OS from `project.properties`, `lib/` from the repository, no Particle token); the bench soaks that CI-built `.bin`; **the binary that ships is the binary that was soaked**, uploaded without a rebuild (Stage 9).
+- **Gate:** CI green on the release commit (the merge commit the tag points at), plus the per-change local ARM build and linkage check (unchanged: a fresh `BUILD_PATH_BASE`, `nm` on the symbolised ELF, Stage 7), plus the soak. No `particle compile` is required.
+- **Record:** the CI run id, the `.bin` name, size and SHA-256, the buildpack image digest, and flash and RAM go in the release record and the tag notes (the `publish` job summary lists them), beside §13 (j).
+- **The risk the cloud compile covered** (§12.5 item 5: a library both vendored in `lib/` and listed in `project.properties` replaced by the registry copy in a cloud build) does not apply: CI compiles the repository tree with its `lib/`, as the local build does. "Verify the binary, not the source" stays.
+- **The cloud compile is retired as a gate.** It may still be run ad hoc to diagnose a difference; a failure of the Particle service no longer blocks a release (on 25 Oct 2026 it timed out on a candidate and on the unmodified base).
 
 #### Mandatory: retirement replacement check
 
@@ -568,7 +544,7 @@ codex exec -m <model> -c model_reasoning_effort="<level>" -s workspace-write \
 
 `<N>` is the round number. The names are never reused across rounds: fixed names caused a round-2 run to be fed the round-1 dispatch, and an `-o` file to be overwritten by a later message (3 Nov 2026). `-o` stores the agent's last message, so the dispatch asks for the complete verdict in the final message.
 
-`codex review --uncommitted` is not used: it rejects custom instructions (CLI 0.154.0). Codex's sandbox has no network, so the Particle cloud compile (a release-head check, once per release; see "Release gate" in §3) is run by Claude Code, not in Stage 7.
+`codex review --uncommitted` is not used: it rejects custom instructions (CLI 0.154.0). Codex's sandbox has no network; the CI build is the release build (see "Release gate" in §3), and Stage 7 uses the local toolchain build.
 
 **Copilot** (Stage 6) is dispatched with its CLI, `copilot -p`:
 
@@ -821,7 +797,7 @@ Step 0 ends with STOP or PROCEED. It stops if the estimate is over budget, or if
 **(h) Every verification step names its environment:**
 - the host test suite;
 - the local ARM toolchain build (with its `BUILD_PATH_BASE`);
-- the Particle cloud compile (once per release, on the release branch head; §3);
+- the CI build (the release build, on the release commit; §3);
 - a bench device (by name);
 - the fleet.
 
