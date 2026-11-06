@@ -50,6 +50,7 @@ inline bool isWithinOpenHours() { return cur_in.open; }
 namespace Clock {
 enum class Openness { Open, Closed, Unknown };
 inline Openness openness() { return (Openness)cur_in.openness; }
+inline bool isTrusted() { return cur_in.clockTrusted; }
 }  // namespace Clock
 namespace Config {
 inline uint16_t reportingIntervalSecForRuntime() { return 3600; }

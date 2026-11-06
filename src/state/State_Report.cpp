@@ -79,6 +79,7 @@ void handleReportingState() {
     if (close == 24 && wasOccupied) {
       CurrentReadings::set_occupied(true);
       CurrentReadings::set_occupancyStartTime(std::max(boundary, originalSessionStart));
+      session.occupancyStartMs = millis(); session.pieceUntrusted = !Clock::isTrusted();  // trusted piece
     }
     SystemConfig::set_lastDailyCleanup(now);
     // The night's full modem-off is the verdict: a still-slow modem re-trips

@@ -485,7 +485,7 @@ mutate_and_expect_failure "sleep check moved below sleepAndResume" "soak:" "stat
 $sleep_pending"
 # WO-2026-10-22-001: the wake's LED-timeout close must run before the PIR event is processed.
 mutate_and_expect_failure "PIR event processed before the debounce close" "wake pir\\+end:" "state/State_Modes.cpp" \
-  "    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDStatus() && debounceRemainingMs() == 0) {" \
+  "    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && (signalLEDStatus() || (session.pieceUntrusted && CurrentReadings::get_occupied())) && debounceRemainingMs() == 0) {" \
   "    if (false) {" \
   "        CurrentReadings::set_lastOccupancyEvent(millis());
       }
@@ -495,7 +495,7 @@ mutate_and_expect_failure "PIR event processed before the debounce close" "wake 
   "        CurrentReadings::set_lastOccupancyEvent(millis());
       }
     }
-    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDStatus() && debounceRemainingMs() == 0) {
+    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && (signalLEDStatus() || (session.pieceUntrusted && CurrentReadings::get_occupied())) && debounceRemainingMs() == 0) {
       const bool reportNow = reportsOccupancyChangesNow();
       const OccupancyCloseResult closeResult = closeOccupancySessionSafely(\"sleep\");
       signalLED(false);
@@ -507,6 +507,10 @@ mutate_and_expect_failure "PIR event processed before the debounce close" "wake 
     }
   return false;
 }"
+# WO-2026-11-03-006: the wake close of an open untrusted piece must not depend on the LED.
+mutate_and_expect_failure "wake close gated on the LED for an untrusted piece" "untrusted piece, LED low:" "state/State_Modes.cpp" \
+  "(signalLEDStatus() || (session.pieceUntrusted && CurrentReadings::get_occupied()))" \
+  "signalLEDStatus()"
 mutate_and_expect_failure "connected clear restored, entry take removed" "norepeat:" "state/State_Report.cpp" \
   "$entry_take" "  const bool occupancyChangeTriggered = session.occupancyChangeTriggered;
 " \

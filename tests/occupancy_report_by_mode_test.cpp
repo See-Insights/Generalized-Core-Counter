@@ -102,6 +102,8 @@ struct SessionState {
   bool serviceRequestTriggered = false;
   bool suppressAlert40ThisSession = false;
   bool awaitingWebhookResponse = false;
+  uint32_t occupancyStartMs = 0;
+  bool pieceUntrusted = false;
 };
 SessionState session;
 
@@ -451,6 +453,38 @@ void testWakePirAfterEnd() {
       CHECK_MODE(m, CurrentReadings::get_occupied() && CurrentReadings::get_occupancyStartTime() > before,
                  "wake pir+end: the PIR event starts a new session after the close");
     }
+  }
+}
+
+// WO-2026-11-03-006: the LED can be low while a session is open (a reset, a night-sleep prep). An open untrusted
+// piece is still closed on the debounce predicate alone; a trusted piece keeps the old LED gate.
+void testWakeClosesUntrustedPieceWithLedOff() {
+  for (const ModeCase &m : kModes) {
+    arm(m);
+    occupiedPastDebounce(SLEEPING_STATE);
+    ledOn = false;
+    Clock::trusted = false;
+    session.pieceUntrusted = true;
+    session.occupancyStartMs = CurrentReadings::get_lastOccupancyEvent() - 60000UL;
+    const uint32_t before = CurrentReadings::get_totalOccupiedSeconds();
+    wakeKind = WAKE_PIR;
+    sleepPass();
+    CHECK_MODE(m, CurrentReadings::get_totalOccupiedSeconds() == before + 60 + kDebounceMs / 1000,
+               "untrusted piece, LED low: the wake closes it and credits its millis() on-time");
+    if (m.reportsNow) {
+      CHECK_MODE(m, state == REPORTING_STATE && wentTo("sleep-occupancy-debounce-report"), "untrusted piece, LED low: the close reports");
+    }
+    arm(m);
+    occupiedPastDebounce(SLEEPING_STATE);
+    ledOn = false;
+    Clock::trusted = true;
+    session.pieceUntrusted = false;
+    const uint32_t trustedBefore = CurrentReadings::get_totalOccupiedSeconds();
+    wakeKind = WAKE_PIR;
+    sleepPass();
+    CHECK_MODE(m, CurrentReadings::get_totalOccupiedSeconds() == trustedBefore && CurrentReadings::get_occupied(),
+               "trusted piece, LED low: the wake path is unchanged (no close)");
+    Clock::trusted = true;
   }
 }
 
@@ -806,7 +840,7 @@ int main() {
   testAwakeLatchedOutsideIdle();
   testWakeStart();
   testWakeEnd();
-  testWakePirAfterEnd();  testSoakLatchedWhileSleeping();
+  testWakePirAfterEnd();  testWakeClosesUntrustedPieceWithLedOff();  testSoakLatchedWhileSleeping();
   testTeardownLatchedAfterRequest();
   testPendingMidGateResetsGateTimer();
   testNoRepeat();

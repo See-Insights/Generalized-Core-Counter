@@ -509,7 +509,9 @@ void setup() {
   // was already open so the first trusted close can credit it (item B3). The
   // anchor is captured here, once: a report sent later in this boot advances
   // lastReport and must not move the cap.
-  session.occupancySessionBootAnchor = CurrentReadings::get_occupied()
+  session.pieceUntrusted = CurrentReadings::get_occupied() && !Clock::isTrusted(); session.occupancyStartMs = millis();  // straddler piece starts at boot
+  if (session.pieceUntrusted) Log.info("Occ: untrusted straddler, pre-boot part dropped");
+  session.occupancySessionBootAnchor = CurrentReadings::get_occupied() && !session.pieceUntrusted
       ? std::max(CurrentReadings::get_occupancyStartTime(), SystemConfig::get_lastReport()) : 0;
   CurrentReadings::set_lastOccupancyEvent(0);
 

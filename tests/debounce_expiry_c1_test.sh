@@ -64,7 +64,7 @@ check_sites() {
   local d="$1"
   check_has "$d/State_Idle.cpp" "if (debounceRemainingMs() == 0) {" &&
   check_has "$d/State_Modes.cpp" "if (debounceRemainingMs() == 0) {" &&
-  check_has "$d/State_Modes.cpp" "OCCUPANCY && signalLEDStatus() && debounceRemainingMs() == 0" &&
+  check_has "$d/State_Modes.cpp" "OCCUPANCY && (signalLEDStatus() || (session.pieceUntrusted && CurrentReadings::get_occupied())) && debounceRemainingMs() == 0" &&
   check_has "$d/State_Sleep.cpp" "const uint32_t remaining = debounceRemainingMs();" &&
   check_has "$d/State_Sleep.cpp" "(int)(remaining / 1000UL) + 1"
 }
@@ -98,7 +98,7 @@ PY
 mutate "no expiry clamp" State_Common.h "return elapsed >= debounceMs ? 0 : debounceMs - elapsed;" "return debounceMs - elapsed;"
 mutate "off by the margin" State_Common.h "debounceMs - elapsed;" "debounceMs - elapsed + 1000;"
 mutate "sentinel not handled" State_Common.h "if (last == 0) {" "if (false) {"
-mutate "wall clock close" State_Modes.cpp "OCCUPANCY && signalLEDStatus() && debounceRemainingMs() == 0" "OCCUPANCY && signalLEDStatus() && signalLEDTimeRemaining() == 0"
+mutate "wall clock close" State_Modes.cpp "pieceUntrusted && CurrentReadings::get_occupied())) && debounceRemainingMs() == 0" "pieceUntrusted && CurrentReadings::get_occupied())) && signalLEDTimeRemaining() == 0"
 mutate "awake idle on subtraction" State_Idle.cpp "if (debounceRemainingMs() == 0) {" "if (millis() - CurrentReadings::get_lastOccupancyEvent() > 1) {"
 mutate "plan on RTC deadline" State_Sleep.cpp "const uint32_t remaining = debounceRemainingMs();" "const uint32_t remaining = signalLEDTimeRemaining() * 1000UL;"
 mutate "plan margin dropped" State_Sleep.cpp "(int)(remaining / 1000UL) + 1" "(int)(remaining / 1000UL)"
