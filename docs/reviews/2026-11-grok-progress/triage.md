@@ -1,6 +1,6 @@
 # Triage of Grok's review of the v49.1 progress pack (6 Nov 2026)
 
-**Rulings: Chip (6 Nov).** Grok's full responses are `grok-response.md` (saved 6 Nov, verbatim), `grok-response-2.md` and `grok-summary.md` in this folder (**the last two are not saved yet: Chip to paste them**). This file records only the rulings and the checks Claude Code made. F-numbers are Grok's; this triage does not restate the findings beyond Chip's one-line labels.
+**Rulings: Chip (6 Nov).** Grok's full responses are `grok-response.md` and `grok-response-2.md` (saved 6 Nov, verbatim) and `grok-summary.md` (**not saved yet: Chip to paste it**) in this folder. This file records only the rulings and the checks Claude Code made. F-numbers are Grok's; this triage does not restate the findings beyond Chip's one-line labels.
 
 | # | Ruling | Where it lands |
 |---|---|---|
@@ -36,7 +36,7 @@ Labels are Chip's; the follow-up's own text is in `grok-response-2.md` once save
 **Notes from Claude Code**
 - **The I21 verdict has no explicit "out of window".** `WakeVerdict` is a six-arm gate plus `sleepErrorSec` (actual minus requested). "Out of window" is not a field. The I21 WO's Step 0 item 6 asks which arm or bound means it; a time bound on `sleepErrorSec` would be new, not a reuse, and Step 0 must say so and size it from the `hibernate_wake` events. If the verdict needs storage past this boot, Step 0 stops and reports (the layouts stay unchanged).
 - **S1 is not touched.** None of these rulings changes S1 or its Amendments, so nothing is added to its Stage 7 dispatch notes. S2 and S3 gain cross-reference text only.
-- **V2 and V3 cross-references name no specific gate**, because the follow-up's text was not available: they record the ruling and tell Stage 6/7 to stop and report if an item turns out not to be covered. Fill in the specific gates when `grok-response-2.md` is saved.
+- **V2 and V3 cross-references now name their gates** (draft branch `7cce641`), from the saved follow-up: V2 -> S2 Step 0 item 4, the parent's ruling 5 and S3's ruling 2 (the post-`POWER_OFF` reason is confirmed on S3's bench and S2's table corrected if it differs); V3 -> S2 Amendments 1-2 and S3 Amendment 2 (Step 0 names the persisted field and file:line for each caller; a spare byte if none; stop and ask only if none), plus the forced `flushAllBeforeReset()` before both power-off calls (`ConnectivityFailsafe.cpp:~315`, `State_Error.cpp:177`).
 
 # Grok summary judgment: rulings, Chip, 6 Nov 2026
 Grok's bottom line matches our release rule (Chip). Text in `grok-summary.md` once saved.
@@ -48,3 +48,11 @@ Grok's bottom line matches our release rule (Chip). Text in `grok-summary.md` on
 - **F2's recommendation** is to "persist the open-session anchor ... in the retained block". The session start is already persisted in `current.dat` (see the F2 check above); what is not protected is a write made just before a reset that cannot flush. That is the "partly wrong" part of Chip's ruling. Grok's F2 evidence cites only `StateMachine.h:49-71` (SessionState), not the persisted store.
 - **F3's three bench cases** (binding present on v50, rollback v50 to v49 with the chip watchdog armed, the wake reason after a native `POWER_OFF`) correspond to the parent WO's pre-ship bench items 1 and 2 and to the architect's ruling 5 (S3's bench must confirm the reason after a native `POWER_OFF` before v50.1 releases); item 3 covers v50 on a bound and an unbound device.
 - **Grok's cuts (its section 4)** include two items not in Chip's rulings: the diagnostics-publish batch and per-category trace flags when not the release default, and removing the vendored `AB1805_RK` (that is L, v50.2, as planned). The first is unruled.
+
+**Checked against the saved follow-up (`grok-response-2.md`, Claude Code, 6 Nov).**
+- **F2 withdrawn by Grok:** it accepts that the open-session start is persisted (`MyPersistentData.h:650-678`; `Generalized-Core-Counter.cpp:512-513`) and reduces F2 to the deferred-write window before an unflushable reset, which is item 15. This agrees with the F2 check above (the residual gap there is the same window).
+- **F1 recommendations (RTC continuity evidence)** are what the summary ruling declines (see the summary section): a stored pre-write RTC reading and a persisted last-known clock source. They are Grok's V4 as well: **V4 as numbered in this response is "persist the last-known clock source (one byte)"**, which Chip declined.
+- **V1:** Grok also asks for a partial S1-only rollback case and for a rollback after `enable()` but before the first `ExternalWatchdog` refresh. Chip's ruling is the integrated-head test only. S1 is never merged or benched alone (S1 WO bench note), so the S1-only case is not run; the "after `enable()` but before the first refresh" timing is covered by (b) only if the flash is done early in that window. Not added; Chip may want it.
+- **V2 gate timing:** Grok wants the S3-bench result to gate the set *merge*; the existing rulings gate the *v50.1 release* (note in the S2 WO).
+- **F4 mechanism:** Grok's cycle (a stage-2 reset, a boot with a fresh `lastConnection` or age base, a brief connect, a wedge, repeat) is a hypothesis that was not checked against the code (`ConnectivityFailsafe.cpp:188-229, 301-316`). Chip's ruling is data-driven (the 7 Nov count); if the pre-RC1 Step 0 is triggered, it must test this exact cycle first. Added to recovery plan item 17.
+- **Grok says it found no I21 WO:** it exists only on the draft branch (`wo/2026-11-05-002-v50-ab1805-switch-draft`), not on `main`; Grok's review was against the v49.1 tag.
