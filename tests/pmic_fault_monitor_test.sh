@@ -21,3 +21,8 @@ clang++ -std=c++17 -Wall -Wextra -pedantic \
 "$binary" 3
 "$binary" 4
 "$binary" 5
+"$binary" 6
+"$binary" 7
+"$binary" 8
+"$binary" 9
+"$binary" 10

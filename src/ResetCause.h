@@ -20,4 +20,5 @@ enum ResetCause : uint32_t {
   RESET_CAUSE_SLEEP_ATTEMPTS_EXHAUSTED = 5,///< All sleep attempts failed
   RESET_CAUSE_ERROR_STATE_SOFT = 6,        ///< ERROR_STATE soft reset
   RESET_CAUSE_OUT_OF_MEMORY = 7,           ///< out of memory
+  RESET_CAUSE_EXRTC_BINDING_DELETE = 8,    ///< setup() deleted a stored Device OS RTC binding; the withdrawn planned-reset design used 8 and was never merged
 };

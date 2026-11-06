@@ -87,6 +87,7 @@ class PMIC {
   int disableChargingCallCount = 0;
   int enableChargingCallCount = 0;
   int setWatchdogCallCount = 0;
+  int readPowerOnCallCount = 0;
 
   uint8_t getFault() {
     const uint8_t v = faultRegQueue[faultCallCount < 2 ? faultCallCount : 1];
@@ -95,6 +96,10 @@ class PMIC {
   }
 
   uint8_t getSystemStatus() { return systemStatusValue; }
+  uint8_t readPowerONRegister() {
+    readPowerOnCallCount++;
+    return 0x1b;
+  }
   void disableCharging() { disableChargingCallCount++; }
   void enableCharging() { enableChargingCallCount++; }
   void setWatchdog(int) { setWatchdogCallCount++; }

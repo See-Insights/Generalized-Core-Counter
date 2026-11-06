@@ -113,6 +113,11 @@ def parse_outputs(path):
     return out
 
 
+LAST = {}
+SHA7 = "abcdef1"
+CANON = "gcc-v49.1-boron-dos6.6.0-" + SHA7 + ".bin"
+
+
 def stub_run(script, tag, message, objtype="tag", bins=("a.bin",), good_hash=True):
     d = tempfile.mkdtemp()
     try:
@@ -136,9 +141,13 @@ def stub_run(script, tag, message, objtype="tag", bins=("a.bin",), good_hash=Tru
         outp = os.path.join(d, "out")
         open(outp, "w").close()
         env = dict(os.environ, PATH=bd + os.pathsep + os.environ["PATH"], GH_TOKEN="x", TAG=tag,
-                   WANT_SHA=want, GITHUB_REPOSITORY="o/r", GITHUB_OUTPUT=outp,
-                   STUB_TYPE=objtype, STUB_MSG=os.path.join(d, "msg"))
+                   WANT_SHA=want, GITHUB_REPOSITORY="o/r", GITHUB_SERVER_URL="https://example.test", GITHUB_OUTPUT=outp,
+                   OS="6.6.0", GITHUB_SHA=SHA7 + "0123456789abcdef0123456789abcdef", STUB_TYPE=objtype, STUB_MSG=os.path.join(d, "msg"))
         r = subprocess.run(["bash", "-c", script], cwd=d, env=env, capture_output=True, text=True)
+        LAST.clear()
+        LAST["files"] = sorted(os.listdir(os.path.join(d, "fw")))
+        for f in LAST["files"]:
+            LAST[f] = open(os.path.join(d, "fw", f), "rb").read()
         return r.returncode, (parse_outputs(outp) if r.returncode == 0 else None), open(outp).read()
     finally:
         shutil.rmtree(d)
@@ -178,36 +187,77 @@ def main():
     r = subprocess.run(["bash", "-n"], input=script, text=True, capture_output=True)
     check(r.returncode == 0, "bash -n of meta step: " + r.stderr)
 
-    # normal, one-line, hostile messages: outputs carry the text verbatim and nothing else
+    link = "[GitHub Release](https://example.test/o/r/releases/tag/v49.1)"
+    title = "Development Release - v49.1"
+    hostile = ("Title $(id) `id`\n\nEOF\ndescription<<abc\nabc\n::set-output name=x::y\n"
+               "version=9999\n$(id) `id` ${HOME}\n::add-mask::x\nEOF")
+    below = "SECRET-BELOW\nverification $(id) `id`\nEOF\nversion=9999"
+    # A `---` inside a fenced block is still the first `---` line: the split is purely line-based.
     cases = [
-        ("normal", "Title line\n\nBody one\nBody two"),
-        ("one-line", "Only a title"),
-        ("hostile", "Title $(id) `id`\n\nEOF\ndescription<<abc\nabc\n::set-output name=x::y\n"
-                    "version=9999\n$(id) `id` ${HOME}\n::add-mask::x\nEOF"),
+        ("normal", "What changed\n- a\n\nRollback: x\n---\nVerification\n" + below, "What changed\n- a\n\nRollback: x"),
+        ("separator first", "---\n" + below, ""),
+        ("hostile", hostile + "\n---\n" + below, hostile),
+        ("fenced separator", "Intro\n```\n---\n```\n" + below, "Intro\n```"),
+        ("evil title", "Evil title\nbody\n---\n" + below, "Evil title\nbody"),
     ]
-    for name, msg in cases:
+    for name, msg, above in cases:
         code, out, raw = stub_run(script, "v49.1", msg)
         check(code == 0, "%s: exit %s" % (name, code))
         if code:
             continue
-        first, _, rest = msg.partition("\n")
+        want = (above + "\n" if above else "") + "\n" + link
         check(set(out) == {"bin", "version", "title", "description"}, "%s: output keys %s" % (name, sorted(out)))
         check(out.get("version") == "4901", "%s: version %r" % (name, out.get("version")))
-        check(out.get("title") == "v49.1: " + first, "%s: title %r" % (name, out.get("title")))
-        check(out.get("description") == rest, "%s: description %r != %r" % (name, out.get("description"), rest))
-        check(out.get("bin") == "fw/a.bin", "%s: bin %r" % (name, out.get("bin")))
-    code, out, _ = stub_run(script, "v7.12", "T")
+        check(out.get("title") == title, "%s: title %r" % (name, out.get("title")))
+        check(out.get("description") == want, "%s: description %r != %r" % (name, out.get("description"), want))
+        check("SECRET-BELOW" not in raw and "verification" not in raw, "%s: text below --- leaked" % name)
+        check(out.get("bin", "").endswith(CANON), "%s: bin %r does not end with %s" % (name, out.get("bin"), CANON))
+        check(out.get("bin") == "fw/" + CANON, "%s: bin %r" % (name, out.get("bin")))
+        check(LAST.get("files") == [CANON], "%s: fw/ holds %r, want only the renamed file" % (name, LAST.get("files")))
+        check(LAST.get(CANON) == b"firmware a.bin", "%s: renamed content differs" % name)
+    code, out, _ = stub_run(script, "v49.1", "---\nbelow")
+    check(code == 0 and out["description"].strip() == link, "separator-first description is only the link")
+    code, out, raw = stub_run(script, "v49.1", "No separator here\nbody")
+    check(code != 0 and raw == "", "no --- line must fail with no outputs (code %s, raw %r)" % (code, raw))
+    code, out, raw = stub_run(script, "v49.1", "x\n --- \n----\n---x")
+    check(code != 0 and raw == "", "near-miss separators must not count")
+
+    muts = {
+        "title from first line": ('echo "title=Development Release - $TAG"', 'echo "title=$TAG: ${msg%%$\'\\n\'*}"'),
+        "description includes below": ("sed '/^---$/,$d' <<<\"$msg\"", 'echo "$msg"'),
+        "no fail-closed check": ("grep -qx -- '---' <<<\"$msg\" ||", "false ||"),
+        "link missing": ('echo "[GitHub Release]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG)"; ', ""),
+        "bin is original path": ('bin=$new\n', 'new=$new\n'),
+        "name missing dos": ("-boron-dos$OS-", "-boron-$OS-"),
+        "name missing sha7": ("-${GITHUB_SHA::7}.bin", ".bin"),
+        "sed removed": ("sed '/^---$/,$d' <<<\"$msg\"", "cat <<<\"$msg\""),
+    }
+    for name, (a, b) in muts.items():
+        ms = script.replace(a, b)
+        check(ms != script, "script mutation %r did not change the script" % name)
+        ok = True
+        for _, msg, above in cases[:3]:
+            code, out, raw = stub_run(ms, "v49.1", msg)
+            want = (above + "\n" if above else "") + "\n" + link
+            if code != 0 or out.get("title") != title or out.get("description") != want or "SECRET-BELOW" in raw \
+                    or out.get("bin") != "fw/" + CANON or LAST.get("files") != [CANON]:
+                ok = False
+        code, _, _ = stub_run(ms, "v49.1", "No separator\nbody")
+        if code == 0:
+            ok = False
+        check(not ok, "script mutation %r not detected" % name)
+    code, out, _ = stub_run(script, "v7.12", "T\n---")
     check(code == 0 and out["version"] == "712", "v7.12 should give 712")
-    code, out, _ = stub_run(script, "v10.01", "T")
+    code, out, _ = stub_run(script, "v10.01", "T\n---")
     check(code == 0 and out["version"] == "1001", "v10.01 should give 1001 (no octal error)")
 
     for name, kw in [
-        ("lightweight tag", dict(tag="v49.1", message="T", objtype="commit")),
-        ("bad tag name", dict(tag="v49.1.2", message="T")),
-        ("bad tag name 3 digits", dict(tag="v100.1", message="T")),
-        ("changed hash", dict(tag="v49.1", message="T", good_hash=False)),
-        ("two bins", dict(tag="v49.1", message="T", bins=("a.bin", "b.bin"))),
-        ("no bin", dict(tag="v49.1", message="T")),
+        ("lightweight tag", dict(tag="v49.1", message="T\n---", objtype="commit")),
+        ("bad tag name", dict(tag="v49.1.2", message="T\n---")),
+        ("bad tag name 3 digits", dict(tag="v100.1", message="T\n---")),
+        ("changed hash", dict(tag="v49.1", message="T\n---", good_hash=False)),
+        ("two bins", dict(tag="v49.1", message="T\n---", bins=("a.bin", "b.bin"))),
+        ("no bin", dict(tag="v49.1", message="T\n---")),
     ]:
         kw = dict(kw)
         if name == "no bin":
@@ -216,6 +266,9 @@ def main():
         else:
             code, _, _ = stub_run(script, kw.pop("tag"), kw.pop("message"), **kw)
         check(code != 0, "%s should fail" % name)
+        if name in ("changed hash", "two bins"):
+            want_files = ["a.bin", "b.bin"] if name == "two bins" else ["a.bin"]
+            check(LAST.get("files") == want_files, "%s: renamed before failing (%r)" % (name, LAST.get("files")))
 
     if fails:
         print("FAIL")

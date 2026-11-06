@@ -299,6 +299,15 @@ void setup() {
   validateRetainedBoot(retainedBoot);
   waitForDebugSerialIfConnected();
 
+  // v49 guard: Device OS must not own the AB1805 that AB1805_RK drives. The reset makes the delete take effect before any use of the chip.
+  if (ExternalTime.status().bound()) {
+    const int r = ExternalTime.disable();
+    Log.warn("AB1805: stored Device OS binding deleted (r=%d)", r);
+    const bool ours = System.resetReason() == RESET_REASON_USER && System.resetReasonData() == RESET_CAUSE_EXRTC_BINDING_DELETE;
+    if (r == 0 && !ExternalTime.status().bound() && !ours) System.reset(RESET_CAUSE_EXRTC_BINDING_DELETE);
+    else if (ours && ExternalTime.status().bound()) Log.warn("AB1805: binding survived the delete");
+  }
+
   ensureRetainedLoopForensicsInitialized();
 
   const int reason = System.resetReason();
