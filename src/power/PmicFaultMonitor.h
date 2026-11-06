@@ -16,8 +16,8 @@ constexpr uint8_t kPmicNtcFaultMask = 0x07;    // REG09 bits 2:0
 // a fault occurs. Both run every battery sample; remediation here always
 // yields to `safeToCharge == false` (never fights the thermal inhibit).
 //
-// Alerts: 20=thermal shutdown, 21=charge timeout/stuck charging,
-// 23=battery/general charge fault. Remediation: level 0 monitor-only,
+// Alerts: 20=thermal shutdown, 21=charge timeout/stuck charging, 22=USB Not
+// Charging 2 h, 23=battery/general charge fault. Remediation: level 0 monitor-only,
 // level 1 soft reset (2+ consecutive faults), level 2 power cycle + watchdog
 // (3+ consecutive faults), 1h cooldown, auto-clears when healthy.
 namespace PmicFaultMonitor {
@@ -47,7 +47,7 @@ struct Registers {
 // effect (WO-2026-08-25-001 Amendment B Blocker 4; renamed under Amendment C
 // Decision C3 point 3).
 Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int powerSource,
-                            bool chargeDisableConfigVerified);
+                            bool chargeDisableConfigVerified, float vcell);
 
 // Compact per-cycle ChargeDiag log line (also carries the trace fields
 // previously logged separately) + pdiag forensic record. Reuses the
