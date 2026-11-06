@@ -1,6 +1,6 @@
 # Triage of Grok's review of the v49.1 progress pack (6 Nov 2026)
 
-**Rulings: Chip (6 Nov).** Grok's full responses are `grok-response.md`, `grok-response-2.md` and `grok-summary.md` in this folder (**none is saved yet: the text was not in the session; Chip to paste them**). This file records only the rulings and the checks Claude Code made. F-numbers are Grok's; this triage does not restate the findings beyond Chip's one-line labels.
+**Rulings: Chip (6 Nov).** Grok's full responses are `grok-response.md` (saved 6 Nov, verbatim), `grok-response-2.md` and `grok-summary.md` in this folder (**the last two are not saved yet: Chip to paste them**). This file records only the rulings and the checks Claude Code made. F-numbers are Grok's; this triage does not restate the findings beyond Chip's one-line labels.
 
 | # | Ruling | Where it lands |
 |---|---|---|
@@ -9,7 +9,7 @@
 | F3 | **Covered** by the pre-ship bench items 1-3 plus the S2/S3 rulings | `WO-2026-11-05-002-v50-ab1805-switch.md` (pre-ship bench; rulings of 5 Nov) |
 | F4 | **Cleanup:** put the last failsafe stage and its time in the status payload | Recovery plan item 17 (cleanup series) |
 | F5 | **Accept now:** a CI step on `v*` tags that fails the build if `DEV_BUILD` or `CONNECTIVITY_FAILSAFE_TEST_MODE` is not 0. Small WO, before RC1; Codex high | Recovery plan item 28 |
-| Cuts | The PMIC retained fields declared in `SensorManager.h` go to cleanup. Library removal (L) stays as planned (v50.2) | Recovery plan item 17; `WO-2026-11-05-002` (L) |
+| Cuts (Grok section 4) | The PMIC retained fields declared in `SensorManager.h` go to cleanup. Library removal (L) stays as planned (v50.2) | Recovery plan item 17; `WO-2026-11-05-002` (L) |
 
 ## F2 check (read-only, `origin/main` @ daec561, v49.1 + C1 + C2)
 **Confirmed:**
@@ -43,3 +43,8 @@ Grok's bottom line matches our release rule (Chip). Text in `grok-summary.md` on
 - **I21: persisted continuity evidence is not needed.** The write-back's correction check (greater than 60 s zeroes `lastTimeSync`) rejects drifting or rate-halved RTCs, and the hibernate-window check (I21 ruling 7) covers the hibernate case. Recorded in the I21 WO ("Why persisted continuity evidence is not needed"), with the residual window stated.
 - **Stage-2 ceiling: data-driven.** Decided from the 7 Nov fleet check (3 or more stage-2 resets in a week on any device triggers a pre-RC1 Step 0); **if not triggered, re-decide at RC1 planning.**
 - **Wave 1 prep.** After the 7 Nov 05:17Z fleet check, if it is clean, Claude Code gives Chip a wave-1 checklist: the device list (WakeForest-PC01 plus the non-Vaughan active units; the Vaughan six later), the steps (move to 42131, pin 4901, confirm the pin per the pin rule) and the first-boot checks (Eastern schedule, fw 4901, reset 70, Ubidots continuity). Not before the check; not if it is not clean.
+
+**Checked against the saved first response (Claude Code, 6 Nov).** Chip's F1-F5 labels match Grok's findings (F1 clock trust, F2 reset/persistence, F3 AB1805 switch, F4 field recovery, F5 release/process). Two points of detail:
+- **F2's recommendation** is to "persist the open-session anchor ... in the retained block". The session start is already persisted in `current.dat` (see the F2 check above); what is not protected is a write made just before a reset that cannot flush. That is the "partly wrong" part of Chip's ruling. Grok's F2 evidence cites only `StateMachine.h:49-71` (SessionState), not the persisted store.
+- **F3's three bench cases** (binding present on v50, rollback v50 to v49 with the chip watchdog armed, the wake reason after a native `POWER_OFF`) are the pre-ship bench items 1, 2 and 4 in `WO-2026-11-05-002`; item 3 of Chip's "items 1-3" covers v50 on a bound and an unbound device.
+- **Grok's cuts (its section 4)** include two items not in Chip's rulings: the diagnostics-publish batch and per-category trace flags when not the release default, and removing the vendored `AB1805_RK` (that is L, v50.2, as planned). The first is unruled.
