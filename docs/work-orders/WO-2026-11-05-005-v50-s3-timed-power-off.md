@@ -45,3 +45,6 @@ Both callers write the **persisted "power-off requested" record** (failsafe or r
 
 ## Amendment 2 (architect, 5 Nov 2026) — no new flag; derive the record from existing fields
 Replaces the "persisted power-off record" wording of Amendment 1: the stage-3 caller relies on the failsafe's already-persisted **stage and action** (written by `persistConnectivityFailsafeState(3, now, true)` before the call), and the ERROR_STATE caller on the Error state's **recorded hard-reset action**. **No new flag.** Step 0 (item 5) finds, per caller, the exact persisted field and confirms it is flushed before the power-off and cleared (or superseded) once the boot has classified the wake. If a caller persists nothing usable, **use an existing spare byte**; **only if none exists, stop and ask.** Counted in the +20 budget.
+
+## Grok follow-up V3 (Chip, 6 Nov 2026)
+Grok's follow-up item **V3** is ruled **already gated** by this WO's existing rulings, Step 0 and bench items; it adds no scope. Cross-reference only: see the parent's "Grok follow-up cross-references" section and `docs/reviews/2026-11-grok-progress/triage.md`. If Stage 6 or 7 finds the item is not in fact covered by a gate named here, stop and report.

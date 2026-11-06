@@ -56,3 +56,6 @@ Revert the S2 commit on the integration branch before the set merges. After the 
 
 ## Amendment 2 (architect, 5 Nov 2026) — the "power-off requested" evidence is derived, not new
 No new flag. The evidence is **derived from existing persisted fields:** the failsafe's persisted **stage and action** (`persistConnectivityFailsafeState(3, now, true)`, written before the stage-3 power-off) and the Error state's **recorded hard-reset action** (the persisted recovery/alert record the ERROR_STATE hard path writes before `flushAllBeforeReset()`). Step 0 names the exact fields and file:line for each caller. If a path persists nothing usable, **use an existing spare byte** (no layout change); **only if there is none, stop and ask.** `retained` RAM is never evidence. Tests: the (b) table reads the derived fields; a mutation that reads `retained` instead must fail.
+
+## Grok follow-up V2 (Chip, 6 Nov 2026)
+Grok's follow-up item **V2** is ruled **already gated** by this WO's existing rulings, Step 0 and bench items; it adds no scope. Cross-reference only: see the parent's "Grok follow-up cross-references" section and `docs/reviews/2026-11-grok-progress/triage.md`. If Stage 6 or 7 finds the item is not in fact covered by a gate named here, stop and report.
