@@ -2,7 +2,7 @@
 
 PROJECT_NAME           = "Generalized-Core-Counter"
 PROJECT_BRIEF          = "Particle-based generalized core counter firmware"
-PROJECT_NUMBER         = "v49.1-DurableResets"
+PROJECT_NUMBER         = "v50.1-NativeRTC"
 
 # Where to put generated docs
 OUTPUT_DIRECTORY       = docs

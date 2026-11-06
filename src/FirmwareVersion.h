@@ -17,9 +17,9 @@
 #define FIRMWARE_VERSION_H
 
 /** @brief Particle Product integer version (must be an integer). */
-#define FIRMWARE_PRODUCT_VERSION 4901
+#define FIRMWARE_PRODUCT_VERSION 5001
 
 /** @brief Current firmware release string. */
-inline const char* FIRMWARE_VERSION = "v49.1-DurableResets";
+inline const char* FIRMWARE_VERSION = "v50.1-NativeRTC";
 
 #endif /* FIRMWARE_VERSION_H */
