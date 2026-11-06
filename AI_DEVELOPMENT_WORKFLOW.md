@@ -577,6 +577,16 @@ Every report from Copilot, Codex, or Claude Code states:
 
 A Codex verdict's first line quotes the `UNDER REVIEW` SHA. A missing or mismatched SHA invalidates the verdict: not counted as a round, archived, rerun.
 
+### Stage 7 time-box (standing rule, Chip, 6 Nov 2026)
+
+A Codex Stage 7 round has a **90-minute time-box** from the moment it is dispatched. The controller registers a completion watcher for the run at dispatch (tested once before it is backgrounded) with a deadline 90 minutes out. If no verdict has been delivered by the deadline:
+
+1. **Stop the run** (kill only the `codex exec` process the controller started).
+2. **Archive the partial output** under `docs/work-orders/` with a name that marks it partial (for example `<WO>-stage7-r<N>-partial.md`); it is a record, **not a verdict, and the round is not counted** against the two-round limit.
+3. **Re-dispatch the round** with a new dispatch file (the names are never reused, §4 Commands) on the same commit, or on the newer commit if the code has changed meanwhile; the `UNDER REVIEW` SHA rule is unchanged.
+
+The time-box applies to the round, not to a single tool call. **Chip may extend it** for a named reason (for example an outage of the network or the vendor service, as on 6 Nov 2026 when a round on `ce2e597` stalled during an internet outage); the extension and its end time are written into the next dispatch's header. A round that delivers a verdict inside the box is judged on the verdict only; speed is not a criterion.
+
 ### Records
 
 Dispatches and verdicts are saved under `docs/work-orders/`, never only in a scratchpad. The verdict file is the record that a Work Order passed review.
