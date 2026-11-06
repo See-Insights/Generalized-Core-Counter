@@ -1,6 +1,6 @@
 # Triage of Grok's review of the v49.1 progress pack (6 Nov 2026)
 
-**Rulings: Chip (6 Nov).** Grok's full responses are `grok-response.md` and `grok-response-2.md` in this folder (**neither is saved yet: the text was not in the session; Chip to paste both**). This file records only the rulings and the checks Claude Code made. F-numbers are Grok's; this triage does not restate the findings beyond Chip's one-line labels.
+**Rulings: Chip (6 Nov).** Grok's full responses are `grok-response.md`, `grok-response-2.md` and `grok-summary.md` in this folder (**none is saved yet: the text was not in the session; Chip to paste them**). This file records only the rulings and the checks Claude Code made. F-numbers are Grok's; this triage does not restate the findings beyond Chip's one-line labels.
 
 | # | Ruling | Where it lands |
 |---|---|---|
@@ -37,3 +37,9 @@ Labels are Chip's; the follow-up's own text is in `grok-response-2.md` once save
 - **The I21 verdict has no explicit "out of window".** `WakeVerdict` is a six-arm gate plus `sleepErrorSec` (actual minus requested). "Out of window" is not a field. The I21 WO's Step 0 item 6 asks which arm or bound means it; a time bound on `sleepErrorSec` would be new, not a reuse, and Step 0 must say so and size it from the `hibernate_wake` events. If the verdict needs storage past this boot, Step 0 stops and reports (the layouts stay unchanged).
 - **S1 is not touched.** None of these rulings changes S1 or its Amendments, so nothing is added to its Stage 7 dispatch notes. S2 and S3 gain cross-reference text only.
 - **V2 and V3 cross-references name no specific gate**, because the follow-up's text was not available: they record the ruling and tell Stage 6/7 to stop and report if an item turns out not to be covered. Fill in the specific gates when `grok-response-2.md` is saved.
+
+# Grok summary judgment: rulings, Chip, 6 Nov 2026
+Grok's bottom line matches our release rule (Chip). Text in `grok-summary.md` once saved.
+- **I21: persisted continuity evidence is not needed.** The write-back's correction check (greater than 60 s zeroes `lastTimeSync`) rejects drifting or rate-halved RTCs, and the hibernate-window check (I21 ruling 7) covers the hibernate case. Recorded in the I21 WO ("Why persisted continuity evidence is not needed"), with the residual window stated.
+- **Stage-2 ceiling: data-driven.** Decided from the 7 Nov fleet check (3 or more stage-2 resets in a week on any device triggers a pre-RC1 Step 0); **if not triggered, re-decide at RC1 planning.**
+- **Wave 1 prep.** After the 7 Nov 05:17Z fleet check, if it is clean, Claude Code gives Chip a wave-1 checklist: the device list (WakeForest-PC01 plus the non-Vaughan active units; the Vaughan six later), the steps (move to 42131, pin 4901, confirm the pin per the pin rule) and the first-boot checks (Eastern schedule, fw 4901, reset 70, Ubidots continuity). Not before the check; not if it is not clean.
