@@ -1,0 +1,16 @@
+**Overall assessment**
+
+You have made real, measurable progress toward production-grade firmware, and the plan to RC1 is coherent. The September concentration of risk in four cores has been reduced, clock ownership is named and used, deliberate resets now flush, the recovery ladder is explicit, and the release pipeline has actual gates. The v50 switch plan (S1–S3 merged as a set, v49 as the rollback floor, binding guard, pre-ship bench that includes an armed-watchdog rollback and two real nights) is the right shape for the remaining ownership problem. The process itself (architect / implementer / independent verifier quoting the SHA / human merge gate) is better than most AI-assisted firmware efforts I have seen.
+
+It is not yet production-grade for an unattended outdoor occupancy fleet. The residual risks are still in the places that produce wrong counts or a device that is dark and unrecoverable:
+
+- Clock trust still does not survive a restart. The planned carry rule (valid RTC, <24 h, no oscillator-fault event, next correction <60 s) is a sound first cut, but it needs the continuity check I described (prior RTC reading + last-known clock source persisted) or a slowly drifting or rate-halved RTC can re-enter the trusted path.
+- The open-session start is persisted (I was wrong on that in F2). What remains is the deferred-write window before an unflushable reset, already tracked as item 15. That is acceptable for people-counting if you keep the “at most one partial session” bound and the post-tag C1/C2 fixes ship.
+- The AB1805 switch is the highest remaining execution risk. The plan correctly refuses to merge any piece alone and correctly treats the post-POWER_OFF reason and the armed-watchdog rollback as gates. The gaps I flagged (partial-rollback timing, retained-window loss on power-down, derived power-off evidence) are closable in Step 0 and the bench; they are not reasons to abandon the switch.
+- The failsafe ladder is sound for devices nobody can reach, with the one addition of a hard ceiling on consecutive stage-2 resets so a cycle of “reset → brief connect → wedge” cannot keep the device in stage 2 indefinitely.
+
+The complexity has been moved more than it has been removed (src/ grew, persistence fan-in relocated to SystemConfig.h, time/ is now large). That is acceptable for this device class if the new modules are the single owners they claim to be and the diagnostic layers that are not load-bearing stay behind the bench profile. The 24 h bench soak plus the planned two-night hibernate proof is the right integration harness; host tests alone will not catch the dual-ownership or wake-classification failures.
+
+**Bottom line**
+
+You are on a sound path to a field release candidate in the 20–23 Nov window, provided the v50 set does not merge until the pre-ship bench items (binding present, armed-watchdog rollback to v49, post-native-POWER_OFF reason recorded and classification updated if needed, two clean 8 h nights) pass, and the clock-trust carry (I21) includes the continuity evidence above. The single biggest remaining risk is still wrong occupancy counts from an untrusted or incorrectly trusted clock across a restart or a hibernate, not a bricked device. Close that, keep the human gate on the switch, and the firmware is ready for the first production wave.
