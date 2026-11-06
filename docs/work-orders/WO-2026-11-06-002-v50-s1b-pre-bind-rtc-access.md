@@ -21,7 +21,7 @@ S1b fixes both from the application side, in the one window where the applicatio
 5. **First unbound boot:** with (a), the internal clock is valid before the bind, so the bind's copy writes the same time back (within rounding) and the first v50 boot keeps valid time. (This reverses S1 Amendment 3 ruling 2.)
 
 ## The change (lines at the integration head after S1; **re-cite at Step 0**)
-1. A small pure, host-testable decoder (BCD registers 0x00-0x07 → `time_t`, honouring the chip's 12/24-hour bit; year 2000-2099) and a read-modify-write of CONTROL1 (set bit 0 only, keep the other bits). A new header is allowed if the budget holds (S1 added `time/ExternalRtc.h` the same way).
+1. A small pure, host-testable decoder (BCD registers 0x00-0x07 → `time_t`, honouring the chip's 12/24-hour bit; year 2000-2099) and a read-modify-write of CONTROL1 (set WRTC, clear the 12/24 bit, keep every other bit: **Amendment 1 supersedes "bit 0 only"**). A new header is allowed if the budget holds (S1 added `time/ExternalRtc.h` the same way).
 2. In `setup()`, immediately before S1's `ensureBound`: `if (!Am18x5.status().bound()) { PreBindRtc::run(...); }` with failures **logged and the boot continued** (never a reset; the bind and the internal-clock fallback still happen).
 3. Plausibility is `Clock::isPlausibleEpoch` (`Clock.cpp:551-555`) or the equivalent already in the tree; no new rule.
 4. **Comments S1 wrote that this piece makes false** are corrected in the same change (comment-only, counted in the budget): S1 documented that the first unbound boot "can miss" the seed (`src/BuildProfile.h`, `src/MyPersistentData.h`, `src/persist/CurrentReadings.h`, `src/Generalized-Core-Counter.cpp` near the bind, `src/time/ClockTrust.h`); with S1b the first unbound boot is seeded before the bind.
@@ -40,7 +40,7 @@ Register facts (Device OS 6.6.0 headers; Step 0 re-verifies): `HUNDREDTHS` at 0x
 ## Tests (host; the real functions)
 - Decoder table: valid 24 h and 12 h (AM/PM) times, year rollover, leap day, an invalid BCD digit, year 00, all-zero and all-FF registers → not plausible.
 - Seed: plausible chip time and `Time` invalid → seeded; `Time` already valid → not seeded; implausible chip time → not seeded.
-- WRTC: CONTROL1 `0x12` → writes `0x13`; `0x13` → no change or the same value; other bits preserved (property over all 256 values).
+- WRTC: CONTROL1 `0x12` → writes `0x13`; `0x13` → same value; result = `(v | 0x01) & ~0x40` with every other bit preserved (property over all 256 values; **Amendment 1**).
 - Control flow: not run when the chip is bound; runs once, **before** `enable()` (structural, in order); an I2C failure logs and the boot continues to `enable()` with no reset.
 - Mutations (each must fail): WRTC write clears other bits; seed even when `Time` is valid; run on a bound boot; run after `enable()`; skip the plausibility check; wrong I2C address; reset on I2C failure; the 12/24 bit ignored.
 
@@ -53,6 +53,14 @@ On **Dev-14 (old-library history: WRTC = 0)** with the spike binary's `settime <
 
 ## Protected / not in scope
 Device OS source; S1 (the read-back, the bind), S2 (alarm, watchdog, wake classification, `ab1805.loop()`), S3, S4, L, I21; the clock-trust rule; the persisted and `retained` layouts.
+
+## Amendment 1 (Chip, 6 Nov 2026, after Codex's Stage 7 round 2 on S1; supersedes "set bit 0 only")
+Origin: Codex round 2, High design gap. Device OS's `setTime()` always writes the hour as 24-hour BCD (`am18x5.cpp:782`) and the bind changes only ARST (`:616`), so a chip left in 12-hour mode would be decoded correctly but then be written a 24-hour hour and corrupt the first-boot time. Ruling:
+1. **Decode the chip's time in its ORIGINAL 12/24 mode** (as item 1 already says).
+2. **Then read-modify-write CONTROL1: set WRTC and clear the 12/24 bit (`CONTROL1_1224_MASK`, 24-hour mode); preserve every other bit** (STOP, OUT, RSO, PWR2, ...). This replaces "set bit 0 only, keep the other bits" in "The change" item 1 and in Step 0 item 4.
+3. **Wire ownership:** hold `WITH_LOCK(Wire)` across the raw time read AND the CONTROL1 read-modify-write (one critical section), and call `Wire.begin()` first if `Wire` is not enabled. Step 0 item 1 records how `setup()` order guarantees this; a Wire left enabled must not conflict with Device OS's `enableInterfaceIfNeeded()`.
+4. **Tests:** the WRTC property over all 256 CONTROL1 values becomes: result = `(v | 0x01) & ~0x40`, every other bit unchanged (so `0x12` -> `0x13`, `0x52` -> `0x13`, `0x53` -> `0x13`). Add: chip in 12-hour PM mode decodes correctly, and after S1b the chip reads back in 24-hour mode with the same wall time. The existing mutation "12/24 bit ignored" stays; add "12/24 bit not cleared" and "Wire lock not held across the read-modify-write" (structural).
+5. **Budget unchanged: `src/` at most +15 net.** Stop and report if the amendment does not fit.
 
 ## Rollback
 Revert the S1b commit on the integration branch before the set merges. After the set ships, rollback is to v49.1 (the guard deletes any stored binding); Step 0 item 5 and bench item 4 cover the WRTC state it leaves.
