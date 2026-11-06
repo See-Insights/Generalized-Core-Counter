@@ -74,6 +74,7 @@ struct SensorMgr {
 
 struct OccupancyCloseResult { bool valid; bool stillOpen; uint32_t sessionSeconds; uint32_t totalSeconds; };
 uint32_t occupancyDebounceMs() { return 0; }
+uint32_t debounceRemainingMs() { return 0; }
 bool reportsOccupancyChangesNow() { return false; }
 OccupancyCloseResult closeOccupancySessionSafely(const char *) { return {false, false, 0, 0}; }
 void logUnoccupiedEvent(const char *, uint32_t, uint32_t, bool) {}

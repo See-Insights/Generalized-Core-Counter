@@ -30,6 +30,7 @@ struct In {
   int untilOpen = 28800, mode = 2;  // mode: 0 COUNTING, 1 OCCUPANCY, 2 other
   uint16_t interval = 3600;
   uint32_t ledRem = 0, set1 = 0;
+  uint32_t nowMs = 10000000, lastEvt = 1;  // millis() and lastOccupancyEvent: by default long expired
   unsigned long heap = 1000000UL;
 };
 static In in;
@@ -50,12 +51,17 @@ namespace DailyBoundary {
 struct Result { bool due; time_t boundary; uint8_t close; };
 inline Result check(time_t t) { sim::emit("CALL DailyBoundary::check %ld", (long)t); return {in.due, 0, 0}; }
 }  // namespace DailyBoundary
-namespace Config { uint16_t reportingIntervalSecForRuntime() { sim::emit("CALL reportingIntervalSecForRuntime"); return in.interval; } }
+namespace Config {
+uint16_t reportingIntervalSecForRuntime() { sim::emit("CALL reportingIntervalSecForRuntime"); return in.interval; }
+uint32_t occupancyDebounceMsForRuntime() { return DEFAULT_OCCUPANCY_DEBOUNCE_MS; }
+}  // namespace Config
 namespace SystemConfig {
 uint8_t get_sensorMode() { return (uint8_t)in.mode; }
 namespace SensorSettings { uint32_t get_sensorSetting1() { sim::emit("CALL get_sensorSetting1"); return in.set1; } }
 }  // namespace SystemConfig
 bool CurrentReadings::get_occupied() { return in.occupied; }
+uint32_t CurrentReadings::get_lastOccupancyEvent() { return in.lastEvt; }
+void CurrentReadings::set_lastOccupancyEvent(uint32_t v) { in.lastEvt = v; }
 inline bool isWithinOpenHours() { sim::emit("CALL isWithinOpenHours"); return in.open != 1; }
 inline void logTimeDiag(bool isOpen) { sim::emit("CALL logTimeDiag isOpen=%d", (int)isOpen); }
 inline int secondsUntilNextOpen() { sim::emit("CALL secondsUntilNextOpen"); return in.untilOpen; }
@@ -72,6 +78,9 @@ inline void hibernateAttempt(bool overnight, int wake) {
 static const char *finalReason = "";
 static int finalWake = 0;
 static bool finalOvernight = false;
+
+// WO-2026-11-03-004: the real debounce predicate, extracted by marker text from the current State_Common.h.
+#include CUR_PRED_INC
 
 namespace base {
 static void pass() {
@@ -123,6 +132,7 @@ static void runScenario(const Sc &s, bool useBase, int index) {
   stage = 0; hibCalls = 0; hibWake = -1; hibOvernight = -1;
   finalReason = ""; finalWake = -1; finalOvernight = false;
   sim::exec.freeHeap = in.heap;
+  sim::now = in.nowMs;  // millis()
   printf("  in open=%d trusted=%d due=%d now=%ld until=%d interval=%u mode=%d led=%u/%d occ=%d set1=%u heap=%lu claim=%d\n",
          in.open, (int)in.trusted, (int)in.due, in.now, in.untilOpen, (unsigned)in.interval, in.mode, (unsigned)in.ledRem,
          (int)in.ledOn, (int)in.occupied, (unsigned)in.set1, in.heap, (int)in.claim);
@@ -202,19 +212,31 @@ int main(int argc, char **argv) {
     add("heap daytime " + std::to_string(heap), [=](In &i) { i.open = 0; i.heap = heap; });
   }
   add("heap unknown clock", [](In &i) { i.open = 2; i.trusted = false; i.heap = 0; });
-  // WO-2026-10-25-001: an occupied OCCUPANCY device sleeps the LED time left + 1, or the full debounce when none is
-  // left, never past the reporting boundary wake. The boundary wake is set through the untrusted-clock interval
-  // (wake = interval) so it can sit below 2 s. Expected values come from the rule, not from the plan block.
-  // The base blocks have no such rule, so mode "a" does not run these.
+  // WO-2026-11-03-004 (replaces WO-2026-10-25-001's LED-deadline rule): an occupied OCCUPANCY device sleeps the
+  // millis debounce time left + 1 s margin, or the full debounce when it has expired, never past the reporting
+  // boundary wake, and the same in both trust states. The boundary wake is the untrusted-clock interval, or the
+  // trusted clock aligned to the interval, so one wake time is reached both ways. Expected values come from the
+  // rule, not from the plan block. The base blocks have no such rule, so mode "a" does not run these.
   if (!useBase) {
     const uint32_t DEBOUNCE_SEC = 300;
-    for (uint32_t rem : {300u, 120u, 5u, 1u, 0u}) for (int near : {1, 0}) {
-      const int boundary = near ? (rem ? (int)rem : 100) : (int)rem + 1000;
-      const int want = rem ? std::min((int)rem + 1, boundary) : std::min((int)DEBOUNCE_SEC, boundary);
-      add("debounce-left occupied ledRem=" + std::to_string(rem) + " boundary=" + std::to_string(boundary),
-          [=](In &i) { i.mode = 1; i.occupied = true; i.set1 = DEBOUNCE_SEC * 1000; i.ledRem = rem; i.trusted = false; i.interval = (uint16_t)boundary; },
+    for (uint32_t remMs : {300000u, 120000u, 5000u, 1500u, 1000u, 999u, 1u, 0u}) for (int near : {1, 0}) for (int tr : {0, 1}) {
+      const int wantDeb = remMs ? (int)(remMs / 1000) + 1 : (int)DEBOUNCE_SEC;
+      const int boundary = near ? std::max(2, wantDeb - 1) : wantDeb + 1000;
+      const int want = std::min(wantDeb, boundary);
+      add("debounce-left occupied remMs=" + std::to_string(remMs) + " boundary=" + std::to_string(boundary) + " trusted=" + std::to_string(tr),
+          [=](In &i) {
+            i.mode = 1; i.occupied = true; i.set1 = DEBOUNCE_SEC * 1000;
+            i.lastEvt = i.nowMs - (DEBOUNCE_SEC * 1000 - remMs);
+            i.trusted = tr;
+            if (tr) { i.interval = 3600; i.now = 1700000000L - (1700000000L % 3600) + 3600 - boundary + 1; }
+            else i.interval = (uint16_t)boundary;
+          },
           want);
     }
+    // lastOccupancyEvent == 0 (a reboot cleared it) re-arms to now: the full debounce is left, never an immediate expiry.
+    add("debounce-left occupied sentinel boundary=1300 trusted=0",
+        [=](In &i) { i.mode = 1; i.occupied = true; i.set1 = DEBOUNCE_SEC * 1000; i.lastEvt = 0; i.interval = 1300; },
+        (int)DEBOUNCE_SEC + 1);
   }
 #endif
 

@@ -210,10 +210,37 @@ if prefix_of(sleep) != prefix_of(base_sleep):
 if log_of(sleep).replace(LED_NEW, LED_BASE) != log_of(base_sleep):
     fail("logWakeSummary() differs from the base")
 base_modes = git_show(base, "src/state/State_Modes.cpp")
+# WO-2026-11-03-004: the base's inline debounce subtraction and its LED close criterion map to the predicate.
+DEBOUNCE_OLD = """  // V3.23: Occupancy debounce timeout comes from sensor.setting1
+  const uint32_t debounceMs = occupancyDebounceMs();
+
+  uint32_t lastEvent = CurrentReadings::get_lastOccupancyEvent();
+  if (lastEvent == 0) {
+    // If this is 0 (for example, occupancy set from a PIR wake path that
+    // didn't update lastOccupancyEvent), we must not immediately expire.
+    lastEvent = millis();
+    CurrentReadings::set_lastOccupancyEvent(lastEvent);
+  }
+  uint32_t timeSinceLastEvent = millis() - lastEvent;
+
+  // Check if debounce timeout has expired
+  if (timeSinceLastEvent > debounceMs) {"""
+LED_CLOSE_OLD = "signalLEDTimeRemaining() == 0 && signalLEDStatus()) {\n      // LED timeout expired - debounce period elapsed without motion"
+LED_CLOSE_NEW = "(signalLEDStatus() || (session.pieceUntrusted && CurrentReadings::get_occupied())) && debounceRemainingMs() == 0) {\n      // Debounce period elapsed without motion (the millis predicate, not the LED's wall deadline)"
+# WO-2026-11-03-006: a piece's millis() start and trust flag are recorded where an occupancy session opens.
+def c2_open(text, pad, anchor):
+    lines = pad + "session.occupancyStartMs = millis();\n" + pad + "session.pieceUntrusted = !Clock::isTrusted();\n"
+    return text.replace(anchor, anchor + lines, 1)
+OPEN_AWAKE = "      CurrentReadings::set_occupancyStartTime(Time.now());\n"
+OPEN_WAKE = "          CurrentReadings::set_occupancyStartTime(Time.now());\n"
+if base_modes is not None:
+    base_modes = base_modes.replace(DEBOUNCE_OLD, "  if (debounceRemainingMs() == 0) {").replace(LED_CLOSE_OLD, LED_CLOSE_NEW)
+    base_modes = c2_open(c2_open(base_modes, "      ", OPEN_AWAKE), "          ", OPEN_WAKE)
 cur_modes_head = modes[:modes.index("\nbool processSleepWakeEvent(bool pirWake) {")]
 added = [l for l in modes.splitlines(keepends=True) if l not in base_modes.splitlines(keepends=True)]
 head_added = [l for l in cur_modes_head.splitlines(keepends=True) if l not in base_modes.splitlines(keepends=True)]
-if head_added and not all(l.startswith("#include") for l in head_added):
+# WO-2026-11-03-004: updateOccupancyState() now asks the one debounce predicate.
+if head_added and not all(l.startswith("#include") or l == "  if (debounceRemainingMs() == 0) {\n" for l in head_added):
     fail("State_Modes.cpp changed above the new owner beyond added includes")
 if "".join(l for l in base_modes.splitlines(keepends=True) if not l.startswith("#include")).rstrip("\n") != \
         "".join(l for l in cur_modes_head.splitlines(keepends=True) if not l.startswith("#include")).rstrip("\n"):
@@ -236,7 +263,7 @@ if cur_region is None:
     fail("could not extract postWakeRouting() and processSleepWakeEvent()")
 a = base_sleep.index(BASE_REGION_START)
 b = base_sleep.index(BASE_REGION_END, a) + len(BASE_REGION_END)
-base_region = base_sleep[a:b]
+base_region = c2_open(base_sleep[a:b].replace(LED_CLOSE_OLD, LED_CLOSE_NEW), "          ", OPEN_WAKE)
 if cur_region.rstrip("\n") != base_region.rstrip("\n"):
     fail("postWakeRouting() plus processSleepWakeEvent() differ from the base region beyond `return true;`/`return false;` "
          "and the call")

@@ -182,7 +182,7 @@ PY
   echo "caught: $label"
 }
 
-LED_CLOSE='    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {'
+LED_CLOSE='    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && (signalLEDStatus() || (session.pieceUntrusted && CurrentReadings::get_occupied())) && debounceRemainingMs() == 0) {'
 # The PIR event processed before the LED-timeout close (a pair of literal replacements).
 mutate_and_expect_diff "PIR event processed before the LED-timeout close" modes \
   "$LED_CLOSE" "    if (false) {" \

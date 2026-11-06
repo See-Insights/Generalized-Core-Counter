@@ -221,6 +221,8 @@ uint32_t occupancyDebounceMsForRuntime() { return 300000UL; }  // the shipped de
 struct SessionState {
   time_t occupancySessionBootAnchor = 0;
   bool occupancyChangeTriggered = false;
+  uint32_t occupancyStartMs = 0;
+  bool pieceUntrusted = false;
 };
 SessionState session;
 
@@ -256,6 +258,8 @@ CPP
   echo ""
   extract_braced_block "$common_src" "inline uint32_t occupancyDebounceMs() {"
   echo ""
+  extract_braced_block "$common_src" "inline uint32_t debounceRemainingMs() {"
+  echo ""
   extract_braced_block "$common_src" \
     "inline OccupancyCloseResult closeOccupancySessionSafely(const char *path, time_t closeAt = Time.now()) {"
 
@@ -283,6 +287,8 @@ void bootMidSession(time_t startEpoch, time_t bootEpoch, unsigned long sinceBoot
   RecoveryState::alertCode = 0;
   Clock::trusted = true;
   session.occupancySessionBootAnchor = std::max(startEpoch, lastReport);  // setup()'s anchor (B3)
+  session.pieceUntrusted = false;  // WO-2026-11-03-006: B2/B3 below model a piece that opened trusted; the untrusted piece is untrusted_piece_c2_test.sh
+  session.occupancyStartMs = 0;
   session.occupancyChangeTriggered = false;
   state = IDLE_STATE;
   transitionCount = 0;
@@ -378,7 +384,7 @@ void testNormalCloseIsNotCapped() {
   assert(r.sessionSeconds == 3600);                     // the whole hour, uncapped
 }
 
-// --- 7. B2: an untrusted clock keeps the session open, credits nothing, and
+// --- 7. B2 (a piece that opened trusted and then loses trust): an untrusted clock keeps the session open, credits nothing, and
 //        re-arms the debounce. The old code cleared the session instead.
 void testUntrustedClockKeepsTheSessionOpen() {
   bootMidSession(/*startEpoch=*/1000, /*bootEpoch=*/1100, /*sinceBootMs=*/50000, /*lastReport=*/0);

@@ -20,6 +20,8 @@ struct SessionState {
   uint8_t modemUnstableReason = 0;
   uint8_t modemConnectTimeoutCount = 0;
   unsigned long lastTeardownEndMs = 0;
+  unsigned long occupancyStartMs = 0;
+  bool pieceUntrusted = false;
 };
 static SessionState session;
 
@@ -46,6 +48,8 @@ static WakeCycleStats &cycleStats() {
 }
 }  // namespace Observability
 
+static unsigned long millis() { return 0; }
+namespace Clock { static bool isTrusted() { return true; } }
 namespace SystemConfig {
 static time_t lastDailyCleanup = 0;
 static void set_lastDailyCleanup(time_t t) { lastDailyCleanup = t; }

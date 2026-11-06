@@ -43,9 +43,9 @@ PLAN_TAIL = "  plan = {wakeInSeconds, sleepReason, overnightFallbackSleep};\n  r
 # WO-2026-10-25-001: the occupied branch's wake is the only intended difference from the base plan block; it is
 # mapped back to the base text, so every other byte of the plan is still compared.
 OCC_NEW = (
-    "      const uint32_t remaining = signalLEDTimeRemaining();  // 0 when expired or no valid time\n"
+    "      const uint32_t remaining = debounceRemainingMs();  // 0 when expired\n"
     "      if (remaining > 0) {\n"
-    "        const int untilDeadline = (int)remaining + 1;  // wake just after the deadline\n"
+    "        const int untilDeadline = (int)(remaining / 1000UL) + 1;  // wake just after expiry (1 s margin)\n"
     "        if (untilDeadline < wakeInSeconds) wakeInSeconds = untilDeadline;\n"
     "      } else if (debounceSeconds < (uint32_t)wakeInSeconds) {\n"
     "        wakeInSeconds = (int)debounceSeconds;  // no deadline known: the full debounce\n"
