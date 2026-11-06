@@ -43,14 +43,12 @@ long lastSyncCorrectionSec();
 // isClockTrusted()/reportedSyncAgeMs() above - these are plain globals in
 // the main app translation unit, not worth a dedicated header for.
 extern bool startupOscUsingRC;
-extern uint8_t startupOscStatusReg;
-extern uint8_t startupOscCtrlReg;
 extern bool startupOscAos;
 extern bool startupOscFos;
 
 namespace {
 
-constexpr int kLedgerSchemaVersion = 2;
+constexpr int kLedgerSchemaVersion = 3;
 constexpr size_t kDeviceDataPayloadCapacity = 512;
 
 bool ledgerHasUnsyncedWriteForDiag(const Ledger &ledger) {
@@ -312,8 +310,8 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
         // is exactly what should hold them steady across that stretch, not
         // something to work around.
         writerBase.name("usingRC").value(startupOscUsingRC);
-        writerBase.name("oscStatus").value((int)startupOscStatusReg);
-        writerBase.name("oscCtrl").value((int)startupOscCtrlReg);
+        writerBase.name("oscStatus").nullValue();
+        writerBase.name("oscCtrl").nullValue();
         writerBase.name("aos").value(startupOscAos);
         writerBase.name("fos").value(startupOscFos);
         writerBase.endObject();

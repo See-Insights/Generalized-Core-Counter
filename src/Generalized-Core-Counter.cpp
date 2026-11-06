@@ -44,7 +44,8 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 
 // Hardware abstraction and device-specific pinouts
 #include "device_pinout.h"           // Platform-specific pin definitions
-#include "AB1805_RK.h"               // RTC and hardware watchdog
+#include "AB1805_RK.h"               // hardware watchdog (S2) and power-off (S3)
+#include "time/ExternalRtc.h"
 #include "LocalTimeRK.h"             // Timezone conversion (UTC to local)
 #include "time/ClockTrust.h"         // Sync-recency resync gate and trust signal (WO-2026-08-29-002)
 #include "time/HibernateWakeDiagnostics.h" // Hibernate-wake gate data types/cloud-event rendering (WO-2026-08-29-001)
@@ -249,16 +250,8 @@ bool startupPinResetAb1805Checked = false;
 const char *startupAb1805WakeReasonName = "N/A";
 bool startupAb1805ConfirmedWatchdog = false;
 
-// WO-2026-08-31-004 Amendment A (cloud follow-up): the AB1805 oscillator
-// state read once at boot in setup(), kept in scope past that single log
-// line so DeviceStatusPublisher.cpp can also publish it. No new I2C read -
-// these are the exact values Amendment A's boot-time read already
-// captured. Defaults are overwritten within milliseconds of boot, long
-// before any cloud publish is possible, so they are never themselves
-// reported.
+// Oscillator state captured once in setup() and published by DeviceStatusPublisher.cpp.
 bool startupOscUsingRC = false;
-uint8_t startupOscStatusReg = 0;
-uint8_t startupOscCtrlReg = 0;
 bool startupOscAos = false;
 bool startupOscFos = false;
 
@@ -299,14 +292,9 @@ void setup() {
   validateRetainedBoot(retainedBoot);
   waitForDebugSerialIfConnected();
 
-  // v49 guard: Device OS must not own the AB1805 that AB1805_RK drives. The reset makes the delete take effect before any use of the chip.
-  if (ExternalTime.status().bound()) {
-    const int r = ExternalTime.disable();
-    Log.warn("AB1805: stored Device OS binding deleted (r=%d)", r);
-    const bool ours = System.resetReason() == RESET_REASON_USER && System.resetReasonData() == RESET_CAUSE_EXRTC_BINDING_DELETE;
-    if (r == 0 && !ExternalTime.status().bound() && !ours) System.reset(RESET_CAUSE_EXRTC_BINDING_DELETE);
-    else if (ours && ExternalTime.status().bound()) Log.warn("AB1805: binding survived the delete");
-  }
+  // v50: Device OS owns the AB1805; bind once before anything reads Time.
+  ExternalRtc::ensureBound(Am18x5, particle::Am18x5Configuration().i2c(Wire).interruptPin(WKP).watchdogPin(WATCHDOG_DONE_PIN)
+      .capabilities(particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL).clockSource(particle::RtcClockSource::EXTERNAL));
 
   ensureRetainedLoopForensicsInitialized();
 
@@ -544,7 +532,7 @@ void setup() {
 
   // Watchdog-reset persistence/forensics-publish (Device-OS-detected and
   // AB1805-confirmed PIN_RESET cases) is handled after AB1805 wake-reason
-  // classification below, once ab1805.setup()/getWakeReason() have run -
+  // classification below, once the AB1805 wake reason is available -
   // see the "WATCHDOG RESET CLASSIFICATION" block further down in setup().
 
   // If a boot storm holdoff was triggered on this or the prior boot, surface
@@ -663,41 +651,18 @@ void setup() {
       .withFileQueueSize(800)
       .setup(); // Initialize the publish queue
 
-  // ===== TIME, RTC, AND WATCHDOG CONFIGURATION =====
-  // Initialize AB1805 RTC and hardware watchdog, then restore system time if needed
+  // ===== TIME AND RTC =====
+  // Device OS seeds Time from the chip before setup() when it is already bound; ensureBound() above covers the first boot.
   const bool timeValidBeforeRtc = Time.isValid();
-  ab1805.withFOUT(WKP).setup();                // Initialize AB1805 RTC - WKP is D10 on Photon2
 
-  // WO-2026-08-31-004 Amendment A: log AB1805 oscillator state once at
-  // boot. Read-only - no gate, no branch, no retry, no state, nothing
-  // conditional on the result, no build flag; firmware behaves identically
-  // regardless of the answer. Investigates whether the field-observed
-  // rate-halving (56.5%-82.1% across 10 days on Dev-11, never below ~50%
-  // or above ~83%, no settled pattern) correlates with AOS/FOS automatic
-  // oscillator switching rather than a fixed RC-vs-XT misconfiguration - a
-  // fixed divider fault could not produce a varying daily rate, but a part
-  // that spends part of each interval on the wrong oscillator source
-  // could. A single boot-time read is a snapshot, not a definitive answer,
-  // if the part is genuinely switching between reads.
-  //
-  // Amendment A (cloud follow-up): written into the startupOsc* globals
-  // above (not locals) so DeviceStatusPublisher.cpp can also publish this
-  // same boot-time read - no new I2C read added for that.
-  startupOscUsingRC = ab1805.usingRCOscillator();
-  startupOscStatusReg = ab1805.readRegister(AB1805::REG_OSC_STATUS);
-  startupOscCtrlReg = ab1805.readRegister(AB1805::REG_OSC_CTRL);
-  startupOscAos = (startupOscCtrlReg & AB1805::REG_OSC_CTRL_AOS) != 0;
-  startupOscFos = (startupOscCtrlReg & AB1805::REG_OSC_CTRL_FOS) != 0;
-  Log.info("OscState: usingRC=%d oscStatus=0x%02x oscCtrl=0x%02x aos=%d fos=%d",
-           startupOscUsingRC ? 1 : 0, startupOscStatusReg, startupOscCtrlReg,
-           startupOscAos ? 1 : 0, startupOscFos ? 1 : 0);
+  // Oscillator snapshot: usingRC from the live clock source, AOS/FOS from the configuration. The raw OSC registers are not readable through the public API (published as null).
+  startupOscUsingRC = Am18x5.status().clockSource() == particle::RtcClockSource::INTERNAL;
+  const auto oscCaps = Am18x5.getConfig().capabilities();
+  startupOscAos = !!(oscCaps & particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_BATTERY);
+  startupOscFos = !!(oscCaps & particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL);
+  Log.info("OscState: usingRC=%d aos=%d fos=%d", startupOscUsingRC ? 1 : 0, startupOscAos ? 1 : 0, startupOscFos ? 1 : 0);
 
-  // WO-2026-09-22-001: currentStatusData::validate()'s occupancyStartTime
-  // future-date clamp runs earlier in setup(), before ab1805.setup() (just
-  // above) has seeded Time, so it can never fire there. Re-run it once,
-  // right here, now that a time source exists this boot - a no-op if
-  // occupied is false, Time is still not valid, or the stored value is
-  // already plausible.
+    // The occupancyStartTime future-date clamp in load() can fire only on a bound boot; re-run it once here so the first (unbound) boot is covered too.
   CurrentReadings::revalidateOccupancyStartTimeIfTimeAvailable();
 
 #if PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST
@@ -705,17 +670,17 @@ void setup() {
   // Compiled in ONLY when ENABLE_RTC_SKEW_TEST=1 (see BuildProfile.h) on
   // Boron. Fires ONCE - not once per boot, but once ever, across resets,
   // until a fresh flash or an explicit reset of retainedRtcSkewTestFired
-  // (Amendment A.2) - right after ab1805.setup() and before the
+  // (Amendment A.2) - right after the bind and before the
   // hibernate-wake classification block below, so the rest of setup() sees
   // exactly the state the field defect produces: a "set" RTC holding a
   // plausible-but-wrong value.
   //
-  // A.3: RTC write only - ab1805.setRtcFromTime() - nothing else. In
-  // particular, no Time.setTime(): ab1805.setup() (above) already seeded
+  // A.3: RTC write only - ExternalRtc::set() - nothing else. In
+  // particular, no Time.setTime(): Device OS already seeded
   // system time from whatever the RTC held BEFORE this hook runs, so this
   // boot's own Time stays whatever it already was. The skewed value only
   // becomes the system's believed time on a LATER boot, when that boot's
-  // own ab1805.setup() reads the now-skewed RTC - matching the bench
+  // own Device OS seeding reads the now-skewed RTC - matching the bench
   // procedure's amended step 3 (verify Time.isValid()/wrong-time belief
   // after the post-flash power-cycle, not on the flashing boot itself).
   //
@@ -751,13 +716,13 @@ void setup() {
     RtcSkewTest::OneShotGuard rtcSkewTestGuard(retainedRtcSkewTestFired);
     if (rtcSkewTestGuard.shouldRun()) {
       time_t rtcSkewRawBefore = 0;
-      const bool rtcSkewReadBeforeOk = ab1805.getRtcAsTime(rtcSkewRawBefore);
+      const bool rtcSkewReadBeforeOk = ExternalRtc::get(rtcSkewRawBefore);
       const time_t rtcSkewAnchor = (time_t)RtcSkewTest::chooseAnchor(rtcSkewRawBefore, rtcSkewReadBeforeOk);
       const time_t rtcSkewAfter = (time_t)RtcSkewTest::applySkew(rtcSkewAnchor);
-      const bool rtcSkewWriteOk = ab1805.setRtcFromTime(rtcSkewAfter);
+      const bool rtcSkewWriteOk = ExternalRtc::set(rtcSkewAfter);
       if (rtcSkewWriteOk) {
         time_t rtcSkewVerify = 0;
-        const bool rtcSkewVerifyReadOk = ab1805.getRtcAsTime(rtcSkewVerify);
+        const bool rtcSkewVerifyReadOk = ExternalRtc::get(rtcSkewVerify);
         Log.warn("RtcSkewTest: ONE-SHOT bench hook fired - before(raw=%ld readOk=%d) anchor=%s "
                  "skew=%ldsec after=%s verify=%s verifyReadOk=%d",
                  (long)rtcSkewRawBefore, rtcSkewReadBeforeOk ? 1 : 0,
@@ -769,7 +734,7 @@ void setup() {
       } else {
         // Write failed - the RTC still holds whatever it held before this
         // hook ran. Do not claim the skew took effect (A.4).
-        Log.error("RtcSkewTest: ONE-SHOT bench hook FAILED - setRtcFromTime() write did not "
+        Log.error("RtcSkewTest: ONE-SHOT bench hook FAILED - ExternalRtc::set() write did not "
                   "succeed; RTC left unchanged (before(raw=%ld readOk=%d) attemptedAfter=%s)",
                   (long)rtcSkewRawBefore, rtcSkewReadBeforeOk ? 1 : 0,
                   Time.format(rtcSkewAfter, TIME_FORMAT_DEFAULT).c_str());
@@ -849,7 +814,7 @@ void setup() {
   // touches Time's validity (confirmed: the RtcSkewTest bench hook
   // explicitly does not call Time.setTime(), and neither setWDT() nor the
   // watchdog forensics block touches Time), so sampling Time.isValid() here
-  // observes the same transition it always did (seeded by ab1805.setup()
+  // observes the same transition it always did (seeded by Device OS
   // earlier in setup(), not by this read itself).
   const time_t rtcTime = (time_t)wakeVerdict.rtcAtWake;
   const bool rtcReadOk = wakeVerdict.rtcReadOk;
@@ -867,7 +832,7 @@ void setup() {
     }
   } else if (!timeValidAfterRtc) {
     Log.warn("RTC did not restore time (rtcSet=%s rtcReadOk=%s)",
-             ab1805.isRTCSet() ? "true" : "false",
+             ExternalRtc::isSet() ? "true" : "false",
              rtcReadOk ? "true" : "false");
   }
 
@@ -951,7 +916,7 @@ void setup() {
   // Validate time and configure local time converter
   //
   // Finding 3 (WO-2026-08-29-002, Round 4 review): Time.isValid() alone can
-  // be true here with zero confirmed cloud syncs ever - ab1805.setup() seeds
+  // be true here with zero confirmed cloud syncs ever - Device OS seeds
   // system time from the RTC every boot, whether or not the RTC is correct.
   //
   // SystemConfig::get_lastTimeSync() (persisted across reboots, stamped only by
