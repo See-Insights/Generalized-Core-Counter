@@ -1,6 +1,6 @@
 # Triage of Grok's review of the v49.1 progress pack (6 Nov 2026)
 
-**Rulings: Chip (6 Nov).** Grok's full responses are `grok-response.md` and `grok-response-2.md` (saved 6 Nov, verbatim) and `grok-summary.md` (**not saved yet: Chip to paste it**) in this folder. This file records only the rulings and the checks Claude Code made. F-numbers are Grok's; this triage does not restate the findings beyond Chip's one-line labels.
+**Rulings: Chip (6 Nov).** Grok's full responses are `grok-response.md`, `grok-response-2.md` and `grok-summary.md` (all saved 6 Nov, verbatim) in this folder. This file records only the rulings and the checks Claude Code made. F-numbers are Grok's; this triage does not restate the findings beyond Chip's one-line labels.
 
 | # | Ruling | Where it lands |
 |---|---|---|
@@ -39,7 +39,7 @@ Labels are Chip's; the follow-up's own text is in `grok-response-2.md` once save
 - **V2 and V3 cross-references now name their gates** (draft branch `7cce641`), from the saved follow-up: V2 -> S2 Step 0 item 4, the parent's ruling 5 and S3's ruling 2 (the post-`POWER_OFF` reason is confirmed on S3's bench and S2's table corrected if it differs); V3 -> S2 Amendments 1-2 and S3 Amendment 2 (Step 0 names the persisted field and file:line for each caller; a spare byte if none; stop and ask only if none), plus the forced `flushAllBeforeReset()` before both power-off calls (`ConnectivityFailsafe.cpp:~315`, `State_Error.cpp:177`).
 
 # Grok summary judgment: rulings, Chip, 6 Nov 2026
-Grok's bottom line matches our release rule (Chip). Text in `grok-summary.md` once saved.
+Grok's bottom line matches our release rule (Chip). Text: `grok-summary.md`.
 - **I21: persisted continuity evidence is not needed.** The write-back's correction check (greater than 60 s zeroes `lastTimeSync`) rejects drifting or rate-halved RTCs, and the hibernate-window check (I21 ruling 7) covers the hibernate case. Recorded in the I21 WO ("Why persisted continuity evidence is not needed"), with the residual window stated.
 - **Stage-2 ceiling: data-driven.** Decided from the 7 Nov fleet check (3 or more stage-2 resets in a week on any device triggers a pre-RC1 Step 0); **if not triggered, re-decide at RC1 planning.**
 - **Wave 1 prep.** After the 7 Nov 05:17Z fleet check, if it is clean, Claude Code gives Chip a wave-1 checklist: the device list (WakeForest-PC01 plus the non-Vaughan active units; the Vaughan six later), the steps (move to 42131, pin 4901, confirm the pin per the pin rule) and the first-boot checks (Eastern schedule, fw 4901, reset 70, Ubidots continuity). Not before the check; not if it is not clean.
@@ -56,3 +56,8 @@ Grok's bottom line matches our release rule (Chip). Text in `grok-summary.md` on
 - **V2 gate timing:** Grok wants the S3-bench result to gate the set *merge*; the existing rulings gate the *v50.1 release* (note in the S2 WO).
 - **F4 mechanism:** Grok's cycle (a stage-2 reset, a boot with a fresh `lastConnection` or age base, a brief connect, a wedge, repeat) is a hypothesis that was not checked against the code (`ConnectivityFailsafe.cpp:188-229, 301-316`). Chip's ruling is data-driven (the 7 Nov count); if the pre-RC1 Step 0 is triggered, it must test this exact cycle first. Added to recovery plan item 17.
 - **Grok says it found no I21 WO:** it exists only on the draft branch (`wo/2026-11-05-002-v50-ab1805-switch-draft`), not on `main`; Grok's review was against the v49.1 tag.
+
+**Checked against the saved summary (`grok-summary.md`, Claude Code, 6 Nov).** Chip's reading is that its bottom line matches the release rule. Two places where the summary's own words go further than the rulings, so they are visible rather than assumed away:
+- **I21 continuity evidence.** The summary says the carry rule "needs the continuity check I described (prior RTC reading + last-known clock source persisted)" and makes it a condition of readiness. **Chip's ruling is that it is not needed** (I21 WO, "Why persisted continuity evidence is not needed"). This is the one condition in Grok's bottom line that we are declining; the reasons are recorded in the WO and above.
+- **When the set must not merge.** The summary says the v50 set "does not merge until" the pre-ship bench passes (binding present, armed-watchdog rollback, post-`POWER_OFF` reason, two clean 8 h nights). The parent WO's release rule is that **v50.1 releases only** when Stage 7 of every piece and the integrated head, bench items 1-4 and the two nights are clean; the pieces merge to `integration/v50-ab1805` and then to `main` as a set. The difference is merge versus release; the bench and the nights gate the release (the tag), and the human gate on the switch stays with Chip.
+- **Agreed as written:** the F2 correction (open-session start is persisted; the residue is item 15), the stage-2 ceiling as a data-driven item (Chip's rule), the "complexity moved more than removed" reading (section 0 and question 9 of the pack), and the 24 h soak plus two-night hibernate proof as the integration harness.
