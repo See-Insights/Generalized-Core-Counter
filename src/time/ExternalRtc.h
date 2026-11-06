@@ -3,6 +3,7 @@
 #include "Particle.h"
 
 namespace ExternalRtc {
+constexpr time_t kWriteVerifyToleranceSec = 2;  // read-back must land within this of the written time
 inline bool get(time_t &t) {
   struct timeval tv = {};
   hal_rtc_option_t opt = {};
@@ -18,7 +19,9 @@ inline bool set(time_t t) {
   hal_rtc_option_t opt = {};
   opt.size = sizeof(opt);
   opt.source = HAL_RTC_SOURCE_EXTERNAL;
-  return hal_rtc_set_time(&tv, &opt) == 0;
+  if (hal_rtc_set_time(&tv, &opt) != 0) return false;
+  time_t back = 0;
+  return get(back) && (back > t ? back - t : t - back) <= kWriteVerifyToleranceSec;  // a silent no-op write fails
 }
 inline bool setFromSystem() { return Time.isValid() && set(Time.now()); }
 inline bool isSet() {

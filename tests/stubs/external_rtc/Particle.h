@@ -18,12 +18,17 @@ struct FakeHal {
   int lastUsec = -1;
   int sets = 0;
   bool valid = false;
+  bool noStick = false;      // the write returns success but the chip keeps its time
+  time_t writeSkew = 0;      // the chip stores written time + this
+  int readbackResult = 0;    // get error once a set has happened (the read-back)
+  bool afterSet = false;
 };
 inline FakeHal &fakeHal() { static FakeHal h; return h; }
 
 inline int hal_rtc_get_time(struct timeval *tv, const hal_rtc_option_t *o) {
   fakeHal().lastSource = o ? o->source : -1;
   if (fakeHal().getResult) return fakeHal().getResult;
+  if (fakeHal().afterSet && fakeHal().readbackResult) return fakeHal().readbackResult;
   tv->tv_sec = fakeHal().chipTime;
   tv->tv_usec = 0;
   return 0;
@@ -33,7 +38,8 @@ inline int hal_rtc_set_time(const struct timeval *tv, const hal_rtc_option_t *o)
   fakeHal().lastUsec = (int)tv->tv_usec;
   fakeHal().sets++;
   if (fakeHal().setResult) return fakeHal().setResult;
-  fakeHal().chipTime = tv->tv_sec;
+  fakeHal().afterSet = true;
+  if (!fakeHal().noStick) fakeHal().chipTime = tv->tv_sec + fakeHal().writeSkew;
   return 0;
 }
 inline bool hal_rtc_time_is_valid(const hal_rtc_option_t *o) {

@@ -27,6 +27,10 @@ def structural(main_text, hdr_text, resetcause_text, publisher_text):
         errs.append("ab1805.setup() is still called")
     if "RESET_CAUSE_EXRTC_BINDING_DELETE" in m or "disable(" in m and "Am18x5" in m:
         errs.append("the v49 binding-delete guard is still present")
+    sm = re.search(r"inline bool set\(time_t t\) \{(.*?)\n\}", strip(hdr_text), re.S)
+    body = sm.group(1) if sm else ""
+    if "hal_rtc_set_time" not in body or "get(back)" not in body or body.index("hal_rtc_set_time") > body.index("get(back)"):
+        errs.append("set() does not read the chip back after hal_rtc_set_time")
     if "ExternalRtc::ensureBound(Am18x5" not in m:
         errs.append("setup() does not call ExternalRtc::ensureBound(Am18x5, ...)")
     if not re.search(r"\.i2c\(Wire\)\.interruptPin\(WKP\)\.watchdogPin\(WATCHDOG_DONE_PIN\)", m):
@@ -86,7 +90,11 @@ def main():
         "skip-bound-check": rep("if (!sameFleetConfig(stored, want)) {", "if (false) {"),
         "reset-on-enable-failure": rep("r = rtc.enable(fleet);\n    Log.info", "r = rtc.enable(fleet); if (r) std::exit(1);\n    Log.info"),
         "write-via-internal-source": hdr.replace("HAL_RTC_SOURCE_EXTERNAL", "HAL_RTC_SOURCE_INTERNAL"),
-        "ignore-write-error": rep("return hal_rtc_set_time(&tv, &opt) == 0;", "hal_rtc_set_time(&tv, &opt); return true;"),
+        "no-readback": rep("return get(back) && (back > t ? back - t : t - back) <= kWriteVerifyToleranceSec;", "return true;"),
+        "threshold-removed": rep("(back > t ? back - t : t - back) <= kWriteVerifyToleranceSec", "true"),
+        "readback-error-ignored": rep("time_t back = 0;\n  return get(back) &&", "time_t back = t;\n  get(back); return"),
+        "wrong-sign": rep("(back > t ? back - t : t - back) <= kWriteVerifyToleranceSec", "back - t <= kWriteVerifyToleranceSec"),
+        "ignore-write-error": rep("if (hal_rtc_set_time(&tv, &opt) != 0) return false;", "hal_rtc_set_time(&tv, &opt);"),
         "ignore-fallback-capability": rep("a.capabilities().value() == b.capabilities().value()", "true"),
         "ignore-pin": rep("a.watchdogPin() == b.watchdogPin()", "true"),
         "nonzero-usec": rep("tv.tv_sec = t;", "tv.tv_sec = t; tv.tv_usec = 5;"),
@@ -98,6 +106,7 @@ def main():
         bad += ok
     main_text, rc, pub = MAIN.read_text(), (SRC / "ResetCause.h").read_text(), (SRC / "cloud" / "DeviceStatusPublisher.cpp").read_text()
     smut = {
+        "readback-before-set": (main_text, rc, pub, hdr.replace("hal_rtc_set_time(&tv, &opt) != 0) return false;\n  time_t back = 0;\n  return get(back)", "time_t back = 0; get(back);\n  if (hal_rtc_set_time(&tv, &opt) != 0) return false;\n  return true && get(back)", 1)),
         "setup-left-in": (main_text.replace("ExternalRtc::ensureBound(Am18x5", "ab1805.withFOUT(WKP).setup(); ExternalRtc::ensureBound(Am18x5", 1), rc, pub),
         "guard-kept": (main_text + "\nRESET_CAUSE_EXRTC_BINDING_DELETE", rc, pub),
         "wrong-pin": (main_text.replace("interruptPin(WKP)", "interruptPin(D4)", 1), rc, pub),
@@ -105,8 +114,9 @@ def main():
         "cause8-kept": (main_text, rc + "\nRESET_CAUSE_EXRTC_BINDING_DELETE = 8,", pub),
         "schema-2": (main_text, rc, pub.replace("kLedgerSchemaVersion = 3", "kLedgerSchemaVersion = 2")),
     }
-    for name, (a, b, c) in smut.items():
-        caught = bool(structural(a, hdr, b, c))
+    for name, tup in smut.items():
+        a, b, c = tup[:3]
+        caught = bool(structural(a, tup[3] if len(tup) > 3 else hdr, b, c))
         print(("OK" if caught else "FAIL"), f"mutation {name} is caught")
         bad += not caught
     if bad:

@@ -44,11 +44,39 @@ int main() {
   CHECK(!ExternalRtc::set(1760000000) && h.chipTime == 1750000000);
   h.setResult = 0;
 
+  // Read-back verification: the write only counts if the chip holds the time within the tolerance.
+  CHECK(ExternalRtc::kWriteVerifyToleranceSec == 2);
+  h.writeSkew = 2;
+  CHECK(ExternalRtc::set(1750000000));
+  h.writeSkew = -2;
+  CHECK(ExternalRtc::set(1750000000));
+  h.writeSkew = 3;
+  CHECK(!ExternalRtc::set(1750000000) && h.sets > 0);
+  h.writeSkew = -3;
+  CHECK(!ExternalRtc::set(1750000000));
+  h.writeSkew = 0;
+  h.noStick = true;
+  h.chipTime = 1700000000;
+  CHECK(!ExternalRtc::set(1750000000));
+  h.noStick = false;
+  h.readbackResult = -5;
+  CHECK(!ExternalRtc::set(1750000000));
+  h.readbackResult = 0;
+  h.setResult = -3;
+  h.writeSkew = 0;
+  CHECK(!ExternalRtc::set(1750000000));
+  h.setResult = 0;
+  CHECK(ExternalRtc::set(1750000000));
+
   h.sets = 0;
   fakeTime().valid = false;
   CHECK(!ExternalRtc::setFromSystem() && h.sets == 0);
   fakeTime().valid = true;
   CHECK(ExternalRtc::setFromSystem() && h.chipTime == fakeTime().now_);
+  h.noStick = true;
+  h.chipTime = 1;
+  CHECK(!ExternalRtc::setFromSystem());
+  h.noStick = false;
 
   h.valid = true;
   CHECK(ExternalRtc::isSet() && h.lastSource == HAL_RTC_SOURCE_EXTERNAL);
