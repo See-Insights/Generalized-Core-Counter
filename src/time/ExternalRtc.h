@@ -30,11 +30,11 @@ inline bool isSet() {
   opt.source = HAL_RTC_SOURCE_EXTERNAL;
   return hal_rtc_time_is_valid(&opt);
 }
-// The fields the fleet configuration fixes (clock source is the Device OS default and is not compared).
+// The fields the fleet configuration fixes (including the clock source: Device OS reports the actual one).
 template <typename C> bool sameFleetConfig(C &a, C &b) {
   return a.valid() && a.address() == b.address() && a.interruptPin() == b.interruptPin() &&
          a.watchdogPin() == b.watchdogPin() && a.capabilities().value() == b.capabilities().value() &&
-         a.defaultTimeSource() == b.defaultTimeSource() && a.halDevice()->i2c.interface == b.halDevice()->i2c.interface;
+         a.defaultTimeSource() == b.defaultTimeSource() && a.clockSource() == b.clockSource() && a.halDevice()->i2c.interface == b.halDevice()->i2c.interface;
 }
 // Bind once with the fleet configuration; a failure is logged and the boot continues on the internal clock.
 template <typename R, typename C> int ensureBound(R &rtc, const C &fleet) {

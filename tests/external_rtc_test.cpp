@@ -23,7 +23,7 @@ struct FakeRtc {
 };
 
 static particle::Am18x5Configuration fleet() {
-  return particle::Am18x5Configuration().i2c(0).interruptPin(8).watchdogPin(5).capabilities(0x3);
+  return particle::Am18x5Configuration().i2c(0).interruptPin(8).watchdogPin(5).capabilities(0x3).clockSource(particle::RtcClockSource::EXTERNAL);
 }
 
 int main() {
@@ -105,6 +105,18 @@ int main() {
   missingCap.bound_ = true;
   missingCap.stored = fleet().capabilities(0);
   CHECK(ExternalRtc::ensureBound(missingCap, fleet()) == 0 && missingCap.enables == 1);
+
+  FakeRtc internalRc;  // stored config identical except it runs from the internal RC
+  internalRc.bound_ = true;
+  internalRc.stored = fleet().clockSource(particle::RtcClockSource::INTERNAL);
+  warns = log.warns;
+  CHECK(ExternalRtc::ensureBound(internalRc, fleet()) == 0 && internalRc.enables == 1 && log.warns == warns + 1);
+  CHECK(internalRc.stored.clockSource() == particle::RtcClockSource::EXTERNAL);
+
+  particle::Am18x5Configuration c1 = fleet(), c2 = fleet();
+  CHECK(ExternalRtc::sameFleetConfig(c1, c2));
+  c2.clockSource(particle::RtcClockSource::INTERNAL);
+  CHECK(!ExternalRtc::sameFleetConfig(c1, c2) && !ExternalRtc::sameFleetConfig(c2, c1));
 
   if (failures) return 1;
   std::printf("external_rtc_test: all checks passed\n");

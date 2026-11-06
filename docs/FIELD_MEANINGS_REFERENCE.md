@@ -202,9 +202,9 @@ The charge failure is *consistent with* the Solar profile's 5.08V minimum input 
 - `schema=Y` = ledger schema version (3 from v50; one constant shared by both ledgers. Status `oscStatus`/`oscCtrl` are `null` from v3; `usingRC`/`aos`/`fos` remain)
 
 **Typical healthy ranges:**
-- DATA: 200-350 bytes used (schema 2)
-- STATUS: 450-600 bytes used (schema 2)
-- Schema version: should be consistent (typically 2 for current builds)
+- DATA: 200-350 bytes used (schema 3)
+- STATUS: 450-600 bytes used (schema 3)
+- Schema version: should be consistent (typically 3 for current builds)
 
 ---
 

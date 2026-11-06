@@ -37,6 +37,8 @@ def structural(main_text, hdr_text, resetcause_text, publisher_text):
         errs.append("fleet config is not Wire/WKP/D5")
     if ".capabilities(particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL)" not in m:
         errs.append("fallback capability missing from the fleet config")
+    if ".clockSource(particle::RtcClockSource::EXTERNAL)" not in m:
+        errs.append("clock source EXTERNAL missing from the fleet config")
     if m.index("ensureBound") > m.index("ensureRetainedLoopForensicsInitialized();"):
         errs.append("bind must come before the first Time-dependent setup work")
     if "RESET_CAUSE_EXRTC_BINDING_DELETE" in strip(resetcause_text):
@@ -96,6 +98,8 @@ def main():
         "wrong-sign": rep("(back > t ? back - t : t - back) <= kWriteVerifyToleranceSec", "back - t <= kWriteVerifyToleranceSec"),
         "ignore-write-error": rep("if (hal_rtc_set_time(&tv, &opt) != 0) return false;", "hal_rtc_set_time(&tv, &opt);"),
         "ignore-fallback-capability": rep("a.capabilities().value() == b.capabilities().value()", "true"),
+        "ignore-clock-source": rep("a.clockSource() == b.clockSource()", "true"),
+        "wrong-clock-source-value": rep("a.clockSource() == b.clockSource()", "a.clockSource() == particle::RtcClockSource::INTERNAL"),
         "ignore-pin": rep("a.watchdogPin() == b.watchdogPin()", "true"),
         "nonzero-usec": rep("tv.tv_sec = t;", "tv.tv_sec = t; tv.tv_usec = 5;"),
     }
@@ -111,6 +115,7 @@ def main():
         "guard-kept": (main_text + "\nRESET_CAUSE_EXRTC_BINDING_DELETE", rc, pub),
         "wrong-pin": (main_text.replace("interruptPin(WKP)", "interruptPin(D4)", 1), rc, pub),
         "no-fallback-cap": (main_text.replace(".capabilities(particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL)", ".capabilities(particle::RtcCap::NONE)", 1), rc, pub),
+        "no-clock-source": (main_text.replace(".clockSource(particle::RtcClockSource::EXTERNAL)", "", 1), rc, pub),
         "cause8-kept": (main_text, rc + "\nRESET_CAUSE_EXRTC_BINDING_DELETE = 8,", pub),
         "schema-2": (main_text, rc, pub.replace("kLedgerSchemaVersion = 3", "kLedgerSchemaVersion = 2")),
     }

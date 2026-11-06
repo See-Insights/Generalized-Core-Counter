@@ -13,3 +13,6 @@ Binding spec: `docs/work-orders/WO-2026-11-05-003-v50-s1-boot-config-time.md` **
 the change does not fit in about +2 lines or the S1 total would exceed +21; Device OS `RtcClockSource` or `clockSource()` is not available in the form the WO needs.
 ## Report
 `docs/work-orders/WO-2026-11-05-003-r1fix-stage6-copilot-report.md`: model and reasoning actually used (say plainly if lower than dispatched), interpreter line, the diff summary, net `src/` lines (this change and the S1 total), tests and mutation results, build and `nm` evidence, the corrections section, deviations.
+
+## Controller record (6 Nov 2026)
+The report says the reasoning level was **not observable from inside the session** (the harness reported none), so the dispatched medium cannot be confirmed. Accepted for this change: **+0 net `src/` lines** (two edits extend existing lines), covered by three new mutations that the controller re-ran (clock source not compared: fails, using a backup and restore from the backup, identical afterwards), suite 116/116. The standing condition from the Amendment 3 record stands (re-run at the dispatched level on a larger change).

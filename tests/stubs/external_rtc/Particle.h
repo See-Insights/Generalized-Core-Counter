@@ -65,6 +65,7 @@ inline FakeLog &fakeLog() { static FakeLog l; return l; }
 #define Log fakeLog()
 
 namespace particle {
+enum class RtcClockSource : uint8_t { NONE = 0, INTERNAL = 1, EXTERNAL = 2 };
 struct HalDevice { struct { int interface; } i2c; };
 struct Caps { uint32_t v = 0; uint32_t value() const { return v; } };
 struct Am18x5Configuration {
@@ -72,11 +73,14 @@ struct Am18x5Configuration {
   uint8_t addr = 0x69;
   int intPin = -1, wdtPin = -1, wire = 0, tsrc = 0;
   uint32_t caps = 0;
+  RtcClockSource src = RtcClockSource::INTERNAL;
   HalDevice dev{};
   Am18x5Configuration &i2c(int w) { wire = w; dev.i2c.interface = w; valid_ = true; return *this; }
   Am18x5Configuration &interruptPin(int p) { intPin = p; return *this; }
   Am18x5Configuration &watchdogPin(int p) { wdtPin = p; return *this; }
   Am18x5Configuration &capabilities(uint32_t c) { caps = c; return *this; }
+  Am18x5Configuration &clockSource(RtcClockSource c) { src = c; return *this; }
+  RtcClockSource clockSource() const { return src; }
   bool valid() const { return valid_; }
   uint8_t address() const { return addr; }
   int interruptPin() const { return intPin; }
