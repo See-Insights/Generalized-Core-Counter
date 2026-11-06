@@ -1,4 +1,6 @@
-# DRAFT GitHub issue for particle-iot/device-os (for Chip to review and file; not filed)
+# DRAFT GitHub issue for particle-iot/device-os — ON HOLD (Chip, 6 Nov)
+
+**Hold until the 14 Nov bench reproduces the WRTC failure on Dev-14.** Then add the hardware evidence (the `settime … hal` result without S1b, the read-back, CONTROL1 before and after) to the Reproduction section, and Chip files it. Not filed; do not file before then.
 
 **Suggested title:** AM18x5 external RTC: `setTime()` never sets WRTC and `writeContinuousRegisters()` ignores I2C errors, so `hal_rtc_set_time(EXTERNAL)` can return success without changing the chip
 

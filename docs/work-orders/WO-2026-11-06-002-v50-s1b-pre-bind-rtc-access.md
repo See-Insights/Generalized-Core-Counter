@@ -1,6 +1,6 @@
 # WO-2026-11-06-002: v50 piece S1b — pre-bind access to the AB1805: seed the clock, set WRTC
 
-**Author:** Claude Code, 6 Nov 2026, DRAFT for Chip's review; not dispatched · **Status:** DRAFT (rulings of 6 Nov, Chip, after Codex's Stage 7 round 1 on S1)
+**Author:** Claude Code, 6 Nov 2026, DRAFT for Chip's review; not dispatched · **Status:** **APPROVED by Chip, 6 Nov 2026** (rulings after Codex's Stage 7 round 1 on S1); dispatch after S1's Stage 7 round 2
 **Parent:** `WO-2026-11-05-002-v50-ab1805-switch.md` · **Origin:** `WO-2026-11-05-003-stage7-r1-verdict.md` findings 1 and 2; S1 Amendment 4 · **Position:** on `integration/v50-ab1805` **between S1 and S2** (S1 → S1b → S2 → S3, S4)
 **Branch (when dispatched):** `wo/…-v50-s1b-…`, from `integration/v50-ab1805` after S1 has passed Stage 7 round 2 and its PR has been merged to the integration branch; S1b's PR goes to the integration branch, **never to `main` alone**; the set merges to `main` only under the 6 Nov merge gate.
 **Workflow:** `AI_DEVELOPMENT_WORKFLOW.md` §3 Stages 5-8; §4 (SHA rule; the 90-minute Stage 7 time-box once #194 merges); §5 (boot-time hardware and time: Codex xhigh); §12; §13 (c), (j) · **Agents:** Stage 6 Copilot standard/medium (re-run at the dispatched level if a run comes back lower on anything larger than a few lines); Stage 7 Codex `gpt-5.6-sol` **xhigh**, at most two rounds · **Budget:** `src/` at most **+15 net** (removals count); stop and report rather than trim style.
@@ -33,7 +33,7 @@ Register facts (Device OS 6.6.0 headers; Step 0 re-verifies): `HUNDREDTHS` at 0x
 2. **Decode details:** the time-register layout and the BCD/hour-mode rules (`am18x5.cpp:770-788` is the write side; read the `getTime` side `:791-814`); behaviour on an invalid BCD digit or a chip reading year 00 (not plausible: do not seed).
 3. **Seeding:** `Time.setTime()` versus the HAL clock Device OS seeds; whether setting `Time` before `enable()` is seen by `bindIfNeededAndResync` (it must be, so the bind writes the right time back); no cloud-sync or event side effect of an early `Time.setTime()`.
 4. **WRTC set when already 1** is a no-op; confirm the read-modify-write does not disturb the other CONTROL1 bits (STOP, 12/24, OUT, RSO, PWR2).
-5. **Rollback (added by Claude Code, not ruled):** after v50 has set WRTC = 1, the chip reads "not set" to the vendored library's `isRTCSet()` (WRTC clear = set). State what v49's `ab1805.setup()` and the clock code do on the first v49 boot after a rollback (it should treat the chip as unset and take time from the cloud; confirm there is no reset loop or bad seed), and put the answer into the rollback bench (parent pre-ship item 2).
+5. **Rollback (ruled by Chip, 6 Nov): accepted, no code change.** After v50 has set WRTC = 1, the vendored library's `isRTCSet()` (WRTC clear = set) reads the chip as unset, so a rollback to v49 waits for the cloud for its time. This is the same bounded exposure as any untrusted boot, and **v49's first sync re-writes the time and clears WRTC.** Step 0 still reads v49's `ab1805.setup()` and the clock code to confirm there is no reset loop and no bad seed (a check, not a reopening), and the answer goes into the rollback bench as the expected result.
 6. **Count** the net `src/` lines per file; if over +15, stop and report the cut.
 
 ## Tests (host; the real functions)
@@ -48,7 +48,7 @@ On **Dev-14 (old-library history: WRTC = 0)** with the spike binary's `settime <
 1. **Without S1b** (S1 only): `settime … hal` fails (the read-back catches the no-op) or the chip keeps its old time; record it.
 2. **With S1b:** the same `settime … hal` succeeds and reads back within 2 s.
 3. **First v50 boot after v49** (no stored binding): the chip keeps valid time through the bind (read it before the cloud sync: not year 2000), and `Time` is valid at the first log lines.
-4. **Rollback v50 → v49** observation from Step 0 item 5 (what the vendored `isRTCSet()` sees, and the first v49 boot).
+4. **Rollback v50 → v49 (expected result, ruled by Chip):** on the first v49 boot after v50 has set WRTC = 1 the vendored `isRTCSet()` reads the chip as **unset**; v49 has no valid time until the cloud sync (untrusted, like any untrusted boot); **v49's first sync re-writes the chip's time and clears WRTC** (confirm WRTC reads 0 afterwards and a second v49 boot reads the chip as set). No reset loop; no bad seed. A different result is a finding.
 
 ## Protected / not in scope
 Device OS source; S1 (the read-back, the bind), S2 (alarm, watchdog, wake classification, `ab1805.loop()`), S3, S4, L, I21; the clock-trust rule; the persisted and `retained` layouts.
