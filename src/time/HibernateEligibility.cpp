@@ -1,6 +1,7 @@
 #include "time/HibernateEligibility.h"
 #include "state/StateMachine.h"
 #include "time/Clock.h"
+#include "time/ExternalRtc.h"
 #include "persist/SystemConfig.h"
 #if PLATFORM_ID == PLATFORM_BORON
 bool isDeviceOsAtLeast6400() {
@@ -72,12 +73,12 @@ bool shouldUseBoronRtcAlarmHibernate(uint32_t requestedSleepSec, time_t &rtcNow)
     return false;
   }
 
-  if (!ab1805.isRTCSet()) {
+  if (!ExternalRtc::isSet()) {
     Log.info("HibernateDiag: fail=rtc_not_set");
     return false;
   }
 
-  if (!ab1805.getRtcAsTime(rtcNow)) {
+  if (!ExternalRtc::get(rtcNow)) {
     Log.info("HibernateDiag: fail=rtc_read");
     return false;
   }

@@ -195,7 +195,7 @@
  * @brief TEMPORARY DIAGNOSTIC: Write a deliberately wrong RTC value once on boot.
  *
  * Set to 1 to enable, then reflash. Runs automatically during setup(),
- * immediately after ab1805.setup() and before the hibernate-wake
+ * immediately after the bind and before the hibernate-wake
  * classification block: it reads the current AB1805 RTC value, writes back
  * a compile-time-skewed value (see RtcSkewTest::kSkewSeconds in
  * src/time/RtcSkewTest.h), and logs both readings. Deliberately NOT tied to

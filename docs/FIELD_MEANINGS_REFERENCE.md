@@ -199,7 +199,7 @@ The charge failure is *consistent with* the Solar profile's 5.08V minimum input 
 **Components:**
 - `bytes=X/512` = used/total for DATA ledger
 - `bytes=X/896` = used/total for STATUS ledger
-- `schema=Y` = ledger schema version
+- `schema=Y` = ledger schema version (3 from v50; one constant shared by both ledgers. Status `oscStatus`/`oscCtrl` are `null` from v3; `usingRC`/`aos`/`fos` remain)
 
 **Typical healthy ranges:**
 - DATA: 200-350 bytes used (schema 2)

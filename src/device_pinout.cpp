@@ -41,6 +41,7 @@ const pin_t TMP36_SENSE_PIN   = A4;
 
 const pin_t BUTTON_PIN        = D4;
 const pin_t BLUE_LED          = D7;
+const pin_t WATCHDOG_DONE_PIN = D5;
 const pin_t WAKEUP_PIN        = WKP;  // D10 on Photon2 (was D8 on Argon/Boron)
 
 // These carrier functions are intentionally kept stable across platforms so

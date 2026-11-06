@@ -7,9 +7,7 @@
 #include "time/LocalTimeCache.h"    // Cached LocalTimeRK conversions
 #include "time/ClockTrust.h"        // Sync-recency resync gate and trust signal (WO-2026-08-29-002)
 #include "cloud/Cloud.h"            // Cloud::instance().requestStatusPublish()
-#include "AB1805_RK.h"              // ab1805.setRtcFromSystem()
-
-extern AB1805 ab1805; // WO-2026-08-24: defined once, in Generalized-Core-Counter.cpp
+#include "time/ExternalRtc.h"      // hal_rtc_* external-source helpers
 
 static bool isWithinOpenHoursForHour(uint8_t hour, uint8_t openHour, uint8_t closeHour) {
   // Daytime window only: the hour rules guarantee closeHour > openHour, and
@@ -76,7 +74,7 @@ bool isWithinOpenHoursAt(time_t epoch) {
 // ===== sync-recency trust signal                                     =====
 //
 // Root cause recap (see the Work Order's Investigation Findings 3 and 5):
-// `Time.isValid()` is true as soon as `ab1805.setup()` seeds system time
+// `Time.isValid()` is true as soon as Device OS seeds system time
 // from the RTC, whether or not the RTC itself is correct. The only path
 // that ever wrote the RTC in this build, `AB1805::loop()`, is latched by a
 // per-boot `timeSet` member: it can fire once, as a no-op, before any real
@@ -399,8 +397,8 @@ void checkClockResync() {
     // this file's Amendment A note (mirroring RtcSkewTest's own "do not log
     // a fabricated value" rule) for the same reasoning applied here.
     time_t rtcPreWriteValue = 0;
-    const bool rtcPreWriteReadOk = ab1805.getRtcAsTime(rtcPreWriteValue);
-    const bool rtcUpdated = ab1805.setRtcFromSystem();
+    const bool rtcPreWriteReadOk = ExternalRtc::get(rtcPreWriteValue);
+    const bool rtcUpdated = ExternalRtc::setFromSystem();
     const long rtcCorrectionSec = rtcPreWriteReadOk
         ? (long)(Time.now() - rtcPreWriteValue)
         : -1;

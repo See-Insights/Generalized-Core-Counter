@@ -13,7 +13,7 @@
  *
  *          `Time.isValid()` is NOT a trust signal in this codebase - it only
  *          means "system time has been set from some source", and
- *          `ab1805.setup()` sets it from the RTC on every boot, even when the
+ *          Device OS sets it from the RTC before setup() on every boot, even when the
  *          RTC itself is wrong (see the Work Order's Investigation Finding
  *          3). The actual trust signal is the *recency of a confirmed cloud
  *          time sync*, exposed by Device OS as `Particle.timeSyncedLast()` -
@@ -105,7 +105,7 @@ inline bool shouldResync(uint32_t nowMs, uint32_t timeSyncedLastMs) {
  * @details Requires BOTH `Time.isValid()` and a confirmed sync within
  *          `kMaxSyncAgeMs`. Finding 3: `Time.isValid()` alone was true
  *          throughout the ~5h09m-wrong-clock incident because
- *          `ab1805.setup()` had seeded system time from the RTC - it carries
+ *          Device OS had seeded system time from the RTC - it carries
  *          no information about correctness.
  */
 inline bool isTrusted(bool timeValid, uint32_t nowMs, uint32_t timeSyncedLastMs) {

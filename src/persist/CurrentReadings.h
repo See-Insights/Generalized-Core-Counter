@@ -44,7 +44,7 @@ void resetEverything(bool includeSensorTotals = true);
  *        time source exists this boot.
  *
  * validate()'s own clamp runs from the .load() in setup(), long before
- * ab1805.setup() seeds Time, so it can never fire there (WO-2026-09-22-001).
+ * Device OS seeds Time only on a bound boot, so it can miss the first boot (WO-2026-09-22-001).
  * Call this once, opportunistically, from global setup() as soon as
  * Clock::isTimeValid(). No-op if occupied is false or occupancyStartTime is
  * already plausible.

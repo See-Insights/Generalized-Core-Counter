@@ -136,6 +136,7 @@ if changed:
     fail(f"SleepTeardown.{{h,cpp}} must be unchanged against {base}: {changed}")
 added = git("diff", "--name-status", "--diff-filter=A", base, "--", "src").stdout.split()
 added += git("ls-files", "--others", "--exclude-standard", "--", "src").stdout.split()
+added = [a for a in added if a not in ("A", "src/time/ExternalRtc.h")]  # v50 S1 helper header
 if added:
     fail(f"no new file may appear under src/: {added}")
 for name in git("diff", "--name-only", base, "--", "src").stdout.split():

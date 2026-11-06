@@ -13,7 +13,7 @@ set -euo pipefail
 #       - BuildProfile.h defaults ENABLE_RTC_SKEW_TEST to 0, with the same
 #         0/1 #error guard every other flag carries, and the app emits a
 #         #warning when it is enabled
-#       - A.6 gap 1: the RTC-write call (`ab1805.setRtcFromTime(`) is
+#       - A.6 gap 1: the RTC-write call (`ExternalRtc::set(`) is
 #         actually NESTED inside the `if (rtcSkewTestGuard.shouldRun())`
 #         block, by brace-depth counting - not merely that the guard line
 #         is present somewhere in the file. This is what makes "replace the
@@ -152,7 +152,7 @@ for i in range(guard_line_idx, len(lines)):
             opened = True
         elif ch == '}':
             depth -= 1
-    if opened and "ab1805.setRtcFromTime(" in line:
+    if opened and "ExternalRtc::set(" in line:
         write_call_seen_inside = True
     if opened and depth == 0:
         end_idx = i
@@ -161,7 +161,7 @@ for i in range(guard_line_idx, len(lines)):
 if end_idx is None:
     print("FAIL: guard block's closing brace was not found")
 elif not write_call_seen_inside:
-    print("FAIL: ab1805.setRtcFromTime( was not found nested inside the guarded if-block")
+    print("FAIL: ExternalRtc::set( was not found nested inside the guarded if-block")
 else:
     print("PASS")
 PY
@@ -170,7 +170,7 @@ if [[ "$gap1_result" != "PASS" ]]; then
   echo "FAILED (A.6 gap 1): $gap1_result" >&2
   exit 1
 fi
-echo "OK (A.6 gap 1): ab1805.setRtcFromTime( is nested inside the guarded 'if (rtcSkewTestGuard.shouldRun())' block"
+echo "OK (A.6 gap 1): ExternalRtc::set( is nested inside the guarded 'if (rtcSkewTestGuard.shouldRun())' block"
 
 # A.3: Time.setTime( must not appear anywhere in the bench-hook block AS
 # CODE (comment-only mentions, e.g. explaining its absence, don't count -
@@ -189,10 +189,10 @@ echo "OK (A.3): Time.setTime( is absent from the bench-hook block"
 
 # A.4: the write's return value must be checked (branched on), not discarded.
 if ! echo "$hook_block" | grep -q 'if (rtcSkewWriteOk)'; then
-  echo "FAILED (A.4): setRtcFromTime()'s return value does not appear to be checked before use" >&2
+  echo "FAILED (A.4): ExternalRtc::set()'s return value does not appear to be checked before use" >&2
   exit 1
 fi
-echo "OK (A.4): setRtcFromTime()'s return value is checked before the write is treated as done"
+echo "OK (A.4): ExternalRtc::set()'s return value is checked before the write is treated as done"
 
 # Round 4 MEDIUM: bind the production re-arm call
 # (RtcSkewTest::rearmIfBuildTokenChanged() must appear, and must appear
