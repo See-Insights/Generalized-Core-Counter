@@ -62,4 +62,4 @@ Grok's V2 (`docs/reviews/2026-11-grok-progress/grok-response-2.md`): the rule "r
 - **Step 0 item 4** (the window arithmetic for reason 20, and that `retainedHibernatePending` and the RTC can be lost on a power-down, spike P7);
 - **the parent's ruling 5** and **S3's ruling 2:** the post-`POWER_OFF` wake reason is unobserved; **S3's bench must record and confirm it before v50.1 releases**, and **this WO's classification table is corrected if the reason or the retained state differs** from the table;
 - the (b) table in Amendment 1 (reason 20 with neither a due window nor a persisted power-off record counts as `inferred`; `retained`-only evidence is not accepted).
-**Note for Chip:** Grok asks for this to gate the set *merge*; the existing rulings gate the *v50.1 release*. If you want the stricter gate, say so.
+**Gate timing (Chip, 6 Nov): the stricter gate is ruled.** The S-set does not merge to `main` until all five pre-ship bench items pass on the integration branch's CI binaries (parent WO, "Release and merge rule"); the S3 bench result is one of them.
