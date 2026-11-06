@@ -46,16 +46,7 @@ void handleIdleState() {
   if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY) {
     // Check if debounce timeout expired (no motion for debounce period)
     if (CurrentReadings::get_occupied()) {
-      const uint32_t debounceMs = occupancyDebounceMs();
-
-      uint32_t lastEvent = CurrentReadings::get_lastOccupancyEvent();
-      if (lastEvent == 0) {
-        lastEvent = millis();
-        CurrentReadings::set_lastOccupancyEvent(lastEvent);
-      }
-      uint32_t timeSinceLastEvent = millis() - lastEvent;
-
-      if (timeSinceLastEvent >= debounceMs) {
+      if (debounceRemainingMs() == 0) {
         // Debounce timeout expired - space is now unoccupied
         const bool reportNow = reportsOccupancyChangesNow();
         const OccupancyCloseResult closeResult = closeOccupancySessionSafely("idle");

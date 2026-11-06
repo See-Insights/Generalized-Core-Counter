@@ -156,7 +156,11 @@ emit("extracted_gate.inc", common, s, e)
 s, e = common.stmt("struct OccupancyCloseResult {", semicolon=True)
 emit("extracted_close_1.inc", common, s, e)
 s, e = common.stmt("inline uint32_t occupancyDebounceMs() {")
-emit("extracted_close_2.inc", common, s, e)
+# WO-2026-11-03-004: debounceRemainingMs() follows occupancyDebounceMs() and is extracted with it.
+s2, e2 = common.stmt("inline uint32_t debounceRemainingMs() {", e)
+if common.text[e + 1:s2].count("inline") != 0:
+    die("debounceRemainingMs() must directly follow occupancyDebounceMs()")
+emit("extracted_close_2.inc", common, s, e2)
 s, e = common.stmt("inline OccupancyCloseResult closeOccupancySessionSafely(const char *path, time_t closeAt = Time.now()) {")
 emit("extracted_close_3.inc", common, s, e)
 
@@ -480,8 +484,8 @@ mutate_and_expect_failure "sleep check moved below sleepAndResume" "soak:" "stat
   if (sleepAndResume(wakeInSeconds, useNetworkStandby, sleepReason, wake)) return;
 $sleep_pending"
 # WO-2026-10-22-001: the wake's LED-timeout close must run before the PIR event is processed.
-mutate_and_expect_failure "PIR event processed before the LED-timeout close" "wake pir\\+end:" "state/State_Modes.cpp" \
-  "    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {" \
+mutate_and_expect_failure "PIR event processed before the debounce close" "wake pir\\+end:" "state/State_Modes.cpp" \
+  "    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDStatus() && debounceRemainingMs() == 0) {" \
   "    if (false) {" \
   "        CurrentReadings::set_lastOccupancyEvent(millis());
       }
@@ -491,7 +495,7 @@ mutate_and_expect_failure "PIR event processed before the LED-timeout close" "wa
   "        CurrentReadings::set_lastOccupancyEvent(millis());
       }
     }
-    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDTimeRemaining() == 0 && signalLEDStatus()) {
+    if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY && signalLEDStatus() && debounceRemainingMs() == 0) {
       const bool reportNow = reportsOccupancyChangesNow();
       const OccupancyCloseResult closeResult = closeOccupancySessionSafely(\"sleep\");
       signalLED(false);
