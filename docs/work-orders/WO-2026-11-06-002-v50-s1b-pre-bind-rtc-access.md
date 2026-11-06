@@ -24,7 +24,8 @@ S1b fixes both from the application side, in the one window where the applicatio
 1. A small pure, host-testable decoder (BCD registers 0x00-0x07 → `time_t`, honouring the chip's 12/24-hour bit; year 2000-2099) and a read-modify-write of CONTROL1 (set bit 0 only, keep the other bits). A new header is allowed if the budget holds (S1 added `time/ExternalRtc.h` the same way).
 2. In `setup()`, immediately before S1's `ensureBound`: `if (!Am18x5.status().bound()) { PreBindRtc::run(...); }` with failures **logged and the boot continued** (never a reset; the bind and the internal-clock fallback still happen).
 3. Plausibility is `Clock::isPlausibleEpoch` (`Clock.cpp:551-555`) or the equivalent already in the tree; no new rule.
-4. Nothing else: no change to the write-back, the payload, the failsafe, `retained` or persisted layouts.
+4. **Comments S1 wrote that this piece makes false** are corrected in the same change (comment-only, counted in the budget): S1 documented that the first unbound boot "can miss" the seed (`src/BuildProfile.h`, `src/MyPersistentData.h`, `src/persist/CurrentReadings.h`, `src/Generalized-Core-Counter.cpp` near the bind, `src/time/ClockTrust.h`); with S1b the first unbound boot is seeded before the bind.
+5. Nothing else: no change to the write-back, the payload, the failsafe, `retained` or persisted layouts.
 
 Register facts (Device OS 6.6.0 headers; Step 0 re-verifies): `HUNDREDTHS` at 0x00 (`am18x5.h:39`), `CONTROL1` at 0x10 (`am18x5.h:57`), `CONTROL1_WRTC_MASK` 0x01 (`am18x5_defines.h:67`; the only use of WRTC in the driver), `CONTROL1_1224_MASK` 0x40; the vendored library's `REG_CTRL_1_DEFAULT` is 0x13 (WRTC set), `AB1805_RK.h:795`.
 
