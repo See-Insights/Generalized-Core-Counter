@@ -150,7 +150,7 @@ def main() -> None:
     # WO-2026-10-21-001: scan every src/ file, so the sleep phase functions (or any other
     # file) cannot pick up a direct call; only HibernateEligibility.cpp and Clock.* may name it.
     for path in sorted(SRC_ROOT.rglob("*")):
-        if path.suffix not in (".cpp", ".h") or path in (HIBERNATE_ELIGIBILITY_CPP, CLOCK_CPP, CLOCK_H):
+        if path.suffix not in (".cpp", ".h") or path in (HIBERNATE_ELIGIBILITY_CPP, CLOCK_CPP, CLOCK_H, SRC_ROOT / "time" / "PreBindRtc.h"):  # S1b pre-bind seed rule
             continue
         if re.search(r"Clock::isPlausibleEpoch\s*\(", strip_comments(path.read_text())):
             fail(f"{path.relative_to(REPO_ROOT)} must not call Clock::isPlausibleEpoch(...) directly")

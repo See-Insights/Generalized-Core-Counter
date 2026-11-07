@@ -46,6 +46,7 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 #include "device_pinout.h"           // Platform-specific pin definitions
 #include "AB1805_RK.h"               // hardware watchdog (S2) and power-off (S3)
 #include "time/ExternalRtc.h"
+#include "time/PreBindRtc.h"
 #include "LocalTimeRK.h"             // Timezone conversion (UTC to local)
 #include "time/ClockTrust.h"         // Sync-recency resync gate and trust signal (WO-2026-08-29-002)
 #include "time/HibernateWakeDiagnostics.h" // Hibernate-wake gate data types/cloud-event rendering (WO-2026-08-29-001)
@@ -293,6 +294,7 @@ void setup() {
   waitForDebugSerialIfConnected();
 
   // v50: Device OS owns the AB1805; bind once before anything reads Time.
+  if (!Am18x5.status().bound() && !PreBindRtc::run(ab1805, Wire)) Log.warn("PreBindRtc: chip access failed");
   ExternalRtc::ensureBound(Am18x5, particle::Am18x5Configuration().i2c(Wire).interruptPin(WKP).watchdogPin(WATCHDOG_DONE_PIN)
       .capabilities(particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL).clockSource(particle::RtcClockSource::EXTERNAL));
 
@@ -652,7 +654,7 @@ void setup() {
       .setup(); // Initialize the publish queue
 
   // ===== TIME AND RTC =====
-  // Device OS seeds Time from the chip before setup() when it is already bound; ensureBound() above covers the first boot.
+  // Device OS seeds Time from the chip before setup() when it is already bound; on an unbound boot S1b seeds it only on a successful plausible pre-bind chip read.
   const bool timeValidBeforeRtc = Time.isValid();
 
   // Oscillator snapshot: usingRC from the live clock source, AOS/FOS from the configuration. The raw OSC registers are not readable through the public API (published as null).
@@ -662,7 +664,7 @@ void setup() {
   startupOscFos = !!(oscCaps & particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL);
   Log.info("OscState: usingRC=%d aos=%d fos=%d", startupOscUsingRC ? 1 : 0, startupOscAos ? 1 : 0, startupOscFos ? 1 : 0);
 
-    // The occupancyStartTime future-date clamp in load() can fire only on a bound boot; re-run it once here so the first (unbound) boot is covered too.
+    // Re-run the occupancyStartTime future-date clamp once here: Time is valid here only if Device OS or a successful plausible S1b pre-bind read seeded it.
   CurrentReadings::revalidateOccupancyStartTimeIfTimeAvailable();
 
 #if PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST

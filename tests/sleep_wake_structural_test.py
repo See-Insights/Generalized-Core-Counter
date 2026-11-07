@@ -176,7 +176,7 @@ if base_sleep is None:
 
 # No new src/ file; SleepTeardown.* unchanged.
 ls = subprocess.run(["git", "-C", str(ROOT), "ls-tree", "-r", "--name-only", base, "src"], capture_output=True, text=True).stdout.split()
-ls.append("src/time/ExternalRtc.h")  # v50 S1 helper header (WO-2026-11-05-003)
+ls.extend(["src/time/ExternalRtc.h", "src/time/PreBindRtc.h"])  # S1b adds PreBindRtc.h  # v50 S1 helper header (WO-2026-11-05-003)
 if SRC == ROOT / "src":
     cur_files = sorted(str(p.relative_to(ROOT)) for p in SRC.rglob("*") if p.is_file())
     if sorted(ls) != cur_files:
