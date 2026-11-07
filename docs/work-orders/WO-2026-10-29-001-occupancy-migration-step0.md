@@ -75,5 +75,17 @@ Recorded by Claude Code from Chip's message of 7 Nov; Chip performs every device
 ### First-boot checks per wave-1 device (Claude Code, read-only, after each device's first 4901 boot)
 The 14220 units read offline, so the first 4901 boot may come well after the move (the device must connect, take the OTA including the Device OS 6.6.0 jump, and boot). Watchers poll the S3 archive for a `status` event reporting `v49.1` for each device ID. Then, per device, UTC: (1) **Eastern schedule** in effect (EST5EDT, open and close in local time); (2) **fw 4901**; (3) **status reset 70** at the OTA boot; (4) **Ubidots continuity**: reports arrive with no gap and the counters continue from the old product's last values. Each device is reported separately.
 
-### Wave 1 results
-(To be filled as each device boots; none yet as of 7 Nov 06:05Z.)
+### Wave rules (Chip, 7 Nov 2026)
+- **Move after close, before open.** Move each device to 42131 after its close and before its next open, so day one starts at 0 on the new product. **Applies to the Vaughan wave (wave 2).**
+- **The migration-day count reset is expected.** The device starts a fresh GCC store on the new product, so its daily count restarts at 0 on the move day. This is not a continuity failure; the first-boot "Ubidots continuity" check judges reporting gaps, and treats the counter reset as expected.
+- **WAKEFOREST-PC01 (Device OS 4.2.0):** the cloud should deliver the Device OS dependency with the 4901 OTA. Watch its next connections (about 18:00Z) and report per window. **After three daily windows without a 4901 boot, flag it for a USB flash at a site visit.** Window 1 is 7 Nov ~18:00Z.
+
+### Wave 1 results (Claude Code, read-only; UTC)
+**Morrisville-Tennis-ChurchSt-1a** (`e00fce686f8cb2133cd3f8ed`): first 4901 boot 7 Nov 12:57:06Z (archive `status/.../2026-11-07T12-57-06-780Z.json`; a 34-event Ubidots backlog flushed 12:55:53-12:57:09Z). Checked ~13:04Z.
+- fw 4901 (`v49.1-DurableResets`, product 42131): PASS. Cloud agrees: firmware 4901, desired 4901.
+- Reset 70 at the OTA boot (`resetReasonData` 0): PASS.
+- Ubidots continuity: PARTIAL. No gap (12:48:42Z, 12:55:59Z, 13:00:02Z). No 14220-era archive exists in S3 to compare. `dailyoccupancy` went 11 to 0 across the move: the expected migration-day reset (fresh GCC store).
+- Nothing abnormal: alert 0, watchdogResetCount 0, failsafeStage 0, free heap 89488.
+- **Eastern schedule: NOT YET OBSERVED.** The payloads carry no timezone or open/close field and a variable read timed out. Method (Chip): at 03:10Z on 8 Nov confirm its last report is stamped 02:59:59Z with quiet after it until 11:00Z (the ChurchSt-2 method). Result to be added.
+
+**WAKEFOREST-PC01** (`e00fce68878d84d810c25d41`): no 4901 boot as of 13:04Z on 7 Nov. Cloud: offline, `last_heard` 5 Nov 18:02:02Z (about 43 h), last handshake 4 Nov 18:00:25Z, product 42131, last ran a 14220 build (`firmware_product_id` 14220), desired and targeted firmware 4901, system firmware **4.2.0**. No archived events in S3 for it (15 Oct to 7 Nov). It checked in around 18:00Z on 4 and 5 Nov (possible once-a-day pattern; two timestamps only). Window 1 (7 Nov ~18:00Z): pending.
