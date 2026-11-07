@@ -37,11 +37,12 @@ struct FakeAb {
   uint8_t ctrl1 = 0x12;
   time_t chip = 1750000000;
   bool timeOk = true, readOk = true, writeOk = true;
-  int writes = 0;
+  int writes = 0, writeCalls = 0, failWriteCall = 0;  // failWriteCall: 1-based write call that fails
+  bool wrtcBlocksRead = true;  // vendored getRtcAsTime fails while WRTC is set
   uint8_t lastReg = 0x10, readReg = 0x10;
-  bool getRtcAsTime(time_t &t) { events.push_back("time"); if (!timeOk) return false; t = chip; return true; }
+  bool getRtcAsTime(time_t &t) { events.push_back("time"); if (!timeOk || (wrtcBlocksRead && (ctrl1 & 0x01))) return false; t = chip; return true; }
   bool readRegister(uint8_t r, uint8_t &v) { events.push_back("read"); readReg = r; if (!readOk) return false; v = ctrl1; return true; }
-  bool writeRegister(uint8_t r, uint8_t v) { events.push_back("write"); lastReg = r; if (!writeOk) return false; ctrl1 = v; writes++; return true; }
+  bool writeRegister(uint8_t r, uint8_t v) { events.push_back("write"); lastReg = r; writeCalls++; if (!writeOk || writeCalls == failWriteCall) return false; if (r != 0x10) return true; ctrl1 = v; writes++; return true; }
 };
 
 #include "time/PreBindRtc.h"
@@ -65,22 +66,37 @@ int main() {
   { FakeAb ab; reset(); fakeTime.valid = true; fakeTime.now_ = 1760000000; PreBindRtc::run(ab, w); CHECK(fakeTime.now_ == 1760000000); }
   { FakeAb ab; ab.chip = 946684800; reset(); PreBindRtc::run(ab, w); CHECK(!fakeTime.valid); }  // year 2000
   { FakeAb ab; ab.chip = 0; reset(); PreBindRtc::run(ab, w); CHECK(!fakeTime.valid); }
-  { FakeAb ab; ab.timeOk = false; reset(); PreBindRtc::run(ab, w); CHECK(!fakeTime.valid && ab.writes == 1); }  // WRTC still set
+  { FakeAb ab; ab.timeOk = false; reset(); CHECK(!PreBindRtc::run(ab, w) && !fakeTime.valid && ab.writes == 1 && ab.ctrl1 == 0x13); }  // time read failed: false, CONTROL1 still written
+
+  // WRTC=1 with a valid chip time: WRTC cleared for the read, time seeded, CONTROL1 ends normalised.
+  {
+    FakeAb ab; ab.ctrl1 = 0x53; reset();
+    CHECK(PreBindRtc::run(ab, w) && fakeTime.valid && fakeTime.now_ == 1750000000 && ab.ctrl1 == 0x13 && ab.writes == 2);
+    const std::vector<std::string> want = {"lock", "read", "write", "time", "setTime", "write", "unlock"};
+    CHECK(events == want);
+  }
+  // Retry: a failed bind leaves WRTC=1; the next unbound boot still seeds.
+  { FakeAb ab; reset(); PreBindRtc::run(ab, w); fakeTime = FakeTime(); events.clear(); CHECK(PreBindRtc::run(ab, w) && fakeTime.valid && ab.ctrl1 == 0x13); }
+  // WRTC=1 with an implausible chip time does not seed.
+  { FakeAb ab; ab.ctrl1 = 0x13; ab.chip = 946684800; reset(); PreBindRtc::run(ab, w); CHECK(!fakeTime.valid && ab.ctrl1 == 0x13); }
 
   // Failures return false (the caller logs and continues); none throws or exits.
   { FakeAb ab; ab.readOk = false; reset(); CHECK(!PreBindRtc::run(ab, w) && ab.writes == 0); }
   { FakeAb ab; ab.writeOk = false; reset(); CHECK(!PreBindRtc::run(ab, w)); }
+  { FakeAb ab; ab.ctrl1 = 0x13; ab.failWriteCall = 1; ab.wrtcBlocksRead = false; reset(); CHECK(!PreBindRtc::run(ab, w) && ab.ctrl1 == 0x13 && ab.writeCalls == 2); }  // clear fails: still restores
+  { FakeAb ab; ab.ctrl1 = 0x13; ab.failWriteCall = 2; reset(); CHECK(!PreBindRtc::run(ab, w) && fakeTime.valid); }  // final write fails
+  { FakeAb ab; ab.ctrl1 = 0x12; ab.failWriteCall = 1; reset(); CHECK(!PreBindRtc::run(ab, w) && ab.writeCalls == 1); }  // final write fails, no clear needed
 
   // Wire: lock held across the time read and the CONTROL1 read-modify-write; begin() only when not enabled.
   {
     FakeAb ab; FakeWire w2; reset();
     PreBindRtc::run(ab, w2);
-    const std::vector<std::string> want = {"lock", "begin", "time", "setTime", "read", "write", "unlock"};
+    const std::vector<std::string> want = {"lock", "begin", "read", "time", "setTime", "write", "unlock"};
     CHECK(events == want);
   }
   {
     FakeAb ab; reset(); PreBindRtc::run(ab, w);
-    CHECK(events.front() == "lock" && events.back() == "unlock" && events[1] == "time");
+    CHECK(events.front() == "lock" && events.back() == "unlock" && events[1] == "read");
     int begins = 0; for (auto &e : events) begins += e == "begin";
     CHECK(begins == 0);
   }

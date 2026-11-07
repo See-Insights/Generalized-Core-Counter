@@ -654,7 +654,7 @@ void setup() {
       .setup(); // Initialize the publish queue
 
   // ===== TIME AND RTC =====
-  // Device OS seeds Time from the chip before setup() when it is already bound; ensureBound() above covers the first boot.
+  // Device OS seeds Time from the chip before setup() when it is already bound; on an unbound boot S1b seeds it only on a successful plausible pre-bind chip read.
   const bool timeValidBeforeRtc = Time.isValid();
 
   // Oscillator snapshot: usingRC from the live clock source, AOS/FOS from the configuration. The raw OSC registers are not readable through the public API (published as null).
@@ -664,7 +664,7 @@ void setup() {
   startupOscFos = !!(oscCaps & particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL);
   Log.info("OscState: usingRC=%d aos=%d fos=%d", startupOscUsingRC ? 1 : 0, startupOscAos ? 1 : 0, startupOscFos ? 1 : 0);
 
-    // Re-run the occupancyStartTime future-date clamp once here: Time is valid by now on every boot where the chip held a plausible time (S1b seeds the unbound boot).
+    // Re-run the occupancyStartTime future-date clamp once here: Time is valid here only if Device OS or a successful plausible S1b pre-bind read seeded it.
   CurrentReadings::revalidateOccupancyStartTimeIfTimeAvailable();
 
 #if PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST

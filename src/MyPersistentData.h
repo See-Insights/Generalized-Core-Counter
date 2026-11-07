@@ -628,7 +628,7 @@ public:
 	 *
 	 * validate()'s own future-date clamp for occupancyStartTime runs once,
 	 * from the .load() call in setup() - which is called long before
-	 * Device OS (bound) or S1b (unbound) seeds Time; the clamp runs only if Time is valid then (see
+	 * Device OS (bound) or a successful plausible S1b pre-bind read seeds Time; the clamp runs only if Time is valid then (see
 	 * WO-2026-09-22-001). Call this once, opportunistically, from global
 	 * setup() as soon as a time source is available (Clock::isTimeValid()),
 	 * to give the same corruption check a point in boot where it can
