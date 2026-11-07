@@ -62,3 +62,18 @@ Chip's next expansion is the **remaining dozen occupancy sensors still running t
 
 - 0 `src/` lines.
 - The report: at most 150 lines, committed on the WO branch, then stop for the architect and Chip.
+
+## Wave plan (Chip, 7 Nov 2026)
+Recorded by Claude Code from Chip's message of 7 Nov; Chip performs every device move and pin. Nothing here is a Claude Code action on a device.
+- **Wave 1:** **WAKEFOREST-PC01** (`e00fce68878d84d810c25d41`) and **Morrisville-Tennis-ChurchSt-1a** (`e00fce686f8cb2133cd3f8ed`). Chip moves both from product 14220 to **42131** and pins them to firmware **4901** (pin rule: never rely on a pin for a Development-marked device: flash or un-mark first; confirm the Console shows 4901 after the next connect).
+- **Wave 2:** all eight **Vaughan** units (Vaughan-001..008; none retire).
+- **Retiring:** OCCUPANCY-DEVSAM01, 02 and 03, plus the four already marked retired (Morrisville-Tennis-MCP-01-RETIRED, MCP-04-RETIRED, Retired-029, Retired-20).
+- **Stale (site visit needed):** Morrisville-Tennis-ChurchSt-3.
+- **HollySprings-Tennis-1, -2, -3:** Chip is cleaning those up (no wave assigned).
+- Counts: 2 + 8 move (10 units); 7 retire (3 DEVSAM + 4 marked); 1 stale; 3 HollySprings pending. Total 21 devices in product 14220.
+
+### First-boot checks per wave-1 device (Claude Code, read-only, after each device's first 4901 boot)
+The 14220 units read offline, so the first 4901 boot may come well after the move (the device must connect, take the OTA including the Device OS 6.6.0 jump, and boot). Watchers poll the S3 archive for a `status` event reporting `v49.1` for each device ID. Then, per device, UTC: (1) **Eastern schedule** in effect (EST5EDT, open and close in local time); (2) **fw 4901**; (3) **status reset 70** at the OTA boot; (4) **Ubidots continuity**: reports arrive with no gap and the counters continue from the old product's last values. Each device is reported separately.
+
+### Wave 1 results
+(To be filled as each device boots; none yet as of 7 Nov 06:05Z.)
