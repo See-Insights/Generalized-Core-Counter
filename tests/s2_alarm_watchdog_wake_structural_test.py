@@ -39,6 +39,7 @@ def _problems(files):
     gcc = strip(files["gcc"])
     sleep = strip(files["sleep"])
     err = strip(files["err"])
+    fs = strip(files["fs"])
     hc = strip(files["hc"])
 
     for name in ("clearAb1805StaleAlarmInterrupts", "interruptAtTime", "setWDT", "stopWDT", "resumeWDT",
@@ -48,15 +49,15 @@ def _problems(files):
                 p.append(f"{name} still referenced in {label}")
 
     # Only the two S3 callers may still touch the AB1805 object for power-down.
-    for label in ("gcc", "sleep", "err", "hc"):
+    for label in ("gcc", "sleep", "err", "hc", "fs"):
         t = strip(files[label])
         for m in re.finditer(r"\bab1805\.(\w+)", t):
             if m.group(1) != "deepPowerDown":
                 p.append(f"ab1805.{m.group(1)} in {label}")
 
     # Reason 20 is judged from persisted evidence, not the retained struct, and a reason-30-only wake.
-    if "in.wakeReasonIsAlarm = in.resetReasonIsPowerManagement;" not in hc:
-        p.append("reason 30 alone must be the alarm wake")
+    if "in.wakeReasonIsHibernateWake = in.resetReasonIsPowerManagement;" not in hc:
+        p.append("reason 30 alone must be the successful-HIBERNATE-wake arm")
     if re.search(r"retained\w*", hc) and "PIN_RESET" in hc:
         pass
     setup = gcc[gcc.index("classifyWake(reason)"):]
@@ -69,15 +70,23 @@ def _problems(files):
         p.append("the byte must be read before it is cleared")
     if gcc.count("set_powerOffRequested(0)") != 1:
         p.append("the byte must be cleared exactly once, at boot")
+    if not re.search(r"set_powerOffRequested\(0\);\s*SystemConfig::flushNow\(\);", gcc):
+        p.append("the boot clear must be flushed immediately (forced consumption)")
+    if 'ab1805WakeReason\\":\\"N/A\\"' not in files["gcc"]:
+        p.append("the status payload must keep ab1805WakeReason with the constant N/A")
     if "if (reason == RESET_REASON_PIN_RESET)" not in block:
         p.append("reason 20 gate missing")
 
     # The byte is persisted before the deep power-down and the flush, never after.
     case3 = err[err.index("case 3:"):]
     case3 = case3[:case3.index("break;")]
-    order = [case3.find(s) for s in ("set_powerOffRequested(1)", "flushAllBeforeReset()", "ab1805.deepPowerDown()")]
+    order = [case3.find(s) for s in ("set_powerOffRequested(HibernateWakeDiagnostics::kPowerOffSentinel)", "flushAllBeforeReset()", "ab1805.deepPowerDown()")]
     if min(order) < 0 or order != sorted(order):
-        p.append("State_Error case 3 must write the byte, then flush, then deepPowerDown")
+        p.append("State_Error case 3 must write the sentinel, then flush, then deepPowerDown")
+    if not re.search(r"deepPowerDown\(\);\s*RecoveryState::set_powerOffRequested\(0\);\s*SystemConfig::flushNow\(\);", case3):
+        p.append("State_Error case 3 must clear the byte and flush after a returning deepPowerDown()")
+    if not re.search(r"deepPowerDown\(\);\s*RecoveryState::set_powerOffRequested\(0\);\s*RecoveryState::set_connectivityRecoveryStage\(2\);\s*SystemConfig::flushNow\(\);", fs):
+        p.append("the failsafe caller must clear the byte, downgrade stage 3 and flush after a returning deepPowerDown()")
 
     # The chip watchdog: init+start in setup, refreshed in the main loop, stopped before and started after every sleep.
     if gcc.count("ExternalWatchdog.refresh()") != 1:
@@ -123,6 +132,7 @@ raw = {
     "gcc": read("Generalized-Core-Counter.cpp"),
     "sleep": read("state/State_Sleep.cpp"),
     "err": read("state/State_Error.cpp"),
+    "fs": read("power/ConnectivityFailsafe.cpp"),
     "hc": read("time/HibernateCycle.cpp"),
     "diag": read("time/ClockDiagnostics.cpp"),
     "elig": read("time/HibernateEligibility.cpp"),
@@ -140,12 +150,16 @@ def mutated(label, old, new, count=1):
 
 
 probes = {
-    "reason 20 always a wake": mutated("hc", "in.wakeReasonIsAlarm = in.resetReasonIsPowerManagement;", "in.wakeReasonIsAlarm = true;"),
-    "evidence read from retained": mutated("gcc", "RecoveryState::get_powerOffRequested() != 0", "retainedHibernatePending != 0"),
+    "reason 20 always a wake": mutated("hc", "in.wakeReasonIsHibernateWake = in.resetReasonIsPowerManagement;", "in.wakeReasonIsHibernateWake = true;"),
+    "evidence read from retained": mutated("gcc", "RecoveryState::get_powerOffRequested(),", "retainedHibernatePending,"),
     "byte not cleared": mutated("gcc", "RecoveryState::set_powerOffRequested(0);", ""),
     "byte cleared before read": mutated("gcc", "  bool inferredWatchdog = false;\n", "  RecoveryState::set_powerOffRequested(0);\n  bool inferredWatchdog = false;\n"),
-    "byte written after the call": mutated("err", "RecoveryState::set_powerOffRequested(1); // persisted evidence: a reason-20 boot after this is a power-up, not a watchdog\n      flushAllBeforeReset();\n      ab1805.deepPowerDown();",
-                                           "flushAllBeforeReset();\n      ab1805.deepPowerDown();\n      RecoveryState::set_powerOffRequested(1);"),
+    "byte written after the call": mutated("err", "RecoveryState::set_powerOffRequested(HibernateWakeDiagnostics::kPowerOffSentinel); // persisted evidence: a reason-20 boot after this is a power-up, not a watchdog\n      flushAllBeforeReset();\n      ab1805.deepPowerDown();",
+                                           "flushAllBeforeReset();\n      ab1805.deepPowerDown();\n      RecoveryState::set_powerOffRequested(HibernateWakeDiagnostics::kPowerOffSentinel);"),
+    "boot clear not flushed": mutated("gcc", "  SystemConfig::flushNow(); // consume the evidence durably before anything can reload it\n", ""),
+    "no clear after a returning error-path power-down": mutated("err", "      RecoveryState::set_powerOffRequested(0); SystemConfig::flushNow();", ""),
+    "failsafe stage 3 not downgraded on return": mutated("fs", "RecoveryState::set_connectivityRecoveryStage(2); SystemConfig::flushNow();", ""),
+    "ab1805WakeReason dropped from the payload": mutated("gcc", '\\"ab1805WakeReason\\":\\"N/A\\",', ""),
     "alarm armed twice": mutated("sleep", ".duration((uint32_t)wakeInSeconds * 1000UL);\n\n        const bool watchdogStopped",
                                  ".duration((uint32_t)wakeInSeconds * 1000UL).duration(1);\n\n        const bool watchdogStopped"),
     "no watchdog stop before hibernate": mutated("sleep", "const bool watchdogStopped = (ExternalWatchdog.stop() == SYSTEM_ERROR_NONE);\n        pauseAwakeWatchdogForSleep",

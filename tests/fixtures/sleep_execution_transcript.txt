@@ -1,8 +1,9 @@
-# Frozen output of the sleep execution (standby decision, hibernate attempt, ULP/STOP cascade): WO-2026-10-21-001 (Sleep S-2), re-frozen for v50 S2 (WO-2026-11-05-004).
+# Frozen output of the pre-change sleep execution (standby decision, hibernate attempt, ULP/STOP cascade): WO-2026-10-21-001 (Sleep S-2), with the approved v50 S2 substitutions normalised (tests/s2_transcript_normalise.py).
+# Base commit: 1e6d34f
 # Scenarios: 121 (cellular 101 + wifi 20); passes: 141
 # Per-platform summary (scenarios passes WOKE RETURNED distinct-events): cellular 101 121 111 10 70; wifi 20 20 18 2 54
-# Body sha256: 05f221f2cf72bcd86d1e94c6ccaf1e5bd6129ab61102868d171cf25e52ccd347
-# Generated with --regenerate from the S2 State_Sleep.cpp (native HIBERNATE duration alarm, ExternalWatchdog) against tests/stubs/sleep_teardown.
+# Body sha256: ee7639603eeb4d42012f7cae518c4011add06da96aceaa936832e14159406815
+# Generated with --regenerate: the blocks extracted by marker text from 1e6d34f:src/state/State_Sleep.cpp (git show) run in mode a against tests/stubs/sleep_teardown, then normalised.
 PLATFORM cellular
 S0 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=1 t=901000
@@ -401,7 +402,7 @@ S11 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
 S12 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=900 overnight=1 t=1801000
+  p0 wakeIn=900 overnight=1 t=901007
     TEARDOWN req=0 eff=0 force=0 err=0
     HIB eligible? wakeIn=900 -> 1
     CALL pinMode 7 2
@@ -448,13 +449,13 @@ S12 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=1801000
+    CYCLE resetOnWake ms=901007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
 S13 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=7201000
+  p0 wakeIn=3600 overnight=1 t=3601007
     TEARDOWN req=1 eff=1 force=0 err=0
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
@@ -501,13 +502,13 @@ S13 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=7201000
+    CYCLE resetOnWake ms=3601007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
 S14 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=7201000
+  p0 wakeIn=3600 overnight=1 t=3601007
     TEARDOWN req=0 eff=0 force=0 err=0
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
@@ -554,13 +555,13 @@ S14 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=7201000
+    CYCLE resetOnWake ms=3601007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
 S15 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=900 overnight=1 t=1801000
+  p0 wakeIn=900 overnight=1 t=901007
     TEARDOWN req=1 eff=1 force=0 err=0
     HIB eligible? wakeIn=900 -> 1
     CALL pinMode 7 2
@@ -607,13 +608,13 @@ S15 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=1801000
+    CYCLE resetOnWake ms=901007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
 S16 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=7201000
+  p0 wakeIn=3600 overnight=1 t=3601007
     TEARDOWN req=0 eff=0 force=1 err=-170
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
@@ -660,13 +661,13 @@ S16 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=7201000
+    CYCLE resetOnWake ms=3601007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
 S17 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=7201000
+  p0 wakeIn=3600 overnight=1 t=3601007
     TEARDOWN req=1 eff=0 force=1 err=-170
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
@@ -713,7 +714,7 @@ S17 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=7201000
+    CYCLE resetOnWake ms=3601007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
@@ -4506,7 +4507,7 @@ S3 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
 S4 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=7201000
+  p0 wakeIn=3600 overnight=1 t=3601007
     TEARDOWN req=0 eff=0 force=0 err=0
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
@@ -4551,13 +4552,13 @@ S4 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
     CALL Watchdog.started
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=7201000
+    CYCLE resetOnWake ms=3601007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
 S5 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=7201000
+  p0 wakeIn=3600 overnight=1 t=3601007
     TEARDOWN req=1 eff=0 force=0 err=0
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
@@ -4602,7 +4603,7 @@ S5 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
     CALL Watchdog.started
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=7201000
+    CYCLE resetOnWake ms=3601007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0

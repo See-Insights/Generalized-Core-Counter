@@ -314,4 +314,5 @@ void connectivityFailsafeSupervisor() {
            (long)connectionAgeSec);
   flushAllBeforeReset();
   ab1805.deepPowerDown();
+  RecoveryState::set_powerOffRequested(0); RecoveryState::set_connectivityRecoveryStage(2); SystemConfig::flushNow(); // not expected to return: no recent stage-3 evidence
 }

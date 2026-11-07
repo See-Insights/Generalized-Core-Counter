@@ -28,7 +28,10 @@ PY
 }
 mutant always_wake "return !errorPathByte && !failsafeRecent;" "return false;"
 mutant never_wake "return !errorPathByte && !failsafeRecent;" "return true;"
-mutant no_recency "(!timeValid || (age >= 0 && age <= kPowerOffEvidenceMaxAgeSec))" "true"
+mutant no_recency "(timeValid && age >= 0 && age <= kPowerOffEvidenceMaxAgeSec)" "true"
+mutant invalid_time_accepted "(timeValid && age >= 0 && age <= kPowerOffEvidenceMaxAgeSec)" "(!timeValid || (age >= 0 && age <= kPowerOffEvidenceMaxAgeSec))"
+mutant sentinel_nonzero "evidenceByte == kPowerOffSentinel" "evidenceByte != 0"
+mutant sentinel_legacy_two "evidenceByte == kPowerOffSentinel" "evidenceByte >= 2"
 mutant no_byte "return !errorPathByte && !failsafeRecent;" "return !failsafeRecent;"
 mutant any_stage "failsafeStage == 3 &&" "failsafeStage != 0 &&"
 echo "watchdog_inferred_classification_test: classification and mutants ok"

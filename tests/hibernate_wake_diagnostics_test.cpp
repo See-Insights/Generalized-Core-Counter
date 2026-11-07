@@ -20,7 +20,7 @@ using HibernateWakeDiagnostics::gateArmName;
 GateInputs passingInputs() {
   GateInputs in{};
   in.resetReasonIsPowerManagement = true;
-  in.wakeReasonIsAlarm = true;
+  in.wakeReasonIsHibernateWake = true;
   in.rtcReadOk = true;
   in.rtcBefore = 1000;
   in.requestedSleepSec = 3600;
@@ -42,7 +42,7 @@ GateArm classifyGateArmMirror(const GateInputs &in) {
   if (!in.resetReasonIsPowerManagement) {
     return GateArm::kResetReason;
   }
-  if (!in.wakeReasonIsAlarm) {
+  if (!in.wakeReasonIsHibernateWake) {
     return GateArm::kWakeReason;
   }
   if (!in.rtcReadOk) {
@@ -66,8 +66,9 @@ void testGatePassesClassifiesNone() {
 }
 
 // v50 S2 (WO-2026-11-05-004): the AB1805 wake-reason read is gone. Device OS 6.6.0 programs the
-// chip alarm itself and reports RESET_REASON_POWER_MANAGEMENT (30) for the hibernate wake, so
-// in.wakeReasonIsAlarm in HibernateCycle.cpp is exactly in.resetReasonIsPowerManagement - there
+// chip alarm itself and reports RESET_REASON_POWER_MANAGEMENT (30) for any successful HIBERNATE wake
+// (RTC or GPIO; firmware cannot tell them apart), so
+// in.wakeReasonIsHibernateWake in HibernateCycle.cpp is exactly in.resetReasonIsPowerManagement - there
 // is no DEEP_POWER_DOWN window and no AB1805 label. The .sh fidelity checks pin that text.
 GateInputs wakeInputs(bool powerMgmt, int64_t skewSec, bool rtcReadOk = true) {
   GateInputs in{};
@@ -76,23 +77,33 @@ GateInputs wakeInputs(bool powerMgmt, int64_t skewSec, bool rtcReadOk = true) {
   in.rtcBefore = 1000;
   in.requestedSleepSec = 3600;
   in.rtcAtWake = 1000 + 3600 + skewSec;
-  in.wakeReasonIsAlarm = in.resetReasonIsPowerManagement;
+  in.wakeReasonIsHibernateWake = in.resetReasonIsPowerManagement;
   return in;
 }
 
+// Reason 30 is a successful HIBERNATE wake whatever the elapsed time (including a 1,800 s early wake, e.g. a
+// button/GPIO wake); it is not proof of an alarm wake. The bench's actual-vs-requested sleep shows early wakes.
 void testReason30AloneAcceptsAnyTiming() {
   for (const int64_t skewSec : {(int64_t)0, (int64_t)30, (int64_t)600, (int64_t)-1800}) {
     const GateInputs in = wakeInputs(true, skewSec);
-    assert(in.wakeReasonIsAlarm);
+    assert(in.wakeReasonIsHibernateWake);
     assert(classifyGateArmMirror(in) == GateArm::kNone);
   }
   const GateInputs noRtc = wakeInputs(true, 0, /*rtcReadOk=*/false);
   assert(classifyGateArmMirror(noRtc) == GateArm::kRtcRead);
 }
 
+// A button/GPIO wake from HIBERNATE also reports reason 30; 100 s into a 3600 s sleep it is indistinguishable in
+// firmware from an alarm wake (recorded residual, Amendment 4). The event's actual/err fields carry the evidence.
+void testGpioWakeIsAlsoReason30Success() {
+  const GateInputs in = wakeInputs(true, -3500);
+  assert(in.wakeReasonIsHibernateWake);
+  assert(classifyGateArmMirror(in) == GateArm::kNone);
+}
+
 void testOtherResetReasonsFailOnTheResetReasonArm() {
   const GateInputs in = wakeInputs(false, 0);
-  assert(!in.wakeReasonIsAlarm);
+  assert(!in.wakeReasonIsHibernateWake);
   assert(classifyGateArmMirror(in) == GateArm::kResetReason);
 }
 
@@ -144,7 +155,7 @@ void testBuildEventFieldsOnFailureZeroesActualAndErrorRegardlessOfInput() {
 void testBuildEventFieldsOnSuccessForwardsEveryForensicInputFaithfully() {
   GateInputs in{};
   in.resetReasonIsPowerManagement = true;
-  in.wakeReasonIsAlarm = true;
+  in.wakeReasonIsHibernateWake = true;
   in.rtcReadOk = true;
   in.rtcBefore = 87654321;         // distinctive int64_t
   in.requestedSleepSec = 424242;   // distinctive uint32_t
@@ -191,7 +202,7 @@ void testBuildEventFieldsOnSuccessForwardsEveryForensicInputFaithfully() {
 void testBuildEventFieldsOnFailureForwardsEveryForensicInputFaithfully() {
   GateInputs in{};
   in.resetReasonIsPowerManagement = true;
-  in.wakeReasonIsAlarm = true;
+  in.wakeReasonIsHibernateWake = true;
   in.rtcReadOk = false;             // fails the kRtcRead arm
   in.rtcBefore = 55555555;         // distinctive int64_t
   in.requestedSleepSec = 808080;   // distinctive uint32_t
@@ -256,7 +267,7 @@ void testEachGateArmFailureIsIdentified() {
   }
   {
     GateInputs in = passingInputs();
-    in.wakeReasonIsAlarm = false;
+    in.wakeReasonIsHibernateWake = false;
     assert(classifyGateArmMirror(in) == GateArm::kWakeReason);
     assert(strcmp(gateArmName(classifyGateArmMirror(in)), "wake_reason") == 0);
   }
@@ -293,7 +304,7 @@ void testEachGateArmFailureIsIdentified() {
 void testFirstFailingArmInEvaluationOrderWins() {
   GateInputs in = passingInputs();
   in.resetReasonIsPowerManagement = false;
-  in.wakeReasonIsAlarm = false;
+  in.wakeReasonIsHibernateWake = false;
   in.rtcReadOk = false;
   assert(classifyGateArmMirror(in) == GateArm::kResetReason);
 }
@@ -321,13 +332,13 @@ void testFirstFailingArmInEvaluationOrderWins() {
 void testAdjacentArmOrdering_ResetReasonBeforeWakeReason() {
   GateInputs in = passingInputs();
   in.resetReasonIsPowerManagement = false; // fails check 1
-  in.wakeReasonIsAlarm = false;             // fails check 2
+  in.wakeReasonIsHibernateWake = false;             // fails check 2
   assert(classifyGateArmMirror(in) == GateArm::kResetReason);
 }
 
 void testAdjacentArmOrdering_WakeReasonBeforeRtcRead() {
   GateInputs in = passingInputs();
-  in.wakeReasonIsAlarm = false; // fails check 2
+  in.wakeReasonIsHibernateWake = false; // fails check 2
   in.rtcReadOk = false;         // fails check 3
   assert(classifyGateArmMirror(in) == GateArm::kWakeReason);
 }
@@ -411,6 +422,7 @@ void testWorstCasePayloadFitsBudget() {
 int main() {
   testGatePassesClassifiesNone();
   testReason30AloneAcceptsAnyTiming();
+  testGpioWakeIsAlsoReason30Success();
   testOtherResetReasonsFailOnTheResetReasonArm();
   testBuildEventFieldsOnSuccessReportsProvidedActualAndError();
   testBuildEventFieldsOnFailureZeroesActualAndErrorRegardlessOfInput();

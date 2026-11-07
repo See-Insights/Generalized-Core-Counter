@@ -753,12 +753,13 @@ void setup() {
     startupPinResetChecked = true;
     const bool timeValid = Time.isValid();
     inferredWatchdog = HibernateWakeDiagnostics::isInferredWatchdog(
-        RecoveryState::get_powerOffRequested() != 0, RecoveryState::get_connectivityRecoveryStage(),
+        RecoveryState::get_powerOffRequested(), RecoveryState::get_connectivityRecoveryStage(),
         (int64_t)RecoveryState::get_lastConnectivityRecoveryAction(), timeValid, (int64_t)Time.now());
     startupInferredWatchdog = inferredWatchdog;
     Log.info("PIN_RESET: %s", inferredWatchdog ? "no power-off evidence - inferred watchdog" : "power-off evidence - power-up wake");
   }
   RecoveryState::set_powerOffRequested(0);
+  SystemConfig::flushNow(); // consume the evidence durably before anything can reload it
 
   // Device OS keeps the chip watchdog running across a reset; init() re-arms it.
   if (ExternalWatchdog.init(WatchdogConfiguration().timeout(124000)) != SYSTEM_ERROR_NONE || ExternalWatchdog.start() != SYSTEM_ERROR_NONE) {
@@ -1289,9 +1290,9 @@ void publishStartupStatus() {
 
   // Only present when the OS reset reason was PIN_RESET (see the wake
   // classification block in setup()).
-  char pinResetFields[64] = "";
+  char pinResetFields[80] = "";
   if (startupPinResetChecked) {
-    snprintf(pinResetFields, sizeof(pinResetFields), ",\"watchdogSource\":\"%s\"", startupInferredWatchdog ? "inferred" : "NONE");
+    snprintf(pinResetFields, sizeof(pinResetFields), ",\"ab1805WakeReason\":\"N/A\",\"watchdogSource\":\"%s\"", startupInferredWatchdog ? "inferred" : "NONE");
   }
 
 #if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS

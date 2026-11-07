@@ -60,14 +60,14 @@ WakeVerdict classifyWake(int osResetReason) {
     in.rtcBefore = (int64_t)retainedHibernateRtcBefore;
     in.requestedSleepSec = retainedHibernateRequestedSleep;
     in.rtcAtWake = v.rtcAtWake;
-    // Reason 30 alone passes the wake-reason arm (WO-2026-11-05-004 Amendment 3).
-    in.wakeReasonIsAlarm = in.resetReasonIsPowerManagement;
+    // Reason 30 is a successful HIBERNATE wake (RTC or GPIO alike) and alone passes the wake-reason arm (WO-2026-11-05-004 Amendments 3-4).
+    in.wakeReasonIsHibernateWake = in.resetReasonIsPowerManagement;
     if (in.resetReasonIsPowerManagement) v.wakeReasonName = "POWER_MGMT";
 
     using HibernateWakeDiagnostics::GateArm;
     if (!in.resetReasonIsPowerManagement) {
       v.gateArm = GateArm::kResetReason;
-    } else if (!in.wakeReasonIsAlarm) {
+    } else if (!in.wakeReasonIsHibernateWake) {
       v.gateArm = GateArm::kWakeReason;
     } else if (!in.rtcReadOk) {
       v.gateArm = GateArm::kRtcRead;

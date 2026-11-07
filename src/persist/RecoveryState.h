@@ -75,7 +75,7 @@ void set_lastWatchdogResetReasonData(uint32_t value);
 uint8_t get_lastWatchdogSource();
 void set_lastWatchdogSource(uint8_t value);
 
-/// Spare SysData byte (was structuresVersion; layout unchanged): set before a requested power-down, cleared once the wake is classified.
+/// Spare SysData byte (was structuresVersion; layout unchanged): set to HibernateWakeDiagnostics::kPowerOffSentinel before a requested power-down, cleared once the wake is classified.
 uint8_t get_powerOffRequested();
 void set_powerOffRequested(uint8_t value);
 

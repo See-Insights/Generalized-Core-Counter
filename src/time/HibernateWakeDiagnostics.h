@@ -47,11 +47,11 @@ enum class GateArm {
 
 /// Raw inputs to the gate, exactly as `HibernateCycle::classifyWake()`
 /// reads them. The caller resolves `resetReasonIsPowerManagement` and
-/// `wakeReasonIsAlarm` from Device-OS/AB1805 types before populating this,
+/// `wakeReasonIsHibernateWake` from Device-OS/AB1805 types before populating this,
 /// so this header never needs to know those enums.
 struct GateInputs {
   bool resetReasonIsPowerManagement;
-  bool wakeReasonIsAlarm;
+  bool wakeReasonIsHibernateWake;
   bool rtcReadOk;
   int64_t rtcBefore;
   uint32_t requestedSleepSec;
@@ -161,12 +161,15 @@ inline int buildEventPayload(char *buffer, size_t bufferSize, const EventFields 
 }
 
 /// Reason-20 boot: persisted power-off evidence (the Error-path byte, or a
-/// recent failsafe stage 3) means a power-up wake; none means an inferred
+/// failsafe stage 3 within 600 s on a valid clock) means a power-up wake; none means an inferred
 /// watchdog. `retained` is never evidence (a power-down clears it).
 constexpr int64_t kPowerOffEvidenceMaxAgeSec = 600;
-inline bool isInferredWatchdog(bool errorPathByte, uint8_t failsafeStage, int64_t failsafeActionAt, bool timeValid, int64_t now) {
+/// The Error-path evidence byte counts only when it is exactly this value (0 and the legacy structuresVersion 2 are "no record").
+constexpr uint8_t kPowerOffSentinel = 0xA5;
+inline bool isInferredWatchdog(uint8_t evidenceByte, uint8_t failsafeStage, int64_t failsafeActionAt, bool timeValid, int64_t now) {
+  const bool errorPathByte = evidenceByte == kPowerOffSentinel;
   const int64_t age = now - failsafeActionAt;
-  const bool failsafeRecent = failsafeStage == 3 && (!timeValid || (age >= 0 && age <= kPowerOffEvidenceMaxAgeSec));
+  const bool failsafeRecent = failsafeStage == 3 && (timeValid && age >= 0 && age <= kPowerOffEvidenceMaxAgeSec);
   return !errorPathByte && !failsafeRecent;
 }
 

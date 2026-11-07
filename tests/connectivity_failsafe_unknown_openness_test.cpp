@@ -59,6 +59,8 @@ uint8_t stage = 0;
 time_t lastAction = 0;
 inline uint8_t get_connectivityRecoveryStage() { return stage; }
 inline time_t get_lastConnectivityRecoveryAction() { return lastAction; }
+inline void set_connectivityRecoveryStage(uint8_t) {}
+inline void set_powerOffRequested(uint8_t) {}
 } // namespace RecoveryState
 
 namespace SystemConfig {

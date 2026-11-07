@@ -123,9 +123,9 @@ awk '
 check "in.resetReasonIsPowerManagement maps from osResetReason, not a literal" \
   "in.resetReasonIsPowerManagement = (osResetReason == RESET_REASON_POWER_MANAGEMENT);" \
   "$hc_src"
-# v50 S2 (WO-2026-11-05-004): reason 30 alone is the alarm wake; no AB1805 wake-reason read, no DEEP_POWER_DOWN window.
-check "in.wakeReasonIsAlarm is exactly the power-management reset reason" \
-  "in.wakeReasonIsAlarm = in.resetReasonIsPowerManagement;" \
+# v50 S2 (WO-2026-11-05-004): reason 30 alone is a successful HIBERNATE wake (RTC or GPIO); no AB1805 wake-reason read, no DEEP_POWER_DOWN window.
+check "in.wakeReasonIsHibernateWake is exactly the power-management reset reason" \
+  "in.wakeReasonIsHibernateWake = in.resetReasonIsPowerManagement;" \
   "$hc_src"
 for banned in "AB1805" "dpdOnTime" "getWakeReason" "DEEP_POWER_DOWN"; do
   if grep -q -- "$banned" "$hc_src"; then
