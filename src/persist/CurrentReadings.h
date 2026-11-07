@@ -44,7 +44,7 @@ void resetEverything(bool includeSensorTotals = true);
  *        time source exists this boot.
  *
  * validate()'s own clamp runs from the .load() in setup(), long before
- * Device OS seeds Time only on a bound boot, so it can miss the first boot (WO-2026-09-22-001).
+ * Time is seeded by Device OS (bound boot) or S1b (before the first bind), so it is usually valid here (WO-2026-09-22-001).
  * Call this once, opportunistically, from global setup() as soon as
  * Clock::isTimeValid(). No-op if occupied is false or occupancyStartTime is
  * already plausible.
