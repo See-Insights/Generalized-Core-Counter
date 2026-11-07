@@ -26,8 +26,9 @@ enum { SYSTEM_ERROR_NONE = 0, SYSTEM_ERROR_ABORTED = -170, SYSTEM_ERROR_NOT_SUPP
 
 namespace {
 std::vector<std::string> ev;
-int sleepError = 0;
-struct PowerCut {};   // System.sleep() succeeded: nothing after it ever runs
+constexpr int kPowerCut = 1; // not a Device OS result: System.sleep() never returns
+int sleepError = kPowerCut;
+struct PowerCut {};   // the rail was cut: nothing after System.sleep() ever runs
 struct ActionStop {}; // System.reset(): the board restarts
 std::string fmt(const char *f, ...) {
   char b[160];
@@ -101,13 +102,18 @@ struct SystemFake {
   bool updatesPending() { return false; }
   SystemSleepResult sleep(const SystemSleepConfiguration &c) {
     ev.push_back(fmt("sleep mode=%s ms=%lu gpios=%d", c.m == SystemSleepMode::POWER_OFF ? "POWER_OFF" : "other", c.ms, c.gpios));
-    if (sleepError == 0) {
+    if (sleepError == kPowerCut) {
       throw PowerCut{};
     }
     return {sleepError};
   }
   void reset(int cause) { ev.push_back(fmt("reset=%d", cause)); throw ActionStop{}; }
 } System;
+
+struct ExternalWatchdogFake {
+  int stop() { ev.push_back("wd.stop"); return SYSTEM_ERROR_NONE; }
+  int start() { ev.push_back("wd.start"); return SYSTEM_ERROR_NONE; }
+} ExternalWatchdog;
 
 struct TimeFake { time_t now() { return 10 * 86400; } } Time;
 
@@ -168,6 +174,8 @@ void expect(const char *what, const Events &want) {
 }
 
 const std::string kSleep = fmt("sleep mode=POWER_OFF ms=%lu gpios=0", (unsigned long)kPowerOffRecoverySec * 1000UL);
+const Events kWdThenSleep = {"wd.stop", kSleep};            // power cut: stopped, never restarted
+const Events kReturned = {"wd.stop", kSleep, "wd.start"};   // any return: restarted straight after
 const std::string kHelperLog = "log:PowerOff: System.sleep returned err=%d";
 const std::string kStage3Log = "log:Failsafe: stage=3 action=deep-powerdown age=%lds";
 const std::string kErrorLog = "log:Executing deep power down from ERROR_STATE (alert=%d)";
@@ -175,33 +183,42 @@ const std::string kErrorLog = "log:Executing deep power down from ERROR_STATE (a
 
 int main() {
   printf("--- helper: POWER_OFF, the real off time, RTC wake only ---\n");
-  run(0, powerOffForRecovery);
-  expect("success: one POWER_OFF sleep of kPowerOffRecoverySec, no GPIO wake, nothing after", {kSleep});
+  run(kPowerCut, powerOffForRecovery);
+  expect("power cut: watchdog stopped, one POWER_OFF sleep of kPowerOffRecoverySec, no GPIO wake, nothing after", kWdThenSleep);
   if (kPowerOffRecoverySec == 0) { printf("  FAIL off time is zero\n"); failures++; }
-  for (int err : {SYSTEM_ERROR_ABORTED, SYSTEM_ERROR_NOT_SUPPORTED}) {
+  for (int err : {SYSTEM_ERROR_NONE, SYSTEM_ERROR_ABORTED, SYSTEM_ERROR_NOT_SUPPORTED}) {
     run(err, powerOffForRecovery);
-    expect("error: logs and returns (never resets inside)", {kSleep, kHelperLog});
+    Events want = kReturned;
+    want.push_back(kHelperLog);
+    expect(err == SYSTEM_ERROR_NONE ? "returned success: watchdog restarted, logs and returns (never resets inside)"
+                                    : "error: watchdog restarted, logs and returns (never resets inside)", want);
   }
 
   printf("--- failsafe stage 3 ---\n");
-  const Events stage3Head = {"persist=3", kStage3Log, "flush", kSleep};
-  run(0, connectivityFailsafeSupervisor);
-  expect("success: record, log, flush, then exactly one sleep; nothing follows", stage3Head);
-  for (int err : {SYSTEM_ERROR_ABORTED, SYSTEM_ERROR_NOT_SUPPORTED}) {
+  const Events stage3Pre = {"persist=3", kStage3Log, "flush"};
+  Events stage3Cut = stage3Pre;
+  stage3Cut.insert(stage3Cut.end(), kWdThenSleep.begin(), kWdThenSleep.end());
+  run(kPowerCut, connectivityFailsafeSupervisor);
+  expect("power cut: record, log, flush, then exactly one sleep; nothing follows", stage3Cut);
+  for (int err : {SYSTEM_ERROR_NONE, SYSTEM_ERROR_ABORTED, SYSTEM_ERROR_NOT_SUPPORTED}) {
     run(err, connectivityFailsafeSupervisor);
-    Events want = stage3Head;
+    Events want = stage3Pre;
+    want.insert(want.end(), kReturned.begin(), kReturned.end());
     for (const char *s : {kHelperLog.c_str(), "byte=0x00", "stage=2", "flushNow"}) want.push_back(s);
     want.push_back("reset=2");
     expect("return: clear evidence, downgrade, flush, then System.reset(failsafe cause)", want);
   }
 
   printf("--- ERROR_STATE hard recovery ---\n");
-  const Events errHead = {kErrorLog, "byte=0xA5", "flush", kSleep};
-  run(0, errorCase3);
-  expect("success: log, evidence, flush, then exactly one sleep; nothing follows", errHead);
-  for (int err : {SYSTEM_ERROR_ABORTED, SYSTEM_ERROR_NOT_SUPPORTED}) {
+  const Events errPre = {kErrorLog, "byte=0xA5", "flush"};
+  Events errCut = errPre;
+  errCut.insert(errCut.end(), kWdThenSleep.begin(), kWdThenSleep.end());
+  run(kPowerCut, errorCase3);
+  expect("power cut: log, evidence, flush, then exactly one sleep; nothing follows", errCut);
+  for (int err : {SYSTEM_ERROR_NONE, SYSTEM_ERROR_ABORTED, SYSTEM_ERROR_NOT_SUPPORTED}) {
     run(err, errorCase3);
-    Events want = errHead;
+    Events want = errPre;
+    want.insert(want.end(), kReturned.begin(), kReturned.end());
     for (const char *s : {kHelperLog.c_str(), "byte=0x00", "flushNow"}) want.push_back(s);
     want.push_back("reset=3");
     expect("return: clear evidence, flush, then System.reset(ERROR_STATE_SOFT)", want);

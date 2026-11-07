@@ -37,6 +37,18 @@ def fail(msg):
     sys.exit(1)
 
 
+def in_function_body(text, pos):
+    """True when pos is inside a brace that is not a namespace / extern "C" block."""
+    stack = []
+    for m in re.finditer(r"[{}]", text[:pos]):
+        if m.group(0) == "{":
+            head = text[:m.start()].rstrip()
+            stack.append(bool(re.search(r'(?:\bnamespace(?:\s+\w+)?|\bextern\s+"C")$', head)))
+        elif stack:
+            stack.pop()
+    return not all(stack)
+
+
 def strip_comments(code):
     code = re.sub(r"/\*.*?\*/", "", code, flags=re.DOTALL)
     return re.sub(r"//[^\n]*", "", code)
@@ -112,8 +124,7 @@ for path in sorted(SRC.rglob("*")):
     for m in re.finditer(r"[^\n]*\bSystemSleepConfiguration\b[^\n]*", text):
         if not re.fullmatch(r"\s+SystemSleepConfiguration\s+\w+;", m.group(0)):
             fail(f"{path.relative_to(REPO_ROOT)}: SystemSleepConfiguration must be a fresh local, found: {m.group(0).strip()}")
-        depth = text[:m.start()].count("{") - text[:m.start()].count("}")
-        if depth < 1:  # a function body, in a namespace or (the S3 power-off helper) at file level
+        if not in_function_body(text, m.start()):  # a namespace-scope global is rejected; the S3 helper is a file-level function
             fail(f"{path.relative_to(REPO_ROOT)}: SystemSleepConfiguration declared outside a function body")
         fresh += 1
 if fresh != 6:

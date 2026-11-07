@@ -135,7 +135,10 @@ void powerOffForRecovery() {
   // RTC wake only: no GPIO source, so noise cannot cut the off period short
   SystemSleepConfiguration cfg;
   cfg.mode(SystemSleepMode::POWER_OFF).duration(kPowerOffRecoverySec * 1000UL);
+  // Device OS's modem shutdown (up to 120 s) runs before the HAL disables the chip watchdog
+  ExternalWatchdog.stop();
   const SystemSleepResult result = System.sleep(cfg);
+  ExternalWatchdog.start();
   Log.error("PowerOff: System.sleep returned err=%d", (int)result.error()); // reached only if power was not cut
 }
 

@@ -284,6 +284,18 @@ def extract_sites(sleep_src_text):
     return sites
 
 
+def in_function_body(text, pos):
+    """True when pos is inside a brace that is not a namespace / extern "C" block."""
+    stack = []
+    for m in re.finditer(r"[{}]", text[:pos]):
+        if m.group(0) == "{":
+            head = text[:m.start()].rstrip()
+            stack.append(bool(re.search(r'(?:\bnamespace(?:\s+\w+)?|\bextern\s+"C")$', head)))
+        elif stack:
+            stack.pop()
+    return not all(stack)
+
+
 def check_no_long_lived(src_root):
     """WO Acceptance 1."""
     decl_re = re.compile(
@@ -329,7 +341,7 @@ def check_no_long_lived(src_root):
             line_start = scrubbed.rfind("\n", 0, m.end()) + 1
             indent = scrubbed[line_start:m.end()]
             indent = indent[:len(indent) - len(indent.lstrip())]
-            at_file_scope = scrubbed.count("{", 0, m.end()) == scrubbed.count("}", 0, m.end())  # m.start() may be the function's own "{"
+            at_file_scope = not in_function_body(scrubbed, m.end())  # namespace blocks are not function bodies; m.start() may be the function's own "{"
             if at_file_scope and "extern" not in decl:
                 fail("%s:%d: file-scope SystemSleepConfiguration object - it is "
                      "never destroyed, so every reset orphans a wake-source list"
