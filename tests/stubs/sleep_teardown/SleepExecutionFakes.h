@@ -44,7 +44,7 @@ struct SensorWakeSource { pin_t pin; InterruptMode edge; };
 namespace sim {
 struct Exec {
   struct Sleep { int err; pin_t pin; };
-  bool hibEligible = false, hibPinHigh = true, staleClearOk = true, alarmOk = true, wdtStopOk = true;
+  bool hibEligible = false, hibPinHigh = true, staleClearOk = true, alarmOk = true, wdtStopOk = true; // staleClearOk/alarmOk serve only the base blocks
   std::vector<Sleep> sleeps;
   size_t nextSleep = 0;
   pin_t sensorPin = 9;
@@ -103,7 +103,7 @@ struct SystemStub {
     auto &x = sim::exec;
     const sim::Exec::Sleep s = x.nextSleep < x.sleeps.size() ? x.sleeps[x.nextSleep++] : sim::Exec::Sleep{-1, PIN_INVALID};
     sim::emit("SLEEP %s -> err=%d pin=%u", c.str().c_str(), s.err, (unsigned)s.pin);
-    sim::now += (s.err == 0 && s.pin == PIN_INVALID && c.dur > 0) ? (unsigned long)c.dur : 7UL;
+    sim::now += (s.err == 0 && s.pin == PIN_INVALID && c.dur > 0 && c.m != (int)SystemSleepMode::HIBERNATE) ? (unsigned long)c.dur : 7UL; // a returned HIBERNATE is modelled as 7 ms whatever its duration
     return SystemSleepResult{s.err, s.pin};
   }
   void reset(uint32_t cause) { sim::emit("RESET cause=%u", (unsigned)cause); }
@@ -146,6 +146,11 @@ struct AB1805Stub {
   bool resumeWDT() { sim::emit("AB1805 resumeWDT"); return true; }
 };
 inline AB1805Stub ab1805;
+struct ExternalWatchdogStub {
+  int stop() { sim::emit("EXTWDT stop"); return sim::exec.wdtStopOk ? SYSTEM_ERROR_NONE : -1; }
+  int start() { sim::emit("EXTWDT start"); return SYSTEM_ERROR_NONE; }
+};
+inline ExternalWatchdogStub ExternalWatchdog;
 struct WatchdogStub { bool started() { sim::emit("CALL Watchdog.started"); return true; } };
 inline WatchdogStub Watchdog;
 inline void pauseAwakeWatchdogForSleep(const char *ctx) { sim::emit("WATCHDOG pause %s", ctx); }

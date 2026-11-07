@@ -114,7 +114,7 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 static void waitForDebugSerialIfConnected(); // Brief settle delay if a debug terminal is already attached at boot
 void userSwitchISR();         // Interrupt for the user switch
 void publishStartupStatus();  // One-time status summary at boot
-void publishWatchdogForensics(bool ab1805Confirmed = false); // One-time watchdog forensic snapshot at boot
+void publishWatchdogForensics(bool inferred = false); // One-time watchdog forensic snapshot at boot
 // requestClockResync()/checkClockResync()/isClockTrusted()/
 // observedTimeSyncedLastMs()/reportedSyncAgeMs() now declared by
 // time/Clock.h (WO-2026-09-18 Step 3a) - defined in time/Clock.cpp.
@@ -243,13 +243,10 @@ const char *startupHibernateWakeReason = "UNKNOWN";
 uint32_t startupHibernateActualSleepSec = 0;
 int32_t startupHibernateSleepErrorSec = 0;
 
-// AB1805 wake-reason classification captured on a RESET_REASON_PIN_RESET
-// boot (see setup()). Only meaningful when startupPinResetAb1805Checked is
-// true; otherwise the OS reset reason was not PIN_RESET and these fields
-// carry their initialized defaults and are omitted from the status payload.
-bool startupPinResetAb1805Checked = false;
-const char *startupAb1805WakeReasonName = "N/A";
-bool startupAb1805ConfirmedWatchdog = false;
+// Reason-20 (PIN_RESET) boot classification (see setup()). The watchdogSource
+// field is published only when startupPinResetChecked is true.
+bool startupPinResetChecked = false;
+bool startupInferredWatchdog = false;
 
 // Oscillator state captured once in setup() and published by DeviceStatusPublisher.cpp.
 bool startupOscUsingRC = false;
@@ -533,8 +530,8 @@ void setup() {
   }
 
   // Watchdog-reset persistence/forensics-publish (Device-OS-detected and
-  // AB1805-confirmed PIN_RESET cases) is handled after AB1805 wake-reason
-  // classification below, once the AB1805 wake reason is available -
+  // inferred PIN_RESET cases) is handled after the wake classification
+  // below (a reason-20 boot with no persisted power-off evidence is inferred) -
   // see the "WATCHDOG RESET CLASSIFICATION" block further down in setup().
 
   // If a boot storm holdoff was triggered on this or the prior boot, surface
@@ -745,48 +742,40 @@ void setup() {
   }
 #endif
 
-  // ===== AB1805 WAKE-REASON CLASSIFICATION (HibernateCycle) =====
-  // WO-2026-09-16 Step 2: PIN_RESET/AB1805-watchdog confirmation and the
-  // hibernate wake-validation gate both used to read ab1805.getWakeReason()
-  // independently, at two different points in setup(). Both are safe to
-  // call more than once - see HibernateCycle.cpp's own comment for why
-  // (getWakeReason() is a plain getter onto the one destructive
-  // updateWakeReason() call AB1805::setup() already made) - but there is no
-  // longer a reason to keep them apart: HibernateCycle::classifyWake() does
-  // both in one call, here, before setWDT() re-arms the watchdog, exactly
-  // where the PIN_RESET classification used to run alone.
-  const HibernateCycle::WakeVerdict wakeVerdict = HibernateCycle::classifyWake(reason, ab1805);
+  // ===== WAKE CLASSIFICATION (HibernateCycle) =====
+  // Reason 30 is judged by HibernateCycle from the OS reason and the retained
+  // request. Reason 20 is judged from persisted evidence only (a power-down
+  // clears `retained`); no evidence is counted as an inferred watchdog.
+  const HibernateCycle::WakeVerdict wakeVerdict = HibernateCycle::classifyWake(reason);
 
-  bool ab1805ConfirmedWatchdog = false;
-  if (wakeVerdict.pinResetChecked) {
-    startupPinResetAb1805Checked = true;
-    startupAb1805WakeReasonName = wakeVerdict.pinResetWakeReasonName;
-
-    if (wakeVerdict.pinResetConfirmedWatchdog) {
-      ab1805ConfirmedWatchdog = true;
-      Log.warn("PIN_RESET confirmed as AB1805 watchdog reset");
-    } else if (wakeVerdict.pinResetWakeReasonUnknown) {
-      // Explicitly inconclusive - do NOT treat UNKNOWN as "not the AB1805".
-      Log.info("PIN_RESET with AB1805 wake reason UNKNOWN - inconclusive, not ruling out AB1805 watchdog");
-    } else {
-      Log.info("PIN_RESET with AB1805 wake reason=%s - not an AB1805 watchdog reset",
-               startupAb1805WakeReasonName);
-    }
-    startupAb1805ConfirmedWatchdog = ab1805ConfirmedWatchdog;
+  bool inferredWatchdog = false;
+  if (reason == RESET_REASON_PIN_RESET) {
+    startupPinResetChecked = true;
+    const bool timeValid = Time.isValid();
+    inferredWatchdog = HibernateWakeDiagnostics::isInferredWatchdog(
+        RecoveryState::get_powerOffRequested(), RecoveryState::get_connectivityRecoveryStage(),
+        (int64_t)RecoveryState::get_lastConnectivityRecoveryAction(), timeValid, (int64_t)Time.now());
+    startupInferredWatchdog = inferredWatchdog;
+    Log.info("PIN_RESET: %s", inferredWatchdog ? "no power-off evidence - inferred watchdog" : "power-off evidence - power-up wake");
   }
+  RecoveryState::set_powerOffRequested(0);
+  SystemConfig::flushNow(); // consume the evidence durably before anything can reload it
 
-  ab1805.setWDT(AB1805::WATCHDOG_MAX_SECONDS); // Enable watchdog
+  // Device OS keeps the chip watchdog running across a reset; init() re-arms it.
+  if (ExternalWatchdog.init(WatchdogConfiguration().timeout(124000)) != SYSTEM_ERROR_NONE || ExternalWatchdog.start() != SYSTEM_ERROR_NONE) {
+    Log.warn("ExternalWatchdog: init/start failed");
+  }
 
   // ===== WATCHDOG RESET PERSISTENCE / FORENSICS =====
   // Moved here (from immediately after SystemConfig::setup(), before AB1805 init)
-  // so it can act on the AB1805 classification above. The publish queue was
+  // so it can act on the classification above. The publish queue was
   // already initialized above, so this is a reordering, not a new
   // dependency. Covers both the Device-OS-detected case
-  // (reason == RESET_REASON_WATCHDOG) and the AB1805-confirmed PIN_RESET
-  // case classified above; both reuse the same lastWatchdog* fields, tagged
+  // (reason == RESET_REASON_WATCHDOG) and the inferred PIN_RESET
+  // case classified above (the "inferred" source); both reuse the same lastWatchdog* fields, tagged
   // with lastWatchdogSource. An inconclusive or non-watchdog PIN_RESET must
   // not overwrite a previously persisted watchdog's forensic data.
-  const bool watchdogClassified = watchdogResetDetected || ab1805ConfirmedWatchdog;
+  const bool watchdogClassified = watchdogResetDetected || inferredWatchdog;
   if (watchdogClassified) {
     const uint16_t priorWatchdogResetCount = RecoveryState::get_watchdogResetCount();
     if (priorWatchdogResetCount < 0xFFFF) {
@@ -795,7 +784,7 @@ void setup() {
     RecoveryState::set_lastWatchdogBreadcrumb(previousBreadcrumb);
     RecoveryState::set_lastWatchdogUptimeMs(previousBreadcrumbMs);
     RecoveryState::set_lastWatchdogResetReasonData(reasonData);
-    RecoveryState::set_lastWatchdogSource(watchdogResetDetected ? RecoveryState::WATCHDOG_SOURCE_DEVICE_OS : RecoveryState::WATCHDOG_SOURCE_AB1805_PIN);
+    RecoveryState::set_lastWatchdogSource(watchdogResetDetected ? RecoveryState::WATCHDOG_SOURCE_DEVICE_OS : RecoveryState::WATCHDOG_SOURCE_INFERRED);
 
     // New watchdog-reset alert code (its own tier, strictly above tier-3;
     // see getAlertSeverity() in MyPersistentData.cpp - this must outrank
@@ -808,13 +797,13 @@ void setup() {
 
     // Queue watchdog forensic event only after PublishQueuePosix setup above
     // initialized its mutex.
-    publishWatchdogForensics(ab1805ConfirmedWatchdog);
+    publishWatchdogForensics(inferredWatchdog);
   }
 
   // wakeVerdict.rtcReadOk/rtcAtWake were computed inside classifyWake()
-  // (called above, before setWDT()) - nothing between that call and here
+  // (called above) - nothing between that call and here
   // touches Time's validity (confirmed: the RtcSkewTest bench hook
-  // explicitly does not call Time.setTime(), and neither setWDT() nor the
+  // explicitly does not call Time.setTime(), and neither the watchdog init nor the
   // watchdog forensics block touches Time), so sampling Time.isValid() here
   // observes the same transition it always did (seeded by Device OS
   // earlier in setup(), not by this read itself).
@@ -1140,8 +1129,8 @@ void loop() {
   setLoopStage(LOOP_STAGE_DIAGNOSTICS);
   thrashGuard.loop(state, millis());
 
-  ab1805.loop(); // Keeps the RTC synchronized with the device clock
-  checkClockResync(); // WO-2026-08-29-002: recurring app-side RTC write-back, not gated by ab1805.loop()'s per-boot latch
+  ExternalWatchdog.refresh(); // the only refresh source (Device OS does not refresh instance 2)
+  checkClockResync(); // WO-2026-08-29-002: recurring app-side RTC write-back
 
   // Housekeeping for each transit of the main loop
   CurrentReadings::loop();
@@ -1299,22 +1288,11 @@ void publishStartupStatus() {
              (unsigned long)HibernateCycle::currentHibernateCount());
   }
 
-  // Only present when the OS reset reason was PIN_RESET (see the AB1805
-  // classification block in setup()) - surfaces the AB1805's own wake-reason
-  // read result and the resolved watchdogSource so a PIN_RESET boot can be
-  // told apart in cloud telemetry, without requiring serial-log tracing.
-  // No separate "read ok" flag is published: WakeReason::UNKNOWN already and
-  // correctly covers both "chip detection failed" and "no known wake-reason
-  // bit set" (see the classification block above), so a distinct success
-  // flag would be redundant and cannot be obtained without repeating the
-  // destructive updateWakeReason() read that Fix 2 removed.
-  char pinResetAb1805Fields[160] = "";
-  if (startupPinResetAb1805Checked) {
-    snprintf(pinResetAb1805Fields,
-             sizeof(pinResetAb1805Fields),
-             ",\"ab1805WakeReason\":\"%s\",\"watchdogSource\":\"%s\"",
-             startupAb1805WakeReasonName,
-             startupAb1805ConfirmedWatchdog ? "AB1805_PIN" : "NONE");
+  // Only present when the OS reset reason was PIN_RESET (see the wake
+  // classification block in setup()).
+  char pinResetFields[80] = "";
+  if (startupPinResetChecked) {
+    snprintf(pinResetFields, sizeof(pinResetFields), ",\"ab1805WakeReason\":\"N/A\",\"watchdogSource\":\"%s\"", startupInferredWatchdog ? "inferred" : "NONE");
   }
 
 #if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
@@ -1345,7 +1323,7 @@ void publishStartupStatus() {
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
            hibernateFields,
-           pinResetAb1805Fields);
+           pinResetFields);
 #else
   snprintf(status, sizeof(status),
            "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d%s%s}",
@@ -1368,7 +1346,7 @@ void publishStartupStatus() {
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
            hibernateFields,
-           pinResetAb1805Fields);
+           pinResetFields);
 #endif
 
   PublishQueuePosix::instance().publish("status", status, PRIVATE | WITH_ACK);
@@ -1381,23 +1359,23 @@ void publishStartupStatus() {
  * connection age) to pinpoint exactly where the main loop stalled. Essential for
  * diagnosing watchdog timeout root causes in production.
  *
- * @param ab1805Confirmed True when this event is for an AB1805-confirmed external
- *        watchdog reset (Device OS reported RESET_REASON_PIN_RESET, but the AB1805's
- *        own wake-reason register confirmed WakeReason::WATCHDOG). False for the
+ * @param inferred True when this event is for a PIN_RESET with no persisted
+ *        power-off evidence (the label "ab1805_watchdog" is kept for fleet
+ *        queries). False for the
  *        Device-OS-detected case (RESET_REASON_WATCHDOG). Only called for one of
  *        these two classified cases - see the "WATCHDOG RESET PERSISTENCE /
  *        FORENSICS" block in setup(). Forensic data captured from FRAM.
  */
-void publishWatchdogForensics(bool ab1805Confirmed) {
+void publishWatchdogForensics(bool inferred) {
   char payload[224];
   const LoopStage stage = static_cast<LoopStage>(startupPreviousLoopStage);
   const int osResetReason = System.resetReason();
 
-  // "ab1805_watchdog" distinguishes an AB1805-confirmed external reset (OS
-  // reason PIN_RESET) from "watchdog", the Device-OS-detected case (OS
+  // "ab1805_watchdog" distinguishes an inferred PIN_RESET (no persisted
+  // power-off evidence) from "watchdog", the Device-OS-detected case (OS
   // reason RESET_REASON_WATCHDOG) - both land here via the same classified
   // condition in setup().
-  const char *resetLabel = ab1805Confirmed ? "ab1805_watchdog" : "watchdog";
+  const char *resetLabel = inferred ? "ab1805_watchdog" : "watchdog";
 
   snprintf(payload,
            sizeof(payload),

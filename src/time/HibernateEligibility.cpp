@@ -22,36 +22,6 @@ bool isDeviceOsAtLeast6400() {
   return minor >= 4;
 }
 
-bool clearAb1805StaleAlarmInterrupts() {
-  static const uint8_t kRegStatus = 0x0f;
-  static const uint8_t kRegIntMask = 0x12;
-  static const uint8_t kMaskAieTie = 0x0c;
-
-  uint8_t intMask = 0;
-  if (!ab1805.readRegister(kRegIntMask, intMask)) {
-    return false;
-  }
-
-  // Clear stale interrupt flags before arming the next one-shot alarm.
-  if (!ab1805.writeRegister(kRegStatus, 0x00)) {
-    return false;
-  }
-
-  intMask = (uint8_t)(intMask & (uint8_t)~kMaskAieTie);
-  if (!ab1805.writeRegister(kRegIntMask, intMask)) {
-    return false;
-  }
-
-  if (!ab1805.maskRegister(
-        AB1805::REG_TIMER_CTRL,
-        (uint8_t)~AB1805::REG_TIMER_CTRL_RPT_MASK,
-        AB1805::REG_TIMER_CTRL_RPT_DIS)) {
-    return false;
-  }
-
-  return true;
-}
-
 bool shouldUseBoronRtcAlarmHibernate(uint32_t requestedSleepSec, time_t &rtcNow) {
   Log.info("HibernateDiag: check enabled=%d requested=%lu",
            SystemConfig::get_enableHibernateSleep() ? 1 : 0,

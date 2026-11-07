@@ -36,7 +36,7 @@ SITES = [
     ("heap guard", "sleep", "System.reset(RESET_CAUSE_SLEEP_HEAP_GUARD);", "PowerDiagnostics::flushDiagBatch();"),
     ("sleep exhausted", "sleep", "System.reset(RESET_CAUSE_SLEEP_ATTEMPTS_EXHAUSTED);", "PowerDiagnostics::flushDiagBatch();"),
     ("failsafe stage 2", "failsafe", "System.reset(RESET_CAUSE_CONNECTIVITY_FAILSAFE);", "persistConnectivityFailsafeState(2, now, true);"),
-    ("failsafe stage 3", "failsafe", "ab1805.deepPowerDown();\n}", "persistConnectivityFailsafeState(3, now, true);"),
+    ("failsafe stage 3", "failsafe", "ab1805.deepPowerDown();\n  RecoveryState::set_powerOffRequested(0);", "persistConnectivityFailsafeState(3, now, true);"),
 ]
 
 

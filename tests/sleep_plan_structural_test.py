@@ -181,6 +181,8 @@ def base_pieces(base_text):
 sleep = SLEEP.read_text()
 # WO-2026-11-03-005: the deliberate-reset flush call is the one intended addition; mapped back so every other byte is still compared.
 sleep = re.sub(r"^ *flushAllBeforeReset\(\);\n", "", sleep, flags=re.M)
+# v50 S2 (WO-2026-11-05-004): the one reworded comment is mapped back so every other handler byte is still compared.
+sleep = sleep.replace("// The chip alarm is armed by Device OS from duration(); the app only drives its watchdog.", "// NO AB1805 alarms - AB1805 is only used for watchdog + RTC time sync.")
 probes = {
     "the guard call before the hibernate attempt": sleep.replace(HIB + "\n" + GUARD_CALL, GUARD_CALL + "\n" + HIB, 1),
     "a second plan call": sleep.replace(HIB, "  { SleepPlan p2; sleepPlan(p2); }\n" + HIB, 1),
@@ -228,12 +230,15 @@ if cur_retained != base_retained:
     fail("a `retained` keyword or identifier was added in src/")
 
 # The S-2 functions, cloudGatePass() and the includes are unchanged.
-tail_of = lambda t: t[t.index("struct WakeContext {"):t.index("} // namespace\n", t.index("struct WakeContext {"))]
+import s2_hibernate_normalise  # v50 S2 (WO-2026-11-05-004): hibernateAttempt() is compared to the base with only the approved S2 substitutions normalised
+
+
+tail_of = lambda t, is_base=False: s2_hibernate_normalise.normalise(t[t.index("struct WakeContext {"):t.index("} // namespace\n", t.index("struct WakeContext {"))], is_base)
 prefix_of = lambda t: t[:t.index("namespace {")]
 cloud_of = lambda t: t[t.index("struct {\n  bool operationsCompleteLogged"):t.index("void endOfCycleSummary(") if "void endOfCycleSummary(" in t else t.index("struct SleepPlan {") if "struct SleepPlan {" in t else t.index("struct WakeContext {")]
-if tail_of(sleep) != tail_of(base_sleep):
+if tail_of(sleep) != tail_of(base_sleep, True):
     fail("the S-2 functions (struct WakeContext .. end of the anonymous namespace) differ from the base")
-if prefix_of(sleep) != prefix_of(base_sleep):
+if prefix_of(sleep) != prefix_of(base_sleep).replace('#include "AB1805_RK.h"\n', ""):
     fail("the includes differ from the base")
 if cloud_of(sleep).rstrip("\n") != cloud_of(base_sleep).rstrip("\n"):
     fail("the cloudGate struct or cloudGatePass() differ from the base")

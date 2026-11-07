@@ -182,9 +182,15 @@ for needle, repl in (("  wake = {pirWake, buttonWake, timerWake, wakeReasonLabel
     body = body.replace(needle, repl)
 checks.append(("sleepAndResume", body,
                base_block("  const SensorWakeSource sensorWake = SensorManager", '  PowerDiagnostics::logPowerState("post-wake");\n')))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import s2_hibernate_normalise  # v50 S2 (WO-2026-11-05-004): the approved S2 substitutions are normalised on the base side only
 for name, current, original in checks:
     for new, old in RENAMES:
         current = current.replace(new, old)
+    if name in ("hibernateAttempt", "sleepAndResume"):
+        hib = name == "hibernateAttempt"
+        current = s2_hibernate_normalise.normalise_block(current, False, hib, 1, 1)
+        original = s2_hibernate_normalise.normalise_block(original, True, hib, 1, 1 if hib else 2)
     if current != original:
         diff = "".join(list(difflib.unified_diff(original.splitlines(True), current.splitlines(True), "base", "current"))[:40])
         fail(f"{name}() differs from the base block beyond the listed edits:\n{diff}")

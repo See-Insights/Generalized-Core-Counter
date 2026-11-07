@@ -1,12 +1,7 @@
 #include "Particle.h"
 #include "time/HibernateCycle.h"
 
-#include "AB1805_RK.h"
-
-// Defined in Generalized-Core-Counter.cpp - not Boron/hibernate-specific
-// (the AB1805 chip is used on every supported platform), so it stays
-// defined in one place rather than duplicated here.
-extern const char *ab1805WakeReasonName(AB1805::WakeReason reason);
+#include "time/ExternalRtc.h"
 
 namespace HibernateCycle {
 
@@ -41,41 +36,12 @@ uint32_t currentHibernateCount() {
   return retainedHibernateCount;
 }
 
-WakeVerdict classifyWake(int osResetReason, AB1805 &rtc) {
+WakeVerdict classifyWake(int osResetReason) {
   WakeVerdict v{};
-
-  // ===== PIN_RESET / AB1805 WATCHDOG CONFIRMATION =====
-  // Device OS reports an external MCU reset (e.g. the carrier board's
-  // AB1805 watchdog firing via the reset pin) as PIN_RESET, not WATCHDOG -
-  // so the only way to confirm the AB1805 was the cause is to ask it
-  // directly, via the same getWakeReason() getter the hibernate gate below
-  // also uses.
-  //
-  // IMPORTANT: this relies on AB1805::getWakeReason() being a plain getter
-  // (returns a cached member, see AB1805_RK.h) onto the result of the ONE
-  // destructive updateWakeReason() call AB1805::setup() already made
-  // earlier in setup() - updateWakeReason() itself clears the status bit
-  // it classifies, so a second call to IT (not getWakeReason()) would
-  // silently overwrite a correct WATCHDOG classification on a combined-bit
-  // status read. Calling getWakeReason() here and again below for the
-  // hibernate gate is safe and idempotent because neither call is
-  // updateWakeReason() - both just read the one already-classified result.
-  if (osResetReason == RESET_REASON_PIN_RESET) {
-    v.pinResetChecked = true;
-    const AB1805::WakeReason pinResetWakeReason = rtc.getWakeReason();
-    v.pinResetWakeReasonName = ab1805WakeReasonName(pinResetWakeReason);
-
-    if (pinResetWakeReason == AB1805::WakeReason::WATCHDOG) {
-      v.pinResetConfirmedWatchdog = true;
-    } else if (pinResetWakeReason == AB1805::WakeReason::UNKNOWN) {
-      // Explicitly inconclusive - do NOT treat UNKNOWN as "not the AB1805".
-      v.pinResetWakeReasonUnknown = true;
-    }
-  }
 
   // ===== RTC READ - every boot, independent of the above =====
   time_t rtcTime = 0;
-  v.rtcReadOk = rtc.getRtcAsTime(rtcTime);
+  v.rtcReadOk = ExternalRtc::get(rtcTime);
   v.rtcAtWake = (int64_t)rtcTime;
 
   // ===== HIBERNATE WAKE-VALIDATION GATE =====
@@ -88,28 +54,20 @@ WakeVerdict classifyWake(int osResetReason, AB1805 &rtc) {
   // logic is written, not a function elsewhere being wrapped).
   if (retainedHibernatePending) {
     v.hibernateGateEvaluated = true;
-    const AB1805::WakeReason wakeReason = rtc.getWakeReason();
-    v.wakeReasonName = ab1805WakeReasonName(wakeReason);
-
     HibernateWakeDiagnostics::GateInputs &in = v.gateInputs;
     in.resetReasonIsPowerManagement = (osResetReason == RESET_REASON_POWER_MANAGEMENT);
     in.rtcReadOk = v.rtcReadOk;
     in.rtcBefore = (int64_t)retainedHibernateRtcBefore;
     in.requestedSleepSec = retainedHibernateRequestedSleep;
     in.rtcAtWake = v.rtcAtWake;
-    // WO-2026-10-04-001 item C: the AB1805 library labels every wake
-    // DEEP_POWER_DOWN once SLST is set and never clears it, so accept that
-    // label when the RTC shows the wake 0 to +60 s after the requested time.
-    // An early wake (a button) or a late wake still fails the gate.
-    const int64_t dpdExpectedWake = in.rtcBefore + (int64_t)in.requestedSleepSec;
-    const bool dpdOnTime = in.rtcReadOk && in.rtcAtWake >= dpdExpectedWake && in.rtcAtWake <= dpdExpectedWake + 60;
-    in.wakeReasonIsAlarm = (wakeReason == AB1805::WakeReason::ALARM) ||
-                           (wakeReason == AB1805::WakeReason::DEEP_POWER_DOWN && dpdOnTime);
+    // Reason 30 is a successful HIBERNATE wake (RTC or GPIO alike) and alone passes the wake-reason arm (WO-2026-11-05-004 Amendments 3-4).
+    in.wakeReasonIsHibernateWake = in.resetReasonIsPowerManagement;
+    if (in.resetReasonIsPowerManagement) v.wakeReasonName = "POWER_MGMT";
 
     using HibernateWakeDiagnostics::GateArm;
     if (!in.resetReasonIsPowerManagement) {
       v.gateArm = GateArm::kResetReason;
-    } else if (!in.wakeReasonIsAlarm) {
+    } else if (!in.wakeReasonIsHibernateWake) {
       v.gateArm = GateArm::kWakeReason;
     } else if (!in.rtcReadOk) {
       v.gateArm = GateArm::kRtcRead;
