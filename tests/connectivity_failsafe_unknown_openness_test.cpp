@@ -94,9 +94,8 @@ struct SystemFake {
   void reset(int) { flushedAfterRecordBeforeAction = flushed; lastActionTaken = RESET; ++actionCount; persistedStageAtAction = persistedStage; throw ActionStop{}; }
 } System;
 
-struct Ab1805Fake {
-  void deepPowerDown() { flushedAfterRecordBeforeAction = flushed; lastActionTaken = DEEP_POWER_DOWN; ++actionCount; persistedStageAtAction = persistedStage; throw ActionStop{}; }
-} ab1805;
+// The shared timed power-off helper: it cuts power and never returns on success.
+void powerOffForRecovery() { flushedAfterRecordBeforeAction = flushed; lastActionTaken = DEEP_POWER_DOWN; ++actionCount; persistedStageAtAction = persistedStage; throw ActionStop{}; }
 
 struct TimeFake {
   time_t current = 0;

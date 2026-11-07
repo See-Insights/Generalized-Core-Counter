@@ -32,11 +32,11 @@ FILES = {
 SITES = [
     ("thrash tier 3", "thrash", "System.reset(RESET_CAUSE_THRASH_TIER3);", "RecoveryState::raiseAlert(18);  // Alert 18: Severe thrash"),
     ("error soft", "error", "System.reset(RESET_CAUSE_ERROR_STATE_SOFT);", "Executing soft reset from ERROR_STATE"),
-    ("error hard", "error", "ab1805.deepPowerDown();", "Executing deep power down from ERROR_STATE"),
+    ("error hard", "error", "powerOffForRecovery();", "Executing deep power down from ERROR_STATE"),
     ("heap guard", "sleep", "System.reset(RESET_CAUSE_SLEEP_HEAP_GUARD);", "PowerDiagnostics::flushDiagBatch();"),
     ("sleep exhausted", "sleep", "System.reset(RESET_CAUSE_SLEEP_ATTEMPTS_EXHAUSTED);", "PowerDiagnostics::flushDiagBatch();"),
     ("failsafe stage 2", "failsafe", "System.reset(RESET_CAUSE_CONNECTIVITY_FAILSAFE);", "persistConnectivityFailsafeState(2, now, true);"),
-    ("failsafe stage 3", "failsafe", "ab1805.deepPowerDown();\n  RecoveryState::set_powerOffRequested(0);", "persistConnectivityFailsafeState(3, now, true);"),
+    ("failsafe stage 3", "failsafe", "powerOffForRecovery();\n  RecoveryState::set_powerOffRequested(0);", "persistConnectivityFailsafeState(3, now, true);"),
 ]
 
 
@@ -49,8 +49,8 @@ def site_problems(texts):
     out = []
     for name, key, term, before in SITES:
         text = texts[key]
-        if text.count(term) != 1:
-            out.append(f"{name}: terminator {term!r} is not unique")
+        if text.count(term) < 1:  # the S3 fallback resets repeat two terminators; the first occurrence is the site
+            out.append(f"{name}: terminator {term!r} not found")
             continue
         at = text.index(term)
         head = text[:at].rstrip()
@@ -175,7 +175,7 @@ for stage in (2, 3):
     m = dict(texts)
     fs = m["failsafe"]
     fs = fs.replace(rec + "\n", "", 1)
-    fs = fs.replace(f"  {CALL}\n  ab1805.deepPowerDown();", f"  {CALL}\n  {rec}\n  ab1805.deepPowerDown();", 1) if stage == 3 else \
+    fs = fs.replace(f"  {CALL}\n  powerOffForRecovery();", f"  {CALL}\n  {rec}\n  powerOffForRecovery();", 1) if stage == 3 else \
         fs.replace(f"    {CALL}\n    System.reset(RESET_CAUSE_CONNECTIVITY_FAILSAFE);", f"    {CALL}\n    {rec}\n    System.reset(RESET_CAUSE_CONNECTIVITY_FAILSAFE);", 1)
     check(m["failsafe"] != fs and bool(site_problems({**m, "failsafe": fs})), f"mutation caught: failsafe stage {stage} flushes before its record")
 

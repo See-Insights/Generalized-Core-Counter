@@ -131,6 +131,14 @@ bool claimFailsafeDeferLog(FailsafeDeferReason reason) {
   return claimFailsafeDeferLogLocal(reason);
 }
 
+void powerOffForRecovery() {
+  // RTC wake only: no GPIO source, so noise cannot cut the off period short
+  SystemSleepConfiguration cfg;
+  cfg.mode(SystemSleepMode::POWER_OFF).duration(kPowerOffRecoverySec * 1000UL);
+  const SystemSleepResult result = System.sleep(cfg);
+  Log.error("PowerOff: System.sleep returned err=%d", (int)result.error()); // reached only if power was not cut
+}
+
 void clearConnectivityFailsafeRecovery(const char *reason) {
   const bool hadRecoveryState =
       RecoveryState::get_connectivityRecoveryStage() != 0 ||
@@ -313,6 +321,7 @@ void connectivityFailsafeSupervisor() {
   Log.info("Failsafe: stage=3 action=deep-powerdown age=%lds",
            (long)connectionAgeSec);
   flushAllBeforeReset();
-  ab1805.deepPowerDown();
+  powerOffForRecovery();
   RecoveryState::set_powerOffRequested(0); RecoveryState::set_connectivityRecoveryStage(2); SystemConfig::flushNow(); // not expected to return: no recent stage-3 evidence
+  System.reset(RESET_CAUSE_CONNECTIVITY_FAILSAFE);
 }

@@ -329,7 +329,7 @@ def check_no_long_lived(src_root):
             line_start = scrubbed.rfind("\n", 0, m.end()) + 1
             indent = scrubbed[line_start:m.end()]
             indent = indent[:len(indent) - len(indent.lstrip())]
-            at_file_scope = scrubbed.count("{", 0, m.start()) == scrubbed.count("}", 0, m.start())
+            at_file_scope = scrubbed.count("{", 0, m.end()) == scrubbed.count("}", 0, m.end())  # m.start() may be the function's own "{"
             if at_file_scope and "extern" not in decl:
                 fail("%s:%d: file-scope SystemSleepConfiguration object - it is "
                      "never destroyed, so every reset orphans a wake-source list"

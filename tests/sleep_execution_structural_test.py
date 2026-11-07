@@ -113,11 +113,11 @@ for path in sorted(SRC.rglob("*")):
         if not re.fullmatch(r"\s+SystemSleepConfiguration\s+\w+;", m.group(0)):
             fail(f"{path.relative_to(REPO_ROOT)}: SystemSleepConfiguration must be a fresh local, found: {m.group(0).strip()}")
         depth = text[:m.start()].count("{") - text[:m.start()].count("}")
-        if depth < 2:
+        if depth < 1:  # a function body, in a namespace or (the S3 power-off helper) at file level
             fail(f"{path.relative_to(REPO_ROOT)}: SystemSleepConfiguration declared outside a function body")
         fresh += 1
-if fresh != 5:
-    fail(f"expected 5 fresh SystemSleepConfiguration locals (hibernate, ULP, STOP, STOP timer-only, boot storm), found {fresh}")
+if fresh != 6:
+    fail(f"expected 6 fresh SystemSleepConfiguration locals (hibernate, ULP, STOP, STOP timer-only, boot storm, S3 power-off helper), found {fresh}")
 print("PASS: all 5 SystemSleepConfiguration objects are fresh locals")
 
 # ---- 4. against the base commit ----
