@@ -60,3 +60,8 @@ S2 (#201) is merged. The evidence for a reason-20 boot is now **already written 
 4. **Reason 30 / 20 table.** The bench must record the post-`POWER_OFF` reset reason (open observation, parent ruling 5). S2's table (reason 20 with the persisted evidence -> power-up wake; without -> `inferred` watchdog) is corrected before release if the reason differs.
 5. **Test-suite rule (workflow §10).** The local suite runs CI's discovery: `tests/*.sh` via zsh and `tests/*.py` via python3 (not `*_test.*`); any helper under `tests/` must exit 0 when run bare; confirm CI green on the PR before saying "ready".
 6. **Budget unchanged: `src/` at most +20 net** (S2's baseline is the integration head). Stop and report the cut if it does not fit.
+
+## Amendment 4 (Chip, 7 Nov 2026, pre-rulings issued during Stage 7 round 1 on 1a5bd12)
+1. **Off time stays 30 s** (fleet parity: both callers used the vendored `deepPowerDown()` 30 s default). The bench measures the rail and modem drop; any change comes from that evidence, not from review.
+2. **Clock after wake: no change.** A bound chip keeps time through a power-off and Device OS seeds `Time` before `setup()`; if `Time` is invalid at the reason-20 check, S2's rule rejects the stage-3 evidence (inferred watchdog), which is a safe fallback.
+If Codex raises either point, it is closed by these rulings (not a finding for a fix). Recorded after the Stage 7 round 1 dispatch, which did not carry them; the dispatch asked Codex to report both without changing anything.
