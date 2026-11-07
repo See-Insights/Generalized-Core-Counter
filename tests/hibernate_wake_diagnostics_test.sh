@@ -38,7 +38,7 @@ check() {
 # classifyGateArm() rather than continuing to call it - see HibernateCycle.cpp's
 # own checks below for that absorbed logic). ---
 check "classifyWake() is called exactly where PIN_RESET classification used to run, before setWDT()" \
-  "const HibernateCycle::WakeVerdict wakeVerdict = HibernateCycle::classifyWake(reason, ab1805);" \
+  "const HibernateCycle::WakeVerdict wakeVerdict = HibernateCycle::classifyWake(reason);" \
   "$gcc_src"
 check "gate now decides via wakeVerdict.hibernateGateEvaluated, not retainedHibernatePending directly" \
   "if (wakeVerdict.hibernateGateEvaluated) {" \
@@ -123,21 +123,16 @@ awk '
 check "in.resetReasonIsPowerManagement maps from osResetReason, not a literal" \
   "in.resetReasonIsPowerManagement = (osResetReason == RESET_REASON_POWER_MANAGEMENT);" \
   "$hc_src"
-check "in.wakeReasonIsAlarm maps from the AB1805 wake reason, not a literal" \
-  "in.wakeReasonIsAlarm = (wakeReason == AB1805::WakeReason::ALARM) ||" \
+# v50 S2 (WO-2026-11-05-004): reason 30 alone is the alarm wake; no AB1805 wake-reason read, no DEEP_POWER_DOWN window.
+check "in.wakeReasonIsAlarm is exactly the power-management reset reason" \
+  "in.wakeReasonIsAlarm = in.resetReasonIsPowerManagement;" \
   "$hc_src"
-# WO-2026-10-04-001 item C: DEEP_POWER_DOWN is sticky once SLST is set, so an
-# on-time DEEP_POWER_DOWN wake is also accepted. The window bounds are pinned
-# here because the .cpp mirror (wakeReasonIsAlarmMirror()) reproduces them.
-check "DEEP_POWER_DOWN is accepted only when on time" \
-  "(wakeReason == AB1805::WakeReason::DEEP_POWER_DOWN && dpdOnTime);" \
-  "$hc_src"
-check "the DEEP_POWER_DOWN expected wake time comes from rtcBefore + requested" \
-  "const int64_t dpdExpectedWake = in.rtcBefore + (int64_t)in.requestedSleepSec;" \
-  "$hc_src"
-check "the DEEP_POWER_DOWN acceptance window is 0 to +60 s and requires a good RTC read" \
-  "const bool dpdOnTime = in.rtcReadOk && in.rtcAtWake >= dpdExpectedWake && in.rtcAtWake <= dpdExpectedWake + 60;" \
-  "$hc_src"
+for banned in "AB1805" "dpdOnTime" "getWakeReason" "DEEP_POWER_DOWN"; do
+  if grep -q -- "$banned" "$hc_src"; then
+    echo "FIDELITY CHECK FAILED: $banned still referenced in $hc_src" >&2
+    exit 1
+  fi
+done
 check "in.rtcReadOk maps from the real RTC read outcome, not a literal" \
   "in.rtcReadOk = v.rtcReadOk;" \
   "$hc_src"

@@ -1,10 +1,9 @@
-// WO-2026-10-21-001 (Sleep S-2): equivalence of the sleep-execution refactor.
-// (a) is the base handler's standby decision, hibernate block and ULP/STOP cascade, extracted
-// by marker text from the base State_Sleep.cpp (wrapped below as base::), (b) is the current
+// WO-2026-10-21-001 (Sleep S-2), re-frozen for v50 S2 (WO-2026-11-05-004): the current
 // effectiveStandby / hibernateAttempt / sleepAndResume and the handler's call-site lines,
-// extracted by marker text from the current file (cur::). Both run one scenario table against
-// the same fakes (tests/stubs/sleep_teardown/SleepExecutionFakes.h); mode "a" writes the frozen
-// fixture, mode "b" must equal it. Build with -DWiring_Cellular=1 -DHAL_PLATFORM_CELLULAR=1
+// extracted by marker text from the current file (cur::), run one scenario table against
+// the fakes (tests/stubs/sleep_teardown/SleepExecutionFakes.h); the transcript must equal the
+// frozen fixture. S2 changed the hibernate block (native duration alarm, ExternalWatchdog)
+// on purpose, so the pre-change base blocks are no longer compared. Build with -DWiring_Cellular=1 -DHAL_PLATFORM_CELLULAR=1
 // (cellular) or without (Wi-Fi), plus -DENABLE_SLEEP_TRACE=1 to compile the trace branch.
 #include <algorithm>
 #include <cstdio>
@@ -18,30 +17,6 @@ bool SystemConfig::get_verboseMode() { return sim::exec.verbose; }
 bool SystemConfig::get_serialConnected() { return sim::exec.serialCfg; }
 bool CurrentReadings::get_occupied() { return cfgOccupied; }
 void RecoveryState::raiseAlert(int8_t value) { sim::emit("ALERT %d", (int)value); }
-
-namespace base {
-namespace {
-#include BASE_DRAIN_INC
-}
-static bool preserveStandbyAfterNormalReturn = false, forceModemOffAfterStandbyFailure = false;
-static int standbySleepFailureError = SYSTEM_ERROR_NONE;
-struct WakeContext { bool pirWake, buttonWake, timerWake; const char *wakeReasonLabel; };
-static bool fell = false;
-
-static bool effectiveStandby(bool useNetworkStandbyRequested) {
-#include BASE_STANDBY_INC
-  return useNetworkStandbyEffective;
-}
-static void hibernateAttempt(bool overnightFallbackSleep, int wakeInSeconds) {
-#include BASE_HIB_INC
-}
-static void cascade(int wakeInSeconds, bool useNetworkStandby, const char *sleepReason, WakeContext &wake) {
-  fell = false;
-#include BASE_ULP_INC
-  wake = {pirWake, buttonWake, timerWake, wakeReasonLabel};
-  fell = true;
-}
-}  // namespace base
 
 namespace cur {
 namespace {
@@ -61,19 +36,6 @@ static void postWakeRouting(bool pirWake, bool buttonWake, bool timerWake, const
 
 struct Outcome { bool fell, pir, btn, timer; const char *label; bool eff; bool preserve, force; int err; };
 
-static void driveBase(bool req, bool overnight, int wakeInSeconds, const char *reason, Outcome &o) {
-  const bool eff = base::effectiveStandby(req);
-  const bool useNetworkStandby = eff;
-  if (SleepTeardown::run(req, eff, base::forceModemOffAfterStandbyFailure, base::standbySleepFailureError) !=
-      SleepTeardown::Result::READY) { return; }
-  base::hibernateAttempt(overnight, wakeInSeconds);
-  base::WakeContext w{};
-  base::cascade(wakeInSeconds, useNetworkStandby, reason, w);
-  o = {base::fell, w.pirWake, w.buttonWake, w.timerWake, w.wakeReasonLabel, eff,
-       base::preserveStandbyAfterNormalReturn, base::forceModemOffAfterStandbyFailure,
-       base::standbySleepFailureError};
-}
-
 static void driveCur(bool useNetworkStandbyRequested, bool overnightFallbackSleep, int wakeInSeconds,
                      const char *sleepReason, Outcome &o) {
   using namespace cur;
@@ -90,7 +52,7 @@ static void driveCur(bool useNetworkStandbyRequested, bool overnightFallbackSlee
 struct Sc {
   int prior = 0;     // 0 none, 1 preserved after a normal standby return, 2 pending forced-off (err -170)
   bool req = true, connectOk = true, cellOff = false, unstable = false, tdClears = false, tdWait = false;
-  int hib = 0;       // 0 not overnight, 1 not eligible, 2 pin low, 3 stale clear fails, 4 alarm fails, 5/6 returns ok/err
+  int hib = 0;       // 0 not overnight, 1 not eligible, 2 pin low, 3/4 sleep returns ok/err
   int ulp = 0;       // 0 timer, 1 button, 2 sensor pin, 3 err then STOP ok, 4 err, err, timer-only ok, 5 all fail
   bool sensorValid = true, serialCfg = false, serialPre = false, verbose = false, wdtOk = true, second = false;
   int serialUpAfter = 0;
@@ -139,7 +101,7 @@ static void script(const Sc &s, bool first) {
   x.reconnecting = false;
   x.serialPolls = 0;
   const int hib = first ? s.hib : 0, ulp = first ? s.ulp : 0;
-  if (hib >= 5) x.sleeps.push_back({hib == 5 ? 0 : -170, PIN_INVALID});
+  if (hib >= 3) x.sleeps.push_back({hib == 3 ? 0 : -170, PIN_INVALID});
   const pin_t sensorPin = x.sensorPin;
   switch (ulp) {
     case 0: x.sleeps.push_back({0, PIN_INVALID}); break;
@@ -152,11 +114,9 @@ static void script(const Sc &s, bool first) {
   }
   x.hibEligible = hib >= 2;
   x.hibPinHigh = hib != 2;
-  x.staleClearOk = hib != 3;
-  x.alarmOk = hib != 4;
 }
 
-static void runScenario(const Sc &s, bool useBase, int index) {
+static void runScenario(const Sc &s, int index) {
   sim::world = sim::World();
   sim::world.modemOff = s.cellOff;
   sim::world.radioOn = !s.cellOff;
@@ -175,9 +135,6 @@ static void runScenario(const Sc &s, bool useBase, int index) {
   sim::exec.tdWait = s.tdWait;
   cfgOccupied = index % 2 == 1;
   const bool preserve = s.prior == 1, force = s.prior == 2;
-  base::preserveStandbyAfterNormalReturn = preserve;
-  base::forceModemOffAfterStandbyFailure = force;
-  base::standbySleepFailureError = force ? -170 : SYSTEM_ERROR_NONE;
   cur::standbyReturn.preserveAfterNormalReturn = preserve;
   cur::standbyReturn.forceModemOff = force;
   cur::standbyReturn.error = force ? -170 : SYSTEM_ERROR_NONE;
@@ -194,16 +151,12 @@ static void runScenario(const Sc &s, bool useBase, int index) {
     const bool overnight = pass == 0 && s.hib > 0;
     Outcome o{};
     o.fell = false;
-    if (useBase) {
-      driveBase(s.req, overnight, wakeIn, "scheduled", o);
-    } else {
-      driveCur(s.req, overnight, wakeIn, "scheduled", o);
-    }
+    driveCur(s.req, overnight, wakeIn, "scheduled", o);
     if (!o.fell) {
       o.eff = false;
-      o.preserve = useBase ? base::preserveStandbyAfterNormalReturn : cur::standbyReturn.preserveAfterNormalReturn;
-      o.force = useBase ? base::forceModemOffAfterStandbyFailure : cur::standbyReturn.forceModemOff;
-      o.err = useBase ? base::standbySleepFailureError : cur::standbyReturn.error;
+      o.preserve = cur::standbyReturn.preserveAfterNormalReturn;
+      o.force = cur::standbyReturn.forceModemOff;
+      o.err = cur::standbyReturn.error;
     }
     printf("  p%d wakeIn=%d overnight=%d t=%lu\n", pass, wakeIn, overnight, sim::now);
     printEvents();
@@ -216,13 +169,12 @@ static void runScenario(const Sc &s, bool useBase, int index) {
   scenarios++;
 }
 
-int main(int argc, char **argv) {
-  const bool useBase = argc > 1 && strcmp(argv[1], "a") == 0;
+int main() {
   const bool cellular = HAL_PLATFORM_CELLULAR != 0;
   printf("PLATFORM %s\n", cellular ? "cellular" : "wifi");
   const int priors = cellular ? 3 : 1;
   std::vector<Sc> table;
-  for (int hib = 1; hib <= 6; hib++)  // hibernate edges (hib=0 is the ULP table's first row)
+  for (int hib = 1; hib <= 4; hib++)  // hibernate edges (hib=0 is the ULP table's first row)
     for (int prior = 0; prior < priors; prior++)
       for (int req = 0; req < 2; req++) {
         Sc s; s.hib = hib; s.prior = prior; s.req = req; table.push_back(s);
@@ -242,7 +194,7 @@ int main(int argc, char **argv) {
     for (int pre = 0; pre < 2; pre++)  // serial: connected beforehand or not, re-enumerates at once / late / never
       for (int up : {0, 2, -1}) { Sc s; s.serialCfg = true; s.serialPre = pre; s.serialUpAfter = up; table.push_back(s); }
     for (int ulp : {0, 3}) { Sc s; s.verbose = true; s.prior = 1; s.ulp = ulp; table.push_back(s); }
-    { Sc s; s.wdtOk = false; s.hib = 5; table.push_back(s); }
+    { Sc s; s.wdtOk = false; s.hib = 4; table.push_back(s); }
     { Sc s; s.wdtOk = false; s.ulp = 4; table.push_back(s); }
     for (int ulp : {0, 3}) { Sc s; s.prior = 2; s.tdClears = true; s.ulp = ulp; s.second = true; table.push_back(s); }
     for (int why = 0; why < 4; why++) {  // teardown still waiting: the handler returns before the sleep, what do the fields hold?
@@ -251,7 +203,7 @@ int main(int argc, char **argv) {
   }
 
   int index = 0;
-  for (const Sc &s : table) runScenario(s, useBase, index++);
+  for (const Sc &s : table) runScenario(s, index++);
   printf("SCENARIOS %d PASSES %d WOKE %d RETURNED %d DISTINCT_EVENTS %d\n", scenarios, totalPasses, nWoke, nReset,
          (int)distinctEvents.size());
   for (const auto &e : distinctEvents) printf("EVENT %s\n", e.c_str());

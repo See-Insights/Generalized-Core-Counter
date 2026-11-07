@@ -33,7 +33,8 @@ namespace RecoveryState {
  */
 enum WatchdogSource : uint8_t {
     WATCHDOG_SOURCE_DEVICE_OS  = 0,
-    WATCHDOG_SOURCE_AB1805_PIN = 1
+    WATCHDOG_SOURCE_AB1805_PIN = 1,
+    WATCHDOG_SOURCE_INFERRED   = 2  // PIN_RESET with no power-off evidence (v50: the chip's wake flags are no longer read)
 };
 
 // *************** Reset accounting ***************
@@ -73,6 +74,10 @@ void set_lastWatchdogResetReasonData(uint32_t value);
 /// WatchdogSource enum value.
 uint8_t get_lastWatchdogSource();
 void set_lastWatchdogSource(uint8_t value);
+
+/// Spare SysData byte (was structuresVersion; layout unchanged): set before a requested power-down, cleared once the wake is classified.
+uint8_t get_powerOffRequested();
+void set_powerOffRequested(uint8_t value);
 
 // *************** Alert state (decision A - backed by CurrentData) ***************
 

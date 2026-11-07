@@ -63,7 +63,8 @@ EXPECTED_SITES = {
     "hibernate": {
         "mode": "SystemSleepMode::HIBERNATE",
         "gpio": [("WAKEUP_PIN", "FALLING"), ("BUTTON_PIN", "FALLING")],
-        "duration": None,
+        # v50 S2 (WO-2026-11-05-004): Device OS arms the chip alarm from duration().
+        "duration": "(uint32_t)wakeInSeconds*1000UL",
         "network": None,
     },
     "ulp": {
@@ -533,6 +534,8 @@ def main():
                     drift.append("%s: not present at baseline" % tag)
                     continue
                 for key in ("mode", "duration", "network"):
+                    if tag == "hibernate" and key == "duration":
+                        continue  # v50 S2 (WO-2026-11-05-004): intentionally added, Device OS arms the alarm
                     if b[key] != expected[key]:
                         drift.append("%s.%s: baseline %r vs expected %r"
                                      % (tag, key, b[key], expected[key]))

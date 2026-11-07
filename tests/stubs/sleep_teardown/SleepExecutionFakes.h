@@ -44,7 +44,7 @@ struct SensorWakeSource { pin_t pin; InterruptMode edge; };
 namespace sim {
 struct Exec {
   struct Sleep { int err; pin_t pin; };
-  bool hibEligible = false, hibPinHigh = true, staleClearOk = true, alarmOk = true, wdtStopOk = true;
+  bool hibEligible = false, hibPinHigh = true, wdtStopOk = true;
   std::vector<Sleep> sleeps;
   size_t nextSleep = 0;
   pin_t sensorPin = 9;
@@ -140,12 +140,11 @@ inline void userSwitchISR() {}
 inline bool userSwitchDetected = true;
 inline void attachInterrupt(pin_t p, void (*)(), InterruptMode e) { sim::emit("CALL attachInterrupt %u %d", (unsigned)p, (int)e); }
 
-struct AB1805Stub {
-  bool interruptAtTime(time_t t) { sim::emit("AB1805 interruptAtTime %lld", (long long)t); return sim::exec.alarmOk; }
-  bool stopWDT() { sim::emit("AB1805 stopWDT"); return sim::exec.wdtStopOk; }
-  bool resumeWDT() { sim::emit("AB1805 resumeWDT"); return true; }
+struct ExternalWatchdogStub {
+  int stop() { sim::emit("EXTWDT stop"); return sim::exec.wdtStopOk ? SYSTEM_ERROR_NONE : -1; }
+  int start() { sim::emit("EXTWDT start"); return SYSTEM_ERROR_NONE; }
 };
-inline AB1805Stub ab1805;
+inline ExternalWatchdogStub ExternalWatchdog;
 struct WatchdogStub { bool started() { sim::emit("CALL Watchdog.started"); return true; } };
 inline WatchdogStub Watchdog;
 inline void pauseAwakeWatchdogForSleep(const char *ctx) { sim::emit("WATCHDOG pause %s", ctx); }
@@ -156,7 +155,6 @@ inline bool shouldUseBoronRtcAlarmHibernate(uint32_t wakeIn, time_t &rtcNow) {
   sim::emit("HIB eligible? wakeIn=%u -> %d", (unsigned)wakeIn, (int)sim::exec.hibEligible);
   return sim::exec.hibEligible;
 }
-inline bool clearAb1805StaleAlarmInterrupts() { sim::emit("HIB clearStale"); return sim::exec.staleClearOk; }
 namespace HibernateCycle {
 inline void armForSleep(time_t rtcNow, uint32_t wakeIn) { sim::emit("HIB armForSleep %lld %u", (long long)rtcNow, (unsigned)wakeIn); }
 inline void abandon() { sim::emit("HIB abandon"); }

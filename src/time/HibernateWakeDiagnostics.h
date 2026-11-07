@@ -38,8 +38,8 @@ namespace HibernateWakeDiagnostics {
 enum class GateArm {
   kNone = 0,
   kResetReason,    // OS reset reason was not RESET_REASON_POWER_MANAGEMENT
-  kWakeReason,     // AB1805 wake reason was not ALARM
-  kRtcRead,        // ab1805.getRtcAsTime() failed
+  kWakeReason,     // unreachable after kResetReason since v50 S2 (reason 30 alone passes)
+  kRtcRead,        // the external RTC read failed
   kRtcBeforeZero,  // retainedHibernateRtcBefore was not > 0
   kRequestedZero,  // retainedHibernateRequestedSleep was not > 0
   kRtcOrder,       // rtcTime on wake was earlier than retainedHibernateRtcBefore
@@ -158,6 +158,16 @@ inline int buildEventPayload(char *buffer, size_t bufferSize, const EventFields 
       f.rtcReadOk ? 1 : 0, (unsigned long)f.requestedSleepSec, (long long)f.rtcBefore,
       (long long)f.rtcAtWake, (unsigned long)f.actualSleepSec, (long)f.sleepErrorSec,
       (unsigned long)f.hibernateCount);
+}
+
+/// Reason-20 boot: persisted power-off evidence (the Error-path byte, or a
+/// recent failsafe stage 3) means a power-up wake; none means an inferred
+/// watchdog. `retained` is never evidence (a power-down clears it).
+constexpr int64_t kPowerOffEvidenceMaxAgeSec = 600;
+inline bool isInferredWatchdog(bool errorPathByte, uint8_t failsafeStage, int64_t failsafeActionAt, bool timeValid, int64_t now) {
+  const int64_t age = now - failsafeActionAt;
+  const bool failsafeRecent = failsafeStage == 3 && (!timeValid || (age >= 0 && age <= kPowerOffEvidenceMaxAgeSec));
+  return !errorPathByte && !failsafeRecent;
 }
 
 } // namespace HibernateWakeDiagnostics

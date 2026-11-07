@@ -1065,6 +1065,9 @@ void set_lastWatchdogResetReasonData(uint32_t value) { sysStatus.set_lastWatchdo
 uint8_t get_lastWatchdogSource() { return sysStatus.get_lastWatchdogSource(); }
 void set_lastWatchdogSource(uint8_t value) { sysStatus.set_lastWatchdogSource(value); }
 
+uint8_t get_powerOffRequested() { return sysStatus.getValue<uint8_t>(offsetof(sysStatusData::SysData, reservedUint8_0)); }
+void set_powerOffRequested(uint8_t value) { sysStatus.setValue<uint8_t>(offsetof(sysStatusData::SysData, reservedUint8_0), value); }
+
 // Decision A: alert state is forensics, so it is exposed here - but it is
 // still physically CurrentData, so these forward to `current`, not `sysStatus`.
 int8_t get_alertCode() { return current.get_alertCode(); }

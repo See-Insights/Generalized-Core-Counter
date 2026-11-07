@@ -196,7 +196,17 @@ if cur_retained != base_retained:
 
 # The S-2 functions, logWakeSummary() and the includes are unchanged; State_Modes.cpp is unchanged above the new
 # owner apart from its three added includes.
-tail_of = lambda t: t[t.index("struct WakeContext {"):t.index("} // namespace\n", t.index("struct WakeContext {"))]
+def without_hibernate_attempt(t):
+    # v50 S2 (WO-2026-11-05-004) changed hibernateAttempt on purpose (and swapped the ab1805 watchdog calls for ExternalWatchdog, normalised here); every other S-2 function is still compared.
+    i = t.find("hibernateAttempt(")
+    i = t.rfind("\n", 0, t.rfind("void", 0, i) + 1) if i >= 0 else -1
+    j = t.index("\n}\n", i) + 3 if i >= 0 else 0
+    t = t[:i] + t[j:] if i >= 0 else t
+    return (t.replace("(ExternalWatchdog.stop() == SYSTEM_ERROR_NONE)", "ab1805.stopWDT()")
+             .replace("ExternalWatchdog.start()", "ab1805.resumeWDT()"))
+
+
+tail_of = lambda t: without_hibernate_attempt(t[t.index("struct WakeContext {"):t.index("} // namespace\n", t.index("struct WakeContext {"))])
 prefix_of = lambda t: t[:t.index("namespace {")]
 log_of = lambda t: t[t.index("void logWakeSummary("):t.index("\n}\n", t.index("void logWakeSummary(")) + 3]
 # WO-2026-10-25-001: the one intended change, the led= value is already in seconds; mapped back for the compare.
@@ -206,7 +216,7 @@ if log_of(sleep).count(LED_NEW) != 1:
     fail("logWakeSummary() must print signalLEDTimeRemaining() (seconds) without a further division")
 if tail_of(sleep) != tail_of(base_sleep):
     fail("the S-2 functions (struct WakeContext .. end of the anonymous namespace) differ from the base")
-if prefix_of(sleep) != prefix_of(base_sleep):
+if prefix_of(sleep) != prefix_of(base_sleep).replace('#include "AB1805_RK.h"\n', ""):
     fail("the State_Sleep.cpp includes differ from the base")
 if log_of(sleep).replace(LED_NEW, LED_BASE) != log_of(base_sleep):
     fail("logWakeSummary() differs from the base")

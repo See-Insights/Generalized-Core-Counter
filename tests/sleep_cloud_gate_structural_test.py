@@ -222,9 +222,19 @@ if retained_count(current_files.values()) != base_retained:
     fail("a `retained` keyword or identifier was added in src/")
 
 # The S-2 functions and the includes are unchanged.
+def without_hibernate_attempt(t):
+    # v50 S2 (WO-2026-11-05-004) changed hibernateAttempt on purpose (and swapped the ab1805 watchdog calls for ExternalWatchdog, normalised here); every other S-2 function is still compared.
+    i = t.find("hibernateAttempt(")
+    i = t.rfind("\n", 0, t.rfind("void", 0, i) + 1) if i >= 0 else -1
+    j = t.index("\n}\n", i) + 3 if i >= 0 else 0
+    t = t[:i] + t[j:] if i >= 0 else t
+    return (t.replace("(ExternalWatchdog.stop() == SYSTEM_ERROR_NONE)", "ab1805.stopWDT()")
+             .replace("ExternalWatchdog.start()", "ab1805.resumeWDT()"))
+
+
 def tail_of(text):
     i = text.index("struct WakeContext {")
-    return text[i:text.index("} // namespace\n", i)]
+    return without_hibernate_attempt(text[i:text.index("} // namespace\n", i)])
 
 
 def prefix_of(text):
@@ -238,7 +248,7 @@ def drain_of(text):
 
 if tail_of(sleep) != tail_of(base_sleep):
     fail("the S-2 functions (struct WakeContext .. end of the anonymous namespace) differ from the base")
-if prefix_of(sleep) != prefix_of(base_sleep) or drain_of(sleep) != drain_of(base_sleep):
+if prefix_of(sleep) != prefix_of(base_sleep).replace('#include "AB1805_RK.h"\n', "") or drain_of(sleep) != drain_of(base_sleep):
     fail("the includes or drainSerialBeforeSleep differ from the base")
 helpers = lambda t: t[t.index("unsigned long computeCloudSyncTimeoutMs("):t.index('    return "unknown";\n  }\n}\n')]
 if helpers(sleep) != helpers(base_sleep):

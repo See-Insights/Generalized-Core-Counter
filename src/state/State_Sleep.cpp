@@ -18,7 +18,6 @@
 #include "sensors/SensorManager.h"
 #include "device_pinout.h"
 #include "sensors/SensorDefinitions.h"
-#include "AB1805_RK.h"
 #include "observability/AwakeCycleCounters.h"
 #include "observability/WakeCycleStats.h"
 #include "ThrashGuard.h"
@@ -694,61 +693,50 @@ void hibernateAttempt(bool overnightFallbackSleep, int wakeInSeconds) {
     if (shouldUseBoronRtcAlarmHibernate((uint32_t)wakeInSeconds, rtcNow)) {
       pinMode(WAKEUP_PIN, INPUT_PULLUP);
       if (digitalRead(WAKEUP_PIN) == HIGH) {
-        if (clearAb1805StaleAlarmInterrupts()) {
-          const time_t wakeTime = rtcNow + (time_t)wakeInSeconds;
-          if (ab1805.interruptAtTime(wakeTime)) {
-            setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START (was stale literal 20, colliding with BREADCRUMB_REPORT_EXIT)
-            // Fresh local configuration per sleep: Device OS move-assigns
-            // without freeing the previous wake-source list, so a reused
-            // long-lived object orphans that list on every cycle.
-            SystemSleepConfiguration hibernateConfig;
-            hibernateConfig.mode(SystemSleepMode::HIBERNATE)
-              .gpio(WAKEUP_PIN, FALLING)
-              .gpio(BUTTON_PIN, FALLING);
+        setAppBreadcrumb(24); // BREADCRUMB_SLEEP_CONFIG_START (was stale literal 20, colliding with BREADCRUMB_REPORT_EXIT)
+        // Fresh local configuration per sleep: Device OS move-assigns
+        // without freeing the previous wake-source list, so a reused
+        // long-lived object orphans that list on every cycle.
+        SystemSleepConfiguration hibernateConfig;
+        hibernateConfig.mode(SystemSleepMode::HIBERNATE)
+          .gpio(WAKEUP_PIN, FALLING)
+          .gpio(BUTTON_PIN, FALLING)
+          .duration((uint32_t)wakeInSeconds * 1000UL);
 
-            const bool watchdogStopped = ab1805.stopWDT();
-            pauseAwakeWatchdogForSleep("hibernate");
-            if (!watchdogStopped) {
-              Log.warn("SleepCall: watchdog-stop failed mode=HIBERNATE dur=%ds", wakeInSeconds);
-            }
-
-            // WO-2026-09-16 Step 2: HibernateCycle now owns the retained
-            // hibernate-cycle fields; wakeTime itself is used above for
-            // ab1805.interruptAtTime() only - nothing reads it back on
-            // wake (confirmed dead as a retained field), so it is not
-            // passed through here.
-            HibernateCycle::armForSleep(rtcNow, (uint32_t)wakeInSeconds);
-
-            Log.info("ModemTeardown: radioOn=%d point=hibernate", (int)Connectivity::isRadioPoweredOn());
-            Log.info("Sleep: HIBERNATE reason=closed dur=%ds wakePin=%d", wakeInSeconds, (int)WAKEUP_PIN);
-            PowerDiagnostics::logPowerState("pre-hibernate");
-            thrashGuard.markProgress("SLEEP_ATTEMPT");
-            Cloud::instance().logLedgerSleepState();
-            setAppBreadcrumb(25); // BREADCRUMB_SLEEP_SYSTEM_CALL (was stale literal 21, colliding with BREADCRUMB_IDLE_ENTRY) - entering final pre-sleep sequence
-            drainSerialBeforeSleep();
-            setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
-            // HIBERNATE may reset the MCU without returning - flush the
-            // diagnostics batch now, since this is the only chance.
-#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
-            PowerDiagnostics::flushDiagBatch();
-            setAppBreadcrumb(27); // BREADCRUMB_SLEEP_DIAG_FLUSH_DONE
-#endif
-            setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
-            const SystemSleepResult hibernateResult = System.sleep(hibernateConfig);
-            AwakeCycles::recordSleepReturn(hibernateResult.error() == SYSTEM_ERROR_NONE);
-
-            // HIBERNATE should reset the MCU. If we return here, treat it as failed and fall back.
-            HibernateCycle::abandon();
-            ab1805.resumeWDT();
-            restoreAwakeWatchdogAfterWake("hibernate");
-            Log.warn("HIBERNATE sleep failed err=%d - falling back to ULTRA_LOW_POWER",
-                     (int)hibernateResult.error());
-          } else {
-            Log.warn("HIBERNATE bypass: failed to program AB1805 alarm - falling back to ULTRA_LOW_POWER");
-          }
-        } else {
-          Log.warn("HIBERNATE bypass: failed stale interrupt cleanup - falling back to ULTRA_LOW_POWER");
+        const bool watchdogStopped = (ExternalWatchdog.stop() == SYSTEM_ERROR_NONE);
+        pauseAwakeWatchdogForSleep("hibernate");
+        if (!watchdogStopped) {
+          Log.warn("SleepCall: watchdog-stop failed mode=HIBERNATE dur=%ds", wakeInSeconds);
         }
+
+        // HibernateCycle owns the retained hibernate-cycle fields; Device OS
+        // arms the chip alarm itself from duration().
+        HibernateCycle::armForSleep(rtcNow, (uint32_t)wakeInSeconds);
+
+        Log.info("ModemTeardown: radioOn=%d point=hibernate", (int)Connectivity::isRadioPoweredOn());
+        Log.info("Sleep: HIBERNATE reason=closed dur=%ds wakePin=%d", wakeInSeconds, (int)WAKEUP_PIN);
+        PowerDiagnostics::logPowerState("pre-hibernate");
+        thrashGuard.markProgress("SLEEP_ATTEMPT");
+        Cloud::instance().logLedgerSleepState();
+        setAppBreadcrumb(25); // BREADCRUMB_SLEEP_SYSTEM_CALL (was stale literal 21, colliding with BREADCRUMB_IDLE_ENTRY) - entering final pre-sleep sequence
+        drainSerialBeforeSleep();
+        setAppBreadcrumb(26); // BREADCRUMB_SLEEP_SERIAL_DRAIN_DONE
+        // HIBERNATE may reset the MCU without returning - flush the
+        // diagnostics batch now, since this is the only chance.
+#if defined(ENABLE_DIAGNOSTICS_PUBLISH_MODE) && ENABLE_DIAGNOSTICS_PUBLISH_MODE
+        PowerDiagnostics::flushDiagBatch();
+        setAppBreadcrumb(27); // BREADCRUMB_SLEEP_DIAG_FLUSH_DONE
+#endif
+        setAppBreadcrumb(28); // BREADCRUMB_SLEEP_CALL_ENTER - immediately before System.sleep()
+        const SystemSleepResult hibernateResult = System.sleep(hibernateConfig);
+        AwakeCycles::recordSleepReturn(hibernateResult.error() == SYSTEM_ERROR_NONE);
+
+        // HIBERNATE should reset the MCU. If we return here, treat it as failed and fall back.
+        HibernateCycle::abandon();
+        ExternalWatchdog.start();
+        restoreAwakeWatchdogAfterWake("hibernate");
+        Log.warn("HIBERNATE sleep failed err=%d - falling back to ULTRA_LOW_POWER",
+                 (int)hibernateResult.error());
       } else {
         Log.warn("HIBERNATE bypass: wake pin held low before sleep - falling back to ULTRA_LOW_POWER");
       }
@@ -782,7 +770,7 @@ bool sleepAndResume(int wakeInSeconds, bool useNetworkStandby, const char *sleep
 
   // Stop watchdog immediately before sleep (after config is fully built)
   // to minimize time between I2C transaction and sleep entry
-  const bool watchdogStopped = ab1805.stopWDT();
+  const bool watchdogStopped = (ExternalWatchdog.stop() == SYSTEM_ERROR_NONE);
   pauseAwakeWatchdogForSleep("ulp");
 #if ENABLE_SLEEP_TRACE
   Log.info("SleepCall: standby=%d dur=%d wdt=%s gate=ok",
@@ -895,7 +883,7 @@ bool sleepAndResume(int wakeInSeconds, bool useNetworkStandby, const char *sleep
         // that requires immediate reset (alert 16 already raised on first failure).
         Log.info("ModemTeardown: radioOn=%d point=sleep-attempts-failed-reset", (int)Connectivity::isRadioPoweredOn());
         Log.error("All sleep attempts failed err=%d - immediate reset required", (int)result.error());
-        ab1805.resumeWDT();
+        ExternalWatchdog.start();
 
         // Brief delay to allow log output to flush before reset
         delay(2000);
@@ -923,7 +911,7 @@ bool sleepAndResume(int wakeInSeconds, bool useNetworkStandby, const char *sleep
   if (sensorCanWake) pinMode(sensorWake.pin, INPUT);  // Reset pin mode
   
   // Resume hardware watchdog immediately after wake
-  ab1805.resumeWDT();
+  ExternalWatchdog.start();
   restoreAwakeWatchdogAfterWake("ulp");
 
   // Mark progress immediately after wake to reset ThrashGuard timer
@@ -1255,7 +1243,7 @@ void handleSleepingState() {
 
   // ********** WORKING SLEEP CONFIGURATION **********
   // Based on Connected-Counter-Next which uses system timer + GPIO wake.
-  // NO AB1805 alarms - AB1805 is only used for watchdog + RTC time sync.
+  // The chip alarm is armed by Device OS from duration(); the app only drives its watchdog.
   // This approach works reliably on Photon2!
 
   // In INTERMITTENT_KEEP_ALIVE mode during open hours on *cellular* devices,

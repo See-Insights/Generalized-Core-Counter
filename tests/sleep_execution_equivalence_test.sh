@@ -1,19 +1,15 @@
 #!/bin/zsh
 set -euo pipefail
 
-# WO-2026-10-21-001 (Sleep S-2): moving the standby decision, the hibernate attempt and the
-# ULP/STOP sleep cascade out of handleSleepingState() into effectiveStandby(), hibernateAttempt()
-# and sleepAndResume() changes no behaviour. tests/sleep_execution_equivalence_test.cpp runs one
-# scenario table through (a) the blocks extracted by marker text from the base State_Sleep.cpp
-# and (b) the current functions and the handler's call-site lines, extracted by marker text from
-# the current file, against the same fakes (tests/stubs/sleep_teardown/SleepExecutionFakes.h),
-# for cellular and Wi-Fi. Both transcripts must equal, byte for byte, the frozen
-# fixtures/sleep_execution_transcript.txt ('# ' header lines stripped first). The extracted copies
-# the harness compiled are read back and compared with a fresh extraction: COPY_MISMATCH on drift.
-# Step (a) needs the base commit named in the fixture header; without it (a) is skipped and said.
-# Mutants of a private copy of State_Sleep.cpp must each change the transcript.
-# SLEEP_EXECUTION_SRC_ROOT tests another src/ root; SLEEP_EXECUTION_TAMPER_COPY=1 demonstrates
-# COPY_MISMATCH. '--regenerate' rewrites the fixture from the base blocks (a).
+# WO-2026-10-21-001 (Sleep S-2), re-frozen for v50 S2 (WO-2026-11-05-004): tests/sleep_execution_equivalence_test.cpp
+# runs one scenario table through the current functions and the handler's call-site lines, extracted by
+# marker text from the current State_Sleep.cpp, against the fakes (tests/stubs/sleep_teardown/SleepExecutionFakes.h),
+# for cellular and Wi-Fi. The transcript must equal, byte for byte, the frozen fixtures/sleep_execution_transcript.txt
+# ('# ' header lines stripped first). The extracted copies the harness compiled are read back and compared with a
+# fresh extraction: COPY_MISMATCH on drift. S2 changed the hibernate block on purpose (native duration alarm,
+# ExternalWatchdog), so the pre-change base blocks are no longer run. Mutants of a private copy of State_Sleep.cpp
+# must each change the transcript. SLEEP_EXECUTION_SRC_ROOT tests another src/ root; SLEEP_EXECUTION_TAMPER_COPY=1
+# demonstrates COPY_MISMATCH. '--regenerate' rewrites the fixture from the current source.
 
 tests_dir="${0:A:h}"
 repo_root="${tests_dir:h}"
@@ -22,12 +18,6 @@ fixture="$tests_dir/fixtures/sleep_execution_transcript.txt"
 stubs="$tests_dir/stubs/sleep_teardown"
 work="$(mktemp -d "${TMPDIR:-/tmp}/sleep_execution_equivalence.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
-
-base="$(sed -n 's/^# Base commit: //p' "$fixture" 2>/dev/null || true)"
-base="${base:-1e6d34f}"
-base_src="$work/base_State_Sleep.cpp"
-have_base=0
-if git -C "$repo_root" show "${base}:src/state/State_Sleep.cpp" > "$base_src" 2>/dev/null; then have_base=1; fi
 
 cat > "$work/extract.py" <<'PY'
 import sys
@@ -51,17 +41,12 @@ def line(start):
 
 
 out = {"drain": span("void drainSerialBeforeSleep() {", "\n}\n")}
-if kind == "base":
-    out["standby"] = span("  bool preserveStandbyForThisPass = false;\n", "  useNetworkStandbyEffective = false;\n#endif\n")
-    out["hib"] = span("#if PLATFORM_ID == PLATFORM_BORON\n  if (overnightFallbackSleep) {\n    time_t rtcNow", "\n  }\n#endif\n")
-    out["ulp"] = span("  const SensorWakeSource sensorWake = SensorManager", '  PowerDiagnostics::logPowerState("post-wake");\n')
-else:
-    out["funcs"] = span("struct WakeContext {", "\n} // namespace\n", keep_end=False) + "\n"
-    out["call_effective"] = line("  bool useNetworkStandbyEffective = effectiveStandby(")
-    out["call_teardown"] = line("  if (SleepTeardown::run(")
-    out["call_hibernate"] = line("  hibernateAttempt(")
-    out["call_sleep"] = span("  WakeContext wake;\n", "  if (sleepAndResume(wakeInSeconds, useNetworkStandby, sleepReason, wake)) return;\n")
-    out["call_route"] = line("  postWakeRouting(")
+out["funcs"] = span("struct WakeContext {", "\n} // namespace\n", keep_end=False) + "\n"
+out["call_effective"] = line("  bool useNetworkStandbyEffective = effectiveStandby(")
+out["call_teardown"] = line("  if (SleepTeardown::run(")
+out["call_hibernate"] = line("  hibernateAttempt(")
+out["call_sleep"] = span("  WakeContext wake;\n", "  if (sleepAndResume(wakeInSeconds, useNetworkStandby, sleepReason, wake)) return;\n")
+out["call_route"] = line("  postWakeRouting(")
 for k, v in out.items():
     open(f"{outdir}/{kind}_{k}.inc", "w").write(v)
 PY
@@ -72,7 +57,6 @@ extract() {
   python3 "$work/extract.py" "$1" "$2" "$work"
 }
 
-if (( have_base )); then extract base "$base_src"; fi
 extract cur "$src_root/state/State_Sleep.cpp"
 if [[ "${SLEEP_EXECUTION_TAMPER_COPY:-}" == 1 ]]; then echo "// drift" >> "$work/cur_funcs.inc"; fi
 
@@ -81,8 +65,6 @@ build_run() {
   local platform="$1" mode="$2" out="$3" inc="$4" defs=()
   [[ "$platform" == cellular ]] && defs=(-DWiring_Cellular=1 -DHAL_PLATFORM_CELLULAR=1 -DENABLE_SLEEP_TRACE=1) || defs=(-DWiring_WiFi=1)
   c++ -std=c++17 -Wall -Wextra -Wno-unused-parameter -Werror "${defs[@]}" -I"$stubs" -I"$src_root" \
-    -DBASE_DRAIN_INC="\"$inc/base_drain.inc\"" -DBASE_STANDBY_INC="\"$inc/base_standby.inc\"" \
-    -DBASE_HIB_INC="\"$inc/base_hib.inc\"" -DBASE_ULP_INC="\"$inc/base_ulp.inc\"" \
     -DCUR_DRAIN_INC="\"$inc/cur_drain.inc\"" -DCUR_FUNCS_INC="\"$inc/cur_funcs.inc\"" \
     -DCUR_CALL_EFFECTIVE_INC="\"$inc/cur_call_effective.inc\"" -DCUR_CALL_TEARDOWN_INC="\"$inc/cur_call_teardown.inc\"" \
     -DCUR_CALL_HIBERNATE_INC="\"$inc/cur_call_hibernate.inc\"" -DCUR_CALL_SLEEP_INC="\"$inc/cur_call_sleep.inc\"" -DCUR_CALL_ROUTE_INC="\"$inc/cur_call_route.inc\"" \
@@ -98,25 +80,22 @@ run_all() {
 }
 
 if [[ "${1:-}" == "--regenerate" ]]; then
-  (( have_base )) || { echo "NO_BASE_COMMIT: $base"; exit 1; }
-  run_all a "$work/regen.txt" "$work"
-  python3 - "$base" "$work/regen.txt" "$fixture" <<'PY'
+  run_all b "$work/regen.txt" "$work"
+  python3 - "$work/regen.txt" "$fixture" <<'PY'
 import hashlib
 import re
 import sys
 
-base, body_path, fixture = sys.argv[1:4]
+body_path, fixture = sys.argv[1:3]
 body = open(body_path).read()
 counts = re.findall(r"^SCENARIOS (\d+) PASSES (\d+) WOKE (\d+) RETURNED (\d+) DISTINCT_EVENTS (\d+)$", body, re.M)
 scen = sum(int(c[0]) for c in counts)
 passes = sum(int(c[1]) for c in counts)
-head = f"""# Frozen output of the pre-change sleep execution (standby decision, hibernate attempt, ULP/STOP cascade): WO-2026-10-21-001 (Sleep S-2).
-# Base commit: {base}
+head = f"""# Frozen output of the sleep execution (standby decision, hibernate attempt, ULP/STOP cascade): WO-2026-10-21-001 (Sleep S-2), re-frozen for v50 S2 (WO-2026-11-05-004).
 # Scenarios: {scen} (cellular {counts[0][0]} + wifi {counts[1][0]}); passes: {passes}
 # Per-platform summary (scenarios passes WOKE RETURNED distinct-events): cellular {' '.join(counts[0])}; wifi {' '.join(counts[1])}
 # Body sha256: {hashlib.sha256(body.encode()).hexdigest()}
-# Generated once by extracting the blocks by marker text from {base}:src/state/State_Sleep.cpp (git show),
-# wrapping them in tests/sleep_execution_equivalence_test.cpp against tests/stubs/sleep_teardown, and running mode a.
+# Generated with --regenerate from the S2 State_Sleep.cpp (native HIBERNATE duration alarm, ExternalWatchdog) against tests/stubs/sleep_teardown.
 """
 open(fixture, "w").write(head + body)
 PY
@@ -147,22 +126,14 @@ run_all b "$work/new.txt" "$work"
 mkdir -p "$work/fresh"
 extract_fresh() { python3 "$work/extract.py" "$1" "$2" "$work/fresh"; }
 extract_fresh cur "$src_root/state/State_Sleep.cpp"
-(( have_base )) && extract_fresh base "$base_src"
 for f in "$work"/fresh/*.inc; do
   cmp -s "$f" "$work/${f:t}" || { echo "COPY_MISMATCH: ${f:t} compiled by the harness differs from the file"; exit 1; }
 done
 
 diff -u "$work/expected.txt" "$work/new.txt" > "$work/new.diff" || { head -60 "$work/new.diff"; echo "EQUIVALENCE_FAILED: State_Sleep.cpp differs from the frozen transcript"; exit 1; }
 
-if (( have_base )); then
-  run_all a "$work/old.txt" "$work"
-  diff -u "$work/expected.txt" "$work/old.txt" > "$work/old.diff" || { head -60 "$work/old.diff"; echo "FIXTURE_NOT_FROM_BASE: the base blocks differ from the fixture ($base)"; exit 1; }
-else
-  echo "BASE_CHECK_SKIPPED: commit $base is not in this tree; only the fixture comparison ran"
-fi
-
 # The transcript is not trivial: every branch the moved code has shows up, and so do all outcomes.
-for line in "HIB eligible?" "HIB clearStale" "HIB armForSleep" "HIB abandon" "AB1805 interruptAtTime" \
+for line in "HIB eligible?" "HIB armForSleep" "HIB abandon" "EXTWDT stop" "EXTWDT start" \
             "SLEEP mode=HIBERNATE gpio=[7F,4F]" "SLEEP mode=ULP gpio=[4F,9R] net=3:0 dur=3600000" \
             "SLEEP mode=ULP gpio=[4F,9R] net=none dur=900000" "SLEEP mode=STOP gpio=[4F,9R]" \
             "SLEEP mode=STOP gpio=[] net=none dur=3600000" "SLEEP mode=ULP gpio=[4F] net=3:0" \
@@ -172,8 +143,7 @@ for line in "HIB eligible?" "HIB clearStale" "HIB armForSleep" "HIB abandon" "AB
             "PROGRESS SERIAL_WAIT" "POWER flushDiagBatch" "CYCLE resetOnWake" "MEASURE noteWakeFromLowPowerSleep" \
             "LOG INFO SLEEP: standby sleep returned normally; preserving modem standby" \
             "LOG WARN SLEEP: standby sleep failed; forcing modem-off reason=sleep_error err=-170" \
-            "LOG WARN HIBERNATE bypass: wake pin held low" "LOG WARN HIBERNATE bypass: failed stale interrupt cleanup" \
-            "LOG WARN HIBERNATE bypass: failed to program AB1805 alarm" "LOG WARN HIBERNATE sleep failed err=-170" \
+            "LOG WARN HIBERNATE bypass: wake pin held low" "LOG WARN HIBERNATE sleep failed err=-170" \
             "LOG ERROR ULTRA_LOW_POWER sleep failed err=-170" "LOG ERROR STOP sleep fallback failed" \
             "LOG ERROR All sleep attempts failed err=-170" "LOG WARN Serial did not reconnect within 30s" \
             "LOG INFO SleepCall: standby=1" "LOG WARN SleepCall: watchdog-stop failed" \
@@ -201,7 +171,6 @@ for old, new in zip(pairs[0::2], pairs[1::2]):
     text = text.replace(old, new)
 open(path, "w").write(text)
 PY
-  cp "$work"/base_*.inc "$m/" 2>/dev/null || true
   python3 "$work/extract.py" cur "$m/State_Sleep.cpp" "$m"
   run_all b "$m/new.txt" "$m" > "$m/build.log" 2>&1 || { echo "MUTANT_DID_NOT_BUILD: $label"; cat "$m/build.log"; exit 1; }
   if diff -q "$work/expected.txt" "$m/new.txt" > /dev/null; then echo "MUTANT_SURVIVED: $label"; exit 1; fi
@@ -214,7 +183,7 @@ mutate_and_expect_diff "ULP error skips STOP with GPIO" \
 mutate_and_expect_diff "standby error leaves forceModemOff unset" \
   "standbyReturn.forceModemOff = true;" "standbyReturn.forceModemOff = false;"
 mutate_and_expect_diff "returned hibernate not abandoned" \
-  "            HibernateCycle::abandon();
+  "        HibernateCycle::abandon();
 " ""
 mutate_and_expect_diff "WAKE_FROM_SLEEP progress after the serial re-wait" \
   "  thrashGuard.markProgress(\"WAKE_FROM_SLEEP\");
@@ -228,4 +197,4 @@ mutate_and_expect_diff "PIR classified from the wrong edge" \
 mutate_and_expect_diff "post-wake routing handed swapped pir and button" \
   "postWakeRouting(wake.pirWake, wake.buttonWake, wake.timerWake, wake.wakeReasonLabel);" "postWakeRouting(wake.buttonWake, wake.pirWake, wake.timerWake, wake.wakeReasonLabel);"
 
-echo "sleep_execution_equivalence_test: both transcripts match the frozen pre-change output, all mutations detected"
+echo "sleep_execution_equivalence_test: both transcripts match the re-frozen S2 output, all mutations detected"
