@@ -37,6 +37,9 @@ check() {
 # logic out to HibernateCycle, absorbing HibernateWakeDiagnostics'
 # classifyGateArm() rather than continuing to call it - see HibernateCycle.cpp's
 # own checks below for that absorbed logic). ---
+check "reason 30 is labelled POWER_MGMT (successful HIBERNATE wake), not ALARM (Amendment 4)" \
+  "wakeReasonName = \"POWER_MGMT\"" \
+  "$hc_src"
 check "classifyWake() is called exactly where PIN_RESET classification used to run, before setWDT()" \
   "const HibernateCycle::WakeVerdict wakeVerdict = HibernateCycle::classifyWake(reason);" \
   "$gcc_src"

@@ -116,11 +116,12 @@ void testOtherResetReasonsFailOnTheResetReasonArm() {
 // i.e. setup(), already computed).
 void testBuildEventFieldsOnSuccessReportsProvidedActualAndError() {
   const GateInputs in = passingInputs();
-  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "ALARM",
+  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "POWER_MGMT",
                                           /*hibernateCount=*/7,
                                           /*actualSleepSecOnSuccess=*/3605,
                                           /*sleepErrorSecOnSuccess=*/5);
   assert(f.arm == GateArm::kNone);
+  assert(strcmp(f.wakeReasonName, "POWER_MGMT") == 0); // reason 30 = successful HIBERNATE wake (Amendment 4)
   assert(f.actualSleepSec == 3605);
   assert(f.sleepErrorSec == 5);
   assert(f.hibernateCount == 7);
@@ -133,7 +134,7 @@ void testBuildEventFieldsOnSuccessReportsProvidedActualAndError() {
 void testBuildEventFieldsOnFailureZeroesActualAndErrorRegardlessOfInput() {
   GateInputs in = passingInputs();
   in.rtcReadOk = false; // fails the kRtcRead arm
-  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "ALARM",
+  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "POWER_MGMT",
                                           /*hibernateCount=*/7,
                                           /*actualSleepSecOnSuccess=*/9999,
                                           /*sleepErrorSecOnSuccess=*/9999);
@@ -241,7 +242,7 @@ void testBuildEventFieldsOnFailureForwardsEveryForensicInputFaithfully() {
 
 void testGatePassesPayloadReportsSuccess() {
   const GateInputs in = passingInputs();
-  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "ALARM",
+  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "POWER_MGMT",
                                           /*hibernateCount=*/7,
                                           /*actualSleepSecOnSuccess=*/3605,
                                           /*sleepErrorSecOnSuccess=*/5);
@@ -371,7 +372,7 @@ void testFailurePayloadIdentifiesArmAndOmitsFabricatedTiming() {
   // Same "both outcomes" contract as testBuildEventFieldsOnFailureZeroesActualAndErrorRegardlessOfInput():
   // pass deliberately non-zero success-path values to prove buildEventFields()
   // - not the caller - is what zeroes them on a failed gate.
-  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "ALARM",
+  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "POWER_MGMT",
                                           /*hibernateCount=*/2,
                                           /*actualSleepSecOnSuccess=*/1234,
                                           /*sleepErrorSecOnSuccess=*/1234);

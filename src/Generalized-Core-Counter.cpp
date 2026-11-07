@@ -530,8 +530,8 @@ void setup() {
   }
 
   // Watchdog-reset persistence/forensics-publish (Device-OS-detected and
-  // AB1805-confirmed PIN_RESET cases) is handled after AB1805 wake-reason
-  // classification below, once the AB1805 wake reason is available -
+  // inferred PIN_RESET cases) is handled after the wake classification
+  // below (a reason-20 boot with no persisted power-off evidence is inferred) -
   // see the "WATCHDOG RESET CLASSIFICATION" block further down in setup().
 
   // If a boot storm holdoff was triggered on this or the prior boot, surface
@@ -1371,8 +1371,8 @@ void publishWatchdogForensics(bool inferred) {
   const LoopStage stage = static_cast<LoopStage>(startupPreviousLoopStage);
   const int osResetReason = System.resetReason();
 
-  // "ab1805_watchdog" distinguishes an AB1805-confirmed external reset (OS
-  // reason PIN_RESET) from "watchdog", the Device-OS-detected case (OS
+  // "ab1805_watchdog" distinguishes an inferred PIN_RESET (no persisted
+  // power-off evidence) from "watchdog", the Device-OS-detected case (OS
   // reason RESET_REASON_WATCHDOG) - both land here via the same classified
   // condition in setup().
   const char *resetLabel = inferred ? "ab1805_watchdog" : "watchdog";

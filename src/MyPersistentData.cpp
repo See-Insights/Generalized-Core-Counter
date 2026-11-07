@@ -789,7 +789,7 @@ static int getAlertSeverity(int8_t code) {
         // that merely happened to already be active when the watchdog fired.
         // It needs its own tier, strictly greater than 3, so raiseAlert(19)
         // always supersedes whatever is currently active from that set.
-        case 19: // watchdog reset (Device-OS-detected or AB1805-confirmed PIN_RESET)
+        case 19: // watchdog reset (Device-OS-detected or inferred PIN_RESET)
             return 4; // watchdog / lost-execution - most urgent
 
         case 23: // PMIC battery fault (general)
