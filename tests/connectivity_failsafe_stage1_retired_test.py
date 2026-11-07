@@ -97,8 +97,8 @@ def main():
           "stage 2 (System.reset) is still the system-reset action")
     check("RESET_CAUSE_CONNECTIVITY_FAILSAFE" in supervisor,
           "stage 2 still resets with RESET_CAUSE_CONNECTIVITY_FAILSAFE (code 2)")
-    check("ab1805.deepPowerDown()" in supervisor,
-          "stage 3 is still the AB1805 deep power-down")
+    check("powerOffForRecovery()" in supervisor,
+          "stage 3 is still the deep power-down (now the timed POWER_OFF helper)")
 
     print("")
     print("--- What became unused is gone ---")

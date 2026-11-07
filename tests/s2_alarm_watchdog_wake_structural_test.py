@@ -48,12 +48,11 @@ def _problems(files):
             if label != "raw" and re.search(r"\b" + name + r"\b", strip(t)):
                 p.append(f"{name} still referenced in {label}")
 
-    # Only the two S3 callers may still touch the AB1805 object for power-down.
+    # S3: no caller touches the AB1805 object any more.
     for label in ("gcc", "sleep", "err", "hc", "fs"):
         t = strip(files[label])
         for m in re.finditer(r"\bab1805\.(\w+)", t):
-            if m.group(1) != "deepPowerDown":
-                p.append(f"ab1805.{m.group(1)} in {label}")
+            p.append(f"ab1805.{m.group(1)} in {label}")
 
     # Reason 20 is judged from persisted evidence, not the retained struct, and a reason-30-only wake.
     if "in.wakeReasonIsHibernateWake = in.resetReasonIsPowerManagement;" not in hc:
@@ -80,13 +79,13 @@ def _problems(files):
     # The byte is persisted before the deep power-down and the flush, never after.
     case3 = err[err.index("case 3:"):]
     case3 = case3[:case3.index("break;")]
-    order = [case3.find(s) for s in ("set_powerOffRequested(HibernateWakeDiagnostics::kPowerOffSentinel)", "flushAllBeforeReset()", "ab1805.deepPowerDown()")]
+    order = [case3.find(s) for s in ("set_powerOffRequested(HibernateWakeDiagnostics::kPowerOffSentinel)", "flushAllBeforeReset()", "powerOffForRecovery()")]
     if min(order) < 0 or order != sorted(order):
-        p.append("State_Error case 3 must write the sentinel, then flush, then deepPowerDown")
-    if not re.search(r"deepPowerDown\(\);\s*RecoveryState::set_powerOffRequested\(0\);\s*SystemConfig::flushNow\(\);", case3):
-        p.append("State_Error case 3 must clear the byte and flush after a returning deepPowerDown()")
-    if not re.search(r"deepPowerDown\(\);\s*RecoveryState::set_powerOffRequested\(0\);\s*RecoveryState::set_connectivityRecoveryStage\(2\);\s*SystemConfig::flushNow\(\);", fs):
-        p.append("the failsafe caller must clear the byte, downgrade stage 3 and flush after a returning deepPowerDown()")
+        p.append("State_Error case 3 must write the sentinel, then flush, then power off")
+    if not re.search(r"powerOffForRecovery\(\);\s*RecoveryState::set_powerOffRequested\(0\);\s*SystemConfig::flushNow\(\);\s*System\.reset\(RESET_CAUSE_ERROR_STATE_SOFT\);", case3):
+        p.append("State_Error case 3 must clear the byte and flush after a returning power-off")
+    if not re.search(r"powerOffForRecovery\(\);\s*RecoveryState::set_powerOffRequested\(0\);\s*RecoveryState::set_connectivityRecoveryStage\(2\);\s*SystemConfig::flushNow\(\);\s*System\.reset\(RESET_CAUSE_CONNECTIVITY_FAILSAFE\);", fs):
+        p.append("the failsafe caller must clear the byte, downgrade stage 3 and flush after a returning power-off")
 
     # The chip watchdog: init+start in setup, refreshed in the main loop, stopped before and started after every sleep.
     if gcc.count("ExternalWatchdog.refresh()") != 1:
@@ -154,8 +153,8 @@ probes = {
     "evidence read from retained": mutated("gcc", "RecoveryState::get_powerOffRequested(),", "retainedHibernatePending,"),
     "byte not cleared": mutated("gcc", "RecoveryState::set_powerOffRequested(0);", ""),
     "byte cleared before read": mutated("gcc", "  bool inferredWatchdog = false;\n", "  RecoveryState::set_powerOffRequested(0);\n  bool inferredWatchdog = false;\n"),
-    "byte written after the call": mutated("err", "RecoveryState::set_powerOffRequested(HibernateWakeDiagnostics::kPowerOffSentinel); // persisted evidence: a reason-20 boot after this is a power-up, not a watchdog\n      flushAllBeforeReset();\n      ab1805.deepPowerDown();",
-                                           "flushAllBeforeReset();\n      ab1805.deepPowerDown();\n      RecoveryState::set_powerOffRequested(HibernateWakeDiagnostics::kPowerOffSentinel);"),
+    "byte written after the call": mutated("err", "RecoveryState::set_powerOffRequested(HibernateWakeDiagnostics::kPowerOffSentinel); // persisted evidence: a reason-20 boot after this is a power-up, not a watchdog\n      flushAllBeforeReset();\n      powerOffForRecovery();",
+                                           "flushAllBeforeReset();\n      powerOffForRecovery();\n      RecoveryState::set_powerOffRequested(HibernateWakeDiagnostics::kPowerOffSentinel);"),
     "boot clear not flushed": mutated("gcc", "  SystemConfig::flushNow(); // consume the evidence durably before anything can reload it\n", ""),
     "no clear after a returning error-path power-down": mutated("err", "      RecoveryState::set_powerOffRequested(0); SystemConfig::flushNow();", ""),
     "failsafe stage 3 not downgraded on return": mutated("fs", "RecoveryState::set_connectivityRecoveryStage(2); SystemConfig::flushNow();", ""),
