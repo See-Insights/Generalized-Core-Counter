@@ -734,6 +734,8 @@ Why this is a rule: agents running the tests under bash have produced false fail
 
 Reporting: any report of test results states the interpreter used, e.g. `43/43 (sh via zsh, py via python3)`.
 
+**Discovery matches CI (added 2026-11-07).** The local suite runs exactly CI's discovery: every `tests/*.sh` via zsh and every `tests/*.py` via python3. Not `*_test.*`. Local green must equal CI green, so helper scripts under `tests/` count: a helper that is not a test must exit 0 when run with no arguments (or live outside `tests/*.py`). Before reporting "ready", confirm CI is green on the PR (`gh pr checks <PR>`), not just the local suite. (Origin: S2 PR #201, where `tests/s2_transcript_normalise.py`, a helper that needs an argument, passed a `*_test.py` loop and failed CI's `tests/*.py` loop.)
+
 ## 11. Success criteria for the workflow
 
 The workflow is successful if it produces:
