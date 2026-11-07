@@ -18,3 +18,6 @@ Read-only: no device, ledger, product or repo change; do not edit any tracked fi
 
 ## Report
 Complete verdict in the final message (saved with `-o`): the first line quotes the `UNDER REVIEW` line; findings 1-4 each marked ANSWERED / PARTLY / NOT VERIFIED with evidence; a ranked hypothesis list with what would confirm each; model and reasoning level actually run; at most 150 lines.
+
+## Ruling (Chip, 7 Nov 2026)
+Not an RC1 blocker. Leading hypothesis, recorded as an inference and not proven: **probable supply dip below the power-fail threshold under radio TX load (Device OS `power_failure_handler`, reason-less reset); not app code.** Decisive test: a field battery swap at Court1 (Chip, at a site visit after 14 Nov); if reason 0 stops, close it; if not, a post-RC1 WO to capture the minimum supply voltage around publish. No new firmware logging before RC1. Breadcrumb 28 stays on item 14's watch. The Step 0 verdict (`WO-2026-11-07-001-step0-verdict.md`) ranks the power-fail handler first and leaves signal, sleep mode and teardown NOT VERIFIED.
