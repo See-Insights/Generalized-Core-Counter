@@ -79,4 +79,8 @@ def main(text):
 
 
 if __name__ == "__main__":
+    # A helper, not a test: CI runs every tests/*.py, so a bare run (no file argument) must exit 0.
+    if len(sys.argv) < 2:
+        print("usage: s2_transcript_normalise.py <raw transcript>  (helper; used by sleep_execution_equivalence_test.sh)")
+        sys.exit(0)
     sys.stdout.write(main(open(sys.argv[1]).read()))
