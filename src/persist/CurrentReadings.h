@@ -43,8 +43,8 @@ void resetEverything(bool includeSensorTotals = true);
  * @brief Re-run the occupancyStartTime future-date corruption clamp once a
  *        time source exists this boot.
  *
- * validate()'s own clamp runs from the .load() in setup(), long before
- * Time is seeded by Device OS (bound boot) or only by a successful plausible S1b pre-bind read, so it may be invalid here (WO-2026-09-22-001).
+ * validate()'s own clamp runs from the .load() in setup(), which runs after the pre-bind seed
+ * opportunity, so Time is valid here only when Device OS (bound boot) or a successful plausible S1b read supplied it (WO-2026-09-22-001).
  * Call this once, opportunistically, from global setup() as soon as
  * Clock::isTimeValid(). No-op if occupied is false or occupancyStartTime is
  * already plausible.
