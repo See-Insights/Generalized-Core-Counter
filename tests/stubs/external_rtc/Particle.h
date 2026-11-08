@@ -89,5 +89,11 @@ struct Am18x5Configuration {
   int defaultTimeSource() const { return tsrc; }
   const HalDevice *halDevice() const { return &dev; }
 };
+enum class RtcEvent : uint32_t { NONE = 0, CALIBRATION_FAILURE = 1, CLOCK_SOURCE_EXTERNAL_FAILURE = 2 };
+struct RtcEvents {
+  uint32_t v;
+  RtcEvents(RtcEvent e) : v((uint32_t)e) {}
+  bool isSet(RtcEvents f) const { return (v & f.v) == f.v; }
+};
 struct Status { bool b; bool bound() const { return b; } };
 }  // namespace particle

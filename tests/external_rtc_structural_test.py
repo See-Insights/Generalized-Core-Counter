@@ -53,6 +53,21 @@ def structural(main_text, hdr_text, resetcause_text, publisher_text):
         t = strip((SRC / f).read_text())
         if re.search(r"ab1805\.(getRtcAsTime|setRtcFromSystem|isRTCSet|setRtcFromTime)", t):
             errs.append(f"{f} still reads/writes the RTC through ab1805")
+    # v50 S4: the oscillator-fault latch (registration-time rule, registration order, RAM only, never cleared).
+    reg = "ExternalTime.onEvent(ExternalRtc::onOscillatorEvent)"
+    setrc = re.search(r"if \(startupOscUsingRC\) ExternalRtc::oscillatorFaultSeenSinceBind\(\) = true;", m)
+    read = re.search(r"startupOscUsingRC = Am18x5\.status\(\)\.clockSource\(\) == particle::RtcClockSource::INTERNAL;", m)
+    if m.count(reg) != 1:
+        errs.append("the oscillator-event callback is not registered exactly once")
+    elif not (read and setrc and m.index("ensureBound") < read.start() < setrc.start() < m.index(reg)):
+        errs.append("order must be: bind, clockSource() read, flag set from it, then register the callback")
+    h = strip(hdr_text)
+    if not re.search(r"if \(e\.isSet\(particle::RtcEvent::CLOCK_SOURCE_EXTERNAL_FAILURE\)\) oscillatorFaultSeenSinceBind\(\) = true;", h):
+        errs.append("the callback does not set the latch on CLOCK_SOURCE_EXTERNAL_FAILURE")
+    for name, text in (("main", m), ("header", h), ("publisher", strip(publisher_text))):
+        for line in text.splitlines():
+            if "oscillatorFaultSeenSinceBind" in line and re.search(r"oscillatorFaultSeenSinceBind\(\) = false|set_|flushNow|retained|persist|EEPROM|\.put\(", line):
+                errs.append(f"{name}: the latch is cleared or persisted: {line.strip()}")
     return errs
 
 
@@ -102,6 +117,9 @@ def main():
         "wrong-clock-source-value": rep("a.clockSource() == b.clockSource()", "a.clockSource() == particle::RtcClockSource::INTERNAL"),
         "ignore-pin": rep("a.watchdogPin() == b.watchdogPin()", "true"),
         "nonzero-usec": rep("tv.tv_sec = t;", "tv.tv_sec = t; tv.tv_usec = 5;"),
+        "latch-event-ignored": rep("if (e.isSet(", "if (false && e.isSet("),
+        "latch-wrong-event-enum": rep("e.isSet(particle::RtcEvent::CLOCK_SOURCE_EXTERNAL_FAILURE)", "e.isSet(particle::RtcEvent::CALIBRATION_FAILURE)"),
+        "latch-cleared-by-later-event": rep("oscillatorFaultSeenSinceBind() = true;\n}", "oscillatorFaultSeenSinceBind() = true; else oscillatorFaultSeenSinceBind() = false;\n}"),
     }
     bad = 0
     for name, text in hmut.items():
@@ -117,6 +135,12 @@ def main():
         "no-fallback-cap": (main_text.replace(".capabilities(particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL)", ".capabilities(particle::RtcCap::NONE)", 1), rc, pub),
         "no-clock-source": (main_text.replace(".clockSource(particle::RtcClockSource::EXTERNAL)", "", 1), rc, pub),
         "cause8-kept": (main_text, rc + "\nRESET_CAUSE_EXRTC_BINDING_DELETE = 8,", pub),
+        "latch-registration-time-check-removed": (main_text.replace("if (startupOscUsingRC) ExternalRtc::oscillatorFaultSeenSinceBind() = true;", "", 1), rc, pub),
+        "latch-cleared-by-later-read": (main_text.replace("if (startupOscUsingRC) ExternalRtc::oscillatorFaultSeenSinceBind() = true;", "ExternalRtc::oscillatorFaultSeenSinceBind() = startupOscUsingRC;", 1), rc, pub),
+        "latch-callback-before-bind": (main_text.replace("ExternalTime.onEvent(ExternalRtc::onOscillatorEvent);", "", 1).replace("ExternalRtc::ensureBound(Am18x5", "ExternalTime.onEvent(ExternalRtc::onOscillatorEvent); ExternalRtc::ensureBound(Am18x5", 1), rc, pub),
+        "latch-callback-before-clocksource-read": (main_text.replace("ExternalTime.onEvent(ExternalRtc::onOscillatorEvent);", "", 1).replace("startupOscUsingRC = Am18x5.status()", "ExternalTime.onEvent(ExternalRtc::onOscillatorEvent); startupOscUsingRC = Am18x5.status()", 1), rc, pub),
+        "latch-registered-twice": (main_text.replace("ExternalTime.onEvent(ExternalRtc::onOscillatorEvent);", "ExternalTime.onEvent(ExternalRtc::onOscillatorEvent); ExternalTime.onEvent(ExternalRtc::onOscillatorEvent);", 1), rc, pub),
+        "latch-persisted": (main_text + "\ncurrent.set_oscFault(ExternalRtc::oscillatorFaultSeenSinceBind());", rc, pub),
         "schema-2": (main_text, rc, pub.replace("kLedgerSchemaVersion = 3", "kLedgerSchemaVersion = 2")),
     }
     for name, tup in smut.items():

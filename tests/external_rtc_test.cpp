@@ -118,6 +118,18 @@ int main() {
   c2.clockSource(particle::RtcClockSource::INTERNAL);
   CHECK(!ExternalRtc::sameFleetConfig(c1, c2) && !ExternalRtc::sameFleetConfig(c2, c1));
 
+  // S4 latch: false at start; only the external-failure event sets it; never cleared (the registration-time half is structural).
+  bool &seen = ExternalRtc::oscillatorFaultSeenSinceBind();
+  CHECK(!seen);
+  ExternalRtc::onOscillatorEvent(particle::RtcEvent::CALIBRATION_FAILURE, nullptr);
+  ExternalRtc::onOscillatorEvent(particle::RtcEvent::NONE, nullptr);
+  CHECK(!seen);
+  ExternalRtc::onOscillatorEvent(particle::RtcEvent::CLOCK_SOURCE_EXTERNAL_FAILURE, nullptr);
+  CHECK(seen);
+  ExternalRtc::onOscillatorEvent(particle::RtcEvent::CLOCK_SOURCE_EXTERNAL_FAILURE, nullptr);
+  ExternalRtc::onOscillatorEvent(particle::RtcEvent::NONE, nullptr);
+  CHECK(seen && ExternalRtc::oscillatorFaultSeenSinceBind());
+
   if (failures) return 1;
   std::printf("external_rtc_test: all checks passed\n");
   return 0;

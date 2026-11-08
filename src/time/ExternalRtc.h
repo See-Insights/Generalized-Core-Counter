@@ -30,6 +30,11 @@ inline bool isSet() {
   opt.source = HAL_RTC_SOURCE_EXTERNAL;
   return hal_rtc_time_is_valid(&opt);
 }
+// v50 S4: process-lifetime latch (RAM only, never cleared, never persisted); a reboot re-derives it from the clock source.
+inline bool &oscillatorFaultSeenSinceBind() { static bool seen = false; return seen; }
+inline void onOscillatorEvent(particle::RtcEvents e, void *) {
+  if (e.isSet(particle::RtcEvent::CLOCK_SOURCE_EXTERNAL_FAILURE)) oscillatorFaultSeenSinceBind() = true;
+}
 // The fields the fleet configuration fixes (including the clock source: Device OS reports the actual one).
 template <typename C> bool sameFleetConfig(C &a, C &b) {
   return a.valid() && a.address() == b.address() && a.interruptPin() == b.interruptPin() &&
