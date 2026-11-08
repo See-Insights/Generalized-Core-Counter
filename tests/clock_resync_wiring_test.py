@@ -290,12 +290,13 @@ def main() -> None:
     gate_idx = write_back_gate_stripped.start() if write_back_gate_stripped else gate_idx
     rtc_idx = check_fn_stripped.index("ExternalRtc::setFromSystem()")
     tracked_update_idx = check_fn_stripped.index("lastRtcWriteSyncedLastMs = lastSyncMs")
-    stamp_idx = check_fn_stripped.index("SystemConfig::set_lastTimeSync(Time.now())")
-    if not (gate_idx < rtc_idx < tracked_update_idx < stamp_idx):
+    stamp_idx = check_fn_stripped.index("SystemConfig::set_lastTimeSync(carryStamp)")
+    if not (gate_idx < rtc_idx < stamp_idx < tracked_update_idx):
         fail(
             "checkClockResync() must check the write-back gate, THEN call "
-            "setRtcFromSystem(), THEN (only on confirmed success) update "
-            "lastRtcWriteSyncedLastMs, THEN stamp lastTimeSync - found order "
+            "setRtcFromSystem(), THEN stamp lastTimeSync via carryStamp(rtcUpdated, ...) "
+            "(I21: a failed write stamps 0), THEN (only on confirmed success) update "
+            "lastRtcWriteSyncedLastMs - found order "
             f"gate={gate_idx}, setRtcFromSystem={rtc_idx}, "
             f"trackedUpdate={tracked_update_idx}, set_lastTimeSync={stamp_idx} "
             "(Finding 1, Round 4 review: updating the tracked value before/"
@@ -346,8 +347,10 @@ def main() -> None:
     guarded_body = confirm_guard.group(1)
     if "lastRtcWriteSyncedLastMs = lastSyncMs" not in guarded_body:
         fail("the lastRtcWriteSyncedLastMs update must be inside the `if (rtcUpdated)` guard (Finding 1)")
-    if "SystemConfig::set_lastTimeSync(Time.now())" not in guarded_body:
-        fail("the SystemConfig::set_lastTimeSync() stamp must be inside the `if (rtcUpdated)` guard (Finding 1)")
+    if "SystemConfig::set_lastTimeSync" in guarded_body:
+        fail("lastTimeSync must be written only by the carryStamp() stamp (a failed write stamps 0), never inside the `if (rtcUpdated)` guard (Finding 1, I21)")
+    if "ClockTrust::carryStamp(rtcUpdated," not in check_fn_stripped:
+        fail("the lastTimeSync stamp must be carryStamp(rtcUpdated, ...) so a failed write never stamps (Finding 1, I21)")
 
     # Round 6 (second follow-up), Stage 7 pass 4: the failure-only tracking
     # writes must be OUTSIDE the success guard (i.e. in the paired `else`),

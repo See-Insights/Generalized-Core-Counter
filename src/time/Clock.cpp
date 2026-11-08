@@ -154,6 +154,11 @@ uint32_t lastSeenSyncRawMs = 0;
 // exactly -1 second is possible but rare, and this field is diagnostic
 // telemetry, not a control-path signal.
 long lastRtcCorrectionSec = -1;
+bool carryEligible() {  // I21: trust carried from the persisted lastTimeSync; the external-clock check runs only when a stamp exists
+  const time_t now = Time.now(), last = SystemConfig::get_lastTimeSync();
+  return last != 0 && ClockTrust::isCarryEligible(Time.isValid() && Clock::isPlausibleEpoch(now), ExternalRtc::isSet(), now, last, Clock::isPlausibleEpoch(last),
+                                                  ExternalRtc::oscillatorFaultSeenSinceBind().load(std::memory_order_relaxed));
+}
 } // namespace
 
 /**
@@ -357,6 +362,9 @@ void requestClockResync(const char *reason) {
  *          writes across both this function and the vendored one-shot.
  */
 void checkClockResync() {
+  if (ExternalRtc::oscillatorFaultSeenSinceBind().load(std::memory_order_relaxed) && SystemConfig::get_lastTimeSync() != 0) {
+    SystemConfig::set_lastTimeSync(0); SystemConfig::flushNow();  // withdraw the carry now: it must survive a reset right after
+  }
   const uint32_t nowMs = millis();
   tickMillisWrapTracker(nowMs);
   const uint32_t lastSyncMs = observedTimeSyncedLastMs();
@@ -404,11 +412,13 @@ void checkClockResync() {
         : -1;
     Log.info("ClockResync: sync advanced, rtcUpdated=%d epoch=%ld correctionSec=%ld",
              rtcUpdated ? 1 : 0, (long)Time.now(), rtcCorrectionSec);
+    const time_t carryStamp = (time_t)ClockTrust::carryStamp(rtcUpdated, rtcPreWriteReadOk, rtcCorrectionSec, Time.now());
+    SystemConfig::set_lastTimeSync(carryStamp);
+    if (carryStamp == 0) SystemConfig::flushNow();  // I21: a revoke is flushed synchronously
     if (rtcUpdated) {
       // Finding 1: only mark this sync value as "written" once the RTC
-      // write is confirmed successful, and only then stamp lastTimeSync.
+      // write is confirmed successful.
       lastRtcWriteSyncedLastMs = lastSyncMs;
-      SystemConfig::set_lastTimeSync(Time.now());
 
       // Only persist the correction for cloud reporting once the write it
       // describes is confirmed - same "confirmed, not attempted" standard
@@ -474,7 +484,7 @@ void checkClockResync() {
  */
 bool isClockTrusted() {
   return ClockTrust::isTrustedWrapAware(Time.isValid(), millis(), observedTimeSyncedLastMs(),
-                                         millisWrapGeneration, syncCaptureWrapGeneration);
+                                         millisWrapGeneration, syncCaptureWrapGeneration) || carryEligible();
 }
 
 /**
