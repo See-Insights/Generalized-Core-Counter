@@ -1,0 +1,19 @@
+AGENT: Codex · MODEL: gpt-5.6-sol · REASONING: xhigh
+AUTHORIZATION SCOPE: read the repository; run host tests (zsh for .sh, python3 for .py; run inside this git worktree, not an export), the local Device OS 6.6.0 toolchain build and nm/objdump; scratch `build-tmp/wo-2026-11-06-001-stage7-r2/` (create it; use only that); read Device OS from `~/.particle/toolchains/deviceOS/6.6.0` / NOT authorized: editing any tracked file, committing, pushing, merging, flashing, creating PRs or tags, deleting anything you did not create (including `build-tmp/` itself). Your complete verdict goes in your final message (saved with `-o`).
+UNDER REVIEW: wo/2026-11-06-001-v50-s4-oscillator-fault-latch @ 6106f6ca7f59d758aeb71347be6516089166c3de
+TIME-BOX: 90 minutes from dispatch (deadline 05:56:10Z); a run without a verdict at the deadline is stopped, its partial output archived uncounted. Round 2 of 2, the last: a failure goes to the architect.
+
+# Stage 7 dispatch, round 2: WO-2026-11-06-001 (v50 piece S4)
+**First line of your verdict: quote the `UNDER REVIEW` line above, with the full SHA.** Check `git rev-parse HEAD` equals it first. A verdict without the exact SHA is invalid.
+Binding spec: `docs/work-orders/WO-2026-11-06-001-v50-s4-oscillator-fault-latch.md` **Amendments 1-3** (Amendment 2: the architect ruled the plain-bool race is fixed by `std::atomic<bool>` relaxed, and the read-to-registration window is an **accepted residual**: do not raise it again, and no second `clockSource()` read is wanted), your round 1 verdict `WO-2026-11-06-001-stage7-r1-verdict.md`, and the Stage 6 round 2 report `WO-2026-11-06-001-stage6-r2-copilot-report.md` (reasoning level not observable). Base: `integration/v50-ab1805` @ e21a4a4. Diff: `git diff e21a4a4 HEAD -- src tests`; fixes only: `git diff 6a6a57d HEAD -- src tests`. **Budget: net `src/` <= +10** (reported +8).
+
+## Judge each (PASS / FAIL / NOT VERIFIED, file:line)
+1. **F1.** The latch is `std::atomic<bool>` (relaxed store in the callback; the registration-time site in `Generalized-Core-Counter.cpp` uses `= true`, a seq_cst store: confirm that is correct and acceptable, and that no read site anywhere can misuse it); not `volatile`; still RAM only, never cleared, never persisted; the function-local static is constant-initialised (no init-order hazard; the callback can run before `setup()` finishes only after registration).
+2. **F3 tests.** The structural test requires atomic storage and the relaxed store, keeps the order test (first read -> initial set -> registration); the combined-mask runtime vector is real (run it); the stub's bitwise operators are correct and used only by the host test; the four new mutations (init true, calibration failure also sets, plain bool, volatile bool) fail.
+3. **Residual.** Confirm only that no second read was added and the WO records the residual (Amendment 2/3); do not raise the window as a finding.
+4. **Regression since round 1:** anything the fix broke in items 1-7 of your round 1 table (scope, linkage, S1-S3 untouched, no payload or layout change).
+5. **Budget, build, suite, mutations.** Recount net `src/`. Build (fresh `BUILD_PATH_BASE` as a make argument; Copilot r2: 151092 / 1114 / 2256). CI's discovery inside this worktree (controller: 121/121; thermal test also on a clean export; any helper under `tests/` exits 0 bare). At least three of Copilot's mutations plus two of your own not used before (the controller used: the callback storing false, and the event test changed to an exact-match; both caught).
+6. **Anything else** at boot, the S1 bind, or the I21 hand-off.
+
+## Verdict format
+First line: the `UNDER REVIEW` line. Then **PASS or NOT VERIFIED for S4 as scoped**; a table of 1-6; findings with severity, file:line, what breaks, smallest fix and whether it fits +10; the model and reasoning level you actually ran; the interpreter line; the build numbers. Round 2 of 2. Say plainly what you could not run (no hardware).

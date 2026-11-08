@@ -660,6 +660,8 @@ void setup() {
   startupOscAos = !!(oscCaps & particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_BATTERY);
   startupOscFos = !!(oscCaps & particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL);
   Log.info("OscState: usingRC=%d aos=%d fos=%d", startupOscUsingRC ? 1 : 0, startupOscAos ? 1 : 0, startupOscFos ? 1 : 0);
+  if (startupOscUsingRC) ExternalRtc::oscillatorFaultSeenSinceBind() = true;  // registering the handler clears the chip's fail flag, so it is read first
+  ExternalTime.onEvent(ExternalRtc::onOscillatorEvent);
 
     // Re-run the occupancyStartTime future-date clamp once here: Time is valid here only if Device OS or a successful plausible S1b pre-bind read seeded it.
   CurrentReadings::revalidateOccupancyStartTimeIfTimeAvailable();
