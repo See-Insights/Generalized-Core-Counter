@@ -1,6 +1,6 @@
 # v50.1 pre-ship bench: step-by-step checklist for 14 Nov 2026
 
-For Chip. Parent: `WO-2026-11-05-002-v50-ab1805-switch.md` ("Pre-ship bench", five items), on `integration/v50-ab1805` (not on `main`). The integrated head is final: PR #208 merged, Stage 7 round 2 PASS on `cf09b80` (no findings). Nothing below has been run on hardware; every result is yours to record. Times in UTC.
+For Chip. Parent: `WO-2026-11-05-002-v50-ab1805-switch.md` ("Pre-ship bench", five items), on `integration/v50-ab1805` (not on `main`). The integrated head is final: PR #208 merged, Stage 7 round 2 PASS on `cf09b80` (no findings). Nothing below has been run on hardware; every result is yours to record. Times in UTC. Revision 8 Nov 2026 ~16:45Z: six images in the kit; the boot-storm behavior of the no-refresh image corrected from the code (section 4, S2 watchdog proof, step 3).
 
 ## 0. The kit
 
