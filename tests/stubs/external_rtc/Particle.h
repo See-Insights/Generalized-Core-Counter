@@ -95,5 +95,7 @@ struct RtcEvents {
   RtcEvents(RtcEvent e) : v((uint32_t)e) {}
   bool isSet(RtcEvents f) const { return (v & f.v) == f.v; }
 };
+inline RtcEvents operator|(RtcEvents a, RtcEvents b) { RtcEvents r(RtcEvent::NONE); r.v = a.v | b.v; return r; }
+inline RtcEvents operator|(RtcEvent a, RtcEvent b) { return RtcEvents(a) | RtcEvents(b); }
 struct Status { bool b; bool bound() const { return b; } };
 }  // namespace particle

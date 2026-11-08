@@ -62,11 +62,13 @@ def structural(main_text, hdr_text, resetcause_text, publisher_text):
     elif not (read and setrc and m.index("ensureBound") < read.start() < setrc.start() < m.index(reg)):
         errs.append("order must be: bind, clockSource() read, flag set from it, then register the callback")
     h = strip(hdr_text)
-    if not re.search(r"if \(e\.isSet\(particle::RtcEvent::CLOCK_SOURCE_EXTERNAL_FAILURE\)\) oscillatorFaultSeenSinceBind\(\) = true;", h):
-        errs.append("the callback does not set the latch on CLOCK_SOURCE_EXTERNAL_FAILURE")
+    if not re.search(r"if \(e\.isSet\(particle::RtcEvent::CLOCK_SOURCE_EXTERNAL_FAILURE\)\) oscillatorFaultSeenSinceBind\(\)\.store\(true, std::memory_order_relaxed\);", h):
+        errs.append("the callback does not set the latch on CLOCK_SOURCE_EXTERNAL_FAILURE (relaxed atomic store)")
+    if "#include <atomic>" not in hdr_text or not re.search(r"std::atomic<bool> &oscillatorFaultSeenSinceBind\(\) \{ static std::atomic<bool> \w+\{false\};", h):
+        errs.append("the latch is not std::atomic<bool> initialised false")
     for name, text in (("main", m), ("header", h), ("publisher", strip(publisher_text))):
         for line in text.splitlines():
-            if "oscillatorFaultSeenSinceBind" in line and re.search(r"oscillatorFaultSeenSinceBind\(\) = false|set_|flushNow|retained|persist|EEPROM|\.put\(", line):
+            if "oscillatorFaultSeenSinceBind" in line and re.search(r"oscillatorFaultSeenSinceBind\(\) = false|store\(false|set_|flushNow|retained|persist|EEPROM|\.put\(", line):
                 errs.append(f"{name}: the latch is cleared or persisted: {line.strip()}")
     return errs
 
@@ -119,7 +121,11 @@ def main():
         "nonzero-usec": rep("tv.tv_sec = t;", "tv.tv_sec = t; tv.tv_usec = 5;"),
         "latch-event-ignored": rep("if (e.isSet(", "if (false && e.isSet("),
         "latch-wrong-event-enum": rep("e.isSet(particle::RtcEvent::CLOCK_SOURCE_EXTERNAL_FAILURE)", "e.isSet(particle::RtcEvent::CALIBRATION_FAILURE)"),
-        "latch-cleared-by-later-event": rep("oscillatorFaultSeenSinceBind() = true;\n}", "oscillatorFaultSeenSinceBind() = true; else oscillatorFaultSeenSinceBind() = false;\n}"),
+        "latch-cleared-by-later-event": rep("std::memory_order_relaxed);\n}", "std::memory_order_relaxed); else oscillatorFaultSeenSinceBind().store(false);\n}"),
+        "latch-initialised-true": rep("seen{false}", "seen{true}"),
+        "latch-calibration-failure-also-sets": rep("if (e.isSet(particle::RtcEvent::CLOCK_SOURCE_EXTERNAL_FAILURE))", "if (e.isSet(particle::RtcEvent::CLOCK_SOURCE_EXTERNAL_FAILURE) || e.isSet(particle::RtcEvent::CALIBRATION_FAILURE))"),
+        "latch-plain-bool": rep("std::atomic<bool> &oscillatorFaultSeenSinceBind() { static std::atomic<bool> seen{false}; return seen; }", "bool &oscillatorFaultSeenSinceBind() { static bool seen = false; return seen; }").replace(".store(true, std::memory_order_relaxed)", " = true"),
+        "latch-volatile-bool": rep("std::atomic<bool> &oscillatorFaultSeenSinceBind() { static std::atomic<bool> seen{false}; return seen; }", "volatile bool &oscillatorFaultSeenSinceBind() { static volatile bool seen = false; return seen; }").replace(".store(true, std::memory_order_relaxed)", " = true"),
     }
     bad = 0
     for name, text in hmut.items():

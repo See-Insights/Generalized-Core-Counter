@@ -1,6 +1,7 @@
 #pragma once
 // v50 S1: Device OS owns the carrier AB1805. Every app read/write of the chip goes through hal_rtc_* (external source).
 #include "Particle.h"
+#include <atomic>
 
 namespace ExternalRtc {
 constexpr time_t kWriteVerifyToleranceSec = 2;  // read-back must land within this of the written time
@@ -31,9 +32,9 @@ inline bool isSet() {
   return hal_rtc_time_is_valid(&opt);
 }
 // v50 S4: process-lifetime latch (RAM only, never cleared, never persisted); a reboot re-derives it from the clock source.
-inline bool &oscillatorFaultSeenSinceBind() { static bool seen = false; return seen; }
+inline std::atomic<bool> &oscillatorFaultSeenSinceBind() { static std::atomic<bool> seen{false}; return seen; }
 inline void onOscillatorEvent(particle::RtcEvents e, void *) {
-  if (e.isSet(particle::RtcEvent::CLOCK_SOURCE_EXTERNAL_FAILURE)) oscillatorFaultSeenSinceBind() = true;
+  if (e.isSet(particle::RtcEvent::CLOCK_SOURCE_EXTERNAL_FAILURE)) oscillatorFaultSeenSinceBind().store(true, std::memory_order_relaxed);
 }
 // The fields the fleet configuration fixes (including the clock source: Device OS reports the actual one).
 template <typename C> bool sameFleetConfig(C &a, C &b) {
