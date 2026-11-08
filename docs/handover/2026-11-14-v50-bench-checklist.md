@@ -11,7 +11,7 @@ For Chip. Parent: `WO-2026-11-05-002-v50-ab1805-switch.md` ("Pre-ship bench", fi
 | Spike image | `bench-kit/spike/ab1805-spike.bin` (copy of `~/Downloads/spike-2026-11-03/ab1805-spike.bin`) | the 3 Nov spike | `029e8b6b23eff443e6ac45163b8643d11979e8cd390d93527ad3d84a12dba92d` |
 | Rollback image v49.1 (product version 4901) | `bench-kit/rollback-v49.1/gcc-v49.1-boron-dos6.6.0-9a96854.bin` | GitHub release `v49.1` (Device OS 6.6.0) | `a00c5ceaa939aa274346d52e0cea9477c01a27c37aa1e68829bbc4bb8c145ec6` (matches the release's `.sha256`) |
 
-The kit directory is `/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/7fe8279d-ef98-4f2e-a0e5-e3b17bab0abd/scratchpad/bench-kit/`. It is scratch space: copy it somewhere permanent before you rely on it. Verify each SHA-256 (`shasum -a 256`) before flashing.
+The kit directory is `~/Downloads/v50-bench-kit-2026-11-14/` (with `SHA256SUMS.txt`). Verify each SHA-256 (`shasum -a 256`) before flashing.
 
 **The no-S1b binary** is the integrated head with exactly one behavioural change: the `PreBindRtc::run(ab1805, Wire)` call in `setup()` is removed (S1b's pre-bind seed and WRTC set). Two further lines differ only so the image cannot be mistaken for a release: the product version (5001 -> 5099) and the version string. `git diff 1d1d5af 729ff14 --numstat`: `src/FirmwareVersion.h` 2/2, `src/Generalized-Core-Counter.cpp` 0/1. It is built on a branch that is never merged or tagged; CI's `host-tests` fail on that branch by design (S1b's structural tests require the call), and its `firmware` job passes. Do not OTA it, do not set it as a product default, do not upload it to the console.
 
