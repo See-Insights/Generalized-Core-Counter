@@ -49,3 +49,8 @@ Revert the S4 commit on the integration branch before the set merges. After the 
 2. **Budget unchanged: `src/` at most +10 net.** Stop and report the cut if it does not fit.
 3. **Test-suite rule (workflow §10):** the local suite runs CI's discovery (`tests/*.sh` via zsh, `tests/*.py` via python3), inside a real git worktree (several tests read git history, so an export fails them); any helper under `tests/` exits 0 when run bare; confirm CI green on the PR before "ready". Baseline at the head: the suite count is measured, not inferred (state it).
 4. **Where the boolean is read:** I21 is not yet implemented, so S4's consumer today is the boot log line and the status payload only if the budget allows without a payload change; do **not** add a payload field (the contract bump is I21's).
+
+## Amendment 2 (Chip, 7 Nov 2026, pre-rulings issued during Stage 7 round 1 on 6a6a57d)
+1. **Cross-thread access:** if Codex flags the plain `bool` (the callback runs on the Am18x5 worker thread, the application thread reads it), the latch becomes **`std::atomic<bool>` with relaxed ordering**, not `volatile`; still `src/` <= +10.
+2. **A fault between the `clockSource()` read and the handler registration is the accepted residual.** A persistent fault is caught by the RC fallback at the next boot; a transient one is bounded by I21's 60 s check. **I21 needs only the boolean.**
+If round 1 raises either point, it is closed by these rulings (item 1 is applied as the fix; item 2 is not a finding). Recorded after the Stage 7 round 1 dispatch, which did not carry them.
