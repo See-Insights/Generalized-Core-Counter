@@ -1130,7 +1130,6 @@ void loop() {
   setLoopStage(LOOP_STAGE_DIAGNOSTICS);
   thrashGuard.loop(state, millis());
 
-  ExternalWatchdog.refresh(); // the only refresh source (Device OS does not refresh instance 2)
   checkClockResync(); // WO-2026-08-29-002: recurring app-side RTC write-back
 
   // Housekeeping for each transit of the main loop
