@@ -195,11 +195,11 @@ int main() {
   }
 
   printf("--- failsafe stage 3 ---\n");
-  const Events stage3Pre = {"persist=3", kStage3Log, "flush"};
+  const Events stage3Pre = {"persist=3", kStage3Log, "byte=0xA5", "flush"};
   Events stage3Cut = stage3Pre;
   stage3Cut.insert(stage3Cut.end(), kWdThenSleep.begin(), kWdThenSleep.end());
   run(kPowerCut, connectivityFailsafeSupervisor);
-  expect("power cut: record, log, flush, then exactly one sleep; nothing follows", stage3Cut);
+  expect("power cut: record, log, evidence, flush, then exactly one sleep; nothing follows", stage3Cut);
   for (int err : {SYSTEM_ERROR_NONE, SYSTEM_ERROR_ABORTED, SYSTEM_ERROR_NOT_SUPPORTED}) {
     run(err, connectivityFailsafeSupervisor);
     Events want = stage3Pre;
