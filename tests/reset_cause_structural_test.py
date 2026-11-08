@@ -35,11 +35,13 @@ SRC = REPO_ROOT / "src"
 RESET_CAUSE_HEADER = SRC / "ResetCause.h"
 MAIN = SRC / "Generalized-Core-Counter.cpp"
 
-EXPECTED_SITE_COUNT = 7
+EXPECTED_SITE_COUNT = 9  # 7 primary sites + the two S3 fallback resets that follow a returned POWER_OFF
 
 # WO-2026-10-02-003 item B: the out-of-memory reset must carry its own code.
 OOM_CAUSE_NAME = "RESET_CAUSE_OUT_OF_MEMORY"
 OOM_CAUSE_VALUE = 7
+
+S3_FALLBACK_CAUSES = {"RESET_CAUSE_CONNECTIVITY_FAILSAFE", "RESET_CAUSE_ERROR_STATE_SOFT"}
 
 # v50 S1: the binding-delete guard (cause 8) is retired; the code stays reserved.
 BINDING_DELETE_CAUSE_NAME = "RESET_CAUSE_EXRTC_BINDING_DELETE"
@@ -115,6 +117,8 @@ def main() -> None:
     for where, argument in sites:
         if argument not in declared:
             fail(f"{where} passes '{argument}', which is not a ResetCause enum value")
+        if argument in used and used[argument].split(":")[0] == where.split(":")[0] and argument in S3_FALLBACK_CAUSES:
+            continue  # S3: a returned POWER_OFF falls back to the same caller's own reset cause
         if argument in used:
             fail(
                 f"{where} reuses the cause code '{argument}' already used by {used[argument]}; "
