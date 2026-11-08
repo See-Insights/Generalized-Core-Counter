@@ -54,3 +54,9 @@ Revert the S4 commit on the integration branch before the set merges. After the 
 1. **Cross-thread access:** if Codex flags the plain `bool` (the callback runs on the Am18x5 worker thread, the application thread reads it), the latch becomes **`std::atomic<bool>` with relaxed ordering**, not `volatile`; still `src/` <= +10.
 2. **A fault between the `clockSource()` read and the handler registration is the accepted residual.** A persistent fault is caught by the RC fallback at the next boot; a transient one is bounded by I21's 60 s check. **I21 needs only the boolean.**
 If round 1 raises either point, it is closed by these rulings (item 1 is applied as the fix; item 2 is not a finding). Recorded after the Stage 7 round 1 dispatch, which did not carry them.
+
+## Amendment 3 (Claude Code, 7 Nov 2026: applying Amendment 2 to the Stage 7 round 1 verdict, NOT VERIFIED on 6a6a57d; `WO-2026-11-06-001-stage7-r1-verdict.md`)
+- **F1 (High, cross-thread race): fixed as ruled** by Amendment 2 item 1: `std::atomic<bool>` (relaxed), not `volatile`; Codex's estimate +1 line (net +8).
+- **F2 (Medium, read-to-registration window): closed by Amendment 2 item 2** (accepted residual). **No second `clockSource()` read after registration** (Codex's +1-line option is declined); Amendment 1's "reuse the existing read" stands.
+- **F3 (Medium, tests): fix, test-only,** minus the second-read order: require atomic storage; add the combined mask runtime vector (`CALIBRATION_FAILURE | CLOCK_SOURCE_EXTERNAL_FAILURE` sets the latch; extend the stub with bitwise combination); add the mutations from Codex's audit (latch initialised true; calibration failure also sets the latch). The order test stays: first source read -> initial set -> registration.
+Round 2 (the last): Stage 6 round 2 by Copilot (medium), then Stage 7 round 2 (Codex xhigh, 90-minute box, SHA rule); a failure goes to the architect.
