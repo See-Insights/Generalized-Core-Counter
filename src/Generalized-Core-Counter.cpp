@@ -295,6 +295,11 @@ void setup() {
   ExternalRtc::ensureBound(Am18x5, particle::Am18x5Configuration().i2c(Wire).interruptPin(WKP).watchdogPin(WATCHDOG_DONE_PIN)
       .capabilities(particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL).clockSource(particle::RtcClockSource::EXTERNAL));
 
+  // Device OS keeps the chip watchdog running across a reset; init() re-arms it.
+  if (ExternalWatchdog.init(WatchdogConfiguration().timeout(124000)) != SYSTEM_ERROR_NONE || ExternalWatchdog.start() != SYSTEM_ERROR_NONE) {
+    Log.warn("ExternalWatchdog: init/start failed");
+  }
+
   ensureRetainedLoopForensicsInitialized();
 
   const int reason = System.resetReason();
@@ -389,7 +394,9 @@ void setup() {
     SystemSleepConfiguration bootStormSleep;
     bootStormSleep.mode(SystemSleepMode::ULTRA_LOW_POWER).duration(600000UL);
     drainSerialBeforeSleep();
+    ExternalWatchdog.stop();
     System.sleep(bootStormSleep);
+    ExternalWatchdog.start();
     Log.warn("BOOT STORM holdoff sleep returned unexpectedly - continuing boot");
   }
 
@@ -753,20 +760,12 @@ void setup() {
   bool inferredWatchdog = false;
   if (reason == RESET_REASON_PIN_RESET) {
     startupPinResetChecked = true;
-    const bool timeValid = Time.isValid();
-    inferredWatchdog = HibernateWakeDiagnostics::isInferredWatchdog(
-        RecoveryState::get_powerOffRequested(), RecoveryState::get_connectivityRecoveryStage(),
-        (int64_t)RecoveryState::get_lastConnectivityRecoveryAction(), timeValid, (int64_t)Time.now());
+    inferredWatchdog = HibernateWakeDiagnostics::isInferredWatchdog(RecoveryState::get_powerOffRequested());
     startupInferredWatchdog = inferredWatchdog;
     Log.info("PIN_RESET: %s", inferredWatchdog ? "no power-off evidence - inferred watchdog" : "power-off evidence - power-up wake");
   }
   RecoveryState::set_powerOffRequested(0);
   SystemConfig::flushNow(); // consume the evidence durably before anything can reload it
-
-  // Device OS keeps the chip watchdog running across a reset; init() re-arms it.
-  if (ExternalWatchdog.init(WatchdogConfiguration().timeout(124000)) != SYSTEM_ERROR_NONE || ExternalWatchdog.start() != SYSTEM_ERROR_NONE) {
-    Log.warn("ExternalWatchdog: init/start failed");
-  }
 
   // ===== WATCHDOG RESET PERSISTENCE / FORENSICS =====
   // Moved here (from immediately after SystemConfig::setup(), before AB1805 init)

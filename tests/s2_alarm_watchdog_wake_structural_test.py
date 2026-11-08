@@ -60,7 +60,7 @@ def _problems(files):
     if re.search(r"retained\w*", hc) and "PIN_RESET" in hc:
         pass
     setup = gcc[gcc.index("classifyWake(reason)"):]
-    block = setup[:setup.index("ExternalWatchdog.init")]
+    block = setup[:setup.index("SystemConfig::flushNow();") + 25]
     if "isInferredWatchdog(" not in block or "get_powerOffRequested()" not in block:
         p.append("reason-20 classification must use isInferredWatchdog with the persisted byte")
     if re.search(r"\bretained\w*", block):
@@ -84,14 +84,29 @@ def _problems(files):
         p.append("State_Error case 3 must write the sentinel, then flush, then power off")
     if not re.search(r"powerOffForRecovery\(\);\s*RecoveryState::set_powerOffRequested\(0\);\s*SystemConfig::flushNow\(\);\s*System\.reset\(RESET_CAUSE_ERROR_STATE_SOFT\);", case3):
         p.append("State_Error case 3 must clear the byte and flush after a returning power-off")
+    if not re.search(r"isInferredWatchdog\(RecoveryState::get_powerOffRequested\(\)\)", block):
+        p.append("the reader must take the evidence byte only (no stage/time arguments)")
+    s3 = fs[fs.index("persistConnectivityFailsafeState(3, now, true)"):]
+    s3 = s3[:s3.index("System.reset(")]
+    order = [s3.find(s) for s in ("set_powerOffRequested(HibernateWakeDiagnostics::kPowerOffSentinel)", "flushAllBeforeReset()", "powerOffForRecovery()")]
+    if min(order) < 0 or order != sorted(order):
+        p.append("failsafe stage 3 must write the sentinel, then flush, then power off")
     if not re.search(r"powerOffForRecovery\(\);\s*RecoveryState::set_powerOffRequested\(0\);\s*RecoveryState::set_connectivityRecoveryStage\(2\);\s*SystemConfig::flushNow\(\);\s*System\.reset\(RESET_CAUSE_CONNECTIVITY_FAILSAFE\);", fs):
         p.append("the failsafe caller must clear the byte, downgrade stage 3 and flush after a returning power-off")
 
     # The chip watchdog: init+start in setup, refreshed in the main loop, stopped before and started after every sleep.
     if gcc.count("ExternalWatchdog.refresh()") != 1:
         p.append("ExternalWatchdog.refresh() must appear exactly once in the main loop")
-    if gcc.count("ExternalWatchdog.init(") != 1 or gcc.count("ExternalWatchdog.start()") != 1:
-        p.append("ExternalWatchdog init/start must appear once in setup")
+    setup_all = gcc[gcc.index("void setup()"):gcc.index("void loop()")]
+    if gcc.count("ExternalWatchdog.init(") != 1 or gcc.count("ExternalWatchdog.start()") != 2:
+        p.append("ExternalWatchdog.init once and start twice (setup init, boot-storm restart) expected")
+    init_i = setup_all.find("ExternalWatchdog.init(")
+    bind_i = setup_all.find("ExternalRtc::ensureBound(")
+    storm_i = setup_all.find("System.sleep(bootStormSleep)")
+    if not (0 <= bind_i < init_i < storm_i):
+        p.append("ExternalWatchdog.init must follow the RTC bind and precede the boot-storm sleep")
+    if not re.search(r"ExternalWatchdog\.stop\(\);\s*System\.sleep\(bootStormSleep\);\s*ExternalWatchdog\.start\(\);", setup_all):
+        p.append("the boot-storm System.sleep must be bracketed by ExternalWatchdog.stop()/start()")
     loop = gcc[gcc.index("void loop()"):]
     if loop.index("ExternalWatchdog.refresh()") > loop.index("checkClockResync()"):
         p.append("refresh must precede checkClockResync() (the old ab1805.loop() slot)")
@@ -148,9 +163,23 @@ def mutated(label, old, new, count=1):
     return f
 
 
+def moved_init():
+    init = "  // Device OS keeps the chip watchdog running across a reset; init() re-arms it.\n  if (ExternalWatchdog.init(WatchdogConfiguration().timeout(124000)) != SYSTEM_ERROR_NONE || ExternalWatchdog.start() != SYSTEM_ERROR_NONE) {\n    Log.warn(\"ExternalWatchdog: init/start failed\");\n  }\n"
+    anchor = "  // Wait for serial connection only in explicit DEV builds\n"
+    f = mutated("gcc", init, "")
+    f["gcc"] = f["gcc"].replace(anchor, init + anchor, 1)
+    return f
+
+
 probes = {
     "reason 20 always a wake": mutated("hc", "in.wakeReasonIsHibernateWake = in.resetReasonIsPowerManagement;", "in.wakeReasonIsHibernateWake = true;"),
-    "evidence read from retained": mutated("gcc", "RecoveryState::get_powerOffRequested(),", "retainedHibernatePending,"),
+    "evidence read from retained": mutated("gcc", "isInferredWatchdog(RecoveryState::get_powerOffRequested())", "isInferredWatchdog(retainedHibernatePending)"),
+    "stage-3 sentinel write removed": mutated("fs", "RecoveryState::set_powerOffRequested(HibernateWakeDiagnostics::kPowerOffSentinel);", ""),
+    "reader takes stage again": mutated("gcc", "isInferredWatchdog(RecoveryState::get_powerOffRequested())", "isInferredWatchdog(RecoveryState::get_powerOffRequested(), 3)"),
+    "storm sleep stop removed": mutated("gcc", "ExternalWatchdog.stop();\n    System.sleep(bootStormSleep);", "System.sleep(bootStormSleep);"),
+    "storm sleep start removed": mutated("gcc", "System.sleep(bootStormSleep);\n    ExternalWatchdog.start();", "System.sleep(bootStormSleep);"),
+    "init moved after the storm block": moved_init(),
+    "duplicate init re-added": mutated("gcc", "  RecoveryState::set_powerOffRequested(0);\n", "  RecoveryState::set_powerOffRequested(0);\n  ExternalWatchdog.init(WatchdogConfiguration().timeout(124000));\n"),
     "byte not cleared": mutated("gcc", "RecoveryState::set_powerOffRequested(0);", ""),
     "byte cleared before read": mutated("gcc", "  bool inferredWatchdog = false;\n", "  RecoveryState::set_powerOffRequested(0);\n  bool inferredWatchdog = false;\n"),
     "byte written after the call": mutated("err", "RecoveryState::set_powerOffRequested(HibernateWakeDiagnostics::kPowerOffSentinel); // persisted evidence: a reason-20 boot after this is a power-up, not a watchdog\n      flushAllBeforeReset();\n      powerOffForRecovery();",

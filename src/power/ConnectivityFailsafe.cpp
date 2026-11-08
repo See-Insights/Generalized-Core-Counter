@@ -9,6 +9,7 @@
 #include "time/DailyBoundary.h"
 #include "persist/PowerConfig.h"
 #include "ResetCause.h"
+#include "time/HibernateWakeDiagnostics.h"
 namespace {
 const char *batteryTierShortName(BatteryTier tier) {
   switch (tier) {
@@ -323,6 +324,7 @@ void connectivityFailsafeSupervisor() {
   persistConnectivityFailsafeState(3, now, true);
   Log.info("Failsafe: stage=3 action=deep-powerdown age=%lds",
            (long)connectionAgeSec);
+  RecoveryState::set_powerOffRequested(HibernateWakeDiagnostics::kPowerOffSentinel); // persisted evidence: a reason-20 boot after this is a power-up
   flushAllBeforeReset();
   powerOffForRecovery();
   RecoveryState::set_powerOffRequested(0); RecoveryState::set_connectivityRecoveryStage(2); SystemConfig::flushNow(); // not expected to return: no recent stage-3 evidence

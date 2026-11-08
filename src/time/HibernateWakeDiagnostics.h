@@ -160,18 +160,11 @@ inline int buildEventPayload(char *buffer, size_t bufferSize, const EventFields 
       (unsigned long)f.hibernateCount);
 }
 
-/// Reason-20 boot: persisted power-off evidence (the Error-path byte, or a
-/// failsafe stage 3 within 600 s on a valid clock) means a power-up wake; none means an inferred
-/// watchdog. `retained` is never evidence (a power-down clears it).
-constexpr int64_t kPowerOffEvidenceMaxAgeSec = 600;
-/// The Error-path evidence byte counts only when it is exactly this value (0 and the legacy structuresVersion 2 are "no record").
+/// Reason-20 boot: the persisted power-off evidence byte (written by the Error path and failsafe stage 3) means a
+/// power-up wake; none means an inferred watchdog. `retained` is never evidence (a power-down clears it).
+/// The byte counts only when it is exactly this value (0 and the legacy structuresVersion 2 are "no record").
 constexpr uint8_t kPowerOffSentinel = 0xA5;
-inline bool isInferredWatchdog(uint8_t evidenceByte, uint8_t failsafeStage, int64_t failsafeActionAt, bool timeValid, int64_t now) {
-  const bool errorPathByte = evidenceByte == kPowerOffSentinel;
-  const int64_t age = now - failsafeActionAt;
-  const bool failsafeRecent = failsafeStage == 3 && (timeValid && age >= 0 && age <= kPowerOffEvidenceMaxAgeSec);
-  return !errorPathByte && !failsafeRecent;
-}
+inline bool isInferredWatchdog(uint8_t evidenceByte) { return !(evidenceByte == kPowerOffSentinel); }
 
 } // namespace HibernateWakeDiagnostics
 

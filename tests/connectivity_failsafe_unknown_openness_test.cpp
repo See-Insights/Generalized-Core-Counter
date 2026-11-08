@@ -63,6 +63,8 @@ inline void set_connectivityRecoveryStage(uint8_t) {}
 inline void set_powerOffRequested(uint8_t) {}
 } // namespace RecoveryState
 
+namespace HibernateWakeDiagnostics { constexpr uint8_t kPowerOffSentinel = 0xA5; }
+
 namespace SystemConfig {
 enum { CONNECTED, DISCONNECTED };
 time_t lastConnection = 0;
