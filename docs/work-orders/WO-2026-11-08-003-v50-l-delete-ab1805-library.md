@@ -1,6 +1,6 @@
 # WO-2026-11-08-003: L, delete the vendored `lib/AB1805_RK` and replace S1b's two library calls with raw I2C (v50.2)
 
-**Author:** Claude Code, 8 Nov 2026, **DRAFT for the architect's review; not dispatched** · **Status:** DRAFT
+**Author:** Claude Code, 8 Nov 2026, **architect's rulings of 8 Nov recorded below; not yet dispatched** · **Status:** RULED by the architect, 8 Nov 2026 (rulings below); dispatch gate: v50.1 merged
 **Branch (when dispatched):** `wo/…-l-delete-ab1805-library`, from `main` after v50.1 has merged (the S-set and the integrated fixes are then on `main`); ships in **v50.2** with I21. Never merge.
 **Workflow:** `AI_DEVELOPMENT_WORKFLOW.md` §3 Stages 5-8; §4 (SHA rule); §10 (CI discovery); §12; §13 (c) · **Agents:** Stage 6 Copilot medium (the report states the level actually run); Stage 7 Codex `gpt-5.6-sol` **xhigh**, 90-minute box, at most two rounds; a failure goes to the architect.
 **Inputs:** parent `WO-2026-11-05-002-v50-ab1805-switch.md` (v50.2 = L + I21); S1b `WO-2026-11-06-002-v50-s1b-pre-bind-rtc-access.md` (Amendment 2 item 5 is this WO's mandate); the integrated Stage 7 records `WO-2026-11-08-001-*`; `src/time/PreBindRtc.h` as merged.
@@ -49,7 +49,14 @@ S1 (the bind), S1b's semantics (this WO only re-expresses them), S2, S3, S4, I21
 ## Rollback
 Revert the L commit: the library, the object and the three-call `PreBindRtc` return (v50.1 behaviour). v50.1 remains the floor.
 
-## Open points for the architect
+## Rulings (architect, 8 Nov 2026; supersede the open points below)
+1. **The size is accepted as written:** `src/` about +20 net, **stop and report at +30**; the repository about -2,070 (`lib/`).
+2. **Keep the CONTROL1 re-read** inside the time read (trace parity; the failure-path outcome when the WRTC-clear write failed is unchanged).
+3. **Delete the whole `lib/AB1805_RK/` directory** (library, examples, README, LICENSE), with the one-line origin/licence note.
+4. **L's bench = one night plus a repeat of bench item 3's WRTC pass with the L binary on a v49-touched chip** (WRTC = 0: the no-S1b-then-integrated order rule applies as in the v50.1 checklist, here with the L binary in the integrated slot; `settime <epoch> hal` must succeed after the L boot). Both run **in v50.2's soak**, not as a separate bench. (This replaces the Bench section's items 1-2 wording; item 3 there, bind/unbind and rollback to v49.1, stays.)
+5. Stage 7 focus (the proposal in open point 4 below) stands: trace equivalence and the four preserved properties; chip ownership re-walked once; no retired symbol; changed tests not weakened.
+
+## Open points (resolved by the rulings above; kept for the record)
 1. **The CONTROL1 re-read inside the library's time read.** `getRtcAsTm` re-reads CONTROL1 to gate on WRTC (one extra transaction, `AB1805_RK.cpp:313-325`). Recommended: **keep it** in the raw version, so the trace is identical and the outcome when the WRTC-clear write failed (the gate sees WRTC still set, the time read fails) is unchanged. Dropping it saves one transaction and about 3 lines but changes a failure-path outcome; it would need a ruling and a changed trace.
 2. **Delete the whole directory,** including `examples/` and `LICENSE`? Recommended: yes, with a one-line origin/licence note.
 3. **L's bench:** one smoke night (proposed) or none or the full two? 
