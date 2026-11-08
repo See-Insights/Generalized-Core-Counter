@@ -291,7 +291,6 @@ void setup() {
   waitForDebugSerialIfConnected();
 
   // v50: Device OS owns the AB1805; bind once before anything reads Time.
-  if (!Am18x5.status().bound() && !PreBindRtc::run(ab1805, Wire)) Log.warn("PreBindRtc: chip access failed");
   ExternalRtc::ensureBound(Am18x5, particle::Am18x5Configuration().i2c(Wire).interruptPin(WKP).watchdogPin(WATCHDOG_DONE_PIN)
       .capabilities(particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL).clockSource(particle::RtcClockSource::EXTERNAL));
 
