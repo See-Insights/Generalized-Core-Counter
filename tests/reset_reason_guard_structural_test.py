@@ -12,7 +12,7 @@ also rejected, declared or not: RESET_REASON_USER_APPLICATION is not in Device O
 they are not enumerators and are out of scope here - see the WO-2026-11-09-001
 report.)
 
-DEVICE_OS_ROOT selects the header set (default: the local 6.4.1 toolchain copy).
+DEVICE_OS_ROOT selects the header set (default: the toolchain copy of the version in project.properties; the test fails if the header tree is any other version).
 """
 import os
 import re
@@ -64,7 +64,14 @@ def guarded_hits(path, names):
 
 
 def main():
-    root = Path(os.environ.get("DEVICE_OS_ROOT", str(Path.home() / ".particle/toolchains/deviceOS/6.4.1")))
+    ship = next((l.split("=", 1)[1].strip() for l in (REPO_ROOT / "project.properties").read_text().splitlines()
+                 if l.startswith("deviceOS=")), "")  # the Device OS version we ship
+    root = Path(os.environ.get("DEVICE_OS_ROOT", str(Path.home() / ".particle/toolchains/deviceOS" / ship)))
+    ver_h = root / "system" / "inc" / "system_version.h"
+    have = re.search(r"^#define SYSTEM_VERSION SYSTEM_VERSION_v(\w+)", ver_h.read_text(), flags=re.M) if ver_h.is_file() else None
+    if not ship or not have or have.group(1) != ship.replace(".", ""):
+        print(f"FAIL: Device OS headers under {root} are v{have.group(1) if have else '?'} but project.properties ships {ship}", file=sys.stderr)
+        return 1
     defs = root / "services" / "inc" / "system_defs.h"
     if not defs.is_file():
         print(f"FAIL: missing {defs}", file=sys.stderr)

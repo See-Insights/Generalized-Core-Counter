@@ -12,9 +12,13 @@ set -euo pipefail
 tests_dir="${0:A:h}"
 repo_root="${tests_dir:h}"
 src_root="${STORM_TEST_SRC_ROOT:-$repo_root/src}"
-os_root="${DEVICE_OS_ROOT:-$HOME/.particle/toolchains/deviceOS/6.4.1}"
+ship_os="$(sed -n 's/^deviceOS=//p' "$repo_root/project.properties")"   # the Device OS version we ship
+os_root="${DEVICE_OS_ROOT:-$HOME/.particle/toolchains/deviceOS/$ship_os}"
 defs="$os_root/services/inc/system_defs.h"
 [[ -f "$defs" ]] || { echo "FAILED: missing $defs" >&2; exit 1; }
+# The header tree must be the Device OS in project.properties (header tests check the version we ship).
+have_os="$(sed -n 's/^#define SYSTEM_VERSION SYSTEM_VERSION_v//p' "$os_root/system/inc/system_version.h" | tr -d '[:space:]')"
+[[ -n "$ship_os" && -n "$have_os" && "${ship_os//./}" == "$have_os" ]] || { echo "FAILED: Device OS headers under $os_root are v$have_os but project.properties ships $ship_os" >&2; exit 1; }
 
 work="$(mktemp -d "${TMPDIR:-/tmp}/storm_reason_qualifies.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
