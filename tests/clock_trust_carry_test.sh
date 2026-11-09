@@ -8,11 +8,12 @@
 #    (Clock.cpp, the boot verdict site).
 # 4. The per-boot cached carry (Amendment 2) driven through the REAL carryEligible()/evaluateClockCarry()
 #    extracted from Clock.cpp.
-# 5. Mutations (run on a scratch copy of src/): each must fail.
+# 5. The real write-back producer (rtcCorrectionSec -> carryStamp) extracted from Clock.cpp and driven with measured corrections.
+# 6. Mutations (run on a scratch copy of src/): each must fail.
 set -euo pipefail
 
 repo_root="${0:A:h:h}"
-work="$repo_root/build-tmp/wo-2026-11-05-007-stage6-r2/carry_test"
+work="$repo_root/build-tmp/wo-2026-11-05-007-stage6-r3/carry_test"
 mkdir -p "$work"
 trap 'rm -rf "$work/mut"' EXIT
 
@@ -159,6 +160,47 @@ CPP
   c++ -std=c++17 -I"$1" -o "$work/cache" "$out" && "$work/cache"
 }
 
+run_producer() {  # $1 = src root
+  local clock="$1/time/Clock.cpp" out="$work/producer.cpp"
+  {
+    cat <<'CPP'
+#include <cassert>
+#include <cstdint>
+#include <cstdio>
+#include <ctime>
+#include "time/ClockTrust.h"
+static time_t g_now = 1792000000, g_pre = 0; static bool g_readable = true; static long g_logged = -999;
+struct FakeTime { time_t now() const { return g_now; } };
+FakeTime Time;
+struct FakeLog { void info(const char *, int, long, long c) { g_logged = c; } };
+FakeLog Log;
+namespace ExternalRtc {
+bool get(time_t &v) { v = g_pre; return g_readable; }
+bool setFromSystem() { return true; }
+}
+static time_t producer() {
+CPP
+    awk '/time_t rtcPreWriteValue = 0;/{p=1} p{print} p && /ClockTrust::carryStamp\(/{exit}' "$clock"
+    cat <<'CPP'
+  return carryStamp;
+}
+static time_t drive(bool readable, long delta) { g_readable = readable; g_pre = g_now - delta; g_logged = -999; return producer(); }
+int main() {
+  struct { long d; bool renew; } c[] = {{300, false}, {-300, false}, {61, false}, {-61, false}, {60, true}, {-60, true}, {0, true}};
+  for (auto &k : c) {
+    assert(drive(true, k.d) == (k.renew ? g_now : 0));
+    assert(g_logged == k.d);                              // the measured signed correction reaches the producer's output
+  }
+  assert(drive(false, 0) == 0);                           // unreadable pre-write value: revoke
+  assert(g_logged == -1);
+  std::printf("producer test passed\n");
+  return 0;
+}
+CPP
+  } > "$out"
+  c++ -std=c++17 -I"$1" -o "$work/producer" "$out" && "$work/producer"
+}
+
 check_text() {  # $1 = src root
   python3 - "$1/time/Clock.cpp" "$1/Generalized-Core-Counter.cpp" <<'PY'
 import re, sys
@@ -186,9 +228,11 @@ need("const time_t carryStamp = (time_t)ClockTrust::carryStamp(rtcUpdated, rtcPr
 need(re.search(r"flushNow\(\);[^\n]*\n    if \(rtcUpdated\) \{", cc), "the revoke must not return before the current-boot bookkeeping")
 need(cc.count("carryStampCache") == 2 and cc.count("evaluateClockCarry") == 0, "the cache is touched only by the withdrawal and the write-back stamp")
 need(cc.count("set_lastTimeSync") == 2, "lastTimeSync may be written only by the fault withdrawal and the write-back stamp")
-verdict = "if (HibernateWakeDiagnostics::isRtcArm(wakeVerdict.gateArm)) SystemConfig::set_lastTimeSync(0);"
+verdict = "if (HibernateWakeDiagnostics::isRtcArm(wakeVerdict.gateArm)) { SystemConfig::set_lastTimeSync(0); SystemConfig::flushNow(); }"
 i = app.find(verdict)
-need(i != -1 and 0 < app.find("SystemConfig::flushNow();", i) - i < 1500 and 0 <= app.find("classifyWake(reason);\n  " + verdict) , "a failed RTC arm must zero lastTimeSync right after classifyWake() and before the next flushNow()")
+need(i != -1 and app.count(verdict) == 1 and 0 <= app.find("classifyWake(reason);\n  " + verdict), "a failed RTC arm must zero lastTimeSync and flushNow() in one braced branch right after classifyWake()")
+need(app[i + len(verdict):].startswith("  // I21") or app[i + len(verdict):].lstrip(" ").startswith("// I21"), "the branch line must carry its I21 comment")
+need(0 < app.find("evaluateClockCarry();", i) - i - len(verdict) < 200 and app[i:app.find("evaluateClockCarry();", i)].count("\n") == 1, "the failed-arm branch must be directly followed by evaluateClockCarry()")
 seed = app.index("ExternalRtc::oscillatorFaultSeenSinceBind() = true;")
 call = app.index("evaluateClockCarry();")
 ver = app.index(verdict)
@@ -197,7 +241,7 @@ need(app.index("void setup() {") < seed < ver < call < app.index("void loop() {"
 PY
 }
 
-check_all() { run_unit "$1" && run_c2 "$1" && run_cache "$1" && check_text "$1"; }
+check_all() { run_unit "$1" && run_c2 "$1" && run_cache "$1" && run_producer "$1" && check_text "$1"; }
 
 check_all "$repo_root/src" || { print -u2 "FAILED: clock_trust_carry checks on the real source"; exit 1; }
 
@@ -228,7 +272,14 @@ mutate "revoke leaves the current boot untrusted" time/Clock.cpp "    if (carryS
 "
 mutate "carry without plausibility checks" time/ClockTrust.h "timeOk && externalOk && lastPlausible && " "timeOk && externalOk && "
 mutate "carry without plausibility checks (call site)" time/Clock.cpp "Time.isValid() && Clock::isPlausibleEpoch(now), true," "Time.isValid(), true,"
-mutate "verdict input ignored" Generalized-Core-Counter.cpp "if (HibernateWakeDiagnostics::isRtcArm(wakeVerdict.gateArm)) SystemConfig::set_lastTimeSync(0);" "if (false) SystemConfig::set_lastTimeSync(0);"
+V="if (HibernateWakeDiagnostics::isRtcArm(wakeVerdict.gateArm)) { SystemConfig::set_lastTimeSync(0); SystemConfig::flushNow(); }"
+mutate "verdict input ignored" Generalized-Core-Counter.cpp "$V" "if (false) { SystemConfig::set_lastTimeSync(0); SystemConfig::flushNow(); }"
+mutate "reset between the zeroing and the flush" Generalized-Core-Counter.cpp "$V" "if (HibernateWakeDiagnostics::isRtcArm(wakeVerdict.gateArm)) { SystemConfig::set_lastTimeSync(0); System.reset(); SystemConfig::flushNow(); }"
+mutate "flush removed from the failed-arm branch" Generalized-Core-Counter.cpp "$V" "if (HibernateWakeDiagnostics::isRtcArm(wakeVerdict.gateArm)) { SystemConfig::set_lastTimeSync(0); }"
+mutate "flush moved after the evaluation" Generalized-Core-Counter.cpp "$V  // I21: no trust carry after a failed RTC arm; revoked durably before anything else runs
+  evaluateClockCarry();" "if (HibernateWakeDiagnostics::isRtcArm(wakeVerdict.gateArm)) { SystemConfig::set_lastTimeSync(0); }
+  evaluateClockCarry(); SystemConfig::flushNow();"
+mutate "braces dropped, only the zeroing conditional" Generalized-Core-Counter.cpp "$V" "if (HibernateWakeDiagnostics::isRtcArm(wakeVerdict.gateArm)) SystemConfig::set_lastTimeSync(0); SystemConfig::flushNow();"
 mutate "verdict arm dropped" time/HibernateWakeDiagnostics.h " || a == GateArm::kRtcOrder" ""
 
 mutate "isSet() back in isClockTrusted()" time/Clock.cpp "syncCaptureWrapGeneration) || carryEligible();" "syncCaptureWrapGeneration) || (carryEligible() && ExternalRtc::isSet());"
@@ -251,5 +302,10 @@ mutate "evaluation run per call" time/Clock.cpp "  const time_t now = Time.now()
   return ClockTrust::isCarryEligible(" "  evaluateClockCarry(); const time_t now = Time.now();
   return ClockTrust::isCarryEligible("
 
+mutate "readable correction forced to zero" time/Clock.cpp "? (long)(Time.now() - rtcPreWriteValue)" "? 0L"
+mutate "correction sign flipped" time/Clock.cpp "(long)(Time.now() - rtcPreWriteValue)" "(long)(rtcPreWriteValue - Time.now())"
+mutate "pre-write readability ignored" time/Clock.cpp "carryStamp(rtcUpdated, rtcPreWriteReadOk, rtcCorrectionSec," "carryStamp(rtcUpdated, true, rtcCorrectionSec,"
+mutate "-1 sentinel passed as the correction" time/Clock.cpp "carryStamp(rtcUpdated, rtcPreWriteReadOk, rtcCorrectionSec," "carryStamp(rtcUpdated, rtcPreWriteReadOk, -1,"
+
 echo ""
-echo "clock_trust_carry_test passed (unit, C2 regression, call-site text, 20 mutation checks)"
+echo "clock_trust_carry_test passed (unit, C2 regression, call-site text, 28 mutation checks)"
