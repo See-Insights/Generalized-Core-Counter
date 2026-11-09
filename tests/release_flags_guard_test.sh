@@ -11,19 +11,28 @@ WF="${WF:-$ROOT/.github/workflows/build.yml}"
 fail=0
 bad() { echo "FAIL: $1"; fail=1; }
 
-# The step block: from its name line up to the next step.
-step="$(awk '/^      - /{ if (on) exit } /^      - name: Release flags DEV_BUILD and CONNECTIVITY_FAILSAFE_TEST_MODE are 0/{on=1} on{print}' "$WF")"
-[ -n "$step" ] || { echo "FAIL: release-flag guard step not found in build.yml"; exit 1; }
+# Everything below is bounded to the `firmware:` job (the job that compiles): the guard must live in
+# it, because `host-tests` runs concurrently with `firmware` and would not stop a compile.
+fw="$(awk '/^  firmware:/{on=1; print; next} /^  [A-Za-z0-9_-]+:/{if(on) exit} on{print}' "$WF")"
+[ -n "$fw" ] || { echo "FAIL: firmware job not found in build.yml"; exit 1; }
+
+# The guard appears exactly once in the whole workflow, and inside the firmware job.
+[ "$(grep -c 'Release flags DEV_BUILD and CONNECTIVITY_FAILSAFE_TEST_MODE are 0' "$WF")" = 1 ] || bad "the guard step must appear exactly once in build.yml"
+
+# The step block: from its name line up to the next step, taken from the firmware job only.
+step="$(print -r -- "$fw" | awk '/^      - /{ if (on) exit } /^      - name: Release flags DEV_BUILD and CONNECTIVITY_FAILSAFE_TEST_MODE are 0/{on=1} on{print}')"
+[ -n "$step" ] || { echo "FAIL: release-flag guard step not found in the firmware job of build.yml"; exit 1; }
 
 print -r -- "$step" | grep -qxF "        if: github.ref_type == 'tag'" || bad "the step has no tag-only if: guard"
 
-# Order: the guard must come before the Compile step.
-gl="$(grep -n 'Release flags DEV_BUILD and CONNECTIVITY_FAILSAFE_TEST_MODE are 0' "$WF" | head -n 1 | cut -d: -f1)"
-cl="$(grep -n '^      - name: Compile' "$WF" | head -n 1 | cut -d: -f1)"
-[ -n "$cl" ] && [ "$gl" -lt "$cl" ] || bad "the guard step is not before the Compile step"
+# Order, within the firmware job: the guard must come before the Compile step, and Compile must be there.
+gl="$(print -r -- "$fw" | grep -n 'Release flags DEV_BUILD and CONNECTIVITY_FAILSAFE_TEST_MODE are 0' | head -n 1 | cut -d: -f1)"
+cl="$(print -r -- "$fw" | grep -n '^      - name: Compile' | head -n 1 | cut -d: -f1)"
+[ -n "$cl" ] || bad "no Compile step in the firmware job"
+[ -n "$gl" ] && [ -n "$cl" ] && [ "$gl" -lt "$cl" ] || bad "the guard step is not before the Compile step in the firmware job"
 
 # (f) No compile flags can slip in through the workflow without tripping this test.
-compile="$(awk '/^      - /{ if (on) exit } /^      - name: Compile/{on=1} on{print}' "$WF")"
+compile="$(print -r -- "$fw" | awk '/^      - /{ if (on) exit } /^      - name: Compile/{on=1} on{print}')"
 [ -n "$compile" ] || bad "Compile step not found"
 if print -r -- "$compile" | grep -qiE 'EXTRA_CFLAGS|cflags|(^|[[:space:]])-D[A-Za-z_]'; then
   bad "the Compile step passes compiler flags (EXTRA_CFLAGS, -D or cflags); rule on it, then update this test"

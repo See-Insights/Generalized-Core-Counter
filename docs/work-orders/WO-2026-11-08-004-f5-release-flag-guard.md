@@ -22,3 +22,7 @@ CI's discovery in a git worktree (`tests/*.sh` via zsh, `tests/*.py` via python3
 
 ## Rollback
 Revert the commit; tag builds return to checking only the product version.
+
+## Amendment 1 (architect, 9 Nov 2026, after Stage 7 round 1: PASS on dbb6d5a with two Low findings)
+1. **Low 1 fixed (test-only):** `tests/release_flags_guard_test.sh` now bounds the guard and Compile checks to the `firmware:` job and requires the guard to appear exactly once in `build.yml` (a guard moved into `host-tests` survived round 1; it is now caught, with four further placement mutations: after Compile, removed, duplicated, no Compile step). Applied by Claude Code as a narrow test-only fix on the architect's instruction; no `build.yml` or `src/` change.
+2. **Low 2 accepted:** a compiler `#warning` is non-fatal; the real header emits none and no warning can let a nonzero flag through.
