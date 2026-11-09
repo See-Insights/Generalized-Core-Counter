@@ -38,3 +38,10 @@ The storm window and threshold, the holdoff duration and bracketing (the S2 fix)
 
 ## Rollback
 Revert the commit: v50.1 behaviour (reasons 0 and 60 only) returns.
+
+## Amendment 1 (architect, 9 Nov 2026, after Stage 7 round 1 NOT VERIFIED on 8c82f13; test-only, no `src/` change)
+1. **F1 (Medium), approved, the simpler option:** `tests/storm_reason_qualifies_test.sh` extracts the span from the `bool qualifiesForStormCount` declaration to its first consumer (`if (previousBootFailedEarly && qualifiesForStormCount)`), and fails unless that span contains **exactly one** `switch` and **no other executable code** (only the declaration, comments, the one switch, and whitespace). That one switch is what gets compiled and run. A second switch, an assignment, a call or a loop in the span fails the test.
+2. **F2 (Medium), approved:** `tests/reset_reason_guard_structural_test.py` coalesces backslash-continued lines into one logical directive before matching, keeping the starting line number in the report.
+3. **F3 (Low), NOT fixed; documented limits** (comment block at the top of the scan and in the report): macro aliases (`#define ALIAS RESET_REASON_PANIC` then `#if ALIAS`) and enumerator names inside quoted arguments are not handled; only enumerators declared in `system_defs.h` are covered (not other HAL or system headers); brace counting and the span check are not comment- or string-aware beyond what the scan already blanks. The scan is a guardrail, not a parser.
+4. Mutations to show (own, by the controller): a correct decoy switch before the live switch with `RESET_REASON_POWER_MANAGEMENT` added to the live one must fail the test; a split `#if defined( \` newline `RESET_REASON_PANIC)` guard in `src/` must fail the scan.
+5. Stage 7: Codex xhigh round 2, the last; a failure goes to the architect. Draft PR against `integration/v50-ab1805`, HELD UNMERGED until v50.1 ships (ships v50.2), like I21.
