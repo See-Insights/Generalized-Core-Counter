@@ -360,6 +360,13 @@ inline uint32_t wrapAwareReportedSyncAgeMs(uint32_t nowMs, uint32_t timeSyncedLa
     }
     return elapsedMs(nowMs, timeSyncedLastMs);
 }
+constexpr long kMaxCarryCorrectionSec = 60;  // I21 (WO-2026-11-05-007): a sync correcting the RTC by more than this withdraws the carry
+inline bool isCarryEligible(bool timeOk, bool externalOk, int64_t nowEpoch, int64_t lastSyncEpoch, bool lastPlausible, bool faultSeen) {
+    return timeOk && externalOk && lastPlausible && !faultSeen && lastSyncEpoch != 0 && nowEpoch >= lastSyncEpoch && nowEpoch - lastSyncEpoch < (int64_t)(kMaxSyncAgeMs / 1000UL);
+}
+inline int64_t carryStamp(bool written, bool preReadOk, long correctionSec, int64_t nowEpoch) {
+    return written && preReadOk && correctionSec <= kMaxCarryCorrectionSec && correctionSec >= -kMaxCarryCorrectionSec ? nowEpoch : 0;
+}
 
 } // namespace ClockTrust
 

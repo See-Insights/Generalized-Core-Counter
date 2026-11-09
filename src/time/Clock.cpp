@@ -154,7 +154,14 @@ uint32_t lastSeenSyncRawMs = 0;
 // exactly -1 second is possible but rare, and this field is diagnostic
 // telemetry, not a control-path signal.
 long lastRtcCorrectionSec = -1;
+time_t carryStampCache = 0;  // I21: persisted lastTimeSync captured once per boot (evaluateClockCarry) and at each write-back stamp; 0 = no carry
+bool carryEligible() {  // I21: per call, arithmetic and an atomic load only (no I2C); the 24 h age and the live latch are rechecked here
+  const time_t now = Time.now();
+  return ClockTrust::isCarryEligible(Time.isValid() && Clock::isPlausibleEpoch(now), true, now, carryStampCache, Clock::isPlausibleEpoch(carryStampCache),
+                                     ExternalRtc::oscillatorFaultSeenSinceBind().load(std::memory_order_relaxed));
+}
 } // namespace
+void evaluateClockCarry() { carryStampCache = ExternalRtc::isSet() ? SystemConfig::get_lastTimeSync() : 0; }  // I21: the only isSet() (I2C) call
 
 /**
  * @brief Non-blocking substitute for Particle.timeSyncedLast() (Finding 2,
@@ -357,6 +364,9 @@ void requestClockResync(const char *reason) {
  *          writes across both this function and the vendored one-shot.
  */
 void checkClockResync() {
+  if (ExternalRtc::oscillatorFaultSeenSinceBind().load(std::memory_order_relaxed) && SystemConfig::get_lastTimeSync() != 0) {
+    SystemConfig::set_lastTimeSync(0); carryStampCache = 0; SystemConfig::flushNow();  // withdraw the carry now: it must survive a reset right after
+  }
   const uint32_t nowMs = millis();
   tickMillisWrapTracker(nowMs);
   const uint32_t lastSyncMs = observedTimeSyncedLastMs();
@@ -404,11 +414,13 @@ void checkClockResync() {
         : -1;
     Log.info("ClockResync: sync advanced, rtcUpdated=%d epoch=%ld correctionSec=%ld",
              rtcUpdated ? 1 : 0, (long)Time.now(), rtcCorrectionSec);
+    const time_t carryStamp = (time_t)ClockTrust::carryStamp(rtcUpdated, rtcPreWriteReadOk, rtcCorrectionSec, Time.now());
+    SystemConfig::set_lastTimeSync(carryStamp); carryStampCache = carryStamp;
+    if (carryStamp == 0) SystemConfig::flushNow();  // I21: a revoke is flushed synchronously
     if (rtcUpdated) {
       // Finding 1: only mark this sync value as "written" once the RTC
-      // write is confirmed successful, and only then stamp lastTimeSync.
+      // write is confirmed successful.
       lastRtcWriteSyncedLastMs = lastSyncMs;
-      SystemConfig::set_lastTimeSync(Time.now());
 
       // Only persist the correction for cloud reporting once the write it
       // describes is confirmed - same "confirmed, not attempted" standard
@@ -474,7 +486,7 @@ void checkClockResync() {
  */
 bool isClockTrusted() {
   return ClockTrust::isTrustedWrapAware(Time.isValid(), millis(), observedTimeSyncedLastMs(),
-                                         millisWrapGeneration, syncCaptureWrapGeneration);
+                                         millisWrapGeneration, syncCaptureWrapGeneration) || carryEligible();
 }
 
 /**
