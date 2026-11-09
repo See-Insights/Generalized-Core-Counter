@@ -757,6 +757,7 @@ void setup() {
   // clears `retained`); no evidence is counted as an inferred watchdog.
   const HibernateCycle::WakeVerdict wakeVerdict = HibernateCycle::classifyWake(reason);
   if (HibernateWakeDiagnostics::isRtcArm(wakeVerdict.gateArm)) SystemConfig::set_lastTimeSync(0);  // I21: no trust carry after a wake whose RTC check failed (flushed below)
+  evaluateClockCarry();
 
   bool inferredWatchdog = false;
   if (reason == RESET_REASON_PIN_RESET) {

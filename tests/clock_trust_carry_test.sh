@@ -6,11 +6,13 @@
 #    the REAL closeOccupancySessionSafely() extracted from State_Common.h.
 # 3. Exact-text checks of the call sites that cannot be driven on the host
 #    (Clock.cpp, the boot verdict site).
-# 4. Mutations (run on a scratch copy of src/): each of the nine in the WO must fail.
+# 4. The per-boot cached carry (Amendment 2) driven through the REAL carryEligible()/evaluateClockCarry()
+#    extracted from Clock.cpp.
+# 5. Mutations (run on a scratch copy of src/): each must fail.
 set -euo pipefail
 
 repo_root="${0:A:h:h}"
-work="$repo_root/build-tmp/wo-2026-11-05-007-stage6/carry_test"
+work="$repo_root/build-tmp/wo-2026-11-05-007-stage6-r2/carry_test"
 mkdir -p "$work"
 trap 'rm -rf "$work/mut"' EXIT
 
@@ -103,6 +105,60 @@ CPP
   c++ -std=c++17 -I"$1" -o "$work/c2" "$out" && "$work/c2"
 }
 
+run_cache() {  # $1 = src root
+  local clock="$1/time/Clock.cpp" out="$work/cache.cpp"
+  {
+    cat <<'CPP'
+#include <atomic>
+#include <cassert>
+#include <cstdint>
+#include <cstdio>
+#include <ctime>
+#include "time/ClockTrust.h"
+static time_t g_now = 0; static bool g_valid = true;
+struct FakeTime { time_t now() const { return g_now; } bool isValid() const { return g_valid; } };
+FakeTime Time;
+namespace Clock { bool isPlausibleEpoch(time_t t) { return t >= 1700000000 && t <= 2100000000; } }
+namespace SystemConfig { time_t stamp = 0; time_t get_lastTimeSync() { return stamp; } }
+static int g_isSetCalls = 0; static bool g_isSet = true;
+namespace ExternalRtc {
+bool isSet() { ++g_isSetCalls; return g_isSet; }
+std::atomic<bool> &oscillatorFaultSeenSinceBind() { static std::atomic<bool> f{false}; return f; }
+}
+namespace {
+CPP
+    awk '/^time_t carryStampCache = 0;/{p=1} p{print} /^} \/\/ namespace$/{exit}' "$clock" | sed '$d'
+    echo "}"
+    grep '^void evaluateClockCarry()' "$clock"
+    cat <<'CPP'
+int main() {
+  const time_t kSync = 1792000000;
+  g_now = kSync + 600; SystemConfig::stamp = kSync;
+  assert(!carryEligible());                                   // before the evaluation call: untrusted
+  evaluateClockCarry();
+  assert(carryEligible() && g_isSetCalls == 1);               // after it: trusted
+  for (int i = 0; i < 5; ++i) carryEligible();
+  assert(g_isSetCalls == 1);                                  // no isSet() per call
+  g_now = kSync + 24 * 3600 - 1; assert(carryEligible());     // age bound, per call, no sync
+  g_now = kSync + 24 * 3600;     assert(!carryEligible());
+  g_now = kSync + 600; assert(carryEligible());
+  g_now = kSync - 1;   assert(!carryEligible());              // future stamp
+  g_now = kSync + 600;
+  ExternalRtc::oscillatorFaultSeenSinceBind() = true;         // latch withdraws at once, no loop pass
+  assert(!carryEligible());
+  ExternalRtc::oscillatorFaultSeenSinceBind() = false;
+  g_valid = false; assert(!carryEligible()); g_valid = true;
+  SystemConfig::stamp = 0; evaluateClockCarry(); assert(!carryEligible());   // failed RTC arm / revoke: no carry
+  SystemConfig::stamp = kSync; g_isSet = false; evaluateClockCarry(); assert(!carryEligible());  // invalid external clock
+  g_isSet = true; evaluateClockCarry(); assert(carryEligible());
+  std::printf("carry cache test passed\n");
+  return 0;
+}
+CPP
+  } > "$out"
+  c++ -std=c++17 -I"$1" -o "$work/cache" "$out" && "$work/cache"
+}
+
 check_text() {  # $1 = src root
   python3 - "$1/time/Clock.cpp" "$1/Generalized-Core-Counter.cpp" <<'PY'
 import re, sys
@@ -118,22 +174,30 @@ def body(src, sig):
     sys.exit("EXTRACT_FAILED " + sig)
 trust = body(clock, "bool isClockTrusted() {")
 need(re.search(r"syncCaptureWrapGeneration\) \|\| carryEligible\(\);", trust), "isClockTrusted() must be current-boot trust || carryEligible()")
+need("isSet" not in trust and "evaluateClockCarry" not in trust, "isClockTrusted() must not call ExternalRtc::isSet() or evaluate the carry")
 elig = body(clock, "bool carryEligible() {")
-need("last != 0 && ClockTrust::isCarryEligible(Time.isValid() && Clock::isPlausibleEpoch(now), ExternalRtc::isSet(), now, last, Clock::isPlausibleEpoch(last)," in elig, "carryEligible() must use the epoch now/last, both plausibility checks and the external clock")
-need("ExternalRtc::oscillatorFaultSeenSinceBind().load(std::memory_order_relaxed)" in elig, "carryEligible() must read the S4 latch")
-need("millis" not in elig, "the carry age must not use millis()")
+need("ClockTrust::isCarryEligible(Time.isValid() && Clock::isPlausibleEpoch(now), true, now, carryStampCache, Clock::isPlausibleEpoch(carryStampCache)," in elig, "carryEligible() must recheck age/plausibility per call from the cached epoch stamp")
+need("ExternalRtc::oscillatorFaultSeenSinceBind().load(std::memory_order_relaxed)" in elig, "carryEligible() must AND the live S4 latch")
+need("millis" not in elig and "isSet" not in elig and "get_lastTimeSync" not in elig, "carryEligible() must use the epoch cache only: no millis(), I2C or persisted read per call")
+need(clock.count("ExternalRtc::isSet()") == 1 and clock.count("evaluateClockCarry()") == 1, "ExternalRtc::isSet() may be called only inside evaluateClockCarry(), defined once")
 cc = body(clock, "void checkClockResync() {")
-need(re.match(r"void checkClockResync\(\) \{\n  if \(ExternalRtc::oscillatorFaultSeenSinceBind\(\)\.load\(std::memory_order_relaxed\) && SystemConfig::get_lastTimeSync\(\) != 0\) \{\n    SystemConfig::set_lastTimeSync\(0\); SystemConfig::flushNow\(\);", cc), "a latched fault must zero lastTimeSync and flushNow() synchronously")
-need("const time_t carryStamp = (time_t)ClockTrust::carryStamp(rtcUpdated, rtcPreWriteReadOk, rtcCorrectionSec, Time.now());\n    SystemConfig::set_lastTimeSync(carryStamp);\n    if (carryStamp == 0) SystemConfig::flushNow();" in cc, "the write-back must stamp via carryStamp(rtcUpdated, rtcPreWriteReadOk, ...) and flush a revoke")
+need(re.match(r"void checkClockResync\(\) \{\n  if \(ExternalRtc::oscillatorFaultSeenSinceBind\(\)\.load\(std::memory_order_relaxed\) && SystemConfig::get_lastTimeSync\(\) != 0\) \{\n    SystemConfig::set_lastTimeSync\(0\); carryStampCache = 0; SystemConfig::flushNow\(\);", cc), "a latched fault must zero lastTimeSync and flushNow() synchronously")
+need("const time_t carryStamp = (time_t)ClockTrust::carryStamp(rtcUpdated, rtcPreWriteReadOk, rtcCorrectionSec, Time.now());\n    SystemConfig::set_lastTimeSync(carryStamp); carryStampCache = carryStamp;\n    if (carryStamp == 0) SystemConfig::flushNow();" in cc, "the write-back must stamp via carryStamp(rtcUpdated, rtcPreWriteReadOk, ...) and flush a revoke")
 need(re.search(r"flushNow\(\);[^\n]*\n    if \(rtcUpdated\) \{", cc), "the revoke must not return before the current-boot bookkeeping")
+need(cc.count("carryStampCache") == 2 and cc.count("evaluateClockCarry") == 0, "the cache is touched only by the withdrawal and the write-back stamp")
 need(cc.count("set_lastTimeSync") == 2, "lastTimeSync may be written only by the fault withdrawal and the write-back stamp")
 verdict = "if (HibernateWakeDiagnostics::isRtcArm(wakeVerdict.gateArm)) SystemConfig::set_lastTimeSync(0);"
 i = app.find(verdict)
 need(i != -1 and 0 < app.find("SystemConfig::flushNow();", i) - i < 1500 and 0 <= app.find("classifyWake(reason);\n  " + verdict) , "a failed RTC arm must zero lastTimeSync right after classifyWake() and before the next flushNow()")
+seed = app.index("ExternalRtc::oscillatorFaultSeenSinceBind() = true;")
+call = app.index("evaluateClockCarry();")
+ver = app.index(verdict)
+need(app.count("evaluateClockCarry();") == 1, "evaluateClockCarry() must be called exactly once, in setup()")
+need(app.index("void setup() {") < seed < ver < call < app.index("void loop() {") and call - ver < 400, "evaluateClockCarry() must follow the latch seed and the verdict zeroing in setup()")
 PY
 }
 
-check_all() { run_unit "$1" && run_c2 "$1" && check_text "$1"; }
+check_all() { run_unit "$1" && run_c2 "$1" && run_cache "$1" && check_text "$1"; }
 
 check_all "$repo_root/src" || { print -u2 "FAILED: clock_trust_carry checks on the real source"; exit 1; }
 
@@ -154,7 +218,7 @@ PY
 
 mutate "carry ignores the latch" time/ClockTrust.h "lastPlausible && !faultSeen && " "lastPlausible && "
 mutate "carry ignores age" time/ClockTrust.h " && nowEpoch - lastSyncEpoch < (int64_t)(kMaxSyncAgeMs / 1000UL)" ""
-mutate "age on millis()" time/Clock.cpp "ExternalRtc::isSet(), now, last," "ExternalRtc::isSet(), (time_t)(millis() / 1000), last,"
+mutate "age on millis()" time/Clock.cpp "Clock::isPlausibleEpoch(now), true, now, carryStampCache," "Clock::isPlausibleEpoch(now), true, (time_t)(millis() / 1000), carryStampCache,"
 mutate "abs() dropped" time/ClockTrust.h " && correctionSec >= -kMaxCarryCorrectionSec" ""
 mutate "-1 sentinel compared against T" time/ClockTrust.h "written && preReadOk && correctionSec" "written && correctionSec"
 mutate "no flush after the revoke" time/Clock.cpp "    if (carryStamp == 0) SystemConfig::flushNow();  // I21: a revoke is flushed synchronously
@@ -163,9 +227,29 @@ mutate "revoke leaves the current boot untrusted" time/Clock.cpp "    if (carryS
 " "    if (carryStamp == 0) { SystemConfig::flushNow(); return; }
 "
 mutate "carry without plausibility checks" time/ClockTrust.h "timeOk && externalOk && lastPlausible && " "timeOk && externalOk && "
-mutate "carry without plausibility checks (call site)" time/Clock.cpp "Time.isValid() && Clock::isPlausibleEpoch(now), ExternalRtc::isSet()" "Time.isValid(), ExternalRtc::isSet()"
+mutate "carry without plausibility checks (call site)" time/Clock.cpp "Time.isValid() && Clock::isPlausibleEpoch(now), true," "Time.isValid(), true,"
 mutate "verdict input ignored" Generalized-Core-Counter.cpp "if (HibernateWakeDiagnostics::isRtcArm(wakeVerdict.gateArm)) SystemConfig::set_lastTimeSync(0);" "if (false) SystemConfig::set_lastTimeSync(0);"
 mutate "verdict arm dropped" time/HibernateWakeDiagnostics.h " || a == GateArm::kRtcOrder" ""
 
+mutate "isSet() back in isClockTrusted()" time/Clock.cpp "syncCaptureWrapGeneration) || carryEligible();" "syncCaptureWrapGeneration) || (carryEligible() && ExternalRtc::isSet());"
+mutate "evaluation call removed" Generalized-Core-Counter.cpp "  evaluateClockCarry();
+" ""
+mutate "evaluation before the latch seed " Generalized-Core-Counter.cpp "void setup() {
+" "void setup() {
+  evaluateClockCarry();
+"
+mutate "evaluation before the verdict zeroing" Generalized-Core-Counter.cpp "const HibernateCycle::WakeVerdict wakeVerdict = HibernateCycle::classifyWake(reason);
+" "evaluateClockCarry();
+  const HibernateCycle::WakeVerdict wakeVerdict = HibernateCycle::classifyWake(reason);
+"
+mutate "age not rechecked per call" time/Clock.cpp "Clock::isPlausibleEpoch(now), true, now, carryStampCache," "Clock::isPlausibleEpoch(now), true, carryStampCache, carryStampCache,"
+mutate "cache not cleared at a revoke" time/Clock.cpp " carryStampCache = carryStamp;" ""
+mutate "cache not cleared in the latch withdrawal" time/Clock.cpp " carryStampCache = 0; SystemConfig::flushNow();" " SystemConfig::flushNow();"
+mutate "live latch AND removed" time/Clock.cpp "carryStampCache, Clock::isPlausibleEpoch(carryStampCache),
+                                     ExternalRtc::oscillatorFaultSeenSinceBind().load(std::memory_order_relaxed));" "carryStampCache, Clock::isPlausibleEpoch(carryStampCache), false);"
+mutate "evaluation run per call" time/Clock.cpp "  const time_t now = Time.now();
+  return ClockTrust::isCarryEligible(" "  evaluateClockCarry(); const time_t now = Time.now();
+  return ClockTrust::isCarryEligible("
+
 echo ""
-echo "clock_trust_carry_test passed (unit, C2 regression, call-site text, 11 mutation checks)"
+echo "clock_trust_carry_test passed (unit, C2 regression, call-site text, 20 mutation checks)"
