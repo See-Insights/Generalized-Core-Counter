@@ -400,6 +400,8 @@ void setup() {
     Log.warn("BOOT STORM holdoff sleep returned unexpectedly - continuing boot");
   }
 
+  if (bootStormTripCount == 0) system_reset(SYSTEM_RESET_MODE_NORMAL, RESET_REASON_WATCHDOG, 0x5096, SYSTEM_RESET_FLAG_NO_WAIT, nullptr);  // BENCH ONLY (5096, never released): reset early with a counted reason (60) until the boot storm trips
+
   // Wait for serial connection only in explicit DEV builds
 #if ALLOW_BLOCKING_SERIAL_WAITS
   waitFor(Serial.isConnected, 10000);
