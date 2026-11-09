@@ -25,15 +25,31 @@ trap 'rm -rf "$work"' EXIT
 
 python3 -B - "$src_root/Generalized-Core-Counter.cpp" "$work/decision.h" <<'PY'
 import re, sys
+def fail(msg):
+    sys.exit("FAILED: storm decision span: " + msg)
+
 text = open(sys.argv[1]).read()
-start = text.index("bool qualifiesForStormCount = false;")
-open_brace = text.index("switch (reason) {", start)
-depth, i = 0, text.index("{", open_brace)
-for j in range(i, len(text)):
-    depth += {"{": 1, "}": -1}.get(text[j], 0)
+start = text.find("bool qualifiesForStormCount")
+end = text.find("if (previousBootFailedEarly && qualifiesForStormCount)", start) if start >= 0 else -1
+if start < 0 or end < 0:
+    fail("cannot find the qualifiesForStormCount declaration and its first consumer in setup()")
+span = re.sub(r"/\*.*?\*/|//[^\n]*", "", text[start:end], flags=re.S)
+switches = list(re.finditer(r"\bswitch\b", span))
+if len(switches) != 1:
+    fail(f"expected exactly one switch, found {len(switches)}")
+open_brace = span.index("{", switches[0].start())
+depth = 0
+for j in range(open_brace, len(span)):
+    depth += {"{": 1, "}": -1}.get(span[j], 0)
     if depth == 0:
         break
-switch = text[open_brace:j + 1]
+else:
+    fail("unbalanced braces in the switch")
+rest = span[:switches[0].start()] + span[j + 1:]
+rest = re.sub(r"^\s*bool\s+qualifiesForStormCount\s*=\s*false\s*;", "", rest)
+if rest.strip():
+    fail("executable code besides the declaration and the one switch: " + " ".join(rest.split()))
+switch = span[switches[0].start():j + 1]
 with open(sys.argv[2], "w") as out:
     out.write('#include "system_defs.h"\ninline bool stormReasonQualifies(int reason) {\n'
               '  bool qualifiesForStormCount = false;\n' + switch + '\n  return qualifiesForStormCount;\n}\n')

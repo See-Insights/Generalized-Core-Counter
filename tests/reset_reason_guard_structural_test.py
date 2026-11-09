@@ -12,6 +12,17 @@ also rejected, declared or not: RESET_REASON_USER_APPLICATION is not in Device O
 they are not enumerators and are out of scope here - see the WO-2026-11-09-001
 report.)
 
+Backslash-continued directives are joined into one logical line (reported at
+its starting line) before matching.
+
+Documented limits (a guardrail, not a parser; F3 of the Stage 7 round 1 verdict):
+- macro aliases are not followed (`#define ALIAS RESET_REASON_PANIC`, `#if ALIAS`);
+- an enumerator name inside a quoted directive argument is a false positive;
+- only enumerators declared in Device OS system_defs.h are covered, not those of
+  other HAL or system headers;
+- brace counting and the storm-switch span check are not string-aware (comments
+  are blanked, string and character literals are not).
+
 DEVICE_OS_ROOT selects the header set (default: the toolchain copy of the version in project.properties; the test fails if the header tree is any other version).
 """
 import os
@@ -51,13 +62,22 @@ def storm_switch_lines(text):
 def guarded_hits(path, names):
     hits = []
     text = blank_comments(path.read_text(errors="replace"))
-    storm = storm_switch_lines(text)
-    for number, line in enumerate(text.splitlines(), 1):
+    storm = storm_switch_lines(text)  # uses the original physical line numbers
+    lines = text.splitlines()
+    logical, idx = [], 0
+    while idx < len(lines):
+        number, line = idx + 1, lines[idx]
+        while line.rstrip().endswith("\\") and idx + 1 < len(lines):
+            idx += 1
+            line = line.rstrip()[:-1] + " " + lines[idx]
+        logical.append((number, line, idx + 1))
+        idx += 1
+    for number, line, last in logical:
         m = DIRECTIVE.match(line)
         if not m:
             continue
         for word in re.findall(r"\w+", m.group(2)):
-            if word in names or (number in storm and word.startswith("RESET_REASON_")):
+            if word in names or (any(n in storm for n in range(number, last + 1)) and word.startswith("RESET_REASON_")):
                 hits.append((number, line.strip()))
                 break
     return hits
