@@ -113,3 +113,26 @@ Chip moved the eight Vaughan units to 42131 in the 10 Nov window (after close, b
 
 **Site-visit items added (Chip, 10 Nov 2026):** (4) Vaughan-005, (5) Vaughan-007, (6) Vaughan-008: offline for weeks; need a site visit. Add Vaughan-001..004 if no 4901 boot by 11:30Z on 11 Nov.
 
+### Wave 2 update, 10 Nov 13:10Z (Claude Code, read-only; UTC; S3 archive; Chip's console for the Device OS and OTA state)
+**Vaughan-004: first 4901 boot 10 Nov 11:51:58Z** (`status/e00fce68cd055d063747df0b/2026-11-10T11-51-58-193Z.json`). fw 4901 (event `fw_version` 4901, `v49.1-DurableResets`): PASS. Reset 70, data 0: PASS. alert 0, watchdogResetCount 0, failsafeStage 0, free heap 89376: nothing abnormal. Ubidots reports since: 12:00:08Z, 12:25:31Z, 12:30:27Z, 13:00:08Z, 13:06:42Z, stamps within 14 s of their publish times, `dailyoccupancy` 0 then 5 at 12:30:22Z (counting from 0 after the open): PASS. Two queued events published at boot (stamps 11:00:01Z with resets 0 and 12:00:02Z with resets 1 and alerts 40) are the old firmware's queue (see below). Eastern-schedule check on the first night: pending (about 03:10Z on 11 Nov).
+
+**Vaughan-003: first 4901 boot 10 Nov 12:26:27Z** (`status/e00fce684c2509c83d1b3e2f/2026-11-10T12-26-27-950Z.json`). fw 4901: PASS. Reset 70, data 0: PASS. alert 0, watchdogResetCount 0, failsafeStage 0, free heap 89344: nothing abnormal. Ubidots continuity: PARTIAL, because the first events are the replayed backlog below; no report from v49.1 itself has arrived yet in the archive (the 12:34:28Z-stamped event is in that list). Eastern-schedule check on the first night: pending.
+
+**Observation (Chip, from Vaughan-003): the old firmware's persisted publish queue is replayed by v49.1. EXPECTED migration effect** (same mechanism as ChurchSt-1a's 34-event backlog on 7 Nov). Chip saw `Ubidots-Sensor-Hook-v1` events with `dailyoccupancy` 383 and 392, `counting-webhook-v1`, and `Daily Cleanup` in the console. What S3 shows for Vaughan-003 (all published 12:26:12Z-12:26:26Z, seconds before the status event; seven `Ubidots-Sensor-Hook-v1` events; `Daily Cleanup` and `counting-webhook-v1` are **not** archived in S3, which keeps only the hook, status, hibernate_wake and serialLog events):
+
+| payload stamp | daily | resets | alerts | note |
+|---|---|---|---|---|
+| 10 Nov 02:30:07Z | 383 | 0 | 0 | previous night, old firmware |
+| 02:38:59Z | 392 | 0 | 0 | |
+| 03:00:10Z | 392 | 0 | 0 | the old firmware's close report |
+| 11:00:01Z | 0 | 0 | 0 | open |
+| 12:00:02Z | 0 | 1 | 40 | resets 1, alert 40 (webhook timeout): old firmware, around the failed OTA |
+| 12:01:38Z | 0 | 2 | 40 | |
+| 12:34:28Z | 0 | 2 | 0 | **stamp is about 8 minutes AFTER its publish time (12:26:26Z)**: the device clock was ahead; an anomaly to check, not diagnosed |
+
+**Open reads (not done: this session has no Ubidots access; Chip reads them in the Ubidots app, read-only, or authorises a token):**
+1. Did these values land at their **own timestamps or at arrival time (12:26Z)**? The payloads carry the stamps, so own-timestamp is expected; confirm for the 02:30Z, 02:38Z, 03:00Z and 12:34Z points (the last would sit about 8 minutes in the future).
+2. Did `counting-webhook-v1` (and any `Daily Cleanup`) reach any webhook in product 42131? Not answerable from S3. Chip's console integrations/logs for 42131 are the source.
+3. Clean-up, if any: points whose stamps collide with a later report, or the future-stamped 12:34:28Z point; the 383/392 values describe the previous (old-firmware) day and are correct for 9 to 10 Nov.
+Per the wave rule, the move-day count reset is expected; these backlog values are not a continuity failure.
+
