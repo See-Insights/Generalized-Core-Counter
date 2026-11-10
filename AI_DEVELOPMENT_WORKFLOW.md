@@ -595,7 +595,7 @@ When a reviewer finds that a **test or its tooling** (an extractor, a structural
 - A **plausibly accidental** gap is fixed, as before.
 - **Firmware-behavior findings stay fully adversarial.** Reviewers keep trying to break the shipped behavior; this rule applies to test tooling only.
 
-Reason: a structural test is a guardrail, not a parser. Each round spent closing a constructed evasion buys no field safety and moves the next evasion one step further out (Work Order 2026-11-09-001: three rounds of such findings after the firmware fix had passed).
+Reason: a structural test is a guardrail, not a parser. Each round spent closing a constructed evasion buys no field safety and moves the next evasion one step further out (Work Order 2026-11-09-001: both Stage 7 rounds returned such test findings after the firmware fix had passed).
 
 ### Records
 
