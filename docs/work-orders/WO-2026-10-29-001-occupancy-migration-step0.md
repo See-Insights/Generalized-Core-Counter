@@ -94,3 +94,20 @@ The 14220 units read offline, so the first 4901 boot may come well after the mov
 **WAKEFOREST-PC01 update (8 Nov, 11:45Z):** first 4901 boot 7 Nov 17:04:55Z (archive `status/.../2026-11-07T17-04-55-358Z.json`; `v49.1-DurableResets`, `resetReason` 70, `resetReasonData` 0, alert 0, `watchdogResetCount` 0, `failsafeStage` 0, free heap 89472): PASS, single boot. Device OS dependency: proven by the v49.1 status event (a 6.6.0 app cannot run on 4.2.0, Chip's ruling); the system firmware version itself was not observed. The three-window USB-flash rule is moot (it booted 4901 in window 1). **Eastern schedule: PASS (checked 8 Nov, 11:45Z).** Last report before the close stamped 02:59:59Z, next report stamped 11:00:23Z, nothing between. **Occupancy: all zero.** `occupancy` and `dailyoccupancy` read 0 in every report seen from 6 Nov to 8 Nov (at least 56 h). The date of its last non-zero reading is **not established** from the S3 archive (no 14220-era events exist there); The architect checked the Ubidots history (8 Nov): counted normally until 16 Mar 2025 (daily max about 690), 55 on 17 Mar, one 5-minute blip on 19 May 2025, then zero in every report since (7,700+ reports since Sep 2025). The device is healthy; sensor or cabling is suspected, or a site change. **Not a firmware issue.**
 
 **Site-visit items (architect, 8 Nov 2026):** (1) WAKEFOREST-PC01: sensor, cabling or site change (zero occupancy since 19 May 2025); also a chance to read its Device OS version and USB-flash if ever needed. (2) Morrisville-Tennis-ChurchSt-3: stale, needs a site visit. (3) Court1: battery swap (after the 14 Nov bench).
+
+### Wave 2 results (Claude Code, read-only; UTC; status from Chip's console at about 11:30Z on 10 Nov, S3 from the archive)
+Chip moved the eight Vaughan units to 42131 and pinned 4901 in the 10 Nov window (after close, before open). Device IDs (Ubidots labels): -001 `e00fce68b1f342cd08f63d0a`, -002 `e00fce68cb9f5de5f85641d3`, -003 `e00fce684c2509c83d1b3e2f`, -004 `e00fce68cd055d063747df0b`, -005 `e00fce686f116b11854587c2`, -006 `e00fce6853f037b582c06bdf`, -007 `e00fce6817db65e5bfeae171`, -008 `e00fce68fc5616f88c1b2d1f`.
+
+**Vaughan-006: first 4901 boot 10 Nov 11:04:14Z** (archive `status/e00fce6853f037b582c06bdf/2026-11-10T11-04-14-119Z.json`; console: v4901, Device OS 6.6.0, online). Checked 11:32Z.
+- fw 4901: PASS (event `fw_version` 4901, `product_id` 42131; status `version` `v49.1-DurableResets`).
+- Reset 70 at the OTA boot (`resetReasonData` 0): PASS.
+- Nothing abnormal: alert 0, lastAlert 0, watchdogResetCount 0, failsafeStage 0, free heap 89360, pmicAnomalyCount 0.
+- Ubidots continuity (day one from 0): PASS for the first report: 11:04:12Z, payload stamp 11:00:01Z (the open, 06:00 EST), occupancy 0, dailyoccupancy 0, resets 0, connecttime 14 s, battery 62. No earlier archive exists in S3 to compare (the move reset the count, expected).
+- **Pending: Eastern schedule, first night** (last report before the close stamped 02:59:59Z and nothing until about 11:00Z), check about 03:10Z on 11 Nov.
+
+**Vaughan-001, -002, -003, -004: not yet on 4901.** Console: still Device OS 6.4.1 on the legacy firmware; each logged `spark/flash/status: failed` at about 11:07-11:09Z (likely a two-part Device OS plus app OTA interrupted by the legacy firmware's short connect). The cloud retries at each connection. **Watch their first 4901 boot over the next 24 h** (watcher polls S3 `status` every 5 minutes for each ID). **If none by 11:30Z on 11 Nov, report it for an on-site or update-settings fix.** Per-device first-boot checks run as each boots.
+
+**Vaughan-005, -007, -008: offline for weeks** (last seen 28 Oct, 16 Sep, 4 Oct). Watched with no deadline; site-visit list below.
+
+**Site-visit items added (Chip, 10 Nov 2026):** (4) Vaughan-005, (5) Vaughan-007, (6) Vaughan-008: offline for weeks; need a site visit. Add Vaughan-001..004 if no 4901 boot by 11:30Z on 11 Nov.
+
