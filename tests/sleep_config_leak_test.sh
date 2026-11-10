@@ -9,7 +9,7 @@ set -euo pipefail
 # as tests/sleep_config_ownership_structural_test.py) and generates a C++
 # header of configure functions from them.
 #
-# Part 2 compiles tests/sleep_config_leak_test.cpp against Device OS 6.4.1's
+# Part 2 compiles tests/sleep_config_leak_test.cpp against the shipped Device OS's
 # REAL system/inc/system_sleep_configuration.h - the header whose move
 # assignment (:205-210) memcpys over the old wakeup_sources list without
 # freeing it - and runs >= 1,000 simulated sleep cycles per site under a
@@ -23,7 +23,8 @@ set -euo pipefail
 
 repo_root="${0:A:h:h}"
 src_root="${SLEEP_CONFIG_SRC_ROOT:-$repo_root/src}"
-device_os_root="${DEVICE_OS_ROOT:-$HOME/.particle/toolchains/deviceOS/6.4.1}"
+ship_os="$(sed -n 's/^deviceOS=//p' "$repo_root/project.properties")"   # the Device OS version we ship
+device_os_root="${DEVICE_OS_ROOT:-$HOME/.particle/toolchains/deviceOS/$ship_os}"
 
 work_dir=$(mktemp -d)
 trap 'rm -rf "$work_dir"' EXIT
@@ -38,6 +39,11 @@ sleep_src="$src_root/state/State_Sleep.cpp"
 
 header="$device_os_root/system/inc/system_sleep_configuration.h"
 [[ -f "$header" ]] || fail "missing Device OS header $header"
+
+# Header-based tests must check the version we ship: the header tree has to be the Device OS in
+# project.properties (CI checks out the matching tag; a bump of one without the other fails here).
+have_os="$(sed -n 's/^#define SYSTEM_VERSION SYSTEM_VERSION_v//p' "$device_os_root/system/inc/system_version.h" | tr -d '[:space:]')"
+[[ -n "$ship_os" && -n "$have_os" && "${ship_os//./}" == "$have_os" ]] || fail "Device OS headers under $device_os_root are v$have_os but project.properties ships $ship_os"
 
 # --- Part 1: the real sites -----------------------------------------------
 sites_header="$work_dir/real_sites.h"
@@ -109,7 +115,7 @@ echo ""
 # --- Part 2: compile against the real Device OS header and run ------------
 cat > "$work_dir/prelude.h" <<'EOF'
 #pragma once
-// Host shim: the only thing Device OS 6.4.1's headers need that a host
+// Host shim: the only thing the Device OS headers need that a host
 // toolchain does not provide. The sleep configuration class is unmodified.
 #include <stdint.h>
 typedef int IRQn_Type;
@@ -141,4 +147,4 @@ clang++ -std=gnu++17 -O1 -g -Wall -Wno-unused-function \
 "$binary"
 
 echo ""
-echo "sleep_config_leak_test (real Device OS 6.4.1 header + counting allocator) passed"
+echo "sleep_config_leak_test (real Device OS $ship_os header + counting allocator) passed"
