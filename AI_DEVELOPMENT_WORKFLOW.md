@@ -587,6 +587,16 @@ A Codex Stage 7 round has a **90-minute time-box** from the moment it is dispatc
 
 The time-box applies to the round, not to a single tool call. **Chip may extend it** for a named reason (for example an outage of the network or the vendor service, as on 6 Nov 2026 when a round on `ce2e597` stalled during an internet outage); the extension and its end time are written into the next dispatch's header. A round that delivers a verdict inside the box is judged on the verdict only; speed is not a criterion.
 
+### Findings against test tooling
+
+When a reviewer finds that a **test or its tooling** (an extractor, a structural scan, a guard check) can be defeated, the finding is classified before it costs a round:
+
+- A **deliberately constructed evasion** (a decoy helper that copies the code under test, a directive split in the middle of a token, a macro alias built to hide an enumerator) is a **documented limit**: record it in the test's header and in the Work Order close-out. It is not fixed unless the evasion is **plausibly accidental**, meaning an ordinary refactor or an edit a maintainer could make without intending to defeat the test.
+- A **plausibly accidental** gap is fixed, as before.
+- **Firmware-behavior findings stay fully adversarial.** Reviewers keep trying to break the shipped behavior; this rule applies to test tooling only.
+
+Reason: a structural test is a guardrail, not a parser. Each round spent closing a constructed evasion buys no field safety and moves the next evasion one step further out (Work Order 2026-11-09-001: three rounds of such findings after the firmware fix had passed).
+
 ### Records
 
 Dispatches and verdicts are saved under `docs/work-orders/`, never only in a scratchpad. The verdict file is the record that a Work Order passed review.
