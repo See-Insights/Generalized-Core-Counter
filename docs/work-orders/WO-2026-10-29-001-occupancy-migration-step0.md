@@ -95,8 +95,10 @@ The 14220 units read offline, so the first 4901 boot may come well after the mov
 
 **Site-visit items (architect, 8 Nov 2026):** (1) WAKEFOREST-PC01: sensor, cabling or site change (zero occupancy since 19 May 2025); also a chance to read its Device OS version and USB-flash if ever needed. (2) Morrisville-Tennis-ChurchSt-3: stale, needs a site visit. (3) Court1: battery swap (after the 14 Nov bench).
 
+**Pin rule, clarified (Chip, 10 Nov 2026):** pin a device only when the wave's **target firmware differs from the product default**. When the target **is** the product default, no pin is needed, and the device then follows future product defaults. The earlier text in this WO ("pins them to firmware 4901", the wave 1 wording) applied while 4901 was not the default; it is superseded by this rule. **Wave 2 is not a pin deviation** (v4901 is the default; no pin was set or needed). The Development-marked-device caution stands: confirm the console shows the target after the next connect.
+
 ### Wave 2 results (Claude Code, read-only; UTC; status from Chip's console at about 11:30Z on 10 Nov, S3 from the archive)
-Chip moved the eight Vaughan units to 42131 and pinned 4901 in the 10 Nov window (after close, before open). Device IDs (Ubidots labels): -001 `e00fce68b1f342cd08f63d0a`, -002 `e00fce68cb9f5de5f85641d3`, -003 `e00fce684c2509c83d1b3e2f`, -004 `e00fce68cd055d063747df0b`, -005 `e00fce686f116b11854587c2`, -006 `e00fce6853f037b582c06bdf`, -007 `e00fce6817db65e5bfeae171`, -008 `e00fce68fc5616f88c1b2d1f`.
+Chip moved the eight Vaughan units to 42131 in the 10 Nov window (after close, before open). **They were not pinned:** v4901 is the product default and the console shows each targeting v4901. Device IDs (Ubidots labels): -001 `e00fce68b1f342cd08f63d0a`, -002 `e00fce68cb9f5de5f85641d3`, -003 `e00fce684c2509c83d1b3e2f`, -004 `e00fce68cd055d063747df0b`, -005 `e00fce686f116b11854587c2`, -006 `e00fce6853f037b582c06bdf`, -007 `e00fce6817db65e5bfeae171`, -008 `e00fce68fc5616f88c1b2d1f`.
 
 **Vaughan-006: first 4901 boot 10 Nov 11:04:14Z** (archive `status/e00fce6853f037b582c06bdf/2026-11-10T11-04-14-119Z.json`; console: v4901, Device OS 6.6.0, online). Checked 11:32Z.
 - fw 4901: PASS (event `fw_version` 4901, `product_id` 42131; status `version` `v49.1-DurableResets`).
