@@ -16,6 +16,10 @@ Backslash-continued directives are joined into one logical line (reported at
 its starting line) before matching.
 
 Documented limits (a guardrail, not a parser; F3 of the Stage 7 round 1 verdict):
+- a directive split in the middle of a token by a backslash-newline
+  (`#if defined(RESET_REASON_PAN\` then `IC)`, or `#i\` then `f defined(...)`) is not
+  recognised: continued lines are joined with a space, where the compiler joins them
+  with nothing (Stage 7 round 2, finding 2; deliberately constructed, so documented);
 - macro aliases are not followed (`#define ALIAS RESET_REASON_PANIC`, `#if ALIAS`);
 - an enumerator name inside a quoted directive argument is a false positive;
 - only enumerators declared in Device OS system_defs.h are covered, not those of

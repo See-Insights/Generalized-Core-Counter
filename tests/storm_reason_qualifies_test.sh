@@ -8,6 +8,15 @@ set -euo pipefail
 # header, so a version that lacks one simply has fewer rows). Exactly NONE,
 # PANIC, WATCHDOG and UNKNOWN qualify. DEVICE_OS_ROOT selects the header set;
 # STORM_TEST_SRC_ROOT overrides src/ (used to show the test failing on old code).
+#
+# Documented limits (architect ruling 10 Nov 2026; a guardrail, not a parser):
+# - the span extractor searches the whole file for the `bool qualifiesForStormCount`
+#   declaration, so a deliberately built helper above setup() holding a correct copy
+#   of the declaration, switch and consumer line would be tested instead of setup()'s
+#   live switch (Stage 7 round 2, finding 1);
+# - brace and span checks are not string-aware; a harmless `#if 1` inside the span
+#   passes (it is preserved and compiled), so the span check does not fail on every
+#   preprocessor line.
 
 tests_dir="${0:A:h}"
 repo_root="${tests_dir:h}"

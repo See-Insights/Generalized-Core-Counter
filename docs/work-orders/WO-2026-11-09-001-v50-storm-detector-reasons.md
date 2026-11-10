@@ -45,3 +45,12 @@ Revert the commit: v50.1 behaviour (reasons 0 and 60 only) returns.
 3. **F3 (Low), NOT fixed; documented limits** (comment block at the top of the scan and in the report): macro aliases (`#define ALIAS RESET_REASON_PANIC` then `#if ALIAS`) and enumerator names inside quoted arguments are not handled; only enumerators declared in `system_defs.h` are covered (not other HAL or system headers); brace counting and the span check are not comment- or string-aware beyond what the scan already blanks. The scan is a guardrail, not a parser.
 4. Mutations to show (own, by the controller): a correct decoy switch before the live switch with `RESET_REASON_POWER_MANAGEMENT` added to the live one must fail the test; a split `#if defined( \` newline `RESET_REASON_PANIC)` guard in `src/` must fail the scan.
 5. Stage 7: Codex xhigh round 2, the last; a failure goes to the architect. Draft PR against `integration/v50-ab1805`, HELD UNMERGED until v50.1 ships (ships v50.2), like I21.
+
+## Close-out (architect ruling, 10 Nov 2026: no round 3)
+Stage 7 closes with the **firmware fix verified** (round 2, `ee29773`: `src/` byte-identical to the round 1 PASS, net -6, build 151092 / 1114 / 2256). The round 2 verdict was NOT VERIFIED on two test-fidelity findings; the architect ruled them **documented limits**, not fixed, together with round 1's finding 3 and the system_defs.h limit:
+1. **Whole-file extractor (round 2, finding 1):** a deliberately built helper above `setup()` with a correct copy of the declaration, switch and consumer line is tested instead of the live switch.
+2. **Mid-token backslash splices (round 2, finding 2):** `#if defined(RESET_REASON_PAN\` newline `IC)` and `#i\` newline `f defined(...)` are missed (joined with a space).
+3. **Macro aliases and quoted directive arguments (round 1, finding 3).**
+4. **Only enumerators declared in `system_defs.h` are covered** (not other HAL or system headers).
+**Correction of the span-rule description:** the Stage 6 round 2 report and the controller's earlier summary said any preprocessor line inside the span fails. That is wrong: a harmless `#if 1` inside the span passes (it is preserved and compiled). The real span has no directive, so there is no false positive today.
+The limits are in the headers of `tests/storm_reason_qualifies_test.sh` and `tests/reset_reason_guard_structural_test.py`. Principle recorded in `AI_DEVELOPMENT_WORKFLOW.md` §4 (test-tooling findings).

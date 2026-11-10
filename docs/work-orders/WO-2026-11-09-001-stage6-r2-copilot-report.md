@@ -40,3 +40,5 @@ None. I did not read the transcript file or the Stage 6 round 1 report.
 ## Open questions
 - The span check treats any preprocessor line inside the span as executable code, so it fails on one. This is stricter than the WO text; say if you want it relaxed.
 - No hardware claims.
+
+**Correction (controller, 10 Nov 2026, after Stage 7 round 2):** the open question above is wrong as stated. The span check does **not** fail on every preprocessor line: a harmless `#if 1` inside the span is preserved and compiled, so it passes (Codex round 2 verdict). The real span contains no directive, so there is no false positive today.
