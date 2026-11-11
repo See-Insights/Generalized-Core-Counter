@@ -41,3 +41,16 @@ A GCC alert reaches Slack only when someone needs to visit or act. Every code cl
 
 ## Closing record
 Record budget against actual for each item, any increase with its reason, and the Stage 7 SHA and verdict.
+
+## Amendment 1 (architect, 11 Nov): Stage 7 round 1 findings, fixed in one last round (round 2 of 2)
+Stage 7 round 1 (`007504c`, `docs/work-orders/WO-2026-11-11-001-stage7-r1-verdict.md`) was NOT VERIFIED: the change passed items 1, 3 and 5-8; two PMIC alert-20 lifecycle findings (item 2) came back. Ruling: fix both, in one last round.
+
+**Goal: a PMIC code clears when its condition is gone, never before.**
+- **2a (High).** The new "clear 20 when no NTC fault" line (`PmicFaultMonitor.cpp:390-393`) also requires `consecutiveFaults == 0`, so it cannot run during an unfinished remediation cycle. About +1 `src/` line.
+- **2b (Medium; older behaviour, in scope).** The broad "charging resumed" clear for 20-23 (`:363-379`) does not clear 20 while `ntcFaultCode != 0`. About +1 `src/` line.
+- **Tests (two real-function scenarios):** (a) a thermal 0x02 fault raises 20; 20 stays through the first clean poll and clears only after the cycle completes; (b) a combined charge and NTC fault raises 20; 20 stays on the next poll that shows only the NTC fault, and clears once NTC clears.
+- **Mutation:** removing either guard must fail one of the two scenarios.
+- **Budget:** `src/` at most **+2 on top of round 1** (net about +1 against `f00aa04`). If either guard needs more than 2 lines, stop and report.
+- **Stage 6 round 2:** Copilot (standard model, medium), only the two guards and the two scenarios. **Stage 7 round 2:** Codex `gpt-5.6-sol` at high, the SHA in the dispatch header; the last round.
+- **New findings in round 2:** anything outside these two lines is recorded as a known gap in `alert-codes.md` and in this WO's closing record. There is no round 3.
+- The merge stays held until RC1 is tagged.
