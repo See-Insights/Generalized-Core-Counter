@@ -119,5 +119,11 @@ Code table: legacy codes (`Visitation-Counters.ino:14-35`) against GCC codes (`d
 3. **Legacy 12 (FRAM init error): retired.** GCC has no FRAM; a "storage failed" alert would be a new item.
 4. **Timing:** P1–P5 land **before the counter-fleet conversion, not in RC1** (RC1 scope frozen). X1–X3 after RC1's soak; X1 (`lastAlertTime` in the report) first.
 5. **Added to P5:** give code 18 a clear path (report once, then clear, like 19 and 42).
+   - **Confirmed by Chip, 11 Nov, after the Stage 2 questions:** this includes tier 2. If the thrash recurs, raising and reporting 18 again is real information, not noise, and tier 2 is rare. The WO gives 18 a clear site of its own so that it stops masking lower codes.
 6. **Note:** ChurchSt-1a raised **20 on 7 Nov** (its migration day; the "firmware update completed" Slack post) and **21 on 10 Nov**. Investigate both with the `vc` charging check.
+   - **Close-out, code 20 on 7 Nov (Chip, 11 Nov): it was legacy.** The Ubidots `alerts` variable on device `6195a5aa1d847201d504f196` has value 20 at device timestamp 2026-11-07T12:49:42Z, received (`created_at`) at 12:57:05.9Z: a queued legacy publish. Slack posted at 12:57:06Z, the time Ubidots received it. **Rule: to tell legacy from GCC, use the Ubidots value timestamp, not the Slack post time.** The GCC data agrees (all hooks that day carry `alerts` 0; first GCC report 12:55Z; Stage 2 evidence §3).
+   - **Code 21 on 10 Nov stays as recorded:** a near-full-pack false positive (`vc` 4.08 to 4.16 V while the SoC sat at 89 percent). The WO includes a `vc` ≥ 4.05 V exclusion for alert 21.
 7. **X4 (fleet-wide paging, weekly top-10)** belongs in the **fleet-ops** thread and repo.
+
+## 9. Migration notes (added 11 Nov)
+- **Legacy gauge reads lower than GCC.** On ChurchSt-1a the legacy firmware reported `battery` 64 to 66 until 7 Nov 12:18Z (74 at 12:48Z); the first GCC report read 76.18 with `vc` 4.07. Migration therefore cannot cause a false E11 (battery ≤ 65 % for 3 days) or E12 alert. **Chip: no migration-checklist step.** Source: one device; Stage 2 evidence §3.
