@@ -54,3 +54,10 @@ Today you can't tell from the ledgers whether a setting such as `enableHibernate
 
 ## Closing record
 Record budget against actual, and the Stage 7 SHA and verdict.
+
+## Amendment 1 (architect, 11 Nov): one default file per product; the test checks every file; a README
+GCC moves to **one Particle product per profile** (function plus sensor type: occupancy-PIR now, then counting-PIR, then pressure, accelerometer and magnetometer). Each product gets its own complete default file. One file today: `docs/config/default-settings-42131.json`.
+- **The test checks every file.** `tests/default_settings_coverage_test.py` checks **every** `docs/config/default-settings-*.json` and **fails if there are none**. The rule is the same for each file: no missing keys (a key the firmware reads), no dead keys (a key the firmware does not read), and at least 25 keys (the parser floor, applied to the firmware's read list as before; each file must also hold at least 25 leaf keys). Print the lists per file.
+- **Mutations extend:** a second scratch file (a copy of the JSON with a key removed, and one with a dead key added) placed in a scratch copy of `docs/config/` makes the test fail; an empty `docs/config/` (no files) fails.
+- **New `docs/config/README.md`, about 20 lines.** It says three things: (1) every product's default file has the same structure, set by what the firmware reads (`src/cloud/ConfigApply.cpp`); (2) values differ per product; (3) a table of what `sensor.setting1` to `setting4` mean for each `sensor.type`. Today there is only type 1, the PIR: `setting1` is the occupancy debounce in ms (production 300000; 60000 for testing only), and settings 2-4 are unused (0). **Re-cite the meanings from `ConfigApply.cpp` and the sensor code** (`file:line` in the report, not necessarily in the README); if the code disagrees with the table above, stop and report. It also names the rule "any WO that adds, removes or renames a ledger field updates every default file in the same PR".
+- **Budget unchanged:** `src/` 0 lines; the test stays about 80 lines (a modest increase for the per-file loop is fine; state the number).
