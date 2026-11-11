@@ -66,7 +66,7 @@ Code table: legacy codes (`Visitation-Counters.ino:14-35`) against GCC codes (`d
 | 40 webhook response missing | E30-40 | 40 (now a condition) | kept; meaning broadened |
 | — | none | 16, 18, 41, 42, 43, 44 | **silent**: raised, but never reach Slack |
 
-**Evidence of the wrong label:** on Nov 7, GCC device Morrisville-Tennis-ChurchSt-1 (reports `fh`/`lfb`/`cyc`/`slp`, so it's on GCC) posted *"firmware Update Completed Successfully. Msg E30-20"* to #iot-alerts. Under GCC, 20 means a PMIC thermal fault. A charging problem showed up in Slack as good news.
+**Evidence of the wrong label (corrected 11 Nov by Chip; the 7 Nov post was closed as legacy under ruling 6):** on 10 Nov at 20:59:51Z, GCC device Morrisville-Tennis-ChurchSt-1 (reports `fh`/`lfb`/`cyc`/`slp`, so it's on GCC) raised GCC code 21 (PMIC charge timeout or stuck) and #iot-alerts posted *"Firmware Update Timed-Out. Msg E30-5"*. A charging problem showed up in Slack as a firmware update timeout.
 
 **Other GCC behaviors that weaken the signal:**
 - **Severity masking.** `raiseAlert()` keeps only the more severe code (`MyPersistentData.cpp:811-816`). A code that never clears (18 has no clear site) hides every lower code for good.
@@ -127,3 +127,4 @@ Code table: legacy codes (`Visitation-Counters.ino:14-35`) against GCC codes (`d
 
 ## 9. Migration notes (added 11 Nov)
 - **Legacy gauge reads lower than GCC.** On ChurchSt-1a the legacy firmware reported `battery` 64 to 66 until 7 Nov 12:18Z (74 at 12:48Z); the first GCC report read 76.18 with `vc` 4.07. Migration therefore cannot cause a false E11 (battery ≤ 65 % for 3 days) or E12 alert. **Chip: no migration-checklist step.** Source: one device; Stage 2 evidence §3.
+- **Group coverage gap (Chip, 11 Nov).** Only ChurchSt-1 was in the Ubidots group "Active Solar Devices". WAKEFOREST-PC01 and Vaughan-001 to 006 have therefore had no E01 to E03 or E11/E12 coverage (no offline or low-battery alerts and no Freshdesk tickets). The Ubidots checklist `docs/handover/2026-11-11-ubidots-gcc-devices-checklist.md` (Phase E) fixes it.
