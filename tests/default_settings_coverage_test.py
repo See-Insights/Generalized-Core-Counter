@@ -30,7 +30,7 @@ TOP = re.compile(r'getTopLevelMap\(\s*defaults\s*,\s*"(\w+)"\s*,\s*(\w+)\s*\)')
 NESTED = re.compile(r'getNestedMap\(\s*defaults\s*,\s*"(\w+)"\s*,\s*"(\w+)"\s*,\s*(\w+)\s*\)')
 CALL = re.compile(r'getMerged(?:Int|Bool|String|Float)Value\s*\((?=([^,)]*))')
 PARSED = re.compile(r'\(\s*(\w+)\s*,\s*\w+\s*,\s*"(\w+)"')
-NOT_A_CALL = re.compile(r'\bconst\b|[&*]|\w\s+\w')
+NOT_A_CALL = re.compile(r'\bconst\b|\w\s+\w|\w\s*[*&]\s*\w')
 
 
 def firmware_keys(texts):

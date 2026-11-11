@@ -53,7 +53,13 @@ Today you can't tell from the ledgers whether a setting such as `enableHibernate
 - **The HIBERNATE flip:** after v50.1 soaks, `enableHibernateSleep` becomes `true`, in the console **and** in this file, in the same change.
 
 ## Closing record
-Record budget against actual, and the Stage 7 SHA and verdict.
+**Result: VERIFIED WITH FIXES** (architect's ruling, 11 Nov, under the three-level Stage 7 scale; no Codex round 3, the 22 Oct recheck waived for this case).
+- **Budget against actual:** `src/` 0 lines (budget 0). Test `tests/default_settings_coverage_test.py` 108 lines (about 100 allowed by Amendment 2; unchanged by the fix, one line edited). `docs/config/README.md` 17 lines (about 20). Also: `docs/config/default-settings-42131.json` added; stale root `default-settings-v3.23.json` deleted.
+- **Stage 7:** round 1 `5b87f99` NOT VERIFIED (three findings, fixed under Amendment 2); round 2 `c79b3e3` (Codex `gpt-5.6-sol`, medium) NOT VERIFIED on one Medium test finding; verdicts archived as `...-stage7-r1-verdict.md` and `...-stage7-r2-verdict.md`.
+- **The finding and its fix:** `tests/default_settings_coverage_test.py:33`. Any `*` or `&` in a call's first argument was treated as a definition and skipped, so `Variant *p = &defaultModes; getMergedIntValue(*p, deviceModes, "newKey", x);` passed with 27/27. The skip now requires a type-and-name shape: `NOT_A_CALL = \bconst\b|\w\s+\w|\w\s*[*&]\s*\w`. The dereferenced call now fails as unparsed. Applied by the controller under the Section 4 pre-authorization for test-only fixes: 1 line edited, 0 added.
+- **Checks after the fix (controller, run, not Codex):** full suite 119/119 (sh via zsh, py via python3); all eleven required mutations still fail; the new dereferenced-call mutation fails (`Config.cpp` line named unparsed); definitions written `const Variant &d`, `Variant& d`, `Variant *e` are still skipped; real tree 27 of 27.
+- **Documented limits (also in the test header):** lexical scoping, commented-out calls, and macro or regex evasions.
+- **Known gaps:** `.cpp` files only (headers are not scanned); readers other than `getMerged*Value` are not detected; `ledgerHasConfigContent` (`LedgerClient.cpp:9-14`) does not count the `power` section (pre-existing, not part of this WO); the definition-skip is heuristic, so an unusual declaration style could be skipped (a plausible one fails closed).
 
 ## Amendment 1 (architect, 11 Nov): one default file per product; the test checks every file; a README
 GCC moves to **one Particle product per profile** (function plus sensor type: occupancy-PIR now, then counting-PIR, then pressure, accelerometer and magnetometer). Each product gets its own complete default file. One file today: `docs/config/default-settings-42131.json`.
