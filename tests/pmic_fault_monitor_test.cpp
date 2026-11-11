@@ -512,6 +512,68 @@ void testAlert21ClearUnchanged() {
   assert(testCurrent.raiseAlertCallCount == 0);
 }
 
+// WO-2026-11-11-001 item 3: 20 raised by an NTC fault alone, and 23 raised by
+// BAT_FAULT alone, never touch consecutiveFaults, so they clear on their own
+// no-fault predicates.
+void testAlert20FromNtcAloneClearsWhenNtcClears() {
+  PMIC pmic;
+  resetPmic(pmic);
+  resetCurrent();
+  LatchInput in;
+  in.source = 1; // keep the latch out of it
+  in.status = 0x54;
+  in.fault = 0x01; // NTC fault only
+  unsigned long t = 1000UL;
+  latchPoll(pmic, t++, in);
+  assert(testCurrent.alertCodeValue == 20);
+  latchPoll(pmic, t++, in);
+  assert(testCurrent.alertCodeValue == 20); // still faulted: stays
+  in.fault = 0;
+  latchPoll(pmic, t++, in);
+  assert(testCurrent.alertCodeValue == 0);
+  assert(testCurrent.lastAlertTimeValue == 0);
+}
+
+void testAlert23FromBatFaultAloneClearsWhenBatFaultClears() {
+  PMIC pmic;
+  resetPmic(pmic);
+  resetCurrent();
+  LatchInput in;
+  in.source = 1;
+  in.status = 0x54;
+  in.fault = 0x08; // BAT_FAULT only
+  unsigned long t = 1000UL;
+  latchPoll(pmic, t++, in);
+  assert(testCurrent.alertCodeValue == 23);
+  latchPoll(pmic, t++, in);
+  assert(testCurrent.alertCodeValue == 23);
+  in.fault = 0;
+  latchPoll(pmic, t++, in);
+  assert(testCurrent.alertCodeValue == 0);
+  assert(testCurrent.lastAlertTimeValue == 0);
+}
+
+// WO-2026-11-11-001 item 4: the 6 h no-gain alert 21 is skipped on a full pack
+// (vcell >= 4.05 V); 4.04 V still fires. Driven through trackAndReport().
+bool stuckFastChargeFires(float vcell) {
+  resetCurrent();
+  PmicFaultMonitor::Registers regs;
+  regs.chargeStatus = 0;
+  g_testMillis = 1000UL;
+  PmicFaultMonitor::trackAndReport(regs, 0, 50.0f, vcell, 50.0f); // resets the window
+  regs.chargeStatus = 2;
+  PmicFaultMonitor::trackAndReport(regs, 0, 50.0f, vcell, 50.0f); // window starts
+  g_testMillis = 1000UL + 6UL * kH + 1UL;
+  PmicFaultMonitor::trackAndReport(regs, 0, 50.0f, vcell, 50.0f);
+  return testCurrent.alertCodeValue == 21;
+}
+
+void testAlert21SkippedOnFullPack() {
+  assert(stuckFastChargeFires(4.04f));
+  assert(!stuckFastChargeFires(4.05f));
+  assert(!stuckFastChargeFires(4.16f));
+}
+
 // A latch request inside the 1 h cooldown after a remediation attempt does
 // not start a second cycle: an immediate charge-fault reset that reads back
 // clear leaves the mature latch timer running, so without the cooldown the
@@ -633,8 +695,17 @@ int main(int argc, char **argv) {
     case 10:
       testLatchResumeDuringCycleLeavesNoCounter();
       break;
+    case 11:
+      testAlert20FromNtcAloneClearsWhenNtcClears();
+      break;
+    case 12:
+      testAlert23FromBatFaultAloneClearsWhenBatFaultClears();
+      break;
+    case 13:
+      testAlert21SkippedOnFullPack();
+      break;
     default:
-      fprintf(stderr, "usage: %s <1-10>\n", argv[0]);
+      fprintf(stderr, "usage: %s <1-13>\n", argv[0]);
       return 2;
   }
   printf("pmic_fault_monitor_test: scenario %d passed\n", scenario);

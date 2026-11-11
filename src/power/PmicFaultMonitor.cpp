@@ -387,6 +387,10 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
       RecoveryState::set_alertCode(0);
       RecoveryState::set_lastAlertTime(0);
     }
+    if ((currentAlert == 20 && ntcFaultCode == 0) || (currentAlert == 23 && !(regs.faultReg & kPmicBatFaultMask))) {
+      RecoveryState::set_alertCode(0);
+      RecoveryState::set_lastAlertTime(0);
+    }
   }
 
   // USB latch: corrected USB source + VBUS, stuck 2 h below 4.05 V -> one level-1 cycle per 24 h.
@@ -536,8 +540,10 @@ void trackAndReport(const Registers &regs, int powerSource, float soc, float vce
           const Observability::WakeCycleStats &stats = Observability::cycleStats();
           const bool ambiguousHighLoad = regs.inVsysMin || regs.thermalRegulation || awakeMs > 300000UL ||
                                           stats.connect_duration_ms > 120000UL || stats.teardown_duration_ms > 10000UL;
-          if (ambiguousHighLoad) {
-            Log.warn("PMIC: Fast Charging 6+ hours with limited gain under load socGain=%.2f vcellGain=%.3f awake=%lu conn=%lu td=%lu vsysMin=%d thermal=%d",
+          const bool fullPack = vcell >= kPmicFullPackVcell;
+          if (ambiguousHighLoad || fullPack) {
+            if (fullPack) Log.warn("PMIC: Fast Charging 6+ hours with limited gain on a full pack - alert 21 skipped vcell=%.3f", (double)vcell);
+            else Log.warn("PMIC: Fast Charging 6+ hours with limited gain under load socGain=%.2f vcellGain=%.3f awake=%lu conn=%lu td=%lu vsysMin=%d thermal=%d",
                       (double)socGain, (double)vcellGain, awakeMs, stats.connect_duration_ms, stats.teardown_duration_ms,
                       regs.inVsysMin ? 1 : 0, regs.thermalRegulation ? 1 : 0);
             chargeStateStartTime = millis();
