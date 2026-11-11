@@ -110,3 +110,4 @@ Both missing images are in the kit as bench-only builds (test-mode 5098 for item
 3. Early button/GPIO wake: only if it occurs; compare requested versus actual.
 4. The WRTC retry and the skipped `hal_i2c_reset()`.
 5. The S3 watchdog-window residual.
+6. **Alert 19 on the bench (architect, 11 Nov; observation only).** On the v50 integration head (`1d1d5af`) a PIN_RESET with no persisted power-off evidence is inferred as a watchdog and raises alert 19 (`Generalized-Core-Counter.cpp:760-797`); `f00aa04` raises 19 only for an AB1805-confirmed pin reset. 19 is digest-only, so this causes no Slack noise. **Record each 19 raised on the bench and whether that reset was a real watchdog** (a deliberate pin reset or a test reset is not).
