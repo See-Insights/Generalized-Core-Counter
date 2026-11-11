@@ -553,6 +553,57 @@ void testAlert23FromBatFaultAloneClearsWhenBatFaultClears() {
   assert(testCurrent.lastAlertTimeValue == 0);
 }
 
+// WO-2026-11-11-001 Amendment 1 (2a): a thermal CHRG_FAULT 20 must outlive the
+// first clear poll while its remediation cycle is unfinished, and clear only
+// after the cycle completes and one further clean poll confirms recovery.
+void testAlert20ThermalHeldThroughRemediationCycle() {
+  PMIC pmic;
+  resetPmic(pmic);
+  resetCurrent();
+  LatchInput fault;
+  fault.source = 1; // keep the latch out of it
+  fault.status = 0x54;
+  fault.fault = 0x20; // thermal shutdown
+  LatchInput clean = fault;
+  clean.fault = 0;
+  unsigned long t = 4000000UL; // past the remediation cooldown
+  latchPoll(pmic, t++, fault);
+  assert(testCurrent.alertCodeValue == 20);
+  latchPoll(pmic, t++, fault); // arms level 1
+  latchPoll(pmic, t++, fault); // phase 0
+  assert(pmic.disableChargingCallCount == 1 && pmic.enableChargingCallCount == 0);
+  latchPoll(pmic, t++, clean); // first clear poll, cycle still waiting to re-enable
+  assert(pmic.enableChargingCallCount == 0);
+  assert(testCurrent.alertCodeValue == 20);
+  t += 600UL;
+  latchPoll(pmic, t++, clean); // completes the cycle
+  assert(pmic.enableChargingCallCount == 1);
+  assert(testCurrent.alertCodeValue == 20);
+  latchPoll(pmic, t++, clean); // one further clean poll
+  assert(testCurrent.alertCodeValue == 0);
+}
+
+// Amendment 1 (2b): a combined CHRG+NTC poll raises 20; the next poll showing
+// only the NTC fault must not clear it via the "charging resumed" clear.
+void testAlert20HeldWhileNtcActiveAfterCombinedFault() {
+  PMIC pmic;
+  resetPmic(pmic);
+  resetCurrent();
+  LatchInput in;
+  in.source = 1;
+  in.status = 0x54;
+  in.fault = 0x21; // thermal CHRG_FAULT + NTC fault
+  unsigned long t = 4000000UL;
+  latchPoll(pmic, t++, in);
+  assert(testCurrent.alertCodeValue == 20);
+  in.fault = 0x01; // NTC only
+  latchPoll(pmic, t++, in);
+  assert(testCurrent.alertCodeValue == 20);
+  in.fault = 0;
+  latchPoll(pmic, t++, in);
+  assert(testCurrent.alertCodeValue == 0);
+}
+
 // WO-2026-11-11-001 item 4: the 6 h no-gain alert 21 is skipped on a full pack
 // (vcell >= 4.05 V); 4.04 V still fires. Driven through trackAndReport().
 bool stuckFastChargeFires(float vcell) {
@@ -704,8 +755,14 @@ int main(int argc, char **argv) {
     case 13:
       testAlert21SkippedOnFullPack();
       break;
+    case 14:
+      testAlert20ThermalHeldThroughRemediationCycle();
+      break;
+    case 15:
+      testAlert20HeldWhileNtcActiveAfterCombinedFault();
+      break;
     default:
-      fprintf(stderr, "usage: %s <1-13>\n", argv[0]);
+      fprintf(stderr, "usage: %s <1-15>\n", argv[0]);
       return 2;
   }
   printf("pmic_fault_monitor_test: scenario %d passed\n", scenario);

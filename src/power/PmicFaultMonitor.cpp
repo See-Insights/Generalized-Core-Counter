@@ -373,7 +373,7 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
       remediationPhase = 0;
 
       const int8_t currentAlert = RecoveryState::get_alertCode();
-      if (currentAlert >= 20 && currentAlert <= 23) {
+      if (currentAlert >= 20 && currentAlert <= 23 && !(currentAlert == 20 && ntcFaultCode != 0)) {
         Log.info("PMIC: Clearing battery/charging alert %d - charging resumed", currentAlert);
         RecoveryState::set_alertCode(0);
         RecoveryState::set_lastAlertTime(0);
@@ -387,7 +387,7 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
       RecoveryState::set_alertCode(0);
       RecoveryState::set_lastAlertTime(0);
     }
-    if ((currentAlert == 20 && ntcFaultCode == 0) || (currentAlert == 23 && !(regs.faultReg & kPmicBatFaultMask))) {
+    if ((currentAlert == 20 && ntcFaultCode == 0 && consecutiveFaults == 0) || (currentAlert == 23 && !(regs.faultReg & kPmicBatFaultMask))) {
       RecoveryState::set_alertCode(0);
       RecoveryState::set_lastAlertTime(0);
     }
