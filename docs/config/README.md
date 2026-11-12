@@ -12,6 +12,6 @@ One Particle product per profile (function plus sensor type). Each product has i
 |---|---|---|---|---|---|
 | 1 | PIR (occupancy) | Occupancy debounce, ms (production ledger value 300000; 60000 on test devices only, Chip's rule) | unused (0) | unused (0) | unused (0) |
 
-`setting1` 60000 is also the firmware's compiled default and the fallback when the value is missing or zero (`Config.h:35`, `Config.cpp:145-151`).
+The firmware's compiled default and fallback when `setting1` is missing or zero is 300000 (`Config.h:35`, `Config.cpp:145-151`).
 
 Add a row when a new sensor type is added.

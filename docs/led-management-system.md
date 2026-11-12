@@ -202,7 +202,7 @@ if (signalLEDStatus()) {
 ### OCCUPANCY Mode
 1. Trigger PIR to become occupied
 2. Verify LED turns on and stays on
-3. Wait for debounce timeout (setting1 = 60000ms = 60 seconds)
+3. Wait for debounce timeout (setting1 = 60000ms = 60 seconds, a test-device value; the compiled default is 300000ms)
 4. Verify LED turns off when unoccupied
 5. Verify LED stays on during entire occupancy period
 6. Verify device connects and publishes on occupancy changes
