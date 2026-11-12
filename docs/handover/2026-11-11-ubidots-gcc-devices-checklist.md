@@ -63,11 +63,35 @@ Use your own Ubidots token in your terminal. Never paste it into a chat or the r
 
 - For each device, **add first, then remove**, so it's never unwatched. A minute in both groups risks one duplicate post at most.
 - **Keep the site groups** (Morrisville-Tennis, etc.) unchanged.
-- **Hold Vaughan-007 and -008** until they're back online. They've been silent since 16 Sep and 4 Oct, so adding them now fires E02/E03 at once and opens two Freshdesk tickets for a visit that's already planned.
+- **Hold Vaughan-007 and -008** until they're back online (site-visit item: **on return, join `GCC Devices` and set `email1`**, see Phase G). They've been silent since 16 Sep and 4 Oct, so adding them now fires E02/E03 at once and opens two Freshdesk tickets for a visit that's already planned.
 - **Expect** WAKEFOREST-PC01 and Vaughan-001…006 to start getting offline and battery alerts for the first time.
 
 ## Phase F — from now on, the migration step
 Add one line to the migration checklist: **"Ubidots: add the device to `GCC Devices`; remove it from `Active Solar Devices` if it's there; keep its site group."**
+
+## Phase G: the migration checklist step, as written (12 Nov)
+For every device that moves to GCC, in the Ubidots UI: **add the device to `GCC Devices`; remove it from `Active Solar Devices`; keep its site group; and set `email1`.** For the Vaughan devices `email1` is `rajeev@seeinsights.com` for now (Vaughan-001 to -006 done; **Vaughan-007 and -008: on return, join `GCC Devices` and set `email1`**; they are on the site-visit list).
+
+**Maintenance rule:** the code-independent events (E01, E02, E03, E11, E12) now exist as two copies: the original (watching `Active Solar Devices`) and the `(GCC)` copy (watching `GCC Devices`). **A change to E01, E02, E03, E11 or E12 goes into both copies.**
+
+## Close-out (Chip, 12 Nov 2026): setup complete and verified
+The Ubidots `GCC Devices` setup is complete. The verify script reported **14 of 15 done**; **A03 shows TODO only because the test device was deleted, as planned.** Ids (from the verify output):
+
+| Item | Ubidots id |
+|---|---|
+| Group `gcc-devices` | `6af411698260386d6d0e3d86` |
+| `E30-21 (GCC)` (Phase B1) | `6af412018993ef0c722a508b` |
+| `E30-17 (GCC)` (Phase B2) | `6af412195452ba861762c046` |
+| `E30-18 (GCC)` (Phase B3) | `6af4122e7e4a7149e17bc0bb` |
+| `E12 (GCC)` copy | `6af412f11d79014c3a4b3ba2` |
+| `E11 (GCC)` copy | `6af4130bbf5e1c7917e387ea` |
+| `E02 (GCC)` copy | `6af41321ea81f7410c1cca5c` |
+| `E03 (GCC)` copy | `6af41337745afb2d7b65565e` |
+| `E01 (GCC)` validation copy | `6af4134ebf5e1c7917e38a8c` |
+| `E01 (GCC)` post copy | `6af4146e7cad033f481a19b6` |
+| `E01 (GCC)` reconnected copy | `6af414825452ba861762cdc8` |
+
+The seven code-independent events were therefore handled by **copying** each to a `(GCC)` copy (the picker method in Phase C's note), not by adding the group to the originals. Phase C's ids above are the originals. Vaughan `email1` = `rajeev@seeinsights.com`.
 
 ## Not covered here (each goes to its own thread)
 - Dashboards or reports that filter on "Active Solar Devices" lose ChurchSt-1 once it moves. Check Data → Dashboards before step E. The MCP can't list dashboards.
