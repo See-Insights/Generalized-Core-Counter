@@ -586,21 +586,63 @@ void testAlert20ThermalHeldThroughRemediationCycle() {
 // Amendment 1 (2b): a combined CHRG+NTC poll raises 20; the next poll showing
 // only the NTC fault must not clear it via the "charging resumed" clear.
 void testAlert20HeldWhileNtcActiveAfterCombinedFault() {
+  // Any nonzero NTC_FAULT code (bits 2:0, kPmicNtcFaultMask 0x07) must hold 20;
+  // three representative codes so a guard that protects only one code fails.
+  const uint8_t ntcCodes[] = {0x01, 0x05, 0x07};
+  for (uint8_t ntc : ntcCodes) {
+    PMIC pmic;
+    resetPmic(pmic);
+    resetCurrent();
+    LatchInput in;
+    in.source = 1;
+    in.status = 0x54;
+    in.fault = 0x20 | ntc; // thermal CHRG_FAULT + NTC fault
+    unsigned long t = 4000000UL;
+    latchPoll(pmic, t++, in);
+    assert(testCurrent.alertCodeValue == 20);
+    in.fault = ntc; // NTC only
+    latchPoll(pmic, t++, in);
+    assert(testCurrent.alertCodeValue == 20);
+    in.fault = 0;
+    latchPoll(pmic, t++, in);
+    assert(testCurrent.alertCodeValue == 0);
+  }
+}
+
+// WO-2026-11-11-001 Stage 6 r3: the consecutive-fault counter saturates, so a
+// cycle frozen under a persistent thermal fault for 256+ polls cannot wrap it
+// to zero and let guard 2a clear alert 20 before charging is re-enabled.
+void testAlert20HeldWhenFrozenFaultCounterWouldWrap() {
   PMIC pmic;
   resetPmic(pmic);
   resetCurrent();
-  LatchInput in;
-  in.source = 1;
-  in.status = 0x54;
-  in.fault = 0x21; // thermal CHRG_FAULT + NTC fault
+  LatchInput fault;
+  fault.source = 1;
+  fault.status = 0x54;
+  fault.fault = 0x20; // thermal shutdown
+  LatchInput clean = fault;
+  clean.fault = 0;
   unsigned long t = 4000000UL;
-  latchPoll(pmic, t++, in);
+  latchPoll(pmic, t++, fault);
+  latchPoll(pmic, t++, fault); // arms level 1
+  latchPoll(pmic, t++, fault); // phase 0: charging disabled
+  assert(pmic.disableChargingCallCount == 1 && pmic.enableChargingCallCount == 0);
+  fault.safe = false;
+  clean.safe = false;
+  t += 600UL;
+  for (int i = 0; i < 509; i++) { // 3 + 509 faults wraps a uint8_t counter to 0
+    latchPoll(pmic, t++, fault); // frozen under the persistent fault
+    assert(testCurrent.alertCodeValue == 20);
+    assert(pmic.disableChargingCallCount == 1 && pmic.enableChargingCallCount == 0);
+  }
+  latchPoll(pmic, t++, clean); // CHRG clears, cycle still frozen
   assert(testCurrent.alertCodeValue == 20);
-  in.fault = 0x01; // NTC only
-  latchPoll(pmic, t++, in);
+  assert(pmic.disableChargingCallCount == 1 && pmic.enableChargingCallCount == 0);
+  clean.safe = true;
+  latchPoll(pmic, t++, clean); // cycle completes
+  assert(pmic.enableChargingCallCount == 1);
   assert(testCurrent.alertCodeValue == 20);
-  in.fault = 0;
-  latchPoll(pmic, t++, in);
+  latchPoll(pmic, t++, clean);
   assert(testCurrent.alertCodeValue == 0);
 }
 
@@ -761,8 +803,11 @@ int main(int argc, char **argv) {
     case 15:
       testAlert20HeldWhileNtcActiveAfterCombinedFault();
       break;
+    case 16:
+      testAlert20HeldWhenFrozenFaultCounterWouldWrap();
+      break;
     default:
-      fprintf(stderr, "usage: %s <1-15>\n", argv[0]);
+      fprintf(stderr, "usage: %s <1-16>\n", argv[0]);
       return 2;
   }
   printf("pmic_fault_monitor_test: scenario %d passed\n", scenario);

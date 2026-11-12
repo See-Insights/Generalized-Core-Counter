@@ -31,3 +31,4 @@ clang++ -std=c++17 -Wall -Wextra -pedantic \
 "$binary" 13
 "$binary" 14
 "$binary" 15
+"$binary" 16

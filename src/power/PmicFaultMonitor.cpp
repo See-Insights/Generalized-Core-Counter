@@ -205,7 +205,7 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
   // enter this remediation path (a hardware condition, not fixable by toggle).
   if (regs.faultReg & kPmicChargeFaultMask) {
     const uint8_t chargeFault = pmicChargeFaultCode(regs.faultReg);
-    consecutiveFaults++;
+    if (consecutiveFaults < UINT8_MAX) consecutiveFaults++;
 
     switch (chargeFault) {
       case 0x01: // Input fault: usually a transient solar dip - log only.
