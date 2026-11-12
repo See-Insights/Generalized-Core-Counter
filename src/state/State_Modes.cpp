@@ -73,18 +73,11 @@ void handleOccupancyMode() {
       session.pieceUntrusted = !Clock::isTrusted();
       
       // V3.23: Set LED with debounce timeout from sensor.setting1
-      uint32_t setting1Raw = SystemConfig::SensorSettings::get_sensorSetting1();
-      uint32_t debounceSeconds = setting1Raw / 1000;
-      Log.info("OCCUPANCY detection: setting1=%lu ms => debounce=%lu sec",
-               (unsigned long)setting1Raw, (unsigned long)debounceSeconds);
-      if (debounceSeconds == 0) {
-        Log.warn("Debounce timeout is 0 - using 60 sec default (check sensor.setting1=%lu)", 
-                 (unsigned long)setting1Raw);
-        debounceSeconds = 60;  // Minimum 60 second debounce for occupancy
-      }
-      signalLED(true, debounceSeconds * 1000UL);  // Turn on LED until debounce expires
+      const unsigned long debounceMs = Config::occupancyDebounceMsForRuntime();
+      Log.info("OCCUPANCY detection: debounce=%lu ms (%lu sec)", debounceMs, debounceMs / 1000UL);
+      signalLED(true, debounceMs);  // Turn on LED until debounce expires
       const bool reportNow = reportsOccupancyChangesNow();
-      logOccupiedEvent("pir", debounceSeconds, reportNow);
+      logOccupiedEvent("pir", debounceMs / 1000UL, reportNow);
       
       // In INTERMITTENT_KEEP_ALIVE and CONNECTED modes, report immediately on occupancy state changes
       // This allows dashboard to show real-time occupancy transitions
@@ -96,13 +89,10 @@ void handleOccupancyMode() {
       }
     } else {
       // Already occupied - reset LED timeout on new motion
-      uint32_t debounceSeconds = SystemConfig::SensorSettings::get_sensorSetting1() / 1000;
-      if (debounceSeconds == 0) {
-        debounceSeconds = 60;  // Minimum 60 second debounce for occupancy
-      }
-      signalLED(true, debounceSeconds * 1000UL);  // Reset LED timeout
+      const unsigned long debounceMs = Config::occupancyDebounceMsForRuntime();
+      signalLED(true, debounceMs);  // Reset LED timeout
       if (SystemConfig::get_verboseMode()) {
-        logOccupiedEvent("pir", debounceSeconds, false, true);
+        logOccupiedEvent("pir", debounceMs / 1000UL, false, true);
       }
     }
 
@@ -239,10 +229,7 @@ bool processSleepWakeEvent(bool pirWake) {
           CurrentReadings::set_lastOccupancyEvent(millis());
 
           // Keep LED on for the debounce window (sensor.setting1 is milliseconds).
-          uint32_t debounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
-          if (debounceMs == 0) {
-            debounceMs = Config::occupancyDebounceMsForRuntime();
-          }
+          const unsigned long debounceMs = Config::occupancyDebounceMsForRuntime();
           signalLED(true, debounceMs);
           const bool reportNow = reportsOccupancyChangesNow();
           logOccupiedEvent("pir-wake", debounceMs / 1000UL, reportNow);
@@ -257,10 +244,7 @@ bool processSleepWakeEvent(bool pirWake) {
           }
         } else {
           // Already occupied - motion detected during debounce, restart timer
-          uint32_t debounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
-          if (debounceMs == 0) {
-            debounceMs = Config::occupancyDebounceMsForRuntime();
-          }
+          const unsigned long debounceMs = Config::occupancyDebounceMsForRuntime();
           signalLED(true, debounceMs);  // Restart LED timer
           logOccupiedEvent("pir-wake", debounceMs / 1000UL, false, true);
         }

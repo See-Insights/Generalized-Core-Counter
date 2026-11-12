@@ -123,7 +123,7 @@ struct PowerManager {
   static PowerManager &instance() { static PowerManager pm; return pm; }
   uint8_t effectiveConnectionMode() const { return SystemConfig::get_configuredConnectionMode(); }
 };
-namespace Config { uint32_t occupancyDebounceMsForRuntime() { return 300000UL; } }
+namespace Config { uint32_t occupancyDebounceMsForRuntime() { return SystemConfig::SensorSettings::set1 != 0 ? SystemConfig::SensorSettings::set1 : 300000UL; } }
 struct SessionState {
   time_t occupancySessionBootAnchor = 0;
   bool occupancyChangeTriggered = false;
