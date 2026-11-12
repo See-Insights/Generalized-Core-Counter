@@ -7,6 +7,7 @@ class PMIC;
 constexpr uint8_t kPmicChargeFaultMask = 0x30; // REG09 bits 5:4
 constexpr uint8_t kPmicBatFaultMask = 0x08;    // REG09 bit 3
 constexpr uint8_t kPmicNtcFaultMask = 0x07;    // REG09 bits 2:0
+constexpr float kPmicFullPackVcell = 4.05f;    // at or above this, a no-gain fast charge is a full pack, not alert 21
 
 // PMIC fault monitoring/remediation/telemetry for the BQ24195 (Boron/cellular
 // only). SEPARATE concern from F2a's thermal ChargeInhibit: this reacts to

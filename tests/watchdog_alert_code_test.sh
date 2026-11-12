@@ -53,6 +53,19 @@ if ! echo "$tier3_block" | grep -q "case 18:"; then
   exit 1
 fi
 
+# The mirror's tier-3 list and auto-clear list must match the source tables.
+case_list() { awk -v start="$2" -v stop="$3" '$0 ~ start {on=1} on && /case [0-9]+:/ {match($0,/case [0-9]+/); print substr($0,RSTART+5,RLENGTH-5)} on && $0 ~ stop {exit}' "$1" | tr '\n' ' '; }
+mirror_src="$repo_root/tests/watchdog_alert_code_test.cpp"
+[[ -n "$(case_list "$report_src" 'isAutoClearAfterReportAlert[(]int' 'return true;')" ]] || { echo "FIDELITY CHECK FAILED: empty auto-clear list" >&2; exit 1; }
+if [[ "$(case_list "$persistent_src" 'case 14:' 'return 3;')" != "$(case_list "$mirror_src" 'case 14:' 'return 3;')" ]]; then
+  echo "FIDELITY CHECK FAILED: mirror tier-3 list differs from getAlertSeverity() in $persistent_src" >&2
+  exit 1
+fi
+if [[ "$(case_list "$report_src" 'isAutoClearAfterReportAlert[(]int' 'return true;')" != "$(case_list "$mirror_src" 'isAutoClearAfterReportAlert[(]int' 'return true;')" ]]; then
+  echo "FIDELITY CHECK FAILED: mirror auto-clear list differs from isAutoClearAfterReportAlert() in $report_src" >&2
+  exit 1
+fi
+
 # WO-2026-10-06-001: code 19 MUST appear in isAutoClearAfterReportAlert()'s
 # case list (reported once, then cleared). Before, it was excluded (sticky).
 autoclear_body=$(awk '/static bool isAutoClearAfterReportAlert/,/^}/' "$report_src")

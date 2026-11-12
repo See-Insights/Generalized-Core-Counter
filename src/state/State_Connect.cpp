@@ -547,20 +547,10 @@ void handleConnectingState() {
         thrashGuard.markProgress("LEDGER_SYNC_OK");
       }
 
-      bool ledgerPublishOk = true;
       if (!lastEnteredFromReporting) {
         if (!Cloud::instance().publishDataToLedger("ConnectState")) {
           RecoveryState::raiseAlert(42); // data ledger publish failure
-          ledgerPublishOk = false;
         }
-      }
-
-      // Boot-storm alert is intended as a one-shot incident marker.
-      // After one successful post-boot cloud service pass, clear it.
-      if (RecoveryState::get_alertCode() == 17 && configOk && ledgerPublishOk) {
-        Log.info("Boot-storm recovery verified - clearing alert 17");
-        RecoveryState::set_alertCode(0);
-        RecoveryState::set_lastAlertTime(0);
       }
 
       size_t pending = PublishQueuePosix::instance().getNumEvents();

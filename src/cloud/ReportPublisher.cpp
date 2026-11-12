@@ -25,6 +25,8 @@ constexpr unsigned long REPORT_FORENSICS_ABNORMAL_WARN_THRESHOLD_MS = 1000UL;
 static bool isAutoClearAfterReportAlert(int alertCode) {
   switch (alertCode) {
   case 15:
+  case 17:
+  case 18:
   case 19:
   case 31:
   case 41:

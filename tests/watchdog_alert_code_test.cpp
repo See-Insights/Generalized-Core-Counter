@@ -43,6 +43,7 @@ int getAlertSeverity(int8_t code) {
   case 18:
   case 20:
   case 21:
+  case 22:
     return 3;
 
   case 19: // watchdog reset (Device-OS-detected or AB1805-confirmed PIN_RESET)
@@ -68,6 +69,8 @@ int getAlertSeverity(int8_t code) {
 bool isAutoClearAfterReportAlert(int alertCode) {
   switch (alertCode) {
   case 15:
+  case 17:
+  case 18:
   case 19:
   case 31:
   case 41:
@@ -104,6 +107,7 @@ void testNewAlertCodeIsItsOwnTierAboveExistingTier3Group() {
   assert(getAlertSeverity(18) == 3);
   assert(getAlertSeverity(20) == 3);
   assert(getAlertSeverity(21) == 3);
+  assert(getAlertSeverity(22) == 3);
   assert(getAlertSeverity(WATCHDOG_ALERT_CODE) > getAlertSeverity(14));
   assert(getAlertSeverity(WATCHDOG_ALERT_CODE) > getAlertSeverity(18));
   assert(getAlertSeverity(WATCHDOG_ALERT_CODE) > getAlertSeverity(21));
@@ -118,6 +122,8 @@ void testWatchdogAlertCodeInAutoClearList() {
   // Sanity: confirm the function still behaves correctly for known
   // auto-clear codes, so a trivial "always false" stub wouldn't pass silently.
   assert(isAutoClearAfterReportAlert(15) == true);
+  assert(isAutoClearAfterReportAlert(17) == true);
+  assert(isAutoClearAfterReportAlert(18) == true);
   assert(isAutoClearAfterReportAlert(31) == true);
   assert(isAutoClearAfterReportAlert(41) == true);
   assert(isAutoClearAfterReportAlert(43) == true);

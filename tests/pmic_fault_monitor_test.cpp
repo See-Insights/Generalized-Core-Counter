@@ -512,6 +512,161 @@ void testAlert21ClearUnchanged() {
   assert(testCurrent.raiseAlertCallCount == 0);
 }
 
+// WO-2026-11-11-001 item 3: 20 raised by an NTC fault alone, and 23 raised by
+// BAT_FAULT alone, never touch consecutiveFaults, so they clear on their own
+// no-fault predicates.
+void testAlert20FromNtcAloneClearsWhenNtcClears() {
+  PMIC pmic;
+  resetPmic(pmic);
+  resetCurrent();
+  LatchInput in;
+  in.source = 1; // keep the latch out of it
+  in.status = 0x54;
+  in.fault = 0x01; // NTC fault only
+  unsigned long t = 1000UL;
+  latchPoll(pmic, t++, in);
+  assert(testCurrent.alertCodeValue == 20);
+  latchPoll(pmic, t++, in);
+  assert(testCurrent.alertCodeValue == 20); // still faulted: stays
+  in.fault = 0;
+  latchPoll(pmic, t++, in);
+  assert(testCurrent.alertCodeValue == 0);
+  assert(testCurrent.lastAlertTimeValue == 0);
+}
+
+void testAlert23FromBatFaultAloneClearsWhenBatFaultClears() {
+  PMIC pmic;
+  resetPmic(pmic);
+  resetCurrent();
+  LatchInput in;
+  in.source = 1;
+  in.status = 0x54;
+  in.fault = 0x08; // BAT_FAULT only
+  unsigned long t = 1000UL;
+  latchPoll(pmic, t++, in);
+  assert(testCurrent.alertCodeValue == 23);
+  latchPoll(pmic, t++, in);
+  assert(testCurrent.alertCodeValue == 23);
+  in.fault = 0;
+  latchPoll(pmic, t++, in);
+  assert(testCurrent.alertCodeValue == 0);
+  assert(testCurrent.lastAlertTimeValue == 0);
+}
+
+// WO-2026-11-11-001 Amendment 1 (2a): a thermal CHRG_FAULT 20 must outlive the
+// first clear poll while its remediation cycle is unfinished, and clear only
+// after the cycle completes and one further clean poll confirms recovery.
+void testAlert20ThermalHeldThroughRemediationCycle() {
+  PMIC pmic;
+  resetPmic(pmic);
+  resetCurrent();
+  LatchInput fault;
+  fault.source = 1; // keep the latch out of it
+  fault.status = 0x54;
+  fault.fault = 0x20; // thermal shutdown
+  LatchInput clean = fault;
+  clean.fault = 0;
+  unsigned long t = 4000000UL; // past the remediation cooldown
+  latchPoll(pmic, t++, fault);
+  assert(testCurrent.alertCodeValue == 20);
+  latchPoll(pmic, t++, fault); // arms level 1
+  latchPoll(pmic, t++, fault); // phase 0
+  assert(pmic.disableChargingCallCount == 1 && pmic.enableChargingCallCount == 0);
+  latchPoll(pmic, t++, clean); // first clear poll, cycle still waiting to re-enable
+  assert(pmic.enableChargingCallCount == 0);
+  assert(testCurrent.alertCodeValue == 20);
+  t += 600UL;
+  latchPoll(pmic, t++, clean); // completes the cycle
+  assert(pmic.enableChargingCallCount == 1);
+  assert(testCurrent.alertCodeValue == 20);
+  latchPoll(pmic, t++, clean); // one further clean poll
+  assert(testCurrent.alertCodeValue == 0);
+}
+
+// Amendment 1 (2b): a combined CHRG+NTC poll raises 20; the next poll showing
+// only the NTC fault must not clear it via the "charging resumed" clear.
+void testAlert20HeldWhileNtcActiveAfterCombinedFault() {
+  // Any nonzero NTC_FAULT code (bits 2:0, kPmicNtcFaultMask 0x07) must hold 20;
+  // three representative codes so a guard that protects only one code fails.
+  const uint8_t ntcCodes[] = {0x01, 0x05, 0x07};
+  for (uint8_t ntc : ntcCodes) {
+    PMIC pmic;
+    resetPmic(pmic);
+    resetCurrent();
+    LatchInput in;
+    in.source = 1;
+    in.status = 0x54;
+    in.fault = 0x20 | ntc; // thermal CHRG_FAULT + NTC fault
+    unsigned long t = 4000000UL;
+    latchPoll(pmic, t++, in);
+    assert(testCurrent.alertCodeValue == 20);
+    in.fault = ntc; // NTC only
+    latchPoll(pmic, t++, in);
+    assert(testCurrent.alertCodeValue == 20);
+    in.fault = 0;
+    latchPoll(pmic, t++, in);
+    assert(testCurrent.alertCodeValue == 0);
+  }
+}
+
+// WO-2026-11-11-001 Stage 6 r3: the consecutive-fault counter saturates, so a
+// cycle frozen under a persistent thermal fault for 256+ polls cannot wrap it
+// to zero and let guard 2a clear alert 20 before charging is re-enabled.
+void testAlert20HeldWhenFrozenFaultCounterWouldWrap() {
+  PMIC pmic;
+  resetPmic(pmic);
+  resetCurrent();
+  LatchInput fault;
+  fault.source = 1;
+  fault.status = 0x54;
+  fault.fault = 0x20; // thermal shutdown
+  LatchInput clean = fault;
+  clean.fault = 0;
+  unsigned long t = 4000000UL;
+  latchPoll(pmic, t++, fault);
+  latchPoll(pmic, t++, fault); // arms level 1
+  latchPoll(pmic, t++, fault); // phase 0: charging disabled
+  assert(pmic.disableChargingCallCount == 1 && pmic.enableChargingCallCount == 0);
+  fault.safe = false;
+  clean.safe = false;
+  t += 600UL;
+  for (int i = 0; i < 509; i++) { // 3 + 509 faults wraps a uint8_t counter to 0
+    latchPoll(pmic, t++, fault); // frozen under the persistent fault
+    assert(testCurrent.alertCodeValue == 20);
+    assert(pmic.disableChargingCallCount == 1 && pmic.enableChargingCallCount == 0);
+  }
+  latchPoll(pmic, t++, clean); // CHRG clears, cycle still frozen
+  assert(testCurrent.alertCodeValue == 20);
+  assert(pmic.disableChargingCallCount == 1 && pmic.enableChargingCallCount == 0);
+  clean.safe = true;
+  latchPoll(pmic, t++, clean); // cycle completes
+  assert(pmic.enableChargingCallCount == 1);
+  assert(testCurrent.alertCodeValue == 20);
+  latchPoll(pmic, t++, clean);
+  assert(testCurrent.alertCodeValue == 0);
+}
+
+// WO-2026-11-11-001 item 4: the 6 h no-gain alert 21 is skipped on a full pack
+// (vcell >= 4.05 V); 4.04 V still fires. Driven through trackAndReport().
+bool stuckFastChargeFires(float vcell) {
+  resetCurrent();
+  PmicFaultMonitor::Registers regs;
+  regs.chargeStatus = 0;
+  g_testMillis = 1000UL;
+  PmicFaultMonitor::trackAndReport(regs, 0, 50.0f, vcell, 50.0f); // resets the window
+  regs.chargeStatus = 2;
+  PmicFaultMonitor::trackAndReport(regs, 0, 50.0f, vcell, 50.0f); // window starts
+  g_testMillis = 1000UL + 6UL * kH + 1UL;
+  PmicFaultMonitor::trackAndReport(regs, 0, 50.0f, vcell, 50.0f);
+  return testCurrent.alertCodeValue == 21;
+}
+
+void testAlert21SkippedOnFullPack() {
+  assert(stuckFastChargeFires(4.04f));
+  assert(!stuckFastChargeFires(4.05f));
+  assert(!stuckFastChargeFires(4.16f));
+}
+
 // A latch request inside the 1 h cooldown after a remediation attempt does
 // not start a second cycle: an immediate charge-fault reset that reads back
 // clear leaves the mature latch timer running, so without the cooldown the
@@ -633,8 +788,26 @@ int main(int argc, char **argv) {
     case 10:
       testLatchResumeDuringCycleLeavesNoCounter();
       break;
+    case 11:
+      testAlert20FromNtcAloneClearsWhenNtcClears();
+      break;
+    case 12:
+      testAlert23FromBatFaultAloneClearsWhenBatFaultClears();
+      break;
+    case 13:
+      testAlert21SkippedOnFullPack();
+      break;
+    case 14:
+      testAlert20ThermalHeldThroughRemediationCycle();
+      break;
+    case 15:
+      testAlert20HeldWhileNtcActiveAfterCombinedFault();
+      break;
+    case 16:
+      testAlert20HeldWhenFrozenFaultCounterWouldWrap();
+      break;
     default:
-      fprintf(stderr, "usage: %s <1-10>\n", argv[0]);
+      fprintf(stderr, "usage: %s <1-16>\n", argv[0]);
       return 2;
   }
   printf("pmic_fault_monitor_test: scenario %d passed\n", scenario);

@@ -205,7 +205,7 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
   // enter this remediation path (a hardware condition, not fixable by toggle).
   if (regs.faultReg & kPmicChargeFaultMask) {
     const uint8_t chargeFault = pmicChargeFaultCode(regs.faultReg);
-    consecutiveFaults++;
+    if (consecutiveFaults < UINT8_MAX) consecutiveFaults++;
 
     switch (chargeFault) {
       case 0x01: // Input fault: usually a transient solar dip - log only.
@@ -373,7 +373,7 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
       remediationPhase = 0;
 
       const int8_t currentAlert = RecoveryState::get_alertCode();
-      if (currentAlert >= 20 && currentAlert <= 23) {
+      if (currentAlert >= 20 && currentAlert <= 23 && !(currentAlert == 20 && ntcFaultCode != 0)) {
         Log.info("PMIC: Clearing battery/charging alert %d - charging resumed", currentAlert);
         RecoveryState::set_alertCode(0);
         RecoveryState::set_lastAlertTime(0);
@@ -384,6 +384,10 @@ Registers pollAndRemediate(PMIC &pmic, bool safeToCharge, uint8_t battState, int
     const int8_t currentAlert = RecoveryState::get_alertCode();
     if (currentAlert == 21 && regs.chargeStatus != 2) {
       Log.info("PMIC: clearing alert 21 after charge recovery");
+      RecoveryState::set_alertCode(0);
+      RecoveryState::set_lastAlertTime(0);
+    }
+    if ((currentAlert == 20 && ntcFaultCode == 0 && consecutiveFaults == 0) || (currentAlert == 23 && !(regs.faultReg & kPmicBatFaultMask))) {
       RecoveryState::set_alertCode(0);
       RecoveryState::set_lastAlertTime(0);
     }
@@ -536,8 +540,10 @@ void trackAndReport(const Registers &regs, int powerSource, float soc, float vce
           const Observability::WakeCycleStats &stats = Observability::cycleStats();
           const bool ambiguousHighLoad = regs.inVsysMin || regs.thermalRegulation || awakeMs > 300000UL ||
                                           stats.connect_duration_ms > 120000UL || stats.teardown_duration_ms > 10000UL;
-          if (ambiguousHighLoad) {
-            Log.warn("PMIC: Fast Charging 6+ hours with limited gain under load socGain=%.2f vcellGain=%.3f awake=%lu conn=%lu td=%lu vsysMin=%d thermal=%d",
+          const bool fullPack = vcell >= kPmicFullPackVcell;
+          if (ambiguousHighLoad || fullPack) {
+            if (fullPack) Log.warn("PMIC: Fast Charging 6+ hours with limited gain on a full pack - alert 21 skipped vcell=%.3f", (double)vcell);
+            else Log.warn("PMIC: Fast Charging 6+ hours with limited gain under load socGain=%.2f vcellGain=%.3f awake=%lu conn=%lu td=%lu vsysMin=%d thermal=%d",
                       (double)socGain, (double)vcellGain, awakeMs, stats.connect_duration_ms, stats.teardown_duration_ms,
                       regs.inVsysMin ? 1 : 0, regs.thermalRegulation ? 1 : 0);
             chargeStateStartTime = millis();

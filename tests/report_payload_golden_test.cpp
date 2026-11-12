@@ -146,6 +146,8 @@ static std::vector<V> vectors() {
   const uint8_t badTypes[] = {0, 3, 99};
   for (int m = 0; m < 2; m++) for (int k = 0; k < 3; k++) {
     In i; i.mode = m; i.built = false; i.stype = badTypes[k]; add(S("closed_badtype%d_m%d", badTypes[k], m), i); }
+  // Pin every batteryContext[] string (key1): states 1, 3, 4, 5 are not covered above.
+  for (uint8_t b : {1, 3, 4, 5}) { In i; i.bs = b; add(S("key1_bs%d", b), i); }
   return v;
 }
 
