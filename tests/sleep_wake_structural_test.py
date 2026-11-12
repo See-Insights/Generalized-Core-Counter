@@ -236,11 +236,19 @@ OPEN_WAKE = "          CurrentReadings::set_occupancyStartTime(Time.now());\n"
 if base_modes is not None:
     base_modes = base_modes.replace(DEBOUNCE_OLD, "  if (debounceRemainingMs() == 0) {").replace(LED_CLOSE_OLD, LED_CLOSE_NEW)
     base_modes = c2_open(c2_open(base_modes, "      ", OPEN_AWAKE), "          ", OPEN_WAKE)
+    base_modes = base_modes.replace("""        Log.warn("Debounce timeout is 0 - using 60 sec default (check sensor.setting1=%lu)", 
+                 (unsigned long)setting1Raw);
+        debounceSeconds = 60;  // Minimum 60 second debounce for occupancy
+""", "        debounceSeconds = Config::occupancyDebounceMsForRuntime() / 1000UL;\n").replace(
+        "        debounceSeconds = 60;  // Minimum 60 second debounce for occupancy\n",
+        "        debounceSeconds = Config::occupancyDebounceMsForRuntime() / 1000UL;\n")
 cur_modes_head = modes[:modes.index("\nbool processSleepWakeEvent(bool pirWake) {")]
 added = [l for l in modes.splitlines(keepends=True) if l not in base_modes.splitlines(keepends=True)]
 head_added = [l for l in cur_modes_head.splitlines(keepends=True) if l not in base_modes.splitlines(keepends=True)]
 # WO-2026-11-03-004: updateOccupancyState() now asks the one debounce predicate.
-if head_added and not all(l.startswith("#include") or l == "  if (debounceRemainingMs() == 0) {\n" for l in head_added):
+# WO-2026-11-11-003 Amendment 1: the awake PIR branches fall back to the runtime default, as the sleep path does.
+if head_added and not all(l.startswith("#include") or l == "  if (debounceRemainingMs() == 0) {\n"
+                                       or l == "        debounceSeconds = Config::occupancyDebounceMsForRuntime() / 1000UL;\n" for l in head_added):
     fail("State_Modes.cpp changed above the new owner beyond added includes")
 if "".join(l for l in base_modes.splitlines(keepends=True) if not l.startswith("#include")).rstrip("\n") != \
         "".join(l for l in cur_modes_head.splitlines(keepends=True) if not l.startswith("#include")).rstrip("\n"):

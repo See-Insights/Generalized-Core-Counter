@@ -43,6 +43,11 @@
   - `sleep_wake_equivalence_test.cpp:300`
   - `untrusted_piece_c2_test.sh:211`
   - `webhook_timeout_range_test.py:4` (a comment)
+  - Added in round 2 (superstrings, arithmetic or comments; none pins the default):
+    `debounce_default_test.sh:3` (comment), `debounce_expiry_c1_test.sh:35,52` (`3600000` fake, `60000 - 396`),
+    `firmware_update_dwell_test.sh:435` (`600000`), `pmic_fault_monitor_test.cpp:311` (`3600000UL`),
+    `sleep_execution_equivalence_test.sh:166,168` (`dur=3600000`),
+    `sleep_cloud_gate_transcript.txt` (2 substring hits), `sleep_execution_transcript.txt` (200 substring hits)
   - fixtures `sleep_cloud_gate_transcript.txt:2079,4699`, `sleep_preflight_transcript.txt` (`awake=60000`, many lines) and `sleep_wake_transcript.txt` (`led=1/60000`, 8 lines)
 
 ## Failing-before evidence

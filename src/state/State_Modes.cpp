@@ -78,9 +78,7 @@ void handleOccupancyMode() {
       Log.info("OCCUPANCY detection: setting1=%lu ms => debounce=%lu sec",
                (unsigned long)setting1Raw, (unsigned long)debounceSeconds);
       if (debounceSeconds == 0) {
-        Log.warn("Debounce timeout is 0 - using 60 sec default (check sensor.setting1=%lu)", 
-                 (unsigned long)setting1Raw);
-        debounceSeconds = 60;  // Minimum 60 second debounce for occupancy
+        debounceSeconds = Config::occupancyDebounceMsForRuntime() / 1000UL;
       }
       signalLED(true, debounceSeconds * 1000UL);  // Turn on LED until debounce expires
       const bool reportNow = reportsOccupancyChangesNow();
@@ -98,7 +96,7 @@ void handleOccupancyMode() {
       // Already occupied - reset LED timeout on new motion
       uint32_t debounceSeconds = SystemConfig::SensorSettings::get_sensorSetting1() / 1000;
       if (debounceSeconds == 0) {
-        debounceSeconds = 60;  // Minimum 60 second debounce for occupancy
+        debounceSeconds = Config::occupancyDebounceMsForRuntime() / 1000UL;
       }
       signalLED(true, debounceSeconds * 1000UL);  // Reset LED timeout
       if (SystemConfig::get_verboseMode()) {
