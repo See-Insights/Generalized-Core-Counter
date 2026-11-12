@@ -47,9 +47,13 @@ OCC_NEW = (
     "      if (remaining > 0) {\n"
     "        const int untilDeadline = (int)(remaining / 1000UL) + 1;  // wake just after expiry (1 s margin)\n"
     "        if (untilDeadline < wakeInSeconds) wakeInSeconds = untilDeadline;\n"
-    "      } else if (debounceSeconds < (uint32_t)wakeInSeconds) {\n"
-    "        wakeInSeconds = (int)debounceSeconds;  // no deadline known: the full debounce\n"
+    "      } else if ((debounceMs - 1) / 1000UL + 1 < (uint32_t)wakeInSeconds) {\n"
+    "        wakeInSeconds = (int)((debounceMs - 1) / 1000UL + 1);  // no deadline known: the full debounce, rounded up to whole seconds\n"
     "      }\n")
+# WO-2026-11-11-003 Amendment 2: the debounce comes from the one helper, in milliseconds (base: setting1 / 1000 or 60).
+DEF_NEW = "      const uint32_t debounceMs = Config::occupancyDebounceMsForRuntime();\n"
+DEF_BASE = ("      uint32_t setting1Raw = SystemConfig::SensorSettings::get_sensorSetting1();\n"
+            "      uint32_t debounceSeconds = (setting1Raw > 0) ? (setting1Raw / 1000) : 60;\n")
 OCC_BASE = ("      if (debounceSeconds < (uint32_t)wakeInSeconds) {\n"
             "        wakeInSeconds = (int)debounceSeconds;\n"
             "      }\n")
@@ -144,9 +148,9 @@ def normalized(code):
     if not plan.endswith(PLAN_TAIL) or not guard.endswith("  return false;\n"):
         return None, None, None
     plan = plan[:-len(PLAN_TAIL)].replace("return true;", "return;")
-    if plan.count(OCC_NEW) != 1:
+    if plan.count(OCC_NEW) != 1 or plan.count(DEF_NEW) != 1:
         return None, None, None
-    plan = plan.replace(OCC_NEW, OCC_BASE)
+    plan = plan.replace(OCC_NEW, OCC_BASE).replace(DEF_NEW, DEF_BASE)
     guard = guard[:-len("  return false;\n")].replace("return true;", "return;")
     handler = body_of(code, "void handleSleepingState()")
     if handler.count(PLAN_CALL) != 1 or handler.count(GUARD_CALL) != 1 or handler.count(ROUTE_CALL) != 1:

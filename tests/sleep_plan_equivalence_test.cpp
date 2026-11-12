@@ -53,7 +53,10 @@ inline Result check(time_t t) { sim::emit("CALL DailyBoundary::check %ld", (long
 }  // namespace DailyBoundary
 namespace Config {
 uint16_t reportingIntervalSecForRuntime() { sim::emit("CALL reportingIntervalSecForRuntime"); return in.interval; }
-uint32_t occupancyDebounceMsForRuntime() { return DEFAULT_OCCUPANCY_DEBOUNCE_MS; }
+uint32_t occupancyDebounceMsForRuntime() {
+  sim::emit("CALL get_sensorSetting1");  // the real helper reads setting1 once
+  return in.set1 == 0 ? DEFAULT_OCCUPANCY_DEBOUNCE_MS : in.set1;
+}
 }  // namespace Config
 namespace SystemConfig {
 uint8_t get_sensorMode() { return (uint8_t)in.mode; }

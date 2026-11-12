@@ -242,13 +242,53 @@ if base_modes is not None:
 """, "        debounceSeconds = Config::occupancyDebounceMsForRuntime() / 1000UL;\n").replace(
         "        debounceSeconds = 60;  // Minimum 60 second debounce for occupancy\n",
         "        debounceSeconds = Config::occupancyDebounceMsForRuntime() / 1000UL;\n")
+# WO-2026-11-11-003 Amendment 2: the Amendment 1 forms of the four PIR branches map to the helper-in-milliseconds text.
+if base_modes is not None:
+    for was, now, n in [
+        ("""      uint32_t setting1Raw = SystemConfig::SensorSettings::get_sensorSetting1();
+      uint32_t debounceSeconds = setting1Raw / 1000;
+      Log.info("OCCUPANCY detection: setting1=%lu ms => debounce=%lu sec",
+               (unsigned long)setting1Raw, (unsigned long)debounceSeconds);
+      if (debounceSeconds == 0) {
+        debounceSeconds = Config::occupancyDebounceMsForRuntime() / 1000UL;
+      }
+      signalLED(true, debounceSeconds * 1000UL);  // Turn on LED until debounce expires
+      const bool reportNow = reportsOccupancyChangesNow();
+      logOccupiedEvent("pir", debounceSeconds, reportNow);""",
+         """      const unsigned long debounceMs = Config::occupancyDebounceMsForRuntime();
+      Log.info("OCCUPANCY detection: debounce=%lu ms (%lu sec)", debounceMs, debounceMs / 1000UL);
+      signalLED(true, debounceMs);  // Turn on LED until debounce expires
+      const bool reportNow = reportsOccupancyChangesNow();
+      logOccupiedEvent("pir", debounceMs / 1000UL, reportNow);""", 1),
+        ("""      uint32_t debounceSeconds = SystemConfig::SensorSettings::get_sensorSetting1() / 1000;
+      if (debounceSeconds == 0) {
+        debounceSeconds = Config::occupancyDebounceMsForRuntime() / 1000UL;
+      }
+      signalLED(true, debounceSeconds * 1000UL);  // Reset LED timeout
+      if (SystemConfig::get_verboseMode()) {
+        logOccupiedEvent("pir", debounceSeconds, false, true);""",
+         """      const unsigned long debounceMs = Config::occupancyDebounceMsForRuntime();
+      signalLED(true, debounceMs);  // Reset LED timeout
+      if (SystemConfig::get_verboseMode()) {
+        logOccupiedEvent("pir", debounceMs / 1000UL, false, true);""", 1)]:
+        assert base_modes.count(was) == n, "Amendment 2 mapping"
+        base_modes = base_modes.replace(was, now)
 cur_modes_head = modes[:modes.index("\nbool processSleepWakeEvent(bool pirWake) {")]
 added = [l for l in modes.splitlines(keepends=True) if l not in base_modes.splitlines(keepends=True)]
 head_added = [l for l in cur_modes_head.splitlines(keepends=True) if l not in base_modes.splitlines(keepends=True)]
 # WO-2026-11-03-004: updateOccupancyState() now asks the one debounce predicate.
 # WO-2026-11-11-003 Amendment 1: the awake PIR branches fall back to the runtime default, as the sleep path does.
+# WO-2026-11-11-003 Amendment 2: every consumer takes the helper's milliseconds directly.
+AMEND2 = {"      const unsigned long debounceMs = Config::occupancyDebounceMsForRuntime();\n",
+          "          const unsigned long debounceMs = Config::occupancyDebounceMsForRuntime();\n",
+          '      Log.info("OCCUPANCY detection: debounce=%lu ms (%lu sec)", debounceMs, debounceMs / 1000UL);\n',
+          "      signalLED(true, debounceMs);  // Turn on LED until debounce expires\n",
+          "      signalLED(true, debounceMs);  // Reset LED timeout\n",
+          '      logOccupiedEvent("pir", debounceMs / 1000UL, reportNow);\n',
+          '        logOccupiedEvent("pir", debounceMs / 1000UL, false, true);\n'}
 if head_added and not all(l.startswith("#include") or l == "  if (debounceRemainingMs() == 0) {\n"
-                                       or l == "        debounceSeconds = Config::occupancyDebounceMsForRuntime() / 1000UL;\n" for l in head_added):
+                                       or l == "        debounceSeconds = Config::occupancyDebounceMsForRuntime() / 1000UL;\n"
+                                       or l in AMEND2 for l in head_added):
     fail("State_Modes.cpp changed above the new owner beyond added includes")
 if "".join(l for l in base_modes.splitlines(keepends=True) if not l.startswith("#include")).rstrip("\n") != \
         "".join(l for l in cur_modes_head.splitlines(keepends=True) if not l.startswith("#include")).rstrip("\n"):
@@ -272,6 +312,15 @@ if cur_region is None:
 a = base_sleep.index(BASE_REGION_START)
 b = base_sleep.index(BASE_REGION_END, a) + len(BASE_REGION_END)
 base_region = c2_open(base_sleep[a:b].replace(LED_CLOSE_OLD, LED_CLOSE_NEW), "          ", OPEN_WAKE)
+# WO-2026-11-11-003 Amendment 2: the wake branches read the helper once (the redundant setting1 zero test is gone).
+WAKE_DEBOUNCE_OLD = """          uint32_t debounceMs = SystemConfig::SensorSettings::get_sensorSetting1();
+          if (debounceMs == 0) {
+            debounceMs = Config::occupancyDebounceMsForRuntime();
+          }
+"""
+if base_region.count(WAKE_DEBOUNCE_OLD) != 2:
+    fail("the base wake region lacks the two debounce reads")
+base_region = base_region.replace(WAKE_DEBOUNCE_OLD, "          const unsigned long debounceMs = Config::occupancyDebounceMsForRuntime();\n")
 if cur_region.rstrip("\n") != base_region.rstrip("\n"):
     fail("postWakeRouting() plus processSleepWakeEvent() differ from the base region beyond `return true;`/`return false;` "
          "and the call")

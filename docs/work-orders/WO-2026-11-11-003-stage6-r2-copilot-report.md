@@ -26,8 +26,9 @@ must be 300000 / 300 in all four. Also checked: `setting1 = 60000` gives 60000/6
 `git diff --numstat -- src`: `2 4 src/state/State_Modes.cpp` (+2/-4, net -2; within the +4 budget). No helper added.
 Both awake branches now do `debounceSeconds = Config::occupancyDebounceMsForRuntime() / 1000UL;` when the seconds are 0.
 Removed: the "60 sec default" `Log.warn` (3 lines) and both `debounceSeconds = 60` literals.
-Nonzero `setting1` is unchanged, including the `setting1=... => debounce=... sec` log line and the LED window
-(`seconds * 1000`, so sub-second remainders still truncate as before).
+Correction (round 3): "nonzero `setting1` is unchanged" was wrong for 1-999 ms. In round 2 the awake window for
+those values was 0 ms (seconds = 0, then the helper's 1-999 ms divided by 1000 is 0 again). Round 3 restores
+the exact millisecond value (`debounceMs`, never divided) in every path.
 
 ## Mutation (backup/restore with `cp`; mutants were copies fed through `DEBOUNCE_AWAKE_SRC`)
 | Mutation | Result |

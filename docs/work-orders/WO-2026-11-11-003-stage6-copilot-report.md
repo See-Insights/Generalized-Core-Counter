@@ -34,6 +34,7 @@
 - **Explicit `setting1` test input (not the compiled default):**
   - `debounce_expiry_c1_test.sh:42-52` sets `set1 = 60000` itself and expects 60000.
   - `exerciser_baseline_test.py:66,108` pass `--debounce-ms 60000` explicitly.
+  - `debounce_awake_pir_test.sh:77,78,80` (round 2 numbering; the "explicit" checks of the awake first, awake re-arm and sleep first blocks) set `setting1 = 60000` as an explicit input and expect 60000 back. Not the compiled default. Round 3 rewrote the file; the same explicit input is now the `60000` entry of the matrix.
 - **Unrelated** (durations, timestamps, LED remaining, awake ms, cloud-gate times):
   - `clock_trust_test.cpp:71`
   - `conn_phase_modem_off_test.sh:320`

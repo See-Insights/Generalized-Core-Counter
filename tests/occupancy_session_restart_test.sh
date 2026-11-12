@@ -215,7 +215,9 @@ struct PowerManager {
 };
 
 namespace Config {
-uint32_t occupancyDebounceMsForRuntime() { return 300000UL; }  // the shipped default, 5 minutes
+uint32_t occupancyDebounceMsForRuntime() {  // as Config.cpp: setting1, or the shipped 5 minutes when zero
+  return SystemConfig::SensorSettings::sensorSetting1 != 0 ? SystemConfig::SensorSettings::sensorSetting1 : 300000UL;
+}
 }  // namespace Config
 
 struct SessionState {

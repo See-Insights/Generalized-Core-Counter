@@ -54,7 +54,7 @@ inline bool isTrusted() { return cur_in.clockTrusted; }
 }  // namespace Clock
 namespace Config {
 inline uint16_t reportingIntervalSecForRuntime() { return 3600; }
-inline uint32_t occupancyDebounceMsForRuntime() { return 300000UL; }
+inline uint32_t occupancyDebounceMsForRuntime() { return cur_in.setting1 != 0 ? cur_in.setting1 : 300000UL; }
 }  // namespace Config
 
 // The real predicates of src/state/State_Common.h, over the same fakes.

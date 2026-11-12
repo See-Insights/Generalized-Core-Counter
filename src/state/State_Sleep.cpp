@@ -608,14 +608,13 @@ bool sleepPlan(SleepPlan &plan) {
   if (SystemConfig::get_sensorMode() == SystemConfig::OCCUPANCY) {
     if (CurrentReadings::get_occupied()) {
       // Occupied - wake for debounce timeout check
-      uint32_t setting1Raw = SystemConfig::SensorSettings::get_sensorSetting1();
-      uint32_t debounceSeconds = (setting1Raw > 0) ? (setting1Raw / 1000) : 60;
+      const uint32_t debounceMs = Config::occupancyDebounceMsForRuntime();
       const uint32_t remaining = debounceRemainingMs();  // 0 when expired
       if (remaining > 0) {
         const int untilDeadline = (int)(remaining / 1000UL) + 1;  // wake just after expiry (1 s margin)
         if (untilDeadline < wakeInSeconds) wakeInSeconds = untilDeadline;
-      } else if (debounceSeconds < (uint32_t)wakeInSeconds) {
-        wakeInSeconds = (int)debounceSeconds;  // no deadline known: the full debounce
+      } else if ((debounceMs - 1) / 1000UL + 1 < (uint32_t)wakeInSeconds) {
+        wakeInSeconds = (int)((debounceMs - 1) / 1000UL + 1);  // no deadline known: the full debounce, rounded up to whole seconds
       }
       sleepReason = "debounce";
     } else {
