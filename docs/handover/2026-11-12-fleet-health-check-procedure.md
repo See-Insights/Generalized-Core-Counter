@@ -50,7 +50,7 @@ For each active unit, over the window:
 | 30 | POWER_MANAGEMENT | Low-power management reset (our hibernate wake is 30 / data 0) |
 | 40 | POWER_DOWN | Power-down reset. On Gen 3 also covers brownout |
 | 50 | POWER_BROWNOUT | Brownout reset. Not reported by Gen 3 (Boron); it arrives as 40 |
-| 60 | WATCHDOG | Hardware watchdog reset |
+| 60 | WATCHDOG | Device OS's own watchdog reset (see the external-watchdog note below) |
 | 70 | UPDATE | Firmware update completed (OTA restart) |
 | 80 | UPDATE_ERROR | Deprecated |
 | 90 | UPDATE_TIMEOUT | Firmware update timed out |
@@ -59,6 +59,8 @@ For each active unit, over the window:
 | 120 | DFU_MODE | DFU mode requested |
 | 130 | PANIC | System panic; `resetReasonData` is the panic code (1 HardFault, 2 NMI, 3 MemManage, 4 BusFault, 5 UsageFault, 6 InvalidLength, 7 Exit, 8 OutOfHeap, 9 SPIOverRun, 10 AssertionFailure, 11 InvalidCase, 12 PureVirtualCall, 13 StackOverflow, 14 HeapError, 15 SecureFault) |
 | 140 | USER | `System.reset(data)` by the application; data is ours (below) |
+
+On boards with an external hardware watchdog (ours: the AB1805 on D5), a watchdog reset arrives as PIN_RESET (20), not WATCHDOG (60). 60 is Device OS's own watchdog. GCC's alert 19 classifies these. So **20 is not "button only"**: count it as a possible AB1805 watchdog reset. Source: the same [Particle reset reason reference](https://docs.particle.io/reference/device-os/api/system-calls/reset-reason/).
 
 **GCC `resetReasonData` for reason 140** (`src/ResetCause.h`): 1 app watchdog handler; 2 connectivity failsafe stage 2; 3 ThrashGuard tier 3; 4 nightly heap guard before overnight sleep; 5 all sleep attempts failed; 6 ERROR_STATE soft reset; 7 out of memory; 8 stored Device OS RTC binding deleted at setup(); 0 = not from a GCC site.
 
