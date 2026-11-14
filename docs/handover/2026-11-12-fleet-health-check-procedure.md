@@ -60,7 +60,9 @@ For each active unit, over the window:
 | 130 | PANIC | System panic; `resetReasonData` is the panic code (1 HardFault, 2 NMI, 3 MemManage, 4 BusFault, 5 UsageFault, 6 InvalidLength, 7 Exit, 8 OutOfHeap, 9 SPIOverRun, 10 AssertionFailure, 11 InvalidCase, 12 PureVirtualCall, 13 StackOverflow, 14 HeapError, 15 SecureFault) |
 | 140 | USER | `System.reset(data)` by the application; data is ours (below) |
 
-On boards with an external hardware watchdog (ours: the AB1805 on D5), a watchdog reset arrives as PIN_RESET (20), not WATCHDOG (60). 60 is Device OS's own watchdog. GCC's alert 19 classifies these. So **20 is not "button only"**: count it as a possible AB1805 watchdog reset. Source: the same [Particle reset reason reference](https://docs.particle.io/reference/device-os/api/system-calls/reset-reason/).
+Particle: on devices with an external hardware watchdog (Tracker One, Monitor One, Tracker SoM, Muon), watchdog resets show as pin reset or power management. Source: the same [Particle reset reason reference](https://docs.particle.io/reference/device-os/api/system-calls/reset-reason/). 60 is Device OS's own watchdog.
+
+Our boards: the AB1805 (watchdog on D5) resets the Boron through its reset pin, so an AB1805 watchdog reset arrives as PIN_RESET (20). See `docs/reference/alert-codes.md` row 19 and GCC's wake classification. So 20 is not "button only".
 
 **GCC `resetReasonData` for reason 140** (`src/ResetCause.h`): 1 app watchdog handler; 2 connectivity failsafe stage 2; 3 ThrashGuard tier 3; 4 nightly heap guard before overnight sleep; 5 all sleep attempts failed; 6 ERROR_STATE soft reset; 7 out of memory; 8 stored Device OS RTC binding deleted at setup(); 0 = not from a GCC site.
 
