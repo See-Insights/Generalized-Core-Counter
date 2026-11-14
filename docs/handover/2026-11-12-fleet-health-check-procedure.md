@@ -37,9 +37,35 @@ For each active unit, over the window:
 
 **3.2 Restarts and resets.** From `status` events: `resetReason` and `resetReasonData`. What each means (from the runs and recovery plan):
 - **70** = OTA restart; **30 data 0** = hibernate wake (Dev-09/14/Trail02 daily). Both expected; list every 70 with device and time (needed for the escalation trigger).
-- **140** = connectivity failsafe: data **2 = stage-2 failsafe**, data **4 = nightly heap guard**. Any 140 is a FINDING (read `resetReasonData` first; they mean different things).
-- **60** = watchdog (check the `watchdog` event: `bc` breadcrumb, `stage`, `queue`, `elapsed`). **40** = brownout. **20** = seen on Dev-14 on v48; report it. **8** = binding-deleted: none has occurred since the fix; any is a FINDING.
+- **140** = `RESET_REASON_USER`: the firmware called `System.reset(data)`. GCC puts its own cause in `resetReasonData` (table below): data **2 = stage-2 connectivity failsafe**, data **4 = nightly heap guard**. Any 140 is a FINDING (read `resetReasonData` first; the data codes mean different things). 140 with data 0 came from outside GCC's reset sites (AB1805 library fallback, a cloud reset, or Device OS).
+- **60** = watchdog (check the `watchdog` event: `bc` breadcrumb, `stage`, `queue`, `elapsed`). **40** = `POWER_DOWN`, **not** brownout: on Gen 3 (Boron) Device OS cannot tell power-down from brownout, so a real brownout also arrives as 40; `POWER_BROWNOUT` (**50**) is not reported on this hardware. **20** = pin reset; seen on Dev-14 on v48, report it. **140 data 8** = binding-deleted: none has occurred since the fix; any is a FINDING.
 - **0** (none/unknown) startups: known pattern on PCKL3 and Court1 (recovery plan item 29, **not an RC1 blocker**, cause not diagnosed). Report each as a NOTE with the count; flag if it appears on another unit.
+**Reset reason codes** (`resetReason`; source: [Particle reset reason reference](https://docs.particle.io/reference/device-os/api/system-calls/reset-reason/), checked 14 Nov 2026; names are `RESET_REASON_*`):
+
+| Code | Name | Meaning |
+|---|---|---|
+| 0 | NONE | No information available |
+| 10 | UNKNOWN | Cause not specified |
+| 20 | PIN_RESET | Reset button or reset pin |
+| 30 | POWER_MANAGEMENT | Low-power management reset (our hibernate wake is 30 / data 0) |
+| 40 | POWER_DOWN | Power-down reset. On Gen 3 also covers brownout |
+| 50 | POWER_BROWNOUT | Brownout reset. Not reported by Gen 3 (Boron); it arrives as 40 |
+| 60 | WATCHDOG | Device OS's own watchdog reset (see the external-watchdog note below) |
+| 70 | UPDATE | Firmware update completed (OTA restart) |
+| 80 | UPDATE_ERROR | Deprecated |
+| 90 | UPDATE_TIMEOUT | Firmware update timed out |
+| 100 | FACTORY_RESET | Factory reset requested |
+| 110 | SAFE_MODE | Safe mode requested |
+| 120 | DFU_MODE | DFU mode requested |
+| 130 | PANIC | System panic; `resetReasonData` is the panic code (1 HardFault, 2 NMI, 3 MemManage, 4 BusFault, 5 UsageFault, 6 InvalidLength, 7 Exit, 8 OutOfHeap, 9 SPIOverRun, 10 AssertionFailure, 11 InvalidCase, 12 PureVirtualCall, 13 StackOverflow, 14 HeapError, 15 SecureFault) |
+| 140 | USER | `System.reset(data)` by the application; data is ours (below) |
+
+Particle: on devices with an external hardware watchdog (Tracker One, Monitor One, Tracker SoM, Muon), watchdog resets show as pin reset or power management. Source: the same [Particle reset reason reference](https://docs.particle.io/reference/device-os/api/system-calls/reset-reason/). 60 is Device OS's own watchdog.
+
+Our boards: the AB1805 (watchdog on D5) resets the Boron through its reset pin, so an AB1805 watchdog reset arrives as PIN_RESET (20). See `docs/reference/alert-codes.md` row 19 and GCC's wake classification. So 20 is not "button only".
+
+**GCC `resetReasonData` for reason 140** (`src/ResetCause.h`): 1 app watchdog handler; 2 connectivity failsafe stage 2; 3 ThrashGuard tier 3; 4 nightly heap guard before overnight sleep; 5 all sleep attempts failed; 6 ERROR_STATE soft reset; 7 out of memory; 8 stored Device OS RTC binding deleted at setup(); 0 = not from a GCC site.
+
 - `watchdogResetCount` (in `status`): report the delta over the window per unit; "no status event" means unverified, not zero. `failsafeCount`/`failsafeStage` are in the same event.
 - **Item 17 count:** stage-2 resets (140 data 2) **per device over the last 7 days; 3 or more triggers the stage-2 ceiling Step 0.** Today: ChurchSt-1a 1 (10 Nov 14:00:53Z); LAB-01 had 1 on 1 Nov.
 
