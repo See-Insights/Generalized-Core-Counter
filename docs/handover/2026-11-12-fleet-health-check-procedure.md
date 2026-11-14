@@ -62,7 +62,7 @@ For each active unit, over the window:
 
 Particle: on devices with an external hardware watchdog (Tracker One, Monitor One, Tracker SoM, Muon), watchdog resets show as pin reset or power management. Source: the same [Particle reset reason reference](https://docs.particle.io/reference/device-os/api/system-calls/reset-reason/). 60 is Device OS's own watchdog.
 
-Our boards: the AB1805 (watchdog on D5) resets the Boron through its reset pin, so an AB1805 watchdog reset arrives as PIN_RESET (20). See `docs/reference/alert-codes.md` row 19 and GCC's wake classification. So 20 is not "button only".
+Our boards: the AB1805 (watchdog on D5) resets the Boron through its reset pin, so an AB1805 watchdog reset arrives as PIN_RESET (20). See `docs/reference/alert-codes.md` row 19 and GCC's wake classification, `HibernateCycle::classifyWake()` (`src/time/HibernateCycle.cpp:44`), called from `setup()` at `src/Generalized-Core-Counter.cpp:791` (main `5841a84`). So 20 is not "button only".
 
 **GCC `resetReasonData` for reason 140** (`src/ResetCause.h`): 1 app watchdog handler; 2 connectivity failsafe stage 2; 3 ThrashGuard tier 3; 4 nightly heap guard before overnight sleep; 5 all sleep attempts failed; 6 ERROR_STATE soft reset; 7 out of memory; 8 stored Device OS RTC binding deleted at setup(); 0 = not from a GCC site.
 
@@ -72,6 +72,7 @@ Our boards: the AB1805 (watchdog on D5) resets the Boron through its reset pin, 
 **3.3 Alerts.** Read `alerts` in every report and `alert` in every `status`. Codes (full table: `docs/reference/alert-codes.md`): 19 watchdog reset; 20 PMIC thermal; 21 charge timeout/stuck; 22 USB charge latch; 23 battery fault; 31 failed to connect; 40 repeated webhook failures; 43 publish queue not drained before sleep; 15/16/17/18 etc. as in the table. **Do not decode a code that is not in that table; say "not decoded".** Report every 17-23 and 40 with device and time. Notes:
 - One alert at a time is held (the most severe); it shows in the next report, and report-once codes then clear. A code seen once and gone is normal.
 - **Alert 40 at open** (every unit raised it at its 06:00 open after the 6 Nov OTA) was the known "alert-40-at-open" case (WO 6); it did **not** recur on 9-11 Nov. Flag it if it returns on several units at open.
+- **Alert 40 before a restart (exemption rule).** *Exempt:* an alert 40 at most 60 s before the same device's reason-70 boot (an OTA restart); it goes to the digest only. *Not exempt:* a 40 before a 140 boot; report it as usual (a 140 is a FINDING).
 - Alert 21 on ChurchSt-1a (10 Nov 20:59-22:00Z) is the stale-gauge/full-pack side (recovery plan item 23), not a latch (item 22); the 4.05 V exclusion ships with WO-2026-11-11-001 (held until RC1).
 
 **3.4 Reports (completeness and order).** Per unit, per open day: the count of `Ubidots-Sensor-Hook-v1` events and the **maximum gap between report timestamps inside open hours** (expect 60 min; 120 for Trail02; the nightly gap is the closed period). Also check:
