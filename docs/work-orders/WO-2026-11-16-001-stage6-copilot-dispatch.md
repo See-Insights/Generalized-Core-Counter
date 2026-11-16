@@ -1,0 +1,23 @@
+AGENT: Copilot · MODEL: claude-sonnet-5.5 · REASONING: low
+AUTHORIZATION SCOPE: edit `src/Generalized-Core-Counter.cpp` (two spots only), `tests/external_rtc_structural_test.py`, `tests/external_rtc_test.cpp`; create `tests/external_watchdog_feed_test.py`; write the report; run host tests and one local build; scratch `build-tmp/wo-2026-11-16-001-stage6/` (create it; use only that) / NOT authorized: any other change under `src/` or `lib/`, committing, pushing, merging, flashing, creating PRs or tags, deleting anything you did not create (including `build-tmp/` itself), `git checkout`, `git restore` or `git stash` while your work is uncommitted.
+
+# Stage 6 dispatch: WO-2026-11-16-001
+Binding spec: `docs/work-orders/WO-2026-11-16-001-watchdog-feed-through-register.md` (read it fully) and the Step 0 report `docs/work-orders/WO-2026-11-16-001-step0.md`. Base: this branch HEAD, which is `integration/v50-ab1805 @ 1d1d5af` plus the WO records. **Budget: `src/` at most +4 net lines (Step 0 expects +3); do not compress code to meet it. Tests: guideline +175 added lines; report the actual and do not stop for it.** If `src/` needs more than +4, stop and report.
+
+## Do
+1. **Baseline first:** run the suite the way CI discovers it (`tests/*.sh` via `zsh`, `tests/*.py` via `python3`, skipping anything CI skips; read `.github/workflows` for the exact discovery) and report `N/N (sh via zsh, py via python3)` before editing.
+2. **`src/` (exactly these two edits):**
+   - In `setup()` remove `.watchdogPin(WATCHDOG_DONE_PIN)` from the `Am18x5Configuration` chain (`Generalized-Core-Counter.cpp:295`) and add a trailing comment on the following chain line: the feed goes through the chip's WDT register (D5 edges did not feed the chip; WO-2026-11-16-001). No new line.
+   - In `loop()` (`:1133`) replace the bare refresh with: `static int lastRefreshRc = SYSTEM_ERROR_NONE;`, `const int refreshRc = ExternalWatchdog.refresh();` (keep the existing trailing comment), `if (refreshRc != lastRefreshRc) Log.warn("ExternalWatchdog: refresh rc=%d", refreshRc);`, `lastRefreshRc = refreshRc;`. `ExternalWatchdog.refresh()` must still appear exactly once, before `checkClockResync()`.
+3. **Update the existing tests:** `tests/external_rtc_structural_test.py:36-37` (the fleet config is Wire/WKP with no `.watchdogPin(`; message to match) and add the mutation "pin restored" (insert `.watchdogPin(WATCHDOG_DONE_PIN)` after `.interruptPin(WKP)` in the main text) to its `smut` list; `tests/external_rtc_test.cpp:26-28` (`fleet()` without a watchdog pin), `:87-99` (the lastEnabled check expects no watchdog pin, `wdtPin == -1`; the "watchdog pin differs" case stores `wdtPin = 5`, the pin an earlier bench build bound, and expects one re-bind that leaves `wdtPin == -1`).
+4. **New `tests/external_watchdog_feed_test.py`** (python3, no network, exits 0 bare from any directory; same style as `tests/external_rtc_structural_test.py`, including a mutation runner on scratch copies):
+   - Read the fleet `Am18x5Configuration` chain from the real `src/Generalized-Core-Counter.cpp` and decide whether a watchdog pin is configured.
+   - A small model of Device OS 6.6.0 `Am18x5::feedWatchdog()` (`hal/shared/am18x5.cpp:934-946`: no pin = write the WDT register; pin = toggle the GPIO) and of the chip's counter (124 s; only a register write reloads it; a GPIO edge does not). Cite those lines in the header and say it is a model, not the real function.
+   - Run a 200 s awake window with one feed every 30 s: with the real config the model counts one register write per feed and the counter never expires; the test fails otherwise.
+   - Structural checks on the loop: `ExternalWatchdog.refresh()` once, return code kept, a change-detecting `Log.warn("ExternalWatchdog: refresh rc=%d"`.
+   - Mutations on scratch copies, each must make the test fail: the pin restored (counter expires at 124 s); the refresh removed; the rc logging removed.
+5. **Verify:** full suite `N/N (sh via zsh, py via python3)`; a fresh Device OS local build (§3 "Release gate", `make` with a **fresh `BUILD_PATH_BASE`** under your scratch directory; copy of the tree) and the text/data/bss delta against a build of the base `1d1d5af` (a second fresh `BUILD_PATH_BASE`); `git diff --numstat -- src` shows `src/` at most +4 net.
+6. Mutate from a backup: back up, mutate, restore with `cp`, never `git checkout`.
+
+## Report
+`docs/work-orders/WO-2026-11-16-001-stage6-copilot-report.md` (at most 150 lines): model and level actually used, interpreter line, baseline, the `src/` diff stat, the test sizes, the mutation table, the suite result, the build sizes, deviations, anything you saw outside the WO (listed, not fixed). Leave your changes **uncommitted**.
