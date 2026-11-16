@@ -1130,10 +1130,6 @@ void loop() {
   setLoopStage(LOOP_STAGE_DIAGNOSTICS);
   thrashGuard.loop(state, millis());
 
-  static int lastRefreshRc = SYSTEM_ERROR_NONE;
-  const int refreshRc = ExternalWatchdog.refresh(); // the only refresh source (Device OS does not refresh instance 2)
-  if (refreshRc != lastRefreshRc) Log.warn("ExternalWatchdog: refresh rc=%d", refreshRc);
-  lastRefreshRc = refreshRc;
   checkClockResync(); // WO-2026-08-29-002: recurring app-side RTC write-back
 
   // Housekeeping for each transit of the main loop
