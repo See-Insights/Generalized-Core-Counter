@@ -49,13 +49,18 @@ Note: the source does not bound this interval (Codex, integrated Stage 7 round 1
 ## 4. Item 3: v50 on a bound and an unbound device (includes S1b)
 
 ### 3a. The WRTC discrimination, on Dev-14 (old-library history, WRTC = 0)
-**ORDER RULE: run the NO-S1B binary FIRST (expect `settime … hal` to FAIL on the v49-touched chip), THEN the INTEGRATED binary (expect it to SUCCEED and the time to be valid). The reverse order gives a FALSE PASS, because WRTC = 1 persists on the chip after S1b has run. A v49 reset between runs is only the fallback, not the plan.**
+**15 Nov run: test-plan gap found; rerun 16 Nov.** The 15 Nov sequence flashed 5099 (which binds), then 5001 on the now-**bound** chip. S1b runs only on an unbound chip (`Generalized-Core-Counter.cpp:294`, `!Am18x5.status().bound() && PreBindRtc::run(...)` at `1d1d5af`), so 5001 never touched WRTC and the probe failed as the code specifies. Not a v50 defect (architect ruling (a), 16 Nov). The first probe also read `bound=0` and failed with `-170` for that reason, not for WRTC. The corrected sequence below replaces the 14 Nov one.
 
-0. Before each run, check the WRTC state: flash the **spike** and run `settime <epoch> hal` (then `time` to see the system, EXTERNAL and hal readings). WRTC = 0 shows as a **failure** (the read-back catches the no-op); WRTC = 1 shows as success. The probe does not change WRTC. Before the first run it must **fail**; if it succeeds, the chip is not in the v49-touched state: use the fallback (flash v49.1, let it sync once, confirm WRTC reads 0 afterwards and a second v49 boot reads the chip as set, per S1b's rollback item) and start again.
-1. Flash the **no-S1b binary**. Let it boot. Record: is `Time` valid at the first log lines; does the log show the bind; what the chip holds before any cloud sync.
-2. Flash the **spike**, run the WRTC probe (step 0): expect **FAIL** (WRTC still 0).
-3. Flash the **integration binary**. Let it boot.
-4. Flash the **spike**, run the probe: expect **SUCCESS**, read-back within 2 s.
+**ORDER RULE: run the NO-S1B binary FIRST (expect the probe to FAIL on the v49-touched chip), THEN unbind, THEN the INTEGRATED binary (expect it to SUCCEED and the time to be valid). The reverse order gives a FALSE PASS, because WRTC = 1 persists on the chip after S1b has run. A v49 reset between runs is only the fallback, not the plan.**
+
+**The probe.** Use `settime <now + 3600> hal`, then `time`. Setting the *current* time cannot tell WRTC 0 from 1 (the chip already holds that time). With WRTC = 1 the chip reads back now + 3600 within 2 s (success); with WRTC = 0 the write is ignored and it reads back the current time (the settime call still returns 0, so only the read-back decides). The probe does not change WRTC. **The probe needs a bound chip:** on an unbound chip the call returns `-170` whatever WRTC is.
+
+0. Flash the **spike**. On a v49-touched chip the spike shows `bound=0` (v49 deletes any binding). Run `bind`, `reboot`, `status` and require `bound=1`. Run the probe: it must **fail** (read-back = the current time, WRTC = 0). If it succeeds, the chip is not in the v49-touched state: use the fallback (flash v49.1, let it sync once, confirm WRTC reads 0 afterwards and a second v49 boot reads the chip as set, per S1b's rollback item) and start again.
+1. Flash the **no-S1b binary**. Let it boot (the chip is already bound, so it does not re-bind). Record: is `Time` valid at the first log lines; what the chip holds before any cloud sync. (To also see the bind line from 5099, unbind first and start this step from `bound=0`; then re-run step 0's `bind` before step 2.)
+2. Flash the **spike**, run the probe: expect **FAIL** (WRTC still 0).
+3. **Unbind:** with the spike run `unbind`, `reboot`, `status` and require `bound=0`. Unbinding does not change WRTC (still 0). **Do not bind again before step 5.**
+4. Flash the **integration binary (5001)**. Let it boot (the chip is unbound, so S1b runs, sets WRTC, and the bind follows).
+5. Flash the **spike** and run the probe **without binding first**: the chip is bound by 5001, so expect **SUCCESS** (read-back now + 3600 within 2 s). Do not run the spike's `bind`.
 Record both outcomes. Expect the no-S1b run may leave the chip at the year-2000 internal clock (the bind copies it over the chip when nothing seeded it); that is the very defect S1b fixes, not a failure of this step.
 
 ### 3b. First v50 boot keeps valid time
