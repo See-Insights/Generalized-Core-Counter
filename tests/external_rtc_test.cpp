@@ -24,7 +24,7 @@ struct FakeRtc {
 };
 
 static particle::Am18x5Configuration fleet() {
-  return particle::Am18x5Configuration().i2c(0).interruptPin(8).watchdogPin(5).capabilities(0x3).clockSource(particle::RtcClockSource::EXTERNAL);
+  return particle::Am18x5Configuration().i2c(0).interruptPin(8).capabilities(0x3).clockSource(particle::RtcClockSource::EXTERNAL);
 }
 
 int main() {
@@ -86,7 +86,7 @@ int main() {
 
   FakeRtc rtc;
   CHECK(ExternalRtc::ensureBound(rtc, fleet()) == 0 && rtc.enables == 1);
-  CHECK(rtc.lastEnabled.wire == 0 && rtc.lastEnabled.intPin == 8 && rtc.lastEnabled.wdtPin == 5 && rtc.lastEnabled.caps == 0x3);
+  CHECK(rtc.lastEnabled.wire == 0 && rtc.lastEnabled.intPin == 8 && rtc.lastEnabled.wdtPin == -1 && rtc.lastEnabled.caps == 0x3);
   CHECK(ExternalRtc::ensureBound(rtc, fleet()) == 0 && rtc.enables == 1);  // bound and matching: no re-bind
 
   FakeLog &log = fakeLog();
@@ -95,8 +95,8 @@ int main() {
   CHECK(ExternalRtc::ensureBound(rtc, fleet()) == 0 && rtc.enables == 2 && log.warns == warns + 1);
   CHECK(rtc.stored.intPin == 8);
 
-  rtc.stored.wdtPin = 4;  // watchdog pin differs
-  CHECK(ExternalRtc::ensureBound(rtc, fleet()) == 0 && rtc.enables == 3);
+  rtc.stored.wdtPin = 5;  // a chip bound by an earlier bench build with the D5 watchdog pin
+  CHECK(ExternalRtc::ensureBound(rtc, fleet()) == 0 && rtc.enables == 3 && rtc.stored.wdtPin == -1);
 
   FakeRtc bad;
   bad.enableResult = -7;
