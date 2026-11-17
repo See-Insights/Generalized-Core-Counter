@@ -49,5 +49,14 @@ Revert the PR on `integration/v50-ab1805`. Nothing is persisted by this change.
 ## Approval record
 Architect and Chip, 16 Nov 2026 (relay: "Dispatch WO-2026-11-16-001 now, as prepared").
 
-## Closing record
-Budget against actual, the Stage 7 SHA and verdict, the bench-binary SHA-256s.
+## Closing record (17 Nov 2026)
+**Stage 7:** round 1 on `99ece4e`: VERIFIED WITH FIXES (1 Medium, tests: refresh placement not mutation-protected). Fix applied by Copilot (Stage 6 r2), no further Codex round; head `365358e`. Stage 8: the architect read the `src/` diff and signed it off (17 Nov, no `watchdogPin`; refresh rc logged when it changes).
+**Controller checks on `365358e`:** suite 122/122 (sh via zsh, py via python3); the three mutation-bearing tests pass (`external_watchdog_feed_test` 5 mutations caught, `external_rtc_structural_test` all caught, `s2_alarm_watchdog_wake_structural_test` 21 probes detected); CI `build` on `365358e` green (firmware and host-tests). Local build text/data/bss `151124/1114/2264` against base `151084/1114/2256` (+40/0/+8).
+
+| Item | Budget | Raised to (reason) | Actual net `src/` lines | Tests |
+|---|---|---|---|---|
+| Pin removal and refresh rc log | <= +4 | - | +3 | +137 added / -8 removed (guideline +175): new `external_watchdog_feed_test.py` 115, `s2` order check and IDLE_STATE probe 15, RTC tests 7 |
+
+**Stated deviation:** the rc log fires when the return code changes, not once per wake (per wake would be +6 net, over budget).
+**Controller edits:** none.
+**Bench binaries (CI builds, SHA-256 of the `.bin`):** fixed `365358e` (product 5001, `v50.1-NativeRTC`) `ffa84c20...89ec`; 5097 no-refresh on the fixed base `42e6956` (NEVER RELEASE, `v50.1-NativeRTC-NOREFRESH-BENCH-ONLY`) `73a9d7d5...fb75`. The 5097 CI run's host-tests job fails by design (the structural tests require the refresh); its firmware job is green. Full sums are in the bench kit and the checklist.
