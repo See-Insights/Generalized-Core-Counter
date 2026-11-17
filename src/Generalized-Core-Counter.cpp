@@ -756,6 +756,8 @@ void setup() {
   // request. Reason 20 is judged from persisted evidence only (a power-down
   // clears `retained`); no evidence is counted as an inferred watchdog.
   const HibernateCycle::WakeVerdict wakeVerdict = HibernateCycle::classifyWake(reason);
+  if (HibernateWakeDiagnostics::isRtcArm(wakeVerdict.gateArm)) { SystemConfig::set_lastTimeSync(0); SystemConfig::flushNow(); }  // I21: no trust carry after a failed RTC arm; revoked durably before anything else runs
+  evaluateClockCarry();
 
   bool inferredWatchdog = false;
   if (reason == RESET_REASON_PIN_RESET) {
