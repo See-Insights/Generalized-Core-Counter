@@ -1,0 +1,12 @@
+# Item 17 Step 0: ChurchSt-1a stage-2 failsafes at about 3 h after open (17 Nov 2026)
+
+Trigger: ChurchSt-1a took a stage-2 connectivity failsafe (reset 140, data 2) on 10, 13 and 16 Nov, each at 14:00:01-02Z (09:00 EST, open + 3.0 h). Read-only; nothing changed. Firmware 4901 (v49.1, `9a96854`).
+Records: `-evidence.md` (archive facts, read by Claude Code), `-codex-dispatch.md`, `-codex-report.md` (Codex gpt-5.6-sol, medium, Stage 4; model confirmed accepted by a one-line probe).
+
+## Result
+1. **Clock (Codex, VERIFIED).** Stage 2 uses `Time.now() - max(lastConnection, today's open)` (`ConnectivityFailsafe.cpp:210-233`), the last successful Particle-cloud connection, not the webhook response. A pre-open connection therefore starts the clock at the open, and a unit that connects or reports while online from 06:00 restarts it (`State_Connect.cpp:446-499`, `State_Report.cpp:282-285`). It cannot reach 3 h at 09:00. Alert 40 is a separate clock (`lastHookResponse` > 3 h, `State_Report.cpp:99-125`), which fires at open when the persisted hook-response time is already old (the alert-40-at-open item).
+2. **Did ChurchSt-1a have cloud contact 11:00-14:05Z? No (archive).** The reports stamped 11:00-13:00Z (conn 660 = the full 660 s budget used each hour) were all received at 14:00:49-14:01:08Z, after the reset. Normal days show no delivery lag. A genuine 3-hour outage correctly handled; **not a counting bug (Codex)**.
+3. **Fleet-wide since 1 Nov: 5 stage-2 events.** Three cluster at open + 3 h (ChurchSt-1a). PCKL3 (14 Nov 03:02Z = 22:02 EST, alert 0) is 2 minutes after its close: Codex's reading (INFERRED) is the openness-Unknown path (untrusted clock or config), which counts as open. OCCUPANCY-LAB-01 (fw 47, 1 Nov 15:30Z) is a lab unit, timezone unknown.
+4. **Fix: none.** No src/ change. The open question is why hourly connects failed for 3 h on three days exactly three days apart (10, 13, 16 Nov); the archive cannot say (no serial log, no hook-response events). A fourth recurrence would be due 19 Nov.
+5. **Court2 bc 28, 13 Nov 23:00:57Z:** watchdog event queue **0** (under the 50 trigger); not escalated; added to the watch list.
+6. **v49.1 watchdog feed (Codex VERIFIED, and checked by Claude Code):** the chip is fed by the AB1805_RK library's register write (`src/Generalized-Core-Counter.cpp:809` arms `setWDT(124)`; `:1174` `ab1805.loop()`; `lib/AB1805_RK/src/AB1805_RK.cpp:50-72` re-arms every 62 s; `:234` writes `REG_WDT`). No D5/WDI toggle. The fleet is not exposed to the v50 bug.
