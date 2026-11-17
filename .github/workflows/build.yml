@@ -11,6 +11,8 @@ permissions:
 
 jobs:
   host-tests:
+    # Bench branches (bench/**, NEVER RELEASE) are built for the firmware only: their host tests fail by design. Tags (v*) and every other branch still run them.
+    if: ${{ !startsWith(github.ref_name, 'bench/') }}
     runs-on: ubuntu-latest
     outputs:
       tests: ${{ steps.tests.outputs.result }}
