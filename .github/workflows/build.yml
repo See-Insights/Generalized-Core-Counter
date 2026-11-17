@@ -23,8 +23,8 @@ jobs:
         with:
           persist-credentials: false
           repository: particle-iot/device-os
-          ref: 533fe47b1d420c8c766c488471ee34256727b49e # v6.4.1
-          path: device-os-6.4.1
+          ref: 74391b2c48d1a3a2d66f1583a28e50c613d2bbaf # v6.6.0
+          path: device-os-6.6.0
           sparse-checkout: |
             system/inc
             hal/inc
@@ -39,7 +39,7 @@ jobs:
         id: tests
         env:
           TMPDIR: ${{ runner.temp }}
-          DEVICE_OS_ROOT: ${{ github.workspace }}/device-os-6.4.1
+          DEVICE_OS_ROOT: ${{ github.workspace }}/device-os-6.6.0
         run: |
           pass=0; total=0; failed=()
           for t in tests/*.sh; do

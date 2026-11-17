@@ -336,18 +336,12 @@ void setup() {
   bootInProgress = true;
 
   bool qualifiesForStormCount = false;
+  // The RESET_REASON_* names are enumerators: an #ifdef on them is always false.
   switch (reason) {
   case RESET_REASON_NONE:
-#ifdef RESET_REASON_PANIC
   case RESET_REASON_PANIC:
-#endif
   case RESET_REASON_WATCHDOG:
-#ifdef RESET_REASON_UNKNOWN
   case RESET_REASON_UNKNOWN:
-#endif
-#ifdef RESET_REASON_USER_APPLICATION
-  case RESET_REASON_USER_APPLICATION:
-#endif
     qualifiesForStormCount = true;
     break;
   default:
