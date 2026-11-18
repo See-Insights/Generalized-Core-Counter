@@ -111,7 +111,7 @@
  * and should not be toggled through Config.h. Enable it only with an
  * explicit build flag or a deliberate local edit in this build-profile layer.
  */
-#define CONNECTIVITY_FAILSAFE_TEST_MODE 0
+#define CONNECTIVITY_FAILSAFE_TEST_MODE 1
 #endif
 
 #if (CONNECTIVITY_FAILSAFE_TEST_MODE != 0) && (CONNECTIVITY_FAILSAFE_TEST_MODE != 1)
