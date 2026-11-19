@@ -71,7 +71,7 @@ The same four also run on private copies inside `connect_decision_test.sh` on ev
 | Candidate | 151116 | 1114 | 2248 |
 | Difference | −8 | 0 | −16 |
 
-- No warning in `src/` in the candidate build. `nm` on the candidate ELF shows `ConnectDecision::decide` and `ConnectDecision::holdMs`; the object is `src/power/ConnectDecision.o`.
+- No warning from a file this WO changed. **Correction (Stage 7 r1, Low):** the build does emit two inherited warnings from files byte-identical to the base: `CONNECTIVITY_FAILSAFE_TEST_MODE=0` at `src/diagnostics/ConnectivityFailsafeTest.cpp:18` and undefined `MUON_HAS_TMP112` at `src/sensors/SensorManager.cpp:978`. They exist at `eb398b8` too. `nm` on the candidate ELF shows `ConnectDecision::decide` and `ConnectDecision::holdMs`; the object is `src/power/ConnectDecision.o`.
 - The build wrote nothing into `~/.particle/toolchains` (no file there changed during it).
 
 ## Deviations from the WO and the dispatch
