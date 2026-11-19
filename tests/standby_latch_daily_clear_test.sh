@@ -142,11 +142,15 @@ mutate_and_expect_failure "standbySuppressed not cleared" "latched:standbySuppre
 mutate_and_expect_failure "reason not cleared" "latched:reason" "power/ModemHealth.cpp" \
   "    session.modemUnstableReason = 0;
 " ""
-mutate_and_expect_failure "timeout count not cleared" "latched:timeoutCount" "power/ModemHealth.cpp" \
-  "    session.modemUnstableReason = 0;
-    session.modemConnectTimeoutCount = 0;
-" "    session.modemUnstableReason = 0;
+# WO-2026-11-19-001 ruling 4: the count clears at every close, latched or not.
+count_clear="  session.modemConnectTimeoutCount = 0;  // every close starts a fresh day: its report is never held
 "
+mutate_and_expect_failure "timeout count not cleared" "latched:timeoutCount" "power/ModemHealth.cpp" \
+  "$count_clear" ""
+mutate_and_expect_failure "timeout count cleared only when latched" "unlatched:countCleared" "power/ModemHealth.cpp" \
+  "$count_clear  if (session.modemUnstable) {
+" "  if (session.modemUnstable) {
+  $count_clear"
 mutate_and_expect_failure "clear unconditional" "unlatched:" "power/ModemHealth.cpp" \
   "  if (session.modemUnstable) {" "  {"
 

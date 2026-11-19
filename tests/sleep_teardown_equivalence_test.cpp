@@ -4,6 +4,12 @@
 // state/SleepTeardown.cpp. Both run the same scenario table against the same
 // fakes (tests/stubs/sleep_teardown); each prints the same transcript. Mode "a"
 // writes the frozen fixture, mode "b" is compared to it.
+// WO-2026-11-19-001 deleted the four session teardown timings from src/ (their last
+// reader, the 30 s reconnect defer, is gone). The transcript no longer prints them (the
+// old "sess=" column), and a completed teardown reads millis() once less (the deleted
+// `session.lastTeardownEndMs = millis();`). The base block still has the four writes:
+// base::session below takes them and leaves that one read out of the count, so mode "a"
+// is the base block with exactly this WO's delta removed.
 // Build with -DWiring_Cellular=1 -DHAL_PLATFORM_CELLULAR=1 (cellular) or without (Wi-Fi).
 #include <cstdio>
 #include <cstring>
@@ -45,6 +51,15 @@ static bool cloudDisconnectCompleteLogged = false, radioOffCompleteLogged = fals
 static unsigned long disconnectRequestStartMs = 0, cloudDisconnectStartMs = 0, cloudDisconnectElapsedMs = 0,
                      modemOffElapsedMs = 0, lastDisconnectProgressMs = 0, lastGateProgressMs = 0;
 static bool fellThrough = false;
+// The four fields the base block writes and nothing reads; they shadow ::session inside base only
+// (unused when this tree has no base commit and the base block is empty).
+struct DeletedStamp {
+  void operator=(unsigned long) { sim::reads.millis--; }  // the base's `= millis()` that src/ no longer has
+};
+[[maybe_unused]] static struct {
+  DeletedStamp lastTeardownEndMs;
+  uint32_t lastCloudDisconnectElapsedMs, lastModemOffElapsedMs, lastTotalTeardownElapsedMs;
+} session;
 
 static void enter() {
   cloudDisconnectCompleteLogged = radioOffCompleteLogged = disconnectRequested = false;
@@ -175,10 +190,8 @@ static void runScenario(const Scenario &s, bool useBase, int index) {
            t.disconnectRequestStartMs, t.cloudDisconnectStartMs, t.cloudDisconnectElapsedMs,
            t.modemOffElapsedMs, t.lastDisconnectProgressMs, t.lastGateProgressMs};
     }
-    printf("  p%d t=%lu %s f=%d%d%d,%lu,%lu,%lu,%lu,%lu,%lu force=%d err=%d sess=%lu,%u,%u,%u rd=%d,%d,%d,%d,%d,%d\n",
+    printf("  p%d t=%lu %s f=%d%d%d,%lu,%lu,%lu,%lu,%lu,%lu force=%d err=%d rd=%d,%d,%d,%d,%d,%d\n",
            pass, sim::now, result, f.cdc, f.rol, f.dr, f.drs, f.cds, f.cde, f.moe, f.ldp, f.lgp, force, err,
-           session.lastTeardownEndMs, (unsigned)session.lastCloudDisconnectElapsedMs,
-           (unsigned)session.lastModemOffElapsedMs, (unsigned)session.lastTotalTeardownElapsedMs,
            sim::reads.connected, sim::reads.isOff, sim::reads.isOn, sim::reads.millis, sim::reads.process,
            sim::reads.watchdog);
     for (const auto &e : sim::events) {

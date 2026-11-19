@@ -1,6 +1,6 @@
 #pragma once
-// Host stub of the State_Common.h surface the sleep teardown uses: the session
-// timings, transitionTo, breadcrumbs, the awake watchdog and PowerManager's
+// Host stub of the State_Common.h surface the sleep teardown uses: the session,
+// transitionTo, breadcrumbs, the awake watchdog and PowerManager's
 // connection mode. The config, readings and alert headers are the real ones;
 // the harness defines their functions.
 #include <cstdint>
@@ -27,10 +27,6 @@ inline void setAppBreadcrumb(uint8_t code) { sim::emit("CRUMB %u", (unsigned)cod
 inline void serviceAwakeWatchdog() { sim::reads.watchdog++; }
 
 struct SessionState {
-  unsigned long lastTeardownEndMs = 0;
-  uint32_t lastCloudDisconnectElapsedMs = 0;
-  uint32_t lastModemOffElapsedMs = 0;
-  uint32_t lastTotalTeardownElapsedMs = 0;
   bool modemUnstable = false;
   bool awaitingWebhookResponse = false;
   bool occupancyChangeTriggered = false;

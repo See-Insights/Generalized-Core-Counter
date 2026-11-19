@@ -276,14 +276,16 @@ cfg_s, cfg_e = report.stmt("if (!Config::isValid(true)) {", rfn)
 emit("extracted_report_config_invalid.inc", report, cfg_s, cfg_e)
 
 group_s, group_e = report.stmt("if (!Particle.connected()) {", rfn)
-chain_s = report.find("if (serviceRequestTriggered) {", svc_e + 1)
-if not (group_s < chain_s < group_e):
-    die("the service-request/occupancy chain is no longer inside the not-connected branch")
-chain_e = report.close_of(report.open_after(chain_s))
-tail = re.match(r"\s*else if \((?:session\.)?occupancyChangeTriggered\) \{", report.scrubbed[chain_e + 1:])
-if not tail:
-    die("the occupancy branch no longer follows the service-request branch")
-chain_e = report.close_of(chain_e + 1 + tail.end() - 1)
+# WO-2026-11-19-001: the chain is one decision. The block that builds its inputs, asks
+# ConnectDecision::decide() and acts on the answer is extracted whole (the real
+# power/ConnectDecision.cpp is linked), and it must close the not-connected branch.
+chain_s = report.find("ConnectDecision::Inputs in;", svc_e + 1)
+act = report.find("transitionTo(decision.action", chain_s)
+if not (group_s < chain_s < act < group_e):
+    die("the connect decision is no longer inside the not-connected branch")
+chain_e = report.find(";", act)
+if report.scrubbed[chain_e + 1:group_e].strip():
+    die("the connect decision is no longer the last statement of the not-connected branch")
 emit("extracted_report_chain.inc", report, chain_s, chain_e)
 
 m = re.match(r"\s*else\s*\{", report.scrubbed[group_e + 1:])
@@ -298,9 +300,6 @@ emit("extracted_report_connected.inc", report, else_open + 1, else_close - 1)
 group = (
     "if (!Particle.connected()) {\n"
     '#include "extracted_report_chain.inc"\n'
-    "  else {\n"
-    '    transitionTo(IDLE_STATE, "not aligned");  // model: the rest of the chain\n'
-    "  }\n"
     "} else {\n"
     '#include "extracted_report_connected.inc"\n'
     "}"
@@ -364,6 +363,7 @@ PY
     "$src_root/MyPersistentData.cpp" \
     "$src_root/power/BatteryAuthorityCommand.cpp" \
     "$src_root/power/PowerManager.cpp" \
+    "$src_root/power/ConnectDecision.cpp" \
     "$src_root/power/BatteryAuthority.cpp" \
     "$src_root/reporting/BatteryTierGuard.cpp" \
     "$src_root/power/PowerTier.cpp" \
@@ -514,9 +514,9 @@ mutate_and_expect_failure "wake close gated on the LED for an untrusted piece" "
 mutate_and_expect_failure "connected clear restored, entry take removed" "norepeat:" "state/State_Report.cpp" \
   "$entry_take" "  const bool occupancyChangeTriggered = session.occupancyChangeTriggered;
 " \
-  "    } else if (occupancyChangeTriggered) {
-" "    } else if (occupancyChangeTriggered) {
-      session.occupancyChangeTriggered = false;
+  "    in.occupancyChange = occupancyChangeTriggered;
+" "    in.occupancyChange = occupancyChangeTriggered;
+    if (!serviceRequestTriggered && occupancyChangeTriggered) session.occupancyChangeTriggered = false;
 " \
   '    transitionTo(IDLE_STATE, "already connected");' '    session.occupancyChangeTriggered = false;
     transitionTo(IDLE_STATE, "already connected");'

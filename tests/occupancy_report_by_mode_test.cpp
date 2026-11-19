@@ -18,9 +18,10 @@
 //     call to processSleepWakeEvent() and the timer-wake block
 //                                            from src/state/State_Sleep.cpp
 //   - from handleReportingState(): the entry take of the flag, the alert-40
-//     block, the service-request take, the config-invalid exit, the first two
-//     branches of the not-connected chain and the connected branch
-//                                            from src/state/State_Report.cpp
+//     block, the service-request take, the config-invalid exit, the connect
+//     decision block (build the inputs, ConnectDecision::decide(), act) and the
+//     connected branch                       from src/state/State_Report.cpp
+//   - src/power/ConnectDecision.cpp, the decision itself (WO-2026-11-19-001).
 //   - src/MyPersistentData.cpp and src/power/PowerManager.cpp, so the mode in
 //     use (including the battery downgrade) is the real derivation.
 //
@@ -30,7 +31,8 @@
 // that order (sleep_pass.inc, report_pass.inc), so moving a block in src/
 // changes what the passes below do. Only the glue between the blocks is
 // modelled here: the publish call, the teardown request, the sleep itself, and
-// the tail of the not-connected chain. Each model is marked "model".
+// two inputs of the connect decision (no daily close, cadence not due). Each
+// model is marked "model".
 
 #include "Particle.h"
 #include "StorageHelperRK.h"
@@ -41,6 +43,7 @@
 #include "persist/RecoveryState.h"
 #include "persist/SystemConfig.h"
 #include "power/BatteryAuthority.h"
+#include "power/ConnectDecision.h"
 #include "power/ConnectivityPolicy.h"
 #include "power/PowerManager.h"
 
@@ -104,6 +107,8 @@ struct SessionState {
   bool awaitingWebhookResponse = false;
   uint32_t occupancyStartMs = 0;
   bool pieceUntrusted = false;
+  uint8_t modemConnectTimeoutCount = 0;  // no failed connect in these scenarios: the decision never holds
+  uint32_t lastConnectFailMs = 0;
 };
 SessionState session;
 
@@ -226,6 +231,8 @@ void reportPass() {
   const time_t now = Time.now();
   bool forceConnectForLongTermWebhook = false;
   (void)forceConnectForLongTermWebhook;
+  const bool due = false;                                       // model: no daily close on these passes
+  const struct { bool cadenceDue; } reportingPolicy = {false};  // model: the cadence is not due
 #include "report_pass.inc"
 }
 

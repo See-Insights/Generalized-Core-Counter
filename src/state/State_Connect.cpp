@@ -639,6 +639,7 @@ void handleConnectingState() {
     Observability::cycleStats().markConnectTimeout((uint32_t)elapsedMs);
 
     noteConnectTimeout();
+    session.lastConnectFailMs = millis(); // WO-2026-11-19-001: the connect hold counts from here
 
     RecoveryState::raiseAlert(31);
     Connectivity::requestFullDisconnectAndRadioOff();
