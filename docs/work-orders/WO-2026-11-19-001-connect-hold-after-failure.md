@@ -1,98 +1,168 @@
-# WO-2026-11-19-001: After a failed connect, hold further connect attempts (back-off)
+# WO-2026-11-19-001 (v2): One connect decision, with a hold after failure
 
-**Author:** architect, 19 Nov 2026 (Chip: "an important bug to fix - a device that acts like this in the field would quickly run out of battery") · **Status:** DRAFT for Chip's approval (Stage 5). **Release:** first item of v50.2 unless Chip rules it into v50.1.
-**Branch:** `wo/2026-11-19-001-connect-hold` from `integration/v50-ab1805` at `eb398b8` (so it can land in either v50.1 or v50.2).
-**Workflow:** `AI_DEVELOPMENT_WORKFLOW.md` §3 Stages 5–8; §4 (dispatch format; the three-level Stage 7 verdicts of 11 Nov; at most two Codex rounds); §5 model routing; §6 WO contents.
+**Author:** architect, 19 Nov 2026 · **Status:** DRAFT for Chip's approval (Stage 5) · **Release:** v50.2, first item (Chip's ruling, 19 Nov) · **Replaces:** v1 of this WO (unmerged).
+**Base:** `integration/v50-ab1805` at `eb398b8` · **Branch:** `wo/2026-11-19-001-connect-decision`.
+**Workflow:** `AI_DEVELOPMENT_WORKFLOW.md` §3 Stages 5–8; §4 (dispatch format; the three-level Stage 7 verdicts of 11 Nov; at most two Codex rounds); §5 (model routing); §6 (WO contents).
 **Agents (§5):**
-- Stage 6: **Copilot**, standard model, **medium** reasoning (two files, one small gate).
-- Stage 7: **Codex**, **top model, highest reasoning**. §5 escalates power and time logic.
-- Claude Code resolves the model IDs at dispatch, per §5.
+- Stage 6: **Copilot, top model, high reasoning.** This is a refactor across several files, and §5 escalates those.
+- Stage 7: **Codex, top model, highest reasoning.** This is power and timing logic.
+- Claude Code resolves the model IDs at dispatch.
 
-**Budget:** `src/` **≤ +25 net lines**. Tests are not capped, but keep them proportionate. If the gate cannot be done within the budget, **stop and report**: don't widen the scope.
+**Evidence base:** `docs/reviews/2026-11-19-one-place-map.md` (PR #242), which gives the R/C/X/S row and flag ids below. Every citation in this WO was re-opened at `eb398b8`.
+
+## Budget
+- **`src/`: ≤ 0 net (target), with a hard cap of +10.** Above +10, stop and report: don't widen the scope.
+- **Running total for the one-place path (steps 1–5):** starts at 0. This step's actual figure goes into the closing record.
+- Tests aren't capped, but keep them proportionate.
 
 ## Plain goal
-When a connect attempt fails, the device must not try again straight away. It waits, and the wait grows with each further failure: **1 h, 2 h, 4 h, then every 6 h at most.** A good connect resets the wait. Counts are still recorded on time and queued; only the upload waits.
+1. **One place decides whether a report connects:** a pure function. `State_Report` works out the trigger, asks that function, and does what it answers.
+2. **After a failed connect, the device waits before trying again.** The wait is 1 h, then 2 h, then 4 h, then 6 h at most. A good connect resets it. This sets **how often** the device attempts a connect. **How long** each attempt lasts doesn't change.
 
-## The bug (evidence: Dev-09, 18–19 Nov, mode IKA, fixed 5001 `eb398b8`)
-- **Ubidots and the archive (Claude Code, 19 Nov):**
+Counts are still recorded on time and queued; only the upload waits.
+
+## Principle (Chip, 19 Nov)
+Facts → Decisions → Operating model → the state machine acts. This step moves the **Connect decision** for the REPORTING path into one place, and deletes the separate 30 s rule. It is step 1 of 5. Steps 2–5 come after RC1 and aren't in this WO.
+
+## The bug (evidence)
+- **Dev-09, fixed 5001, mode IKA, bad antenna** (`RECOVERY_PLAN_2026-09-26.md:243`):
   - The last good connect was 07:29Z on 18 Nov.
-  - After it, a 660 s attempt started about every 11 min until the stage-2 failsafe reset at 13:03Z (140/2).
-  - There was a brief connect at 13:15Z, back-to-back attempts again until about 14:22Z, then hibernate.
-  - From 22:00Z to about 23:48Z there were back-to-back attempts again.
-  - Every failure was `CELLULAR_ACQUIRE`, `sig=na`, `NCP client: -210`.
-  - Dev-09 has a known bad antenna: `RECOVERY_PLAN_2026-09-26.md:243`.
-- **Serial, 23:48–23:49Z (Chip's capture):**
-  - The connect succeeded after `cellMs=521772`.
-  - Then came `PPP link failed: error 5`, `MODEM_HEALTH: unstable reason=slow_teardown`, and `Sleep: … standby=1/0 mode=IKA`.
-  - Then `Sleep: ULP standby=0 reason=debounce dur=70s occ=1`.
-  - The next occupancy change reconnects cold.
-  - `INV: awake_ms=6513806 > ceiling_ms=1090000` is logged only (`State_Sleep.cpp:384`).
-- **Why it happens, at `eb398b8`:**
-  - `State_Report.cpp:199–206`: the only guard, `deferAutoConnectForUnstableModem`, holds a reconnect for **30 s** (`MODEM_UNSTABLE_RECONNECT_DEFER_MS`, `:27`).
-  - That guard applies only to the keep-alive branch (`:242–251`) and the boundary-aligned branch (`:254–266`).
-  - **The occupancy-change branch (`:226–231`) has no guard.** Neither do daily close (`:234`), webhook health (`:239`) and config invalid (`:168–169`).
-  - `ModemHealth.cpp:55–63` already counts consecutive timeouts (`modemConnectTimeoutCount`). `:65` (`noteConnectSuccess`, called at `State_Connect.cpp:590`) resets the count, and `:71` (`clearAtDailyClose`, called at `State_Report.cpp:87`) clears it too.
-  - Nothing uses that count to space out attempts.
-- **The fleet runs the same logic.** The relevant constants and branches are the same in v49.1, so this isn't a v50 regression. A field unit with a weak or flaky radio and steady occupancy searches for most of the day.
+  - From then until the stage-2 failsafe reset at 13:03Z (140/2), an attempt started about every 11 min.
+  - From 13:16Z to about 14:22Z, and from 22:00Z to about 23:48Z, attempts ran back to back again.
+  - Source: the archive and Ubidots, Claude Code, 19 Nov.
+- **Serial, 23:48–23:49Z:**
+  - `ConnSummary: ok … cellMs=521772`
+  - `PPP link failed: error 5`
+  - `MODEM_HEALTH: unstable reason=slow_teardown`
+  - `Sleep: ULP standby=0 reason=debounce dur=70s occ=1`
+  - then `INV: awake_ms=6513806 > ceiling_ms=1090000`
+- **Why:** there is no failure back-off at all.
+  - `modemConnectTimeoutCount` has a single reader, the latch at 2 (`power/ModemHealth.cpp:60–61`).
+  - After a timeout (`state/State_Connect.cpp:608–654`, row X4), the next attempt is the next report that passes the chain (`state/State_Report.cpp:220–282`), with a full budget.
+  - The 30 s defer (`state/State_Report.cpp:27`, `:199–207`) covers only rows R6 and R8. Occupancy change (R3, `:226–231`) and four other triggers skip it (map flag F1).
+- **The fleet runs the same logic in v49.1.** It's not a v50 regression, but a field board with a weak radio and steady occupancy searches for most of the day.
 
-## The change (approved architecture, once Chip approves)
-1. **One hold, in one place:** `State_Report.cpp`, ahead of the immediate-connect branches.
-   - The hold is active when the consecutive-failure count is N ≥ 1 and less than `holdMs(N)` has passed since the end of the last failed attempt.
-   - While it's active, every **automatic** trigger goes to `IDLE_STATE` with the reason `"connect hold"`, logging `CONNECT_HOLD: remaining=<s> failures=<N> trigger=<name>` once per trigger. The automatic triggers are: occupancy change, keep alive, boundary aligned, daily close, webhook health and config invalid.
-   - The existing path from Idle to Sleep handles the rest. The records stay queued.
-2. **`holdMs(N)` = 1 h × 2^(N−1), capped at 6 h**: 1 h, 2 h, 4 h, 6 h, 6 h …
-   - Put the 1 h base and the 6 h cap in `ConnectivityPolicy.h` beside the connect budgets, with a short comment.
-   - Use one small function. No new class.
-3. **The count and timestamp:**
-   - Reuse `modemConnectTimeoutCount`, or add one RAM timestamp beside it, set at the timeout in `State_Connect.cpp:641` / `:654`.
-   - Reset on success (`noteConnectSuccess`) and at the daily close (`clearAtDailyClose`), as today.
-   - RAM only: a reset or hibernate starts fresh, which allows at most one extra attempt per failsafe cooldown. This is accepted; state it in the report.
-4. **Exempt:** `service request` (`State_Report.cpp:225`, a deliberate human or remote action). No other trigger is exempt.
-5. **Unchanged:**
-   - the 30 s unstable-modem defer (it still covers `slow_teardown` with no failed connect);
-   - the 5 and 11 minute connect budgets;
-   - the ConnectivityFailsafe ladder;
-   - CONNECTED mode's reconnect at `State_Sleep.cpp:1036–1038` (mains or bench only).
+## Approved architecture (once Chip approves)
 
-## Step 0 (read-only, inside Stage 6; report before editing)
-1. Cite **every** `transitionTo(CONNECTING_STATE, …)` on the base, with file:line. Confirm that each automatic one passes through `REPORTING_STATE`, or list the ones that don't.
-2. Cite how ConnectivityFailsafe stage 1/2 measures connection age (`lastConnection`). Confirm the hold doesn't delay or suppress the failsafe: the hold doesn't touch `lastConnection`. **Stop and report** if the failsafe starts its own connect outside `CONNECTING_STATE`.
-3. Confirm where the end of a failed attempt is known (`State_Connect.cpp:641–654`) and that a stage-2 recovery inside an attempt (`:92–102`) doesn't count as a separate failure.
+### 1. A new pure module: `src/power/ConnectDecision.h` / `.cpp`
+- **Location:** beside `ConnectivityPolicy.h`.
+- **Constraints:** no Particle or Device OS calls, no globals, no logging. It must be host-testable, like `ReportingPolicyResolver::resolve()` (`reporting/ReportingPolicy.h`).
+- **The call:** `ConnectDecision::Result ConnectDecision::decide(const Inputs&)`.
+- **Inputs:**
+  - the six REPORTING triggers as booleans: `configInvalid` (R1), `serviceRequest` (R2), `occupancyChange` (R3), `closeDue` (R4), `webhookHealthDue` (R5), `cadenceDue` (R8/R9);
+  - `effectiveMode`;
+  - `failureCount` (`uint8_t`);
+  - `msSinceLastFailure`.
+- **Result:**
+  - `{ action: CONNECT | WAIT, reason }`. The reason is one of the **existing** outcome strings, so `StateReq` logs read as they do today.
+  - On WAIT: the reason `"connect hold"` or `"not aligned"`, plus `holdRemainingMs`.
+- **Rule order (first match wins).** This is the current chain without rows R6/R8:
+  1. **The hold**, which applies **unless `serviceRequest`**:
+     - while `failureCount ≥ 1` and `msSinceLastFailure < holdMs(failureCount)`, the answer is WAIT `"connect hold"`;
+     - `holdMs(n) = HOLD_BASE_MS << (n−1)`, capped at `HOLD_MAX_MS`;
+     - `HOLD_BASE_MS` = 1 h and `HOLD_MAX_MS` = 6 h, in `ConnectivityPolicy.h`.
+  2. `configInvalid` → CONNECT `"config invalid"`
+  3. `serviceRequest` → CONNECT `"service request"`
+  4. `occupancyChange` → CONNECT `"occupancy change"`
+  5. `closeDue` → CONNECT `"daily close"`
+  6. `webhookHealthDue` → CONNECT `"webhook health check"`
+  7. mode KEEP_ALIVE → CONNECT `"keep alive mode"` (R7, kept as it is: F4 is step 5)
+  8. `cadenceDue` → CONNECT `"boundary aligned"`
+  9. otherwise → WAIT `"not aligned"`
 
-## Non-goals
-- The 11-minute deep budget on any battery above 50 % (`ConnectivityPolicy.h:80–81`): a separate question, ask the architect.
-- Enforcing the `INV` awake ceiling.
-- Any change to the Ubidots or webhook payloads.
-- Persisting the hold across resets.
+### 2. `state/State_Report.cpp`
+- **Keep where they are, before the call:**
+  - the webhook stage-2 ERROR exit (R0, `:141–151`). It's a recovery action, not a connect decision; it belongs to step 3.
+  - the battery commit (`:184–192`);
+  - `returnToSleepAfterReport` (`:211–216`; flag F8 is step 2);
+  - the already-connected exit (R1b, `:283–286`).
+- **Replace with "build Inputs, call `decide`, act":**
+  - the config-invalid branch (R1, `:167–170`);
+  - the `if / else if` chain (`:220–282`).
+- **Acting:** CONNECT → `transitionTo(CONNECTING_STATE, reason)`. WAIT → `transitionTo(IDLE_STATE, reason)`.
+- **Logging:** on `"connect hold"`, log once per pass: `CONNECT_HOLD: remaining=<s> failures=<n> trigger=<name>`.
+- **Delete** the `ENABLE_CONNECT_DECISION_TRACE` blocks inside the chain. Step 0 says whether the flag has other users; if it has none, delete the flag too (`BuildProfile.h:153–154`).
+
+### 3. Delete the 30 s defer, and what only it uses
+- **The defer itself:** `MODEM_UNSTABLE_RECONNECT_DEFER_MS` (`State_Report.cpp:27`), the defer block (`:199–207`) and its two `MODEM_POLICY: reconnect deferred` logs.
+- **Its field:** `session.lastTeardownEndMs`. It has no other reader, per map §1.5; Step 0 confirms. Remove its writes in `state/SleepTeardown.cpp:228`, `:243`.
+- **Three write-only fields:** `lastCloudDisconnectElapsedMs`, `lastModemOffElapsedMs` and `lastTotalTeardownElapsedMs` (`state/StateMachine.h:66–68`, writes at `state/SleepTeardown.cpp:240–242`).
+- **Keep:**
+  - `modemUnstable`, and its standby suppression (`state/State_Sleep.cpp:680`), which is unchanged;
+  - the 10 s slow-teardown latch.
+
+### 4. The failure facts (RAM, in `SessionState`)
+- **`failureCount`:** reuse `modemConnectTimeoutCount`. It's already incremented at the timeout (`ModemHealth.cpp:55–58`, from `State_Connect.cpp:641`) and zeroed on success (`ModemHealth.cpp:65–69`, from `State_Connect.cpp:590`). Its latch at 2 is unchanged.
+- **One new field, `lastConnectFailMs`:** set beside `noteConnectTimeout()` at `State_Connect.cpp:641`. It takes the place of the deleted `lastTeardownEndMs`.
+- **RAM only, on purpose (map Q5):**
+  - every hibernate wake and every reset starts the count fresh, so each morning has one immediate attempt;
+  - after a failsafe reset, there's one attempt. The failsafe's own 6 h cooldown bounds that.
+- Nothing new is persisted.
+
+### 5. Unchanged
+- connect budgets, and their 50 % rule (C1–C5). Chip, 19 Nov, citing Particle's `Cellular.connect()` guidance on the 5- and 11-minute windows;
+- the six bypass sites S1–S6 (boot, OTA, and the CONNECTED reconnect at `State_Sleep.cpp:1038`): step 2;
+- DISCONNECTED (F3) and KEEP_ALIVE hours and battery multiplier (F4): step 5, pinned as they are;
+- the ConnectivityFailsafe ladder;
+- payloads, ledgers and persisted layout.
+
+## Step 0 (read-only, inside Stage 6: report before editing)
+1. **`millis()` across ULP sleep:** the hold measures with `millis()`. Confirm it keeps counting through ULP sleep on Boron with Device OS 6.x. Cite the Particle docs, or a bench serial line, for example the uptime before and after a ULP sleep (map §1.5 notes this assumption isn't verified). **If it doesn't keep counting, stop and report.** The fallback is an RTC epoch, which is the architect's call.
+2. **Readers:** re-grep the readers of `lastTeardownEndMs`, of the three write-only fields, and of `ENABLE_CONNECT_DECISION_TRACE`. Delete only what has no other reader.
+3. **Row order:** confirm that R1 runs before the already-connected check, and say exactly where R1b sits relative to `:220–282`. The new call must keep today's order for every row except R6/R8.
+4. **The new field:** confirm that `lastConnectFailMs` is set only on the timeout path (X4). Stage-1 and stage-2 recoveries inside one attempt (S15/S16) must not count.
 
 ## Tests (host)
-- **Hold sequence:** after 1, 2, 3, 4 and 5 consecutive timeouts, an occupancy-change trigger inside the hold gives no connect. The first trigger after `holdMs(N)` connects. The holds are 1 h, 2 h, 4 h, 6 h, 6 h.
-- **A success resets the hold:** after the reset, the next occupancy change connects immediately.
-- **Daily close clears the hold.**
-- **`service request` connects during a hold.**
-- **The failsafe is unaffected:** the stage-1/2 timing with the hold active is the same as without it.
-- **Mutations** (scratch copy, or `cp` backup and restore; never `git checkout`):
-  - remove the hold check from the occupancy-change branch: the hold test fails;
-  - set the cap to 0 or remove the doubling: the sequence test fails.
-- The full suite stays green, and a fresh Device OS build reports text/data/bss against `eb398b8`.
+1. **Characterization table first.** Encode map rows R1–R10 (without R6/R8) as a table test of `decide` with `failureCount = 0`. Every outcome string must match the map's "Outcome today" column. The old chain can't be host-tested, so Codex checks the equivalence of the old chain and the new function line by line at Stage 7.
+2. **Hold rows:**
+   - after failures 1–5, `occupancyChange`, `closeDue`, `webhookHealthDue`, `configInvalid` and a keep-alive report all give WAIT `"connect hold"` inside the hold;
+   - each gives its own CONNECT once the hold has passed;
+   - the holds are 1, 2, 4, 6 and 6 h;
+   - `serviceRequest` connects during a hold.
+3. **Reset:** with `failureCount = 0` there's no hold, whatever the time since the last failure.
+4. **Mutations** (on a scratch copy, or with a `cp` backup and restore; never `git checkout`):
+   - drop the hold rule: a hold row fails;
+   - remove the doubling or the cap: the sequence test fails;
+   - exempt `occupancyChange` from the hold: a hold row fails.
+5. **The full suite stays green.** Report a fresh Device OS build's text/data/bss against `eb398b8`.
 
 ## Bench (Chip, after Stage 7)
-**Dev-09 as it is now** (bad antenna, mode IKA, exerciser off but `occ=1`) is the perfect test. Over 6 open hours with serial:
-- `CONNECT_HOLD` lines appear after the first failure;
-- attempts start at about +1 h, +2 h, +4 h;
-- no back-to-back `Connect: start`.
+Use **Dev-09 as it is now:** bad antenna, mode IKA, `occ=1`, serial attached. Over one open day, the serial should show:
+- `CONNECT_HOLD` lines after the first failure;
+- `Connect: start` at about +1 h, then +2 h, then +4 h;
+- no back-to-back attempts.
 
-Then fit a good antenna. The first connect clears the hold, and the board returns to normal reporting.
+Then fit a good antenna. The first good connect clears the hold, and normal reporting resumes.
 
 ## Expected telemetry
-- A failing device makes at most about 4–5 attempts per open day instead of dozens.
-- `connecttime` rows thin out.
+- A failing board makes about 4–5 attempts per open day, instead of attempts back to back.
 - Alert 31 is raised once per failed attempt, as today.
+- A healthy board shows no change: `failureCount` stays at 0.
+
+## Non-goals
+- The bypass sites S1–S6;
+- flags F3–F9;
+- the budget rule (F6);
+- merging the battery block, the debounce and the report-due tests;
+- the idle ceiling;
+- any other recovery mechanism.
 
 ## Rollback
-Revert the PR. This is behaviour only: there's no persistent or ledger change.
+Revert the PR. This is behaviour only: nothing persisted, nothing in the ledgers.
+
+## Answers to map PR #242's open questions (architect, 19 Nov)
+1. **The areas:** Chip's nine (Power, Time, Config, Sensor model, Health/recovery, Report cadence, Report content and delivery, Connect, Sleep). The idle ceiling and webhook supervision belong to Health/recovery. The webhook-health **trigger** is an input to Connect.
+2. **Step 1 covers the REPORTING path only.** S1–S6 are step 2.
+3. **DISCONNECTED:** step 5, pinned as it is today.
+4. **KEEP_ALIVE hours and battery multiplier:** step 5, pinned.
+5. **The hold's count:** RAM, as §4 above.
+6. **Exemptions:** only `serviceRequest` is exempt. Daily close is held, and its report stays queued.
+7. **F5:** not confirmed, because the bench logs couldn't show mode 0. The fleet runs mode 3. Step 1 doesn't touch S6, so F5 is left for step 2.
+8. **The 660 s rule above 50 %:** unchanged, by Chip's decision of 19 Nov.
 
 ## Closing record
 | Item | Budget | Raised to (reason) | Actual net `src/` lines | Tests |
 |---|---|---|---|---|
-| Connect hold | ≤ +25 | — | | |
+| Connect decision + hold | ≤ 0 (cap +10) | — | | |
+
+Running one-place total after this step: ____.
