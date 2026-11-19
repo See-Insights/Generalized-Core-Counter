@@ -1,6 +1,6 @@
-# WO-2026-11-19-001 (v2): One connect decision, with a hold after failure
+# WO-2026-11-19-001 (v2.1): One connect decision, with a hold after failure
 
-**Author:** architect, 19 Nov 2026 · **Status:** DRAFT for Chip's approval (Stage 5) · **Release:** v50.2, first item (Chip's ruling, 19 Nov) · **Replaces:** v1 of this WO (unmerged).
+**Author:** architect, 19 Nov 2026 · **Status:** DRAFT for Chip's approval (Stage 5) · **Release:** v50.2, first item (Chip's ruling, 19 Nov) · **Replaces:** v1 and v2 of this WO (unmerged). v2.1 applies the architect's Step 0 rulings (19 Nov 13:15 SGT; see "Step 0 results and rulings").
 **Base:** `integration/v50-ab1805` at `eb398b8` · **Branch:** `wo/2026-11-19-001-connect-decision`.
 **Workflow:** `AI_DEVELOPMENT_WORKFLOW.md` §3 Stages 5–8; §4 (dispatch format; the three-level Stage 7 verdicts of 11 Nov; at most two Codex rounds); §5 (model routing); §6 (WO contents).
 **Agents (§5):**
@@ -30,7 +30,7 @@ Facts → Decisions → Operating model → the state machine acts. This step mo
   - From then until the stage-2 failsafe reset at 13:03Z (140/2), an attempt started about every 11 min.
   - From 13:16Z to about 14:22Z, and from 22:00Z to about 23:48Z, attempts ran back to back again.
   - Source: the archive and Ubidots, Claude Code, 19 Nov.
-- **Serial, 23:48–23:49Z:**
+- **Serial, 23:48–23:49Z** (Chip's own USB capture; these lines are not in the S3 archive):
   - `ConnSummary: ok … cellMs=521772`
   - `PPP link failed: error 5`
   - `MODEM_HEALTH: unstable reason=slow_teardown`
@@ -49,7 +49,7 @@ Facts → Decisions → Operating model → the state machine acts. This step mo
 - **Constraints:** no Particle or Device OS calls, no globals, no logging. It must be host-testable, like `ReportingPolicyResolver::resolve()` (`reporting/ReportingPolicy.h`).
 - **The call:** `ConnectDecision::Result ConnectDecision::decide(const Inputs&)`.
 - **Inputs:**
-  - the six REPORTING triggers as booleans: `configInvalid` (R1), `serviceRequest` (R2), `occupancyChange` (R3), `closeDue` (R4), `webhookHealthDue` (R5), `cadenceDue` (R8/R9);
+  - the five chain triggers as booleans: `serviceRequest` (R2), `occupancyChange` (R3), `closeDue` (R4), `webhookHealthDue` (R5), `cadenceDue` (R8/R9). Config invalid (R1) is not an input (ruling 3);
   - `effectiveMode`;
   - `failureCount` (`uint8_t`);
   - `msSinceLastFailure`.
@@ -61,38 +61,38 @@ Facts → Decisions → Operating model → the state machine acts. This step mo
      - while `failureCount ≥ 1` and `msSinceLastFailure < holdMs(failureCount)`, the answer is WAIT `"connect hold"`;
      - `holdMs(n) = HOLD_BASE_MS << (n−1)`, capped at `HOLD_MAX_MS`;
      - `HOLD_BASE_MS` = 1 h and `HOLD_MAX_MS` = 6 h, in `ConnectivityPolicy.h`.
-  2. `configInvalid` → CONNECT `"config invalid"`
-  3. `serviceRequest` → CONNECT `"service request"`
-  4. `occupancyChange` → CONNECT `"occupancy change"`
-  5. `closeDue` → CONNECT `"daily close"`
-  6. `webhookHealthDue` → CONNECT `"webhook health check"`
-  7. mode KEEP_ALIVE → CONNECT `"keep alive mode"` (R7, kept as it is: F4 is step 5)
-  8. `cadenceDue` → CONNECT `"boundary aligned"`
-  9. otherwise → WAIT `"not aligned"`
+  2. `serviceRequest` → CONNECT `"service request"`
+  3. `occupancyChange` → CONNECT `"occupancy change"`
+  4. `closeDue` → CONNECT `"daily close"`
+  5. `webhookHealthDue` → CONNECT `"webhook health check"`
+  6. mode KEEP_ALIVE → CONNECT `"keep alive mode"` (R7, kept as it is: F4 is step 5)
+  7. `cadenceDue` → CONNECT `"boundary aligned"`
+  8. otherwise → WAIT `"not aligned"`
 
 ### 2. `state/State_Report.cpp`
-- **Keep where they are, before the call:**
+- **Keep where they are, unchanged:**
   - the webhook stage-2 ERROR exit (R0, `:141–151`). It's a recovery action, not a connect decision; it belongs to step 3.
+  - the config-invalid connect (R1, `:167–170`), which runs before the connected test at `:173` (ruling 3). It's a fault recovery and belongs to step 3;
   - the battery commit (`:184–192`);
   - `returnToSleepAfterReport` (`:211–216`; flag F8 is step 2);
   - the already-connected exit (R1b, `:283–286`).
-- **Replace with "build Inputs, call `decide`, act":**
-  - the config-invalid branch (R1, `:167–170`);
-  - the `if / else if` chain (`:220–282`).
+- **Replace with "build Inputs, call `decide`, act":** the `if / else if` chain (`:220–282`), and nothing else.
 - **Acting:** CONNECT → `transitionTo(CONNECTING_STATE, reason)`. WAIT → `transitionTo(IDLE_STATE, reason)`.
 - **Logging:** on `"connect hold"`, log once per pass: `CONNECT_HOLD: remaining=<s> failures=<n> trigger=<name>`.
-- **Delete** the `ENABLE_CONNECT_DECISION_TRACE` blocks inside the chain. Step 0 says whether the flag has other users; if it has none, delete the flag too (`BuildProfile.h:153–154`).
+- **Delete** the `ENABLE_CONNECT_DECISION_TRACE` blocks inside the chain only. **The flag stays:** Step 0 found other users (`State_Connect.cpp:267`, `:273`, `:279`; build-flags bit `0x0040` at `BuildProfile.h:304`).
 
 ### 3. Delete the 30 s defer, and what only it uses
 - **The defer itself:** `MODEM_UNSTABLE_RECONNECT_DEFER_MS` (`State_Report.cpp:27`), the defer block (`:199–207`) and its two `MODEM_POLICY: reconnect deferred` logs.
-- **Its field:** `session.lastTeardownEndMs`. It has no other reader, per map §1.5; Step 0 confirms. Remove its writes in `state/SleepTeardown.cpp:228`, `:243`.
+- **Its field:** `session.lastTeardownEndMs`. It has no other reader, per map §1.5; Step 0 confirms. Remove its only write, at `state/SleepTeardown.cpp:243` (`:228` is an `if` that reads teardown state, not a write).
 - **Three write-only fields:** `lastCloudDisconnectElapsedMs`, `lastModemOffElapsedMs` and `lastTotalTeardownElapsedMs` (`state/StateMachine.h:66–68`, writes at `state/SleepTeardown.cpp:240–242`).
+- **Same PR:** update the two host tests and the stub that name these fields (Step 0 item 2).
 - **Keep:**
   - `modemUnstable`, and its standby suppression (`state/State_Sleep.cpp:680`), which is unchanged;
   - the 10 s slow-teardown latch.
 
 ### 4. The failure facts (RAM, in `SessionState`)
 - **`failureCount`:** reuse `modemConnectTimeoutCount`. It's already incremented at the timeout (`ModemHealth.cpp:55–58`, from `State_Connect.cpp:641`) and zeroed on success (`ModemHealth.cpp:65–69`, from `State_Connect.cpp:590`). Its latch at 2 is unchanged.
+- **The count has three clears today:** `ModemHealth.cpp:47` (recovered), `:67` (success) and `:76` (daily close). **Ruling 4: the daily close always starts a fresh day.** In `clearAtDailyClose()` (`ModemHealth.cpp:71–79`), zero `modemConnectTimeoutCount` unconditionally, not only when `modemUnstable` is set. That's one line moved out of the `if`. The close report then gets its one attempt whatever the count, and the hold restarts from zero.
 - **One new field, `lastConnectFailMs`:** set beside `noteConnectTimeout()` at `State_Connect.cpp:641`. It takes the place of the deleted `lastTeardownEndMs`.
 - **RAM only, on purpose (map Q5):**
   - every hibernate wake and every reset starts the count fresh, so each morning has one immediate attempt;
@@ -112,14 +112,23 @@ Facts → Decisions → Operating model → the state machine acts. This step mo
 3. **Row order:** confirm that R1 runs before the already-connected check, and say exactly where R1b sits relative to `:220–282`. The new call must keep today's order for every row except R6/R8.
 4. **The new field:** confirm that `lastConnectFailMs` is set only on the timeout path (X4). Stage-1 and stage-2 recoveries inside one attempt (S15/S16) must not count.
 
+## Step 0 results and rulings (19 Nov; report `wo-2026-11-19-001-step0-report.md`, Fable 5.2, read-only)
+1. **`millis()` across ULP sleep: PASS.** Bench serial, Device OS 6.6.0, IKA: sleeps of 27 s to 10.5 min advance `millis()` by the full sleep, within 1–3 s of the Pi clock. For example, Dev-09 went from `0000801408` at 13:16:06Z to `0001422950` at 13:26:30Z, which is 621.5 s against 624.2 s. Particle's reference docs don't name `millis()`, so the bench evidence carries this. `millis()` is accepted as the hold's clock.
+2. **Readers: PASS.** Delete the four fields, and update the tests and stub that name them in the same PR. The trace flag stays.
+3. **Ruling: R1 (config invalid) stays where it is, outside `decide()`.** Moving it would change two behaviours: a connected device with invalid config would go to IDLE instead of CONNECTING, and the battery commit and `returnToSleepAfterReport` would run on that path. Neither change is wanted. R1 is a rare fault recovery; it isn't held in this step, and step 3 (Health/recovery) owns it.
+4. **Ruling: the daily close clears the count always** (§4). This replaces answer 6's "daily close is held". The close report gets one attempt per day, and the hold restarts the next day. Hibernate clears RAM overnight anyway, so this only makes the rule state what happens.
+5. **Accepted as they are:**
+   - the exits from CONNECTING that don't count as failures (user switch, ThrashGuard tier 2, resets): they aren't attach failures;
+   - a timeout reached from a bypass site (S1–S6) starts the hold for REPORTING: a failure is a failure.
+
 ## Tests (host)
 1. **Characterization table first.** Encode map rows R1–R10 (without R6/R8) as a table test of `decide` with `failureCount = 0`. Every outcome string must match the map's "Outcome today" column. The old chain can't be host-tested, so Codex checks the equivalence of the old chain and the new function line by line at Stage 7.
 2. **Hold rows:**
-   - after failures 1–5, `occupancyChange`, `closeDue`, `webhookHealthDue`, `configInvalid` and a keep-alive report all give WAIT `"connect hold"` inside the hold;
+   - after failures 1–5, `occupancyChange`, `closeDue`, `webhookHealthDue` and a keep-alive report all give WAIT `"connect hold"` inside the hold;
    - each gives its own CONNECT once the hold has passed;
    - the holds are 1, 2, 4, 6 and 6 h;
    - `serviceRequest` connects during a hold.
-3. **Reset:** with `failureCount = 0` there's no hold, whatever the time since the last failure.
+3. **Reset:** with `failureCount = 0` there's no hold, whatever the time since the last failure. `clearAtDailyClose()` zeroes a count of 1 (with `modemUnstable` clear) as well as a count of 2 or more.
 4. **Mutations** (on a scratch copy, or with a `cp` backup and restore; never `git checkout`):
    - drop the hold rule: a hold row fails;
    - remove the doubling or the cap: the sequence test fails;
@@ -156,7 +165,7 @@ Revert the PR. This is behaviour only: nothing persisted, nothing in the ledgers
 3. **DISCONNECTED:** step 5, pinned as it is today.
 4. **KEEP_ALIVE hours and battery multiplier:** step 5, pinned.
 5. **The hold's count:** RAM, as §4 above.
-6. **Exemptions:** only `serviceRequest` is exempt. Daily close is held, and its report stays queued.
+6. **Exemptions:** only `serviceRequest` is exempt from the hold. The daily close clears the count first, so the close always gets one attempt (Step 0 ruling 4). Config invalid stays outside `decide()` (Step 0 ruling 3).
 7. **F5:** not confirmed, because the bench logs couldn't show mode 0. The fleet runs mode 3. Step 1 doesn't touch S6, so F5 is left for step 2.
 8. **The 660 s rule above 50 %:** unchanged, by Chip's decision of 19 Nov.
 
