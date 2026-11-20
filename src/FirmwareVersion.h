@@ -17,9 +17,9 @@
 #define FIRMWARE_VERSION_H
 
 /** @brief Particle Product integer version (must be an integer). */
-#define FIRMWARE_PRODUCT_VERSION 5094
+#define FIRMWARE_PRODUCT_VERSION 5093
 
 /** @brief Current firmware release string. */
-inline const char* FIRMWARE_VERSION = "v50.1-NativeRTC-CONNECTHOLD-BENCH-ONLY";
+inline const char* FIRMWARE_VERSION = "v50.1-NativeRTC-CONNECTHOLD-NOCLOUD-BENCH-ONLY";
 
 #endif /* FIRMWARE_VERSION_H */

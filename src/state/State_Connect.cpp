@@ -368,7 +368,11 @@ void handleConnectingState() {
          (unsigned long)(budgetMs / 1000UL),
          (unsigned long)System.freeMemory());
     setAppBreadcrumb(6);
-    Particle.connect();
+    // BENCH ONLY, NEVER RELEASE (5093, no-cloud connect hold): the cloud is never requested, so
+    // the modem stays off and every attempt times out like an RF-shielded unit's. Everything
+    // else (budget, timeout, the connect hold, the failsafe supervisor) is the real code.
+    // Replaces: Particle.connect();
+    Log.warn("BENCH5093: Particle.connect() skipped");
     connectRequested = true;
     thrashGuard.markProgress("CONNECT_START");
 
