@@ -321,8 +321,7 @@ struct OccupancyCloseResult {
  *          the cross-boot credit cap in closeOccupancySessionSafely().
  */
 inline uint32_t occupancyDebounceMs() {
-	const uint32_t configured = SystemConfig::SensorSettings::get_sensorSetting1();
-	return configured != 0 ? configured : Config::occupancyDebounceMsForRuntime();
+	return Config::occupancyDebounceMsForRuntime();
 }
 
 /**
