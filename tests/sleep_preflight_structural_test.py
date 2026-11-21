@@ -247,14 +247,16 @@ if base_sleep is None:
 
 # No new src/ file; SleepTeardown.* unchanged.
 ls = subprocess.run(["git", "-C", str(ROOT), "ls-tree", "-r", "--name-only", base, "src"], capture_output=True, text=True).stdout.split()
+import connect_hold_base_delta  # WO-2026-11-19-001: the pure connect decision's two files, and the four session writes deleted from SleepTeardown.cpp
 ls.extend(["src/time/ExternalRtc.h", "src/time/PreBindRtc.h"])  # S1b adds PreBindRtc.h  # v50 S1 helper header (WO-2026-11-05-003)
+ls.extend(connect_hold_base_delta.NEW_SRC_FILES)
 if SRC == ROOT / "src":
     cur_files = sorted(str(p.relative_to(ROOT)) for p in SRC.rglob("*") if p.is_file())
     if sorted(ls) != cur_files:
         fail(f"src/ file list differs from {base}: {sorted(set(cur_files) ^ set(ls))}")
     for rel in ("src/state/SleepTeardown.cpp", "src/state/SleepTeardown.h"):
         want = git_show(base, rel)
-        if want is None or (ROOT / rel).read_text() != want:
+        if want is None or (ROOT / rel).read_text() != connect_hold_base_delta.teardown_base(rel, want):
             fail(f"{rel} changed")
     others = [p for p in SRC.rglob("*") if p.is_file() and p != SLEEP and p.suffix in (".cpp", ".h", ".ino")]
     if any(re.search(r"\b(?:endOfCycleSummary|wifiOffGuardPass|wifiGuard)\b", p.read_text()) for p in others):

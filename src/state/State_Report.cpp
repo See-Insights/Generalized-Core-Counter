@@ -3,6 +3,7 @@
 #include "../Config.h"
 #include "cloud/Cloud.h"
 #include "power/BatteryAuthority.h"
+#include "power/ConnectDecision.h"
 #include "power/ConnectivityPolicy.h"
 #include "power/ModemHealth.h"
 #include "power/PowerManager.h"
@@ -21,12 +22,6 @@
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
 // No behavioral changes were made.
-
-namespace {
-
-constexpr unsigned long MODEM_UNSTABLE_RECONNECT_DEFER_MS = 30000UL;
-
-} // namespace
 
 // REPORTING_STATE: Build and send periodic report
 void handleReportingState() {
@@ -196,15 +191,6 @@ void handleReportingState() {
   #if !ENABLE_CONNECT_DECISION_TRACE
     (void)tierName;
   #endif
-    bool deferAutoConnectForUnstableModem = false;
-    unsigned long reconnectDeferRemainingMs = 0;
-    if (session.modemUnstable && session.lastTeardownEndMs != 0) {
-      unsigned long sinceTeardownMs = millis() - session.lastTeardownEndMs;
-      if (sinceTeardownMs < MODEM_UNSTABLE_RECONNECT_DEFER_MS) {
-        deferAutoConnectForUnstableModem = true;
-        reconnectDeferRemainingMs = MODEM_UNSTABLE_RECONNECT_DEFER_MS - sinceTeardownMs;
-      }
-    }
     
     // Check if occupied in low-power mode - need to return to sleep after reporting
     // to wake periodically and check debounce timeout
@@ -216,70 +202,22 @@ void handleReportingState() {
       session.returnToSleepAfterReport = true;
     }
     
-    // Check if report was triggered by occupancy state change
-    if (serviceRequestTriggered) {
-#if ENABLE_CONNECT_DECISION_TRACE
-      Log.info("REPORTING: Immediate connection (service request) - bypassing alignment tier=%s",
-               tierName);
-#endif
-      transitionTo(CONNECTING_STATE, "service request");
-    } else if (occupancyChangeTriggered) {
-#if ENABLE_CONNECT_DECISION_TRACE
-      Log.info("REPORTING: Immediate connection (occupancy change) - bypassing alignment tier=%s",
-               tierName);
-#endif
-      transitionTo(CONNECTING_STATE, "occupancy change");
-    } else if (due) {
-      // WO-2026-09-29-001 A: the day's closing report goes out at close.
-      transitionTo(CONNECTING_STATE, "daily close");
-    } else if (forceConnectForLongTermWebhook) {
-#if ENABLE_CONNECT_DECISION_TRACE
-      Log.info("REPORTING: Forcing connection due to long-term webhook health (OPEN hours)");
-#endif
-      transitionTo(CONNECTING_STATE, "webhook health check");
-    } else if (PowerManager::instance().effectiveConnectionMode() == SystemConfig::INTERMITTENT_KEEP_ALIVE) {
-      // In INTERMITTENT_KEEP_ALIVE mode, connect immediately for all reports
-      if (deferAutoConnectForUnstableModem) {
-        Log.warn("MODEM_POLICY: reconnect deferred reason=unstable_modem remaining=%lu ms trigger=keep_alive",
-                 reconnectDeferRemainingMs);
-        transitionTo(IDLE_STATE, "modem unstable");
-      } else {
-#if ENABLE_CONNECT_DECISION_TRACE
-        Log.info("REPORTING: Immediate connection (KEEP_ALIVE mode) - bypassing alignment tier=%s",
-                 tierName);
-#endif
-        transitionTo(CONNECTING_STATE, "keep alive mode");
-      }
-    } else if (reportingPolicy.cadenceDue) {
-      if (deferAutoConnectForUnstableModem) {
-        Log.warn("MODEM_POLICY: reconnect deferred reason=unstable_modem remaining=%lu ms trigger=aligned",
-                 reconnectDeferRemainingMs);
-        transitionTo(IDLE_STATE, "modem unstable aligned");
-      } else {
-#if ENABLE_CONNECT_DECISION_TRACE
-        Log.info("REPORTING: Connection due - boundary aligned tier=%s interval=%lus (base=%lu x %u)",
-                 tierName,
-                 (unsigned long)reportingPolicy.effectiveIntervalSec,
-                 (unsigned long)reportingPolicy.configuredIntervalSec,
-                 (unsigned)reportingPolicy.batteryMultiplier);
-#endif
-        transitionTo(CONNECTING_STATE, "boundary aligned");
-      }
-    } else {
-      const time_t nextBoundary = reportingPolicy.nextReportEpoch > now
-          ? reportingPolicy.nextReportEpoch - now
-          : 0;
-#if ENABLE_CONNECT_DECISION_TRACE
-      Log.info("REPORTING: Connection deferred - cadence closed tier=%s interval=%lus next_in=%lus window=%d",
-               tierName,
-               (unsigned long)reportingPolicy.effectiveIntervalSec,
-               (unsigned long)nextBoundary,
-               reportingPolicy.windowOpen ? 1 : 0);
-    #else
-      (void)nextBoundary;
-#endif
-      transitionTo(IDLE_STATE, "not aligned");
+    // WO-2026-11-19-001: build the facts, ask the one connect decision, act on its answer.
+    ConnectDecision::Inputs in;
+    in.serviceRequest = serviceRequestTriggered;
+    in.occupancyChange = occupancyChangeTriggered;
+    in.closeDue = due; // WO-2026-09-29-001 A: the day's closing report goes out at close.
+    in.webhookHealthDue = forceConnectForLongTermWebhook;
+    in.cadenceDue = reportingPolicy.cadenceDue;
+    in.effectiveMode = PowerManager::instance().effectiveConnectionMode();
+    in.failureCount = session.modemConnectTimeoutCount;
+    in.msSinceLastFailure = millis() - session.lastConnectFailMs;
+    const ConnectDecision::Result decision = ConnectDecision::decide(in);
+    if (decision.holdRemainingMs != 0) {
+      Log.info("CONNECT_HOLD: remaining=%lu failures=%u trigger=%s",
+               (unsigned long)(decision.holdRemainingMs / 1000UL), (unsigned)in.failureCount, decision.trigger);
     }
+    transitionTo(decision.action == ConnectDecision::Action::CONNECT ? CONNECTING_STATE : IDLE_STATE, decision.reason);
   } else {
     // An online device has a working cloud connection; Connect never runs for it.
     SystemConfig::set_lastConnection(Time.now());

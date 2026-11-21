@@ -7,6 +7,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 STATE_REPORT = REPO_ROOT / "src" / "state" / "State_Report.cpp"
+CONNECT_DECISION = REPO_ROOT / "src" / "power" / "ConnectDecision.cpp"
 DAILY_BOUNDARY_H = REPO_ROOT / "src" / "time" / "DailyBoundary.h"
 DAILY_BOUNDARY_CPP = REPO_ROOT / "src" / "time" / "DailyBoundary.cpp"
 STATE_COMMON = REPO_ROOT / "src" / "state" / "State_Common.h"
@@ -226,17 +227,19 @@ def verify_source_shape() -> None:
         fail("daily boundary logic must not compare calendar Y/M/D fields")
 
     # WO-2026-09-29-001 item A: the daily-close report is an immediate-connect
-    # trigger, ahead of the keep-alive and cadence branches.
-    due_connect = re.search(
-        r"\}\s*else\s+if\s*\(\s*due\s*\)\s*\{\s*transitionTo\(CONNECTING_STATE,\s*\"daily close\"\);",
-        handle_code,
-    )
-    keep_alive_branch = handle_code.find("SystemConfig::INTERMITTENT_KEEP_ALIVE")
-    cadence_branch = handle_code.find("reportingPolicy.cadenceDue")
-    if due_connect is None or -1 in (keep_alive_branch, cadence_branch) or not (
-        due_connect.start() < keep_alive_branch < cadence_branch
+    # trigger, ahead of the keep-alive and cadence rules. WO-2026-11-19-001 moved
+    # the chain into ConnectDecision: Report hands `due` in as closeDue, and the
+    # rule order there keeps the close ahead of keep-alive and cadence (that the
+    # close rule answers CONNECT "daily close" is run in connect_decision_test.sh).
+    decision_code = strip_comment_lines(CONNECT_DECISION.read_text())
+    due_handed_in = re.search(r"\bin\.closeDue\s*=\s*due\s*;", handle_code)
+    close_rule = decision_code.find('if (in.closeDue) return "daily close";')
+    keep_alive_rule = decision_code.find("SystemConfig::INTERMITTENT_KEEP_ALIVE")
+    cadence_rule = decision_code.find("if (in.cadenceDue)")
+    if due_handed_in is None or -1 in (close_rule, keep_alive_rule, cadence_rule) or not (
+        close_rule < keep_alive_rule < cadence_rule
     ):
-        fail("connect decision must treat due as an immediate CONNECTING_STATE trigger before the keep-alive and cadence branches")
+        fail("connect decision must treat due as an immediate CONNECTING_STATE trigger before the keep-alive and cadence rules")
 
     default_declarations = sum(
         text.count("publishData(time_t stampOverride = 0)")
