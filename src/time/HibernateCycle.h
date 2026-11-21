@@ -16,14 +16,8 @@
  *          `.cpp` now own all five (four - `retainedHibernateWakeTime` had
  *          no readers anywhere in the tree and was not carried forward).
  *
- *          `classifyWake()` also absorbs the PIN_RESET / AB1805-watchdog
- *          confirmation classification that used to live in `setup()`
- *          immediately before the hibernate gate: both consumers read the
- *          same `AB1805::getWakeReason()` getter (safe to call more than
- *          once - it is a plain accessor onto the result of the ONE
- *          destructive `updateWakeReason()` call `AB1805::setup()` already
- *          made; see `HibernateCycle.cpp` for the full citation), so one
- *          call now serves both instead of two independently-timed reads.
+ *          v50 S2: `classifyWake()` reads the OS reset reason and the
+ *          external RTC only; the chip's own wake flags are not used.
  *
  *          The former `HibernateWakeDiagnostics::classifyGateArm()` is not
  *          called from here - its six-condition decision is this file's own
@@ -42,26 +36,14 @@
 
 #include "time/HibernateWakeDiagnostics.h"
 
-class AB1805; // full definition only needed in HibernateCycle.cpp
-
 namespace HibernateCycle {
 
-/// Everything a wake boot needs to know, in one call. Populated in two
-/// independent halves - PIN_RESET fields only when `osResetReason` was
-/// `RESET_REASON_PIN_RESET`; hibernate-gate fields only when a hibernate
-/// was actually pending this boot - a boot can populate neither, either,
-/// but never both (a hibernate wake reports `RESET_REASON_POWER_MANAGEMENT`,
-/// not `PIN_RESET`).
+/// Everything a wake boot needs to know, in one call. The hibernate-gate
+/// fields are populated only when a hibernate was actually pending this boot.
 struct WakeVerdict {
-  // ---- PIN_RESET / AB1805-watchdog confirmation ----
-  bool pinResetChecked = false;
-  bool pinResetConfirmedWatchdog = false;
-  bool pinResetWakeReasonUnknown = false;
-  const char *pinResetWakeReasonName = "N/A";
-
-  // ---- RTC read outcome, populated every boot regardless of the above -
-  // needed both for hibernate-gate classification and, independently, by
-  // the caller's own "did system time just get restored" check. ----
+  // ---- RTC read outcome, populated every boot - needed both for
+  // hibernate-gate classification and, independently, by the caller's own
+  // "did system time just get restored" check. ----
   bool rtcReadOk = false;
   int64_t rtcAtWake = 0;
 
@@ -98,7 +80,7 @@ void abandon();
 /// Classifies this boot's wake in one call - see the struct doc above.
 /// `osResetReason` is the OS reset reason (`System.resetReason()`'s
 /// result, e.g. `RESET_REASON_PIN_RESET`/`RESET_REASON_POWER_MANAGEMENT`).
-WakeVerdict classifyWake(int osResetReason, AB1805 &rtc);
+WakeVerdict classifyWake(int osResetReason);
 
 /// Current hibernate count, for the one confirmed consumer outside the
 /// wake-classification path: `publishStartupStatus()`'s `status` event.

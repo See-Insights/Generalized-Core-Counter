@@ -1,0 +1,16 @@
+AGENT: Copilot · MODEL: claude-sonnet-5.5 · REASONING: medium
+AUTHORIZATION SCOPE: edit `src/time/PreBindRtc.h`, the three comment lines named in Amendment 3 item 3 in `src/` (comment text only), `tests/pre_bind_rtc_test.cpp` and `tests/pre_bind_rtc_test.py` (and the six structural allowlists only if the change forces it), and write the report; run host tests (zsh for .sh, python3 for .py), the local Device OS toolchain build and nm/objdump; scratch `build-tmp/wo-2026-11-06-002-stage6-r3/` (create it; use only that) / NOT authorized: committing, pushing, merging, flashing, creating PRs or tags, touching `lib/`, any other `src/` change, changing the persisted or `retained` layout, deleting anything you did not create (including `build-tmp/` itself).
+
+# Stage 6 follow-up dispatch (round 3): WO-2026-11-06-002 Amendment 3 (Stage 7 round 1 fixes)
+Binding spec: `docs/work-orders/WO-2026-11-06-002-v50-s1b-pre-bind-rtc-access.md` **Amendments 1-3** (read Amendment 3 first) and the round 1 verdict `docs/work-orders/WO-2026-11-06-002-stage7-r1-verdict.md` (findings 1-3). Base: this branch at the S1b head (code commit 89260c9 plus records). **Budget: S1b `src/` at most +17 net against `d6da67c`** (`git diff --numstat d6da67c -- src`; it is +14 now). Leave changes uncommitted. **Run at the dispatched reasoning level (medium); the report states the level actually run, or that it could not be observed.**
+
+## Do
+1. **High (finding 1):** in `PreBindRtc::run`, under the existing lock: read CONTROL1 -> if WRTC is set, clear only WRTC -> the vendored time read (`getRtcAsTime`) -> always write `(c1 | 0x01) & ~0x40` -> propagate every transaction result. Seed rule unchanged (plausible and `!Time.isValid()`).
+2. **Medium (finding 2):** if the time read failed, still complete the CONTROL1 write, then return false (the call site already logs a false return).
+3. **Low (finding 3):** comment text only, line-neutral, at `src/Generalized-Core-Counter.cpp:657` and `:667`, `src/MyPersistentData.h:631`, `src/persist/CurrentReadings.h:47`: seeding happens only on a successful plausible pre-bind read.
+4. **Tests and mutations per Amendment 3 item 4** (WRTC=1 valid-time case; second-unbound-boot retry; time-read failure returns false after the CONTROL1 write; each failed transaction returns false; the four named mutations, each must fail). Back up the file, mutate, restore from the backup; never use `git checkout`/`git restore` while your own uncommitted work is present.
+5. **Verify:** host suite `N/N (sh via zsh, py via python3)` (count with `p=$((p+1))`, never `((p++))`; `thermal_coupling_structural_test.py` also on a clean export of tracked files); local toolchain build (Device OS 6.6.0, fresh `BUILD_PATH_BASE` as a make argument) with text/data/bss and `nm`/objdump showing `PreBindRtc::run` still called before `enable` in `setup()`; `git diff --numstat d6da67c -- src` net <= +17 (state the number).
+## Stop and report if
+the change does not fit in +17; clearing WRTC before the read is not honoured by the library's time read; any S1 behaviour would have to change.
+## Report
+`docs/work-orders/WO-2026-11-06-002-stage6-r3-copilot-report.md`: model and reasoning actually used, interpreter line, diff summary, net `src/` lines, tests and mutation results, build and `nm` evidence, deviations. The bench is Chip's: do not claim it.

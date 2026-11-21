@@ -1,16 +1,15 @@
-# Frozen output of the pre-change sleep execution (standby decision, hibernate attempt, ULP/STOP cascade): WO-2026-10-21-001 (Sleep S-2).
+# Frozen output of the pre-change sleep execution (standby decision, hibernate attempt, ULP/STOP cascade): WO-2026-10-21-001 (Sleep S-2), with the approved v50 S2 substitutions normalised (tests/s2_transcript_normalise.py).
 # Base commit: 1e6d34f
-# Scenarios: 137 (cellular 113 + wifi 24); passes: 157
-# Per-platform summary (scenarios passes WOKE RETURNED distinct-events): cellular 113 133 123 10 74; wifi 24 24 22 2 58
-# Body sha256: 14bcf926ae30bcda8d8ae72fdff681727f09778b886ba93a0d84d0b9ac4134b3
-# Generated once by extracting the blocks by marker text from 1e6d34f:src/state/State_Sleep.cpp (git show),
-# wrapping them in tests/sleep_execution_equivalence_test.cpp against tests/stubs/sleep_teardown, and running mode a.
+# Scenarios: 121 (cellular 101 + wifi 20); passes: 141
+# Per-platform summary (scenarios passes WOKE RETURNED distinct-events): cellular 101 121 111 10 70; wifi 20 20 18 2 54
+# Body sha256: ee7639603eeb4d42012f7cae518c4011add06da96aceaa936832e14159406815
+# Generated with --regenerate: the blocks extracted by marker text from 1e6d34f:src/state/State_Sleep.cpp (git show) run in mode a against tests/stubs/sleep_teardown, then normalised.
 PLATFORM cellular
 S0 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=1 t=901000
     TEARDOWN req=0 eff=0 force=0 err=0
     HIB eligible? wakeIn=900 -> 0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
@@ -24,7 +23,7 @@ S0 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -42,7 +41,7 @@ S1 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=1 t=3601000
     TEARDOWN req=1 eff=1 force=0 err=0
     HIB eligible? wakeIn=3600 -> 0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -56,7 +55,7 @@ S1 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -74,7 +73,7 @@ S2 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=1 t=3601000
     TEARDOWN req=0 eff=0 force=0 err=0
     HIB eligible? wakeIn=3600 -> 0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -88,7 +87,7 @@ S2 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -106,7 +105,7 @@ S3 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=1 t=901000
     TEARDOWN req=1 eff=1 force=0 err=0
     HIB eligible? wakeIn=900 -> 0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
@@ -120,7 +119,7 @@ S3 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -138,7 +137,7 @@ S4 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=1 t=3601000
     TEARDOWN req=0 eff=0 force=1 err=-170
     HIB eligible? wakeIn=3600 -> 0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -152,7 +151,7 @@ S4 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -170,7 +169,7 @@ S5 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=1 t=3601000
     TEARDOWN req=1 eff=0 force=1 err=-170
     HIB eligible? wakeIn=3600 -> 0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -184,7 +183,7 @@ S5 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -204,7 +203,7 @@ S6 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     HIB eligible? wakeIn=900 -> 1
     CALL pinMode 7 2
     LOG WARN HIBERNATE bypass: wake pin held low before sleep - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
@@ -218,7 +217,7 @@ S6 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -238,7 +237,7 @@ S7 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
     LOG WARN HIBERNATE bypass: wake pin held low before sleep - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -252,7 +251,7 @@ S7 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -272,7 +271,7 @@ S8 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
     LOG WARN HIBERNATE bypass: wake pin held low before sleep - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -286,7 +285,7 @@ S8 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -306,7 +305,7 @@ S9 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     HIB eligible? wakeIn=900 -> 1
     CALL pinMode 7 2
     LOG WARN HIBERNATE bypass: wake pin held low before sleep - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
@@ -320,7 +319,7 @@ S9 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -340,7 +339,7 @@ S10 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
     LOG WARN HIBERNATE bypass: wake pin held low before sleep - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -354,7 +353,7 @@ S10 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -374,7 +373,7 @@ S11 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
     LOG WARN HIBERNATE bypass: wake pin held low before sleep - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -388,7 +387,7 @@ S11 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -403,13 +402,31 @@ S11 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
 S12 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=900 overnight=1 t=901000
+  p0 wakeIn=900 overnight=1 t=901007
     TEARDOWN req=0 eff=0 force=0 err=0
     HIB eligible? wakeIn=900 -> 1
     CALL pinMode 7 2
-    HIB clearStale
-    LOG WARN HIBERNATE bypass: failed stale interrupt cleanup - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    CRUMB 24
+    EXTWDT stop
+    WATCHDOG pause hibernate
+    HIB armForSleep 1700000000 900
+    LOG INFO ModemTeardown: radioOn=1 point=hibernate
+    LOG INFO Sleep: HIBERNATE reason=closed dur=900s wakePin=7
+    POWER pre-hibernate
+    PROGRESS SLEEP_ATTEMPT
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    POWER flushDiagBatch
+    CRUMB 27
+    CRUMB 28
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=900000 -> err=0 pin=65535
+    AWAKE recordSleepReturn 1
+    HIB abandon
+    EXTWDT start
+    WATCHDOG restore hibernate
+    LOG WARN HIBERNATE sleep failed err=0 - falling back to ULTRA_LOW_POWER
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
@@ -423,7 +440,7 @@ S12 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -432,19 +449,37 @@ S12 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=901000
+    CYCLE resetOnWake ms=901007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
 S13 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601000
+  p0 wakeIn=3600 overnight=1 t=3601007
     TEARDOWN req=1 eff=1 force=0 err=0
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
-    HIB clearStale
-    LOG WARN HIBERNATE bypass: failed stale interrupt cleanup - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    CRUMB 24
+    EXTWDT stop
+    WATCHDOG pause hibernate
+    HIB armForSleep 1700000000 3600
+    LOG INFO ModemTeardown: radioOn=1 point=hibernate
+    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
+    POWER pre-hibernate
+    PROGRESS SLEEP_ATTEMPT
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    POWER flushDiagBatch
+    CRUMB 27
+    CRUMB 28
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=3600000 -> err=0 pin=65535
+    AWAKE recordSleepReturn 1
+    HIB abandon
+    EXTWDT start
+    WATCHDOG restore hibernate
+    LOG WARN HIBERNATE sleep failed err=0 - falling back to ULTRA_LOW_POWER
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -458,7 +493,7 @@ S13 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -467,19 +502,37 @@ S13 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601000
+    CYCLE resetOnWake ms=3601007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
 S14 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601000
+  p0 wakeIn=3600 overnight=1 t=3601007
     TEARDOWN req=0 eff=0 force=0 err=0
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
-    HIB clearStale
-    LOG WARN HIBERNATE bypass: failed stale interrupt cleanup - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    CRUMB 24
+    EXTWDT stop
+    WATCHDOG pause hibernate
+    HIB armForSleep 1700000000 3600
+    LOG INFO ModemTeardown: radioOn=1 point=hibernate
+    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
+    POWER pre-hibernate
+    PROGRESS SLEEP_ATTEMPT
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    POWER flushDiagBatch
+    CRUMB 27
+    CRUMB 28
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=3600000 -> err=0 pin=65535
+    AWAKE recordSleepReturn 1
+    HIB abandon
+    EXTWDT start
+    WATCHDOG restore hibernate
+    LOG WARN HIBERNATE sleep failed err=0 - falling back to ULTRA_LOW_POWER
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -493,7 +546,7 @@ S14 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -502,19 +555,37 @@ S14 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601000
+    CYCLE resetOnWake ms=3601007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
 S15 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=900 overnight=1 t=901000
+  p0 wakeIn=900 overnight=1 t=901007
     TEARDOWN req=1 eff=1 force=0 err=0
     HIB eligible? wakeIn=900 -> 1
     CALL pinMode 7 2
-    HIB clearStale
-    LOG WARN HIBERNATE bypass: failed stale interrupt cleanup - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    CRUMB 24
+    EXTWDT stop
+    WATCHDOG pause hibernate
+    HIB armForSleep 1700000000 900
+    LOG INFO ModemTeardown: radioOn=1 point=hibernate
+    LOG INFO Sleep: HIBERNATE reason=closed dur=900s wakePin=7
+    POWER pre-hibernate
+    PROGRESS SLEEP_ATTEMPT
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    POWER flushDiagBatch
+    CRUMB 27
+    CRUMB 28
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=900000 -> err=0 pin=65535
+    AWAKE recordSleepReturn 1
+    HIB abandon
+    EXTWDT start
+    WATCHDOG restore hibernate
+    LOG WARN HIBERNATE sleep failed err=0 - falling back to ULTRA_LOW_POWER
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
@@ -528,7 +599,7 @@ S15 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -537,19 +608,37 @@ S15 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=901000
+    CYCLE resetOnWake ms=901007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
 S16 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601000
+  p0 wakeIn=3600 overnight=1 t=3601007
     TEARDOWN req=0 eff=0 force=1 err=-170
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
-    HIB clearStale
-    LOG WARN HIBERNATE bypass: failed stale interrupt cleanup - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    CRUMB 24
+    EXTWDT stop
+    WATCHDOG pause hibernate
+    HIB armForSleep 1700000000 3600
+    LOG INFO ModemTeardown: radioOn=1 point=hibernate
+    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
+    POWER pre-hibernate
+    PROGRESS SLEEP_ATTEMPT
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    POWER flushDiagBatch
+    CRUMB 27
+    CRUMB 28
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=3600000 -> err=0 pin=65535
+    AWAKE recordSleepReturn 1
+    HIB abandon
+    EXTWDT start
+    WATCHDOG restore hibernate
+    LOG WARN HIBERNATE sleep failed err=0 - falling back to ULTRA_LOW_POWER
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -563,7 +652,7 @@ S16 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -572,19 +661,37 @@ S16 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601000
+    CYCLE resetOnWake ms=3601007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
 S17 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601000
+  p0 wakeIn=3600 overnight=1 t=3601007
     TEARDOWN req=1 eff=0 force=1 err=-170
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
-    HIB clearStale
-    LOG WARN HIBERNATE bypass: failed stale interrupt cleanup - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    CRUMB 24
+    EXTWDT stop
+    WATCHDOG pause hibernate
+    HIB armForSleep 1700000000 3600
+    LOG INFO ModemTeardown: radioOn=1 point=hibernate
+    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
+    POWER pre-hibernate
+    PROGRESS SLEEP_ATTEMPT
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    POWER flushDiagBatch
+    CRUMB 27
+    CRUMB 28
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=3600000 -> err=0 pin=65535
+    AWAKE recordSleepReturn 1
+    HIB abandon
+    EXTWDT start
+    WATCHDOG restore hibernate
+    LOG WARN HIBERNATE sleep failed err=0 - falling back to ULTRA_LOW_POWER
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -598,7 +705,7 @@ S17 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -607,20 +714,37 @@ S17 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601000
+    CYCLE resetOnWake ms=3601007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
 S18 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=900 overnight=1 t=901000
+  p0 wakeIn=900 overnight=1 t=901007
     TEARDOWN req=0 eff=0 force=0 err=0
     HIB eligible? wakeIn=900 -> 1
     CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700000900
-    LOG WARN HIBERNATE bypass: failed to program AB1805 alarm - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    CRUMB 24
+    EXTWDT stop
+    WATCHDOG pause hibernate
+    HIB armForSleep 1700000000 900
+    LOG INFO ModemTeardown: radioOn=1 point=hibernate
+    LOG INFO Sleep: HIBERNATE reason=closed dur=900s wakePin=7
+    POWER pre-hibernate
+    PROGRESS SLEEP_ATTEMPT
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    POWER flushDiagBatch
+    CRUMB 27
+    CRUMB 28
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=900000 -> err=-170 pin=65535
+    AWAKE recordSleepReturn 0
+    HIB abandon
+    EXTWDT start
+    WATCHDOG restore hibernate
+    LOG WARN HIBERNATE sleep failed err=-170 - falling back to ULTRA_LOW_POWER
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
@@ -634,7 +758,7 @@ S18 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -643,20 +767,37 @@ S18 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=901000
+    CYCLE resetOnWake ms=901007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
 S19 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601000
+  p0 wakeIn=3600 overnight=1 t=3601007
     TEARDOWN req=1 eff=1 force=0 err=0
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700003600
-    LOG WARN HIBERNATE bypass: failed to program AB1805 alarm - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    CRUMB 24
+    EXTWDT stop
+    WATCHDOG pause hibernate
+    HIB armForSleep 1700000000 3600
+    LOG INFO ModemTeardown: radioOn=1 point=hibernate
+    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
+    POWER pre-hibernate
+    PROGRESS SLEEP_ATTEMPT
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    POWER flushDiagBatch
+    CRUMB 27
+    CRUMB 28
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=3600000 -> err=-170 pin=65535
+    AWAKE recordSleepReturn 0
+    HIB abandon
+    EXTWDT start
+    WATCHDOG restore hibernate
+    LOG WARN HIBERNATE sleep failed err=-170 - falling back to ULTRA_LOW_POWER
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -670,7 +811,7 @@ S19 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -679,20 +820,37 @@ S19 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601000
+    CYCLE resetOnWake ms=3601007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
 S20 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601000
+  p0 wakeIn=3600 overnight=1 t=3601007
     TEARDOWN req=0 eff=0 force=0 err=0
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700003600
-    LOG WARN HIBERNATE bypass: failed to program AB1805 alarm - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    CRUMB 24
+    EXTWDT stop
+    WATCHDOG pause hibernate
+    HIB armForSleep 1700000000 3600
+    LOG INFO ModemTeardown: radioOn=1 point=hibernate
+    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
+    POWER pre-hibernate
+    PROGRESS SLEEP_ATTEMPT
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    POWER flushDiagBatch
+    CRUMB 27
+    CRUMB 28
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=3600000 -> err=-170 pin=65535
+    AWAKE recordSleepReturn 0
+    HIB abandon
+    EXTWDT start
+    WATCHDOG restore hibernate
+    LOG WARN HIBERNATE sleep failed err=-170 - falling back to ULTRA_LOW_POWER
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -706,7 +864,7 @@ S20 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -715,20 +873,37 @@ S20 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601000
+    CYCLE resetOnWake ms=3601007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
 S21 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=900 overnight=1 t=901000
+  p0 wakeIn=900 overnight=1 t=901007
     TEARDOWN req=1 eff=1 force=0 err=0
     HIB eligible? wakeIn=900 -> 1
     CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700000900
-    LOG WARN HIBERNATE bypass: failed to program AB1805 alarm - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    CRUMB 24
+    EXTWDT stop
+    WATCHDOG pause hibernate
+    HIB armForSleep 1700000000 900
+    LOG INFO ModemTeardown: radioOn=1 point=hibernate
+    LOG INFO Sleep: HIBERNATE reason=closed dur=900s wakePin=7
+    POWER pre-hibernate
+    PROGRESS SLEEP_ATTEMPT
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    POWER flushDiagBatch
+    CRUMB 27
+    CRUMB 28
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=900000 -> err=-170 pin=65535
+    AWAKE recordSleepReturn 0
+    HIB abandon
+    EXTWDT start
+    WATCHDOG restore hibernate
+    LOG WARN HIBERNATE sleep failed err=-170 - falling back to ULTRA_LOW_POWER
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
@@ -742,7 +917,7 @@ S21 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -751,20 +926,37 @@ S21 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=901000
+    CYCLE resetOnWake ms=901007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
 S22 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601000
+  p0 wakeIn=3600 overnight=1 t=3601007
     TEARDOWN req=0 eff=0 force=1 err=-170
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700003600
-    LOG WARN HIBERNATE bypass: failed to program AB1805 alarm - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    CRUMB 24
+    EXTWDT stop
+    WATCHDOG pause hibernate
+    HIB armForSleep 1700000000 3600
+    LOG INFO ModemTeardown: radioOn=1 point=hibernate
+    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
+    POWER pre-hibernate
+    PROGRESS SLEEP_ATTEMPT
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    POWER flushDiagBatch
+    CRUMB 27
+    CRUMB 28
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=3600000 -> err=-170 pin=65535
+    AWAKE recordSleepReturn 0
+    HIB abandon
+    EXTWDT start
+    WATCHDOG restore hibernate
+    LOG WARN HIBERNATE sleep failed err=-170 - falling back to ULTRA_LOW_POWER
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -778,7 +970,7 @@ S22 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -787,20 +979,37 @@ S22 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     CALL Watchdog.started
     LOG INFO AppWDT: active ctx=ulp armed=1
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601000
+    CYCLE resetOnWake ms=3601007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
 S23 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601000
+  p0 wakeIn=3600 overnight=1 t=3601007
     TEARDOWN req=1 eff=0 force=1 err=-170
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700003600
-    LOG WARN HIBERNATE bypass: failed to program AB1805 alarm - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    CRUMB 24
+    EXTWDT stop
+    WATCHDOG pause hibernate
+    HIB armForSleep 1700000000 3600
+    LOG INFO ModemTeardown: radioOn=1 point=hibernate
+    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
+    POWER pre-hibernate
+    PROGRESS SLEEP_ATTEMPT
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    POWER flushDiagBatch
+    CRUMB 27
+    CRUMB 28
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=3600000 -> err=-170 pin=65535
+    AWAKE recordSleepReturn 0
+    HIB abandon
+    EXTWDT start
+    WATCHDOG restore hibernate
+    LOG WARN HIBERNATE sleep failed err=-170 - falling back to ULTRA_LOW_POWER
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -814,172 +1023,7 @@ S23 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
-    CALL Watchdog.started
-    LOG INFO AppWDT: active ctx=ulp armed=1
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601000
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S24 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=900 overnight=1 t=901007
-    TEARDOWN req=0 eff=0 force=0 err=0
-    HIB eligible? wakeIn=900 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700000900
-    CRUMB 24
-    AB1805 stopWDT
-    WATCHDOG pause hibernate
-    HIB armForSleep 1700000000 900
-    LOG INFO ModemTeardown: radioOn=1 point=hibernate
-    LOG INFO Sleep: HIBERNATE reason=closed dur=900s wakePin=7
-    POWER pre-hibernate
-    PROGRESS SLEEP_ATTEMPT
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    POWER flushDiagBatch
-    CRUMB 27
-    CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    HIB abandon
-    AB1805 resumeWDT
-    WATCHDOG restore hibernate
-    LOG WARN HIBERNATE sleep failed err=0 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=900000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=900000 reason=TIMER
-    CALL Watchdog.started
-    LOG INFO AppWDT: active ctx=ulp armed=1
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=901007
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S25 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601007
-    TEARDOWN req=1 eff=1 force=0 err=0
-    HIB eligible? wakeIn=3600 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700003600
-    CRUMB 24
-    AB1805 stopWDT
-    WATCHDOG pause hibernate
-    HIB armForSleep 1700000000 3600
-    LOG INFO ModemTeardown: radioOn=1 point=hibernate
-    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
-    POWER pre-hibernate
-    PROGRESS SLEEP_ATTEMPT
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    POWER flushDiagBatch
-    CRUMB 27
-    CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    HIB abandon
-    AB1805 resumeWDT
-    WATCHDOG restore hibernate
-    LOG WARN HIBERNATE sleep failed err=0 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
-    LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=3:0 dur=3600000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
-    CALL Watchdog.started
-    LOG INFO AppWDT: active ctx=ulp armed=1
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601007
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=1 preserve=1 force=0 err=0
-S26 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601007
-    TEARDOWN req=0 eff=0 force=0 err=0
-    HIB eligible? wakeIn=3600 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700003600
-    CRUMB 24
-    AB1805 stopWDT
-    WATCHDOG pause hibernate
-    HIB armForSleep 1700000000 3600
-    LOG INFO ModemTeardown: radioOn=1 point=hibernate
-    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
-    POWER pre-hibernate
-    PROGRESS SLEEP_ATTEMPT
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    POWER flushDiagBatch
-    CRUMB 27
-    CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    HIB abandon
-    AB1805 resumeWDT
-    WATCHDOG restore hibernate
-    LOG WARN HIBERNATE sleep failed err=0 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -993,505 +1037,10 @@ S26 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S27 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=900 overnight=1 t=901007
-    TEARDOWN req=1 eff=1 force=0 err=0
-    HIB eligible? wakeIn=900 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700000900
-    CRUMB 24
-    AB1805 stopWDT
-    WATCHDOG pause hibernate
-    HIB armForSleep 1700000000 900
-    LOG INFO ModemTeardown: radioOn=1 point=hibernate
-    LOG INFO Sleep: HIBERNATE reason=closed dur=900s wakePin=7
-    POWER pre-hibernate
-    PROGRESS SLEEP_ATTEMPT
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    POWER flushDiagBatch
-    CRUMB 27
-    CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    HIB abandon
-    AB1805 resumeWDT
-    WATCHDOG restore hibernate
-    LOG WARN HIBERNATE sleep failed err=0 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
-    LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=3:0 dur=900000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=900000 reason=TIMER
-    CALL Watchdog.started
-    LOG INFO AppWDT: active ctx=ulp armed=1
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=901007
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=1 preserve=1 force=0 err=0
-S28 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601007
-    TEARDOWN req=0 eff=0 force=1 err=-170
-    HIB eligible? wakeIn=3600 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700003600
-    CRUMB 24
-    AB1805 stopWDT
-    WATCHDOG pause hibernate
-    HIB armForSleep 1700000000 3600
-    LOG INFO ModemTeardown: radioOn=1 point=hibernate
-    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
-    POWER pre-hibernate
-    PROGRESS SLEEP_ATTEMPT
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    POWER flushDiagBatch
-    CRUMB 27
-    CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    HIB abandon
-    AB1805 resumeWDT
-    WATCHDOG restore hibernate
-    LOG WARN HIBERNATE sleep failed err=0 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
-    CALL Watchdog.started
-    LOG INFO AppWDT: active ctx=ulp armed=1
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601007
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S29 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601007
-    TEARDOWN req=1 eff=0 force=1 err=-170
-    HIB eligible? wakeIn=3600 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700003600
-    CRUMB 24
-    AB1805 stopWDT
-    WATCHDOG pause hibernate
-    HIB armForSleep 1700000000 3600
-    LOG INFO ModemTeardown: radioOn=1 point=hibernate
-    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
-    POWER pre-hibernate
-    PROGRESS SLEEP_ATTEMPT
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    POWER flushDiagBatch
-    CRUMB 27
-    CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    HIB abandon
-    AB1805 resumeWDT
-    WATCHDOG restore hibernate
-    LOG WARN HIBERNATE sleep failed err=0 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
-    CALL Watchdog.started
-    LOG INFO AppWDT: active ctx=ulp armed=1
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601007
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S30 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=6 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=900 overnight=1 t=901007
-    TEARDOWN req=0 eff=0 force=0 err=0
-    HIB eligible? wakeIn=900 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700000900
-    CRUMB 24
-    AB1805 stopWDT
-    WATCHDOG pause hibernate
-    HIB armForSleep 1700000000 900
-    LOG INFO ModemTeardown: radioOn=1 point=hibernate
-    LOG INFO Sleep: HIBERNATE reason=closed dur=900s wakePin=7
-    POWER pre-hibernate
-    PROGRESS SLEEP_ATTEMPT
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    POWER flushDiagBatch
-    CRUMB 27
-    CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=-170 pin=65535
-    AWAKE recordSleepReturn 0
-    HIB abandon
-    AB1805 resumeWDT
-    WATCHDOG restore hibernate
-    LOG WARN HIBERNATE sleep failed err=-170 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=900000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=900000 reason=TIMER
-    CALL Watchdog.started
-    LOG INFO AppWDT: active ctx=ulp armed=1
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=901007
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S31 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=6 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601007
-    TEARDOWN req=1 eff=1 force=0 err=0
-    HIB eligible? wakeIn=3600 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700003600
-    CRUMB 24
-    AB1805 stopWDT
-    WATCHDOG pause hibernate
-    HIB armForSleep 1700000000 3600
-    LOG INFO ModemTeardown: radioOn=1 point=hibernate
-    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
-    POWER pre-hibernate
-    PROGRESS SLEEP_ATTEMPT
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    POWER flushDiagBatch
-    CRUMB 27
-    CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=-170 pin=65535
-    AWAKE recordSleepReturn 0
-    HIB abandon
-    AB1805 resumeWDT
-    WATCHDOG restore hibernate
-    LOG WARN HIBERNATE sleep failed err=-170 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
-    LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=3:0 dur=3600000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
-    CALL Watchdog.started
-    LOG INFO AppWDT: active ctx=ulp armed=1
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601007
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=1 preserve=1 force=0 err=0
-S32 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=6 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601007
-    TEARDOWN req=0 eff=0 force=0 err=0
-    HIB eligible? wakeIn=3600 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700003600
-    CRUMB 24
-    AB1805 stopWDT
-    WATCHDOG pause hibernate
-    HIB armForSleep 1700000000 3600
-    LOG INFO ModemTeardown: radioOn=1 point=hibernate
-    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
-    POWER pre-hibernate
-    PROGRESS SLEEP_ATTEMPT
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    POWER flushDiagBatch
-    CRUMB 27
-    CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=-170 pin=65535
-    AWAKE recordSleepReturn 0
-    HIB abandon
-    AB1805 resumeWDT
-    WATCHDOG restore hibernate
-    LOG WARN HIBERNATE sleep failed err=-170 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
-    CALL Watchdog.started
-    LOG INFO AppWDT: active ctx=ulp armed=1
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601007
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S33 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=6 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=900 overnight=1 t=901007
-    TEARDOWN req=1 eff=1 force=0 err=0
-    HIB eligible? wakeIn=900 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700000900
-    CRUMB 24
-    AB1805 stopWDT
-    WATCHDOG pause hibernate
-    HIB armForSleep 1700000000 900
-    LOG INFO ModemTeardown: radioOn=1 point=hibernate
-    LOG INFO Sleep: HIBERNATE reason=closed dur=900s wakePin=7
-    POWER pre-hibernate
-    PROGRESS SLEEP_ATTEMPT
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    POWER flushDiagBatch
-    CRUMB 27
-    CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=-170 pin=65535
-    AWAKE recordSleepReturn 0
-    HIB abandon
-    AB1805 resumeWDT
-    WATCHDOG restore hibernate
-    LOG WARN HIBERNATE sleep failed err=-170 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
-    LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=3:0 dur=900000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=900000 reason=TIMER
-    CALL Watchdog.started
-    LOG INFO AppWDT: active ctx=ulp armed=1
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=901007
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=1 preserve=1 force=0 err=0
-S34 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=6 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601007
-    TEARDOWN req=0 eff=0 force=1 err=-170
-    HIB eligible? wakeIn=3600 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700003600
-    CRUMB 24
-    AB1805 stopWDT
-    WATCHDOG pause hibernate
-    HIB armForSleep 1700000000 3600
-    LOG INFO ModemTeardown: radioOn=1 point=hibernate
-    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
-    POWER pre-hibernate
-    PROGRESS SLEEP_ATTEMPT
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    POWER flushDiagBatch
-    CRUMB 27
-    CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=-170 pin=65535
-    AWAKE recordSleepReturn 0
-    HIB abandon
-    AB1805 resumeWDT
-    WATCHDOG restore hibernate
-    LOG WARN HIBERNATE sleep failed err=-170 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
-    CALL Watchdog.started
-    LOG INFO AppWDT: active ctx=ulp armed=1
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601007
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S35 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=6 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601007
-    TEARDOWN req=1 eff=0 force=1 err=-170
-    HIB eligible? wakeIn=3600 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700003600
-    CRUMB 24
-    AB1805 stopWDT
-    WATCHDOG pause hibernate
-    HIB armForSleep 1700000000 3600
-    LOG INFO ModemTeardown: radioOn=1 point=hibernate
-    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
-    POWER pre-hibernate
-    PROGRESS SLEEP_ATTEMPT
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    POWER flushDiagBatch
-    CRUMB 27
-    CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=-170 pin=65535
-    AWAKE recordSleepReturn 0
-    HIB abandon
-    AB1805 resumeWDT
-    WATCHDOG restore hibernate
-    LOG WARN HIBERNATE sleep failed err=-170 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
-    CALL Watchdog.started
-    LOG INFO AppWDT: active ctx=ulp armed=1
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601007
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S36 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S24 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
@@ -1505,7 +1054,7 @@ S36 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -1519,10 +1068,10 @@ S36 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S37 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S25 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -1536,7 +1085,7 @@ S37 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -1552,7 +1101,7 @@ S37 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=1 preserve=1 force=0 err=0
   p1 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -1566,7 +1115,7 @@ S37 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -1580,10 +1129,10 @@ S37 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S38 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S26 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -1597,7 +1146,7 @@ S38 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -1611,10 +1160,10 @@ S38 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S39 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S27 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
@@ -1628,7 +1177,7 @@ S39 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -1644,7 +1193,7 @@ S39 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=1 preserve=1 force=0 err=0
   p1 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
@@ -1658,7 +1207,7 @@ S39 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -1672,10 +1221,10 @@ S39 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S40 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S28 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=0 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -1689,7 +1238,7 @@ S40 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -1703,10 +1252,10 @@ S40 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S41 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S29 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -1720,7 +1269,7 @@ S41 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -1736,7 +1285,7 @@ S41 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=0 preserve=0 force=0 err=0
   p1 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -1750,7 +1299,7 @@ S41 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -1764,10 +1313,10 @@ S41 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S42 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
+S30 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=1007
     TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
@@ -1781,7 +1330,7 @@ S42 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -1795,10 +1344,10 @@ S42 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=1 timer=0 label=BUTTON transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S43 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
+S31 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1007
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -1812,7 +1361,7 @@ S43 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -1828,7 +1377,7 @@ S43 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=1 preserve=1 force=0 err=0
   p1 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -1842,7 +1391,7 @@ S43 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -1856,10 +1405,10 @@ S43 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S44 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
+S32 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1007
     TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -1873,7 +1422,7 @@ S44 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -1887,10 +1436,10 @@ S44 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=1 timer=0 label=BUTTON transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S45 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
+S33 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=1007
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
@@ -1904,7 +1453,7 @@ S45 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -1920,7 +1469,7 @@ S45 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=1 preserve=1 force=0 err=0
   p1 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
@@ -1934,7 +1483,7 @@ S45 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -1948,10 +1497,10 @@ S45 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S46 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
+S34 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1007
     TEARDOWN req=0 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -1965,7 +1514,7 @@ S46 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -1979,10 +1528,10 @@ S46 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=1 timer=0 label=BUTTON transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S47 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
+S35 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1007
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -1996,7 +1545,7 @@ S47 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2012,7 +1561,7 @@ S47 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=0 preserve=0 force=0 err=0
   p1 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -2026,7 +1575,7 @@ S47 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2040,10 +1589,10 @@ S47 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S48 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
+S36 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=1007
     TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
@@ -2057,7 +1606,7 @@ S48 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2071,10 +1620,10 @@ S48 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=1 btn=0 timer=0 label=PIR transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S49 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
+S37 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1007
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -2088,7 +1637,7 @@ S49 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2104,7 +1653,7 @@ S49 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=1 preserve=1 force=0 err=0
   p1 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -2118,7 +1667,7 @@ S49 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2132,10 +1681,10 @@ S49 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S50 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
+S38 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1007
     TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -2149,7 +1698,7 @@ S50 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2163,10 +1712,10 @@ S50 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=1 btn=0 timer=0 label=PIR transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S51 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
+S39 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=1007
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
@@ -2180,7 +1729,7 @@ S51 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2196,7 +1745,7 @@ S51 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=1 preserve=1 force=0 err=0
   p1 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
@@ -2210,7 +1759,7 @@ S51 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2224,10 +1773,10 @@ S51 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S52 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
+S40 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1007
     TEARDOWN req=0 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -2241,7 +1790,7 @@ S52 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2255,10 +1804,10 @@ S52 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=1 btn=0 timer=0 label=PIR transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S53 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
+S41 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1007
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -2272,7 +1821,7 @@ S53 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2288,7 +1837,7 @@ S53 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=0 preserve=0 force=0 err=0
   p1 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -2302,7 +1851,7 @@ S53 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2316,10 +1865,10 @@ S53 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S54 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
+S42 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=1014
     TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
@@ -2344,7 +1893,7 @@ S54 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2358,10 +1907,10 @@ S54 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S55 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
+S43 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1014
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -2387,7 +1936,7 @@ S55 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2403,7 +1952,7 @@ S55 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=1 preserve=0 force=1 err=-170
   p1 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -2417,7 +1966,7 @@ S55 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2431,10 +1980,10 @@ S55 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S56 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
+S44 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1014
     TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -2459,7 +2008,7 @@ S56 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2473,10 +2022,10 @@ S56 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S57 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
+S45 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=1014
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
@@ -2502,7 +2051,7 @@ S57 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2518,7 +2067,7 @@ S57 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=1 preserve=0 force=1 err=-170
   p1 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=1 soc=87.5
@@ -2532,7 +2081,7 @@ S57 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2546,10 +2095,10 @@ S57 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S58 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
+S46 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1014
     TEARDOWN req=0 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -2574,7 +2123,7 @@ S58 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2588,10 +2137,10 @@ S58 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S59 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
+S47 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1014
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -2616,7 +2165,7 @@ S59 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2632,7 +2181,7 @@ S59 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=0 preserve=0 force=0 err=0
   p1 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -2646,7 +2195,7 @@ S59 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2660,10 +2209,10 @@ S59 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S60 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
+S48 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=901014
     TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
@@ -2697,7 +2246,7 @@ S60 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2711,10 +2260,10 @@ S60 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S61 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
+S49 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601014
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -2749,7 +2298,7 @@ S61 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2765,7 +2314,7 @@ S61 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=1 preserve=0 force=1 err=-170
   p1 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -2779,7 +2328,7 @@ S61 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2793,10 +2342,10 @@ S61 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S62 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
+S50 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601014
     TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -2830,7 +2379,7 @@ S62 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2844,10 +2393,10 @@ S62 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S63 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
+S51 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=901014
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
@@ -2882,7 +2431,7 @@ S63 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2898,7 +2447,7 @@ S63 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=1 preserve=0 force=1 err=-170
   p1 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=1 soc=87.5
@@ -2912,7 +2461,7 @@ S63 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2926,10 +2475,10 @@ S63 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S64 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
+S52 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601014
     TEARDOWN req=0 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -2963,7 +2512,7 @@ S64 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -2977,10 +2526,10 @@ S64 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S65 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
+S53 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601014
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -3014,7 +2563,7 @@ S65 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3030,7 +2579,7 @@ S65 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=0 preserve=0 force=0 err=0
   p1 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -3044,7 +2593,7 @@ S65 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3058,10 +2607,10 @@ S65 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S66 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
+S54 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=3021
     TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
@@ -3095,7 +2644,7 @@ S66 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 0
     LOG INFO ModemTeardown: radioOn=1 point=sleep-attempts-failed-reset
     LOG ERROR All sleep attempts failed err=-170 - immediate reset required
-    AB1805 resumeWDT
+    EXTWDT start
     CALL delay 2000
     LOG INFO Resetting device to clear sleep failure state
     POWER flushDiagBatch
@@ -3103,10 +2652,10 @@ S66 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     TRANSITION 1 sleep-all-attempts-failed
     RET fell=0 pir=0 btn=0 timer=0 label=- transitions=1
     FIELDS eff=0 preserve=0 force=0 err=0
-S67 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
+S55 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3021
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -3141,7 +2690,7 @@ S67 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 0
     LOG INFO ModemTeardown: radioOn=1 point=sleep-attempts-failed-reset
     LOG ERROR All sleep attempts failed err=-170 - immediate reset required
-    AB1805 resumeWDT
+    EXTWDT start
     CALL delay 2000
     LOG INFO Resetting device to clear sleep failure state
     POWER flushDiagBatch
@@ -3151,7 +2700,7 @@ S67 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=0 preserve=0 force=1 err=-170
   p1 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -3165,7 +2714,7 @@ S67 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3179,10 +2728,10 @@ S67 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S68 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
+S56 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3021
     TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -3216,7 +2765,7 @@ S68 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 0
     LOG INFO ModemTeardown: radioOn=1 point=sleep-attempts-failed-reset
     LOG ERROR All sleep attempts failed err=-170 - immediate reset required
-    AB1805 resumeWDT
+    EXTWDT start
     CALL delay 2000
     LOG INFO Resetting device to clear sleep failure state
     POWER flushDiagBatch
@@ -3224,10 +2773,10 @@ S68 prior=1 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     TRANSITION 1 sleep-all-attempts-failed
     RET fell=0 pir=0 btn=0 timer=0 label=- transitions=1
     FIELDS eff=0 preserve=0 force=0 err=0
-S69 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
+S57 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=3021
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
@@ -3262,7 +2811,7 @@ S69 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 0
     LOG INFO ModemTeardown: radioOn=1 point=sleep-attempts-failed-reset
     LOG ERROR All sleep attempts failed err=-170 - immediate reset required
-    AB1805 resumeWDT
+    EXTWDT start
     CALL delay 2000
     LOG INFO Resetting device to clear sleep failure state
     POWER flushDiagBatch
@@ -3272,7 +2821,7 @@ S69 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=0 preserve=0 force=1 err=-170
   p1 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=1 soc=87.5
@@ -3286,7 +2835,7 @@ S69 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3300,10 +2849,10 @@ S69 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S70 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
+S58 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3021
     TEARDOWN req=0 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -3337,7 +2886,7 @@ S70 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 0
     LOG INFO ModemTeardown: radioOn=1 point=sleep-attempts-failed-reset
     LOG ERROR All sleep attempts failed err=-170 - immediate reset required
-    AB1805 resumeWDT
+    EXTWDT start
     CALL delay 2000
     LOG INFO Resetting device to clear sleep failure state
     POWER flushDiagBatch
@@ -3345,10 +2894,10 @@ S70 prior=2 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     TRANSITION 1 sleep-all-attempts-failed
     RET fell=0 pir=0 btn=0 timer=0 label=- transitions=1
     FIELDS eff=0 preserve=0 force=0 err=0
-S71 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
+S59 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3021
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -3382,7 +2931,7 @@ S71 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 0
     LOG INFO ModemTeardown: radioOn=1 point=sleep-attempts-failed-reset
     LOG ERROR All sleep attempts failed err=-170 - immediate reset required
-    AB1805 resumeWDT
+    EXTWDT start
     CALL delay 2000
     LOG INFO Resetting device to clear sleep failure state
     POWER flushDiagBatch
@@ -3392,7 +2941,7 @@ S71 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=0 preserve=0 force=0 err=0
   p1 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -3406,7 +2955,7 @@ S71 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3420,10 +2969,10 @@ S71 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S72 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S60 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=0 soc=87.5
@@ -3437,7 +2986,7 @@ S72 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3451,10 +3000,10 @@ S72 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S73 prior=0 req=1 conn=0 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S61 prior=0 req=1 conn=0 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -3468,7 +3017,7 @@ S73 prior=0 req=1 conn=0 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3482,10 +3031,10 @@ S73 prior=0 req=1 conn=0 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S74 prior=0 req=1 conn=1 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S62 prior=0 req=1 conn=1 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -3499,7 +3048,7 @@ S74 prior=0 req=1 conn=1 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3513,10 +3062,10 @@ S74 prior=0 req=1 conn=1 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S75 prior=0 req=1 conn=0 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S63 prior=0 req=1 conn=0 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=1 soc=87.5
@@ -3530,7 +3079,7 @@ S75 prior=0 req=1 conn=0 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3544,10 +3093,10 @@ S75 prior=0 req=1 conn=0 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S76 prior=0 req=1 conn=1 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S64 prior=0 req=1 conn=1 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -3561,7 +3110,7 @@ S76 prior=0 req=1 conn=1 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3575,10 +3124,10 @@ S76 prior=0 req=1 conn=1 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S77 prior=0 req=1 conn=0 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S65 prior=0 req=1 conn=0 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -3592,7 +3141,7 @@ S77 prior=0 req=1 conn=0 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3606,10 +3155,10 @@ S77 prior=0 req=1 conn=0 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S78 prior=0 req=1 conn=1 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S66 prior=0 req=1 conn=1 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
@@ -3623,7 +3172,7 @@ S78 prior=0 req=1 conn=1 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3637,10 +3186,10 @@ S78 prior=0 req=1 conn=1 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S79 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S67 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -3654,7 +3203,7 @@ S79 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3668,10 +3217,10 @@ S79 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S80 prior=1 req=1 conn=0 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S68 prior=1 req=1 conn=0 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -3685,7 +3234,7 @@ S80 prior=1 req=1 conn=0 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3699,10 +3248,10 @@ S80 prior=1 req=1 conn=0 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S81 prior=1 req=1 conn=1 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S69 prior=1 req=1 conn=1 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=1 soc=87.5
@@ -3716,7 +3265,7 @@ S81 prior=1 req=1 conn=1 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3730,10 +3279,10 @@ S81 prior=1 req=1 conn=1 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S82 prior=1 req=1 conn=0 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S70 prior=1 req=1 conn=0 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -3747,7 +3296,7 @@ S82 prior=1 req=1 conn=0 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3761,10 +3310,10 @@ S82 prior=1 req=1 conn=0 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S83 prior=1 req=1 conn=1 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S71 prior=1 req=1 conn=1 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -3778,7 +3327,7 @@ S83 prior=1 req=1 conn=1 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3792,10 +3341,10 @@ S83 prior=1 req=1 conn=1 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S84 prior=1 req=1 conn=0 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S72 prior=1 req=1 conn=0 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
@@ -3809,7 +3358,7 @@ S84 prior=1 req=1 conn=0 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3823,10 +3372,10 @@ S84 prior=1 req=1 conn=0 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S85 prior=1 req=1 conn=1 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S73 prior=1 req=1 conn=1 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -3840,7 +3389,7 @@ S85 prior=1 req=1 conn=1 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3854,10 +3403,10 @@ S85 prior=1 req=1 conn=1 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S86 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S74 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -3871,7 +3420,7 @@ S86 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3885,10 +3434,10 @@ S86 prior=2 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S87 prior=2 req=1 conn=0 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S75 prior=2 req=1 conn=0 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=1 soc=87.5
@@ -3902,7 +3451,7 @@ S87 prior=2 req=1 conn=0 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3916,10 +3465,10 @@ S87 prior=2 req=1 conn=0 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S88 prior=2 req=1 conn=1 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S76 prior=2 req=1 conn=1 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -3933,7 +3482,7 @@ S88 prior=2 req=1 conn=1 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3947,10 +3496,10 @@ S88 prior=2 req=1 conn=1 off=1 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S89 prior=2 req=1 conn=0 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S77 prior=2 req=1 conn=0 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -3964,7 +3513,7 @@ S89 prior=2 req=1 conn=0 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -3978,10 +3527,10 @@ S89 prior=2 req=1 conn=0 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S90 prior=2 req=1 conn=1 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S78 prior=2 req=1 conn=1 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
@@ -3995,7 +3544,7 @@ S90 prior=2 req=1 conn=1 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4009,10 +3558,10 @@ S90 prior=2 req=1 conn=1 off=0 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S91 prior=2 req=1 conn=0 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S79 prior=2 req=1 conn=0 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -4026,7 +3575,7 @@ S91 prior=2 req=1 conn=0 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4040,10 +3589,10 @@ S91 prior=2 req=1 conn=0 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S92 prior=2 req=1 conn=1 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S80 prior=2 req=1 conn=1 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -4057,7 +3606,7 @@ S92 prior=2 req=1 conn=1 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4071,10 +3620,10 @@ S92 prior=2 req=1 conn=1 off=1 unst=1 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S93 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=0 ser=0/0/0 vb=0 wd=1
+S81 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=0 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
@@ -4087,7 +3636,7 @@ S93 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=0 ser=0/0/0 vb=0 wd=1
     SLEEP mode=ULP gpio=[4F] net=3:0 dur=900000 -> err=0 pin=65535
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4101,10 +3650,10 @@ S93 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=0 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S94 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=0 ser=0/0/0 vb=0 wd=1
+S82 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=0 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1007
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -4117,7 +3666,7 @@ S94 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=0 ser=0/0/0 vb=0 wd=1
     SLEEP mode=ULP gpio=[4F] net=3:0 dur=3600000 -> err=0 pin=4
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4131,10 +3680,10 @@ S94 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=0 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=1 timer=0 label=BUTTON transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S95 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=0 ser=0/0/0 vb=0 wd=1
+S83 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=0 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -4147,7 +3696,7 @@ S95 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=0 ser=0/0/0 vb=0 wd=1
     SLEEP mode=ULP gpio=[4F] net=3:0 dur=3600000 -> err=0 pin=65535
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4161,10 +3710,10 @@ S95 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=0 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S96 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=0 ser=0/0/0 vb=0 wd=1
+S84 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=0 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=901007
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=0 soc=87.5
@@ -4189,7 +3738,7 @@ S96 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=0 ser=0/0/0 vb=0 wd=1
     SLEEP mode=STOP gpio=[4F] net=none dur=900000 -> err=0 pin=65535
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4203,10 +3752,10 @@ S96 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=0 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=0 force=1 err=-170
-S97 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/0/0 vb=0 wd=1
+S85 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3602000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -4220,7 +3769,7 @@ S97 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4237,10 +3786,10 @@ S97 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S98 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/0/2 vb=0 wd=1
+S86 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/0/2 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3602200
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -4254,7 +3803,7 @@ S98 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/0/2 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4275,10 +3824,10 @@ S98 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/0/2 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S99 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/0/-1 vb=0 wd=1
+S87 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/0/-1 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=931500
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
@@ -4292,7 +3841,7 @@ S99 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/0/-1 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4312,10 +3861,10 @@ S99 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/0/-1 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S100 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/1/0 vb=0 wd=1
+S88 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/1/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3602075
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -4331,7 +3880,7 @@ S100 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/1/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4348,10 +3897,10 @@ S100 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/1/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S101 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/1/2 vb=0 wd=1
+S89 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/1/2 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3602275
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -4367,7 +3916,7 @@ S101 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/1/2 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4388,10 +3937,10 @@ S101 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/1/2 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S102 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/1/-1 vb=0 wd=1
+S90 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/1/-1 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=931575
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=0 soc=87.5
@@ -4407,7 +3956,7 @@ S102 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/1/-1 vb=0 wd=
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4427,10 +3976,10 @@ S102 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=1/1/-1 vb=0 wd=
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S103 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=1 wd=1
+S91 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=1 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -4445,7 +3994,7 @@ S103 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=1 wd=1
     LOG INFO SLEEP: standby sleep returned normally; preserving modem standby
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4459,10 +4008,10 @@ S103 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=1 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S104 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=1 wd=1
+S92 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=1 wd=1
   p0 wakeIn=3600 overnight=0 t=1014
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -4488,7 +4037,7 @@ S104 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=1 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4502,15 +4051,13 @@ S104 prior=1 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=1 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=0 force=1 err=-170
-S105 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=0
+S93 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=0
   p0 wakeIn=900 overnight=1 t=901007
     TEARDOWN req=1 eff=1 force=0 err=0
     HIB eligible? wakeIn=900 -> 1
     CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700000900
     CRUMB 24
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause hibernate
     LOG WARN SleepCall: watchdog-stop failed mode=HIBERNATE dur=900s
     HIB armForSleep 1700000000 900
@@ -4524,13 +4071,13 @@ S105 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=0
     POWER flushDiagBatch
     CRUMB 27
     CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=900000 -> err=-170 pin=65535
+    AWAKE recordSleepReturn 0
     HIB abandon
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore hibernate
-    LOG WARN HIBERNATE sleep failed err=0 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    LOG WARN HIBERNATE sleep failed err=-170 - falling back to ULTRA_LOW_POWER
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=err gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=1 soc=87.5
@@ -4544,7 +4091,7 @@ S105 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=0
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4558,10 +4105,10 @@ S105 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=0
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S106 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=0
+S94 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=0
   p0 wakeIn=3600 overnight=0 t=3601014
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=err gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=0 soc=87.5
@@ -4596,7 +4143,7 @@ S106 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=0
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4610,10 +4157,10 @@ S106 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=0
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=0 force=1 err=-170
-S107 prior=2 req=1 conn=1 off=0 unst=0 td=1 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S95 prior=2 req=1 conn=1 off=0 unst=0 td=1 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -4627,7 +4174,7 @@ S107 prior=2 req=1 conn=1 off=0 unst=0 td=1 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4643,7 +4190,7 @@ S107 prior=2 req=1 conn=1 off=0 unst=0 td=1 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=0 preserve=0 force=0 err=0
   p1 wakeIn=3600 overnight=0 t=3601000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=3600 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=3600s occ=1 soc=87.5
@@ -4657,7 +4204,7 @@ S107 prior=2 req=1 conn=1 off=0 unst=0 td=1 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4671,10 +4218,10 @@ S107 prior=2 req=1 conn=1 off=0 unst=0 td=1 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S108 prior=2 req=1 conn=1 off=0 unst=0 td=1 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
+S96 prior=2 req=1 conn=1 off=0 unst=0 td=1 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=1014
     TEARDOWN req=1 eff=0 force=1 err=-170
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=0 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
@@ -4699,7 +4246,7 @@ S108 prior=2 req=1 conn=1 off=0 unst=0 td=1 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4715,7 +4262,7 @@ S108 prior=2 req=1 conn=1 off=0 unst=0 td=1 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     FIELDS eff=0 preserve=0 force=0 err=0
   p1 wakeIn=900 overnight=0 t=901000
     TEARDOWN req=1 eff=1 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO SleepCall: standby=1 dur=900 wdt=off gate=ok
     LOG INFO Sleep: ULP standby=1 reason=scheduled dur=900s occ=0 soc=87.5
@@ -4729,7 +4276,7 @@ S108 prior=2 req=1 conn=1 off=0 unst=0 td=1 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4743,30 +4290,27 @@ S108 prior=2 req=1 conn=1 off=0 unst=0 td=1 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=1 preserve=1 force=0 err=0
-S109 prior=1 req=1 conn=1 off=0 unst=0 td=2 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S97 prior=1 req=1 conn=1 off=0 unst=0 td=2 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1000
     TEARDOWN req=1 eff=1 force=0 err=0
     RET fell=0 pir=0 btn=0 timer=0 label=- transitions=0
     FIELDS eff=0 preserve=1 force=0 err=0
-S110 prior=1 req=0 conn=1 off=0 unst=0 td=2 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S98 prior=1 req=0 conn=1 off=0 unst=0 td=2 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1000
     TEARDOWN req=0 eff=0 force=0 err=0
     RET fell=0 pir=0 btn=0 timer=0 label=- transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S111 prior=1 req=1 conn=1 off=0 unst=1 td=2 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S99 prior=1 req=1 conn=1 off=0 unst=1 td=2 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=0 t=1000
     TEARDOWN req=1 eff=0 force=0 err=0
     RET fell=0 pir=0 btn=0 timer=0 label=- transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S112 prior=1 req=1 conn=1 off=1 unst=0 td=2 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S100 prior=1 req=1 conn=1 off=1 unst=0 td=2 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1000
     TEARDOWN req=1 eff=0 force=0 err=0
     RET fell=0 pir=0 btn=0 timer=0 label=- transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-SCENARIOS 113 PASSES 133 WOKE 123 RETURNED 10 DISTINCT_EVENTS 74
-EVENT AB# interruptAtTime #
-EVENT AB# resumeWDT
-EVENT AB# stopWDT
+SCENARIOS 101 PASSES 121 WOKE 111 RETURNED 10 DISTINCT_EVENTS 70
 EVENT ALERT #
 EVENT AWAKE recordSleepReturn #
 EVENT CALL Serial.begin #
@@ -4778,9 +4322,10 @@ EVENT CALL pinMode # #
 EVENT CLOUD logLedgerSleepState
 EVENT CRUMB #
 EVENT CYCLE resetOnWake ms=#
+EVENT EXTWDT start
+EVENT EXTWDT stop
 EVENT HIB abandon
 EVENT HIB armForSleep # #
-EVENT HIB clearStale
 EVENT HIB eligible? wakeIn=# -> #
 EVENT LOG ERROR All sleep attempts failed err=-# - immediate reset required
 EVENT LOG ERROR STOP sleep fallback failed err=-# (wakeIn=# sec) - using timer-only STOP sleep
@@ -4798,8 +4343,6 @@ EVENT LOG INFO WakeReturn: elapsed=# reason=BUTTON
 EVENT LOG INFO WakeReturn: elapsed=# reason=ERROR
 EVENT LOG INFO WakeReturn: elapsed=# reason=PIR
 EVENT LOG INFO WakeReturn: elapsed=# reason=TIMER
-EVENT LOG WARN HIBERNATE bypass: failed stale interrupt cleanup - falling back to ULTRA_LOW_POWER
-EVENT LOG WARN HIBERNATE bypass: failed to program AB# alarm - falling back to ULTRA_LOW_POWER
 EVENT LOG WARN HIBERNATE bypass: wake pin held low before sleep - falling back to ULTRA_LOW_POWER
 EVENT LOG WARN HIBERNATE sleep failed err=# - falling back to ULTRA_LOW_POWER
 EVENT LOG WARN HIBERNATE sleep failed err=-# - falling back to ULTRA_LOW_POWER
@@ -4818,8 +4361,8 @@ EVENT PROGRESS SLEEP_ATTEMPT
 EVENT PROGRESS SLEEP_RETURNED
 EVENT PROGRESS WAKE_FROM_SLEEP
 EVENT RESET cause=#
-EVENT SLEEP mode=HIBERNATE gpio=[#F,#F] net=none dur=none -> err=# pin=#
-EVENT SLEEP mode=HIBERNATE gpio=[#F,#F] net=none dur=none -> err=-# pin=#
+EVENT SLEEP mode=HIBERNATE gpio=[#F,#F] net=none dur=# -> err=# pin=#
+EVENT SLEEP mode=HIBERNATE gpio=[#F,#F] net=none dur=# -> err=-# pin=#
 EVENT SLEEP mode=STOP gpio=[#F,#R] net=none dur=# -> err=# pin=#
 EVENT SLEEP mode=STOP gpio=[#F,#R] net=none dur=# -> err=-# pin=#
 EVENT SLEEP mode=STOP gpio=[#F] net=none dur=# -> err=# pin=#
@@ -4843,7 +4386,7 @@ S0 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=900 overnight=1 t=901000
     TEARDOWN req=0 eff=0 force=0 err=0
     HIB eligible? wakeIn=900 -> 0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
     PROGRESS SLEEP_ATTEMPT
@@ -4856,7 +4399,7 @@ S0 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4873,7 +4416,7 @@ S1 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=1 t=3601000
     TEARDOWN req=1 eff=0 force=0 err=0
     HIB eligible? wakeIn=3600 -> 0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
     PROGRESS SLEEP_ATTEMPT
@@ -4886,7 +4429,7 @@ S1 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=1 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4905,7 +4448,7 @@ S2 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
     LOG WARN HIBERNATE bypass: wake pin held low before sleep - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
     PROGRESS SLEEP_ATTEMPT
@@ -4918,7 +4461,7 @@ S2 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4937,7 +4480,7 @@ S3 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     HIB eligible? wakeIn=900 -> 1
     CALL pinMode 7 2
     LOG WARN HIBERNATE bypass: wake pin held low before sleep - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=1 soc=87.5
     PROGRESS SLEEP_ATTEMPT
@@ -4950,7 +4493,7 @@ S3 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -4964,148 +4507,12 @@ S3 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=2 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
 S4 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601000
-    TEARDOWN req=0 eff=0 force=0 err=0
-    HIB eligible? wakeIn=3600 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    LOG WARN HIBERNATE bypass: failed stale interrupt cleanup - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
-    CALL Watchdog.started
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601000
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S5 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601000
-    TEARDOWN req=1 eff=0 force=0 err=0
-    HIB eligible? wakeIn=3600 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    LOG WARN HIBERNATE bypass: failed stale interrupt cleanup - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
-    CALL Watchdog.started
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601000
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S6 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=900 overnight=1 t=901000
-    TEARDOWN req=0 eff=0 force=0 err=0
-    HIB eligible? wakeIn=900 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700000900
-    LOG WARN HIBERNATE bypass: failed to program AB1805 alarm - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=900000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=900000 reason=TIMER
-    CALL Watchdog.started
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=901000
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S7 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601000
-    TEARDOWN req=1 eff=0 force=0 err=0
-    HIB eligible? wakeIn=3600 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700003600
-    LOG WARN HIBERNATE bypass: failed to program AB1805 alarm - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
-    CALL Watchdog.started
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601000
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S8 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=1 t=3601007
     TEARDOWN req=0 eff=0 force=0 err=0
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700003600
     CRUMB 24
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause hibernate
     HIB armForSleep 1700000000 3600
     LOG INFO ModemTeardown: radioOn=1 point=hibernate
@@ -5118,13 +4525,13 @@ S8 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER flushDiagBatch
     CRUMB 27
     CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=0 pin=65535
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=3600000 -> err=0 pin=65535
     AWAKE recordSleepReturn 1
     HIB abandon
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore hibernate
     LOG WARN HIBERNATE sleep failed err=0 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
     PROGRESS SLEEP_ATTEMPT
@@ -5137,7 +4544,7 @@ S8 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -5150,15 +4557,64 @@ S8 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S9 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=900 overnight=1 t=901007
+S5 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=3 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+  p0 wakeIn=3600 overnight=1 t=3601007
     TEARDOWN req=1 eff=0 force=0 err=0
+    HIB eligible? wakeIn=3600 -> 1
+    CALL pinMode 7 2
+    CRUMB 24
+    EXTWDT stop
+    WATCHDOG pause hibernate
+    HIB armForSleep 1700000000 3600
+    LOG INFO ModemTeardown: radioOn=1 point=hibernate
+    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
+    POWER pre-hibernate
+    PROGRESS SLEEP_ATTEMPT
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    POWER flushDiagBatch
+    CRUMB 27
+    CRUMB 28
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=3600000 -> err=0 pin=65535
+    AWAKE recordSleepReturn 1
+    HIB abandon
+    EXTWDT start
+    WATCHDOG restore hibernate
+    LOG WARN HIBERNATE sleep failed err=0 - falling back to ULTRA_LOW_POWER
+    EXTWDT stop
+    WATCHDOG pause ulp
+    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
+    PROGRESS SLEEP_ATTEMPT
+    POWER pre-sleep-ulp
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    CRUMB 28
+    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=65535
+    AWAKE recordSleepReturn 1
+    CALL pinMode 4 0
+    CALL pinMode 9 0
+    EXTWDT start
+    WATCHDOG restore ulp
+    PROGRESS WAKE_FROM_SLEEP
+    CRUMB 4
+    POWER flushDiagBatch
+    LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
+    CALL Watchdog.started
+    CALL attachInterrupt 4 2
+    CYCLE resetOnWake ms=3601007
+    MEASURE noteWakeFromLowPowerSleep
+    POWER post-wake
+    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
+    FIELDS eff=0 preserve=0 force=0 err=0
+S6 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+  p0 wakeIn=900 overnight=1 t=901007
+    TEARDOWN req=0 eff=0 force=0 err=0
     HIB eligible? wakeIn=900 -> 1
     CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700000900
     CRUMB 24
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause hibernate
     HIB armForSleep 1700000000 900
     LOG INFO ModemTeardown: radioOn=1 point=hibernate
@@ -5171,15 +4627,15 @@ S9 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER flushDiagBatch
     CRUMB 27
     CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=900000 -> err=-170 pin=65535
+    AWAKE recordSleepReturn 0
     HIB abandon
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore hibernate
-    LOG WARN HIBERNATE sleep failed err=0 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    LOG WARN HIBERNATE sleep failed err=-170 - falling back to ULTRA_LOW_POWER
+    EXTWDT stop
     WATCHDOG pause ulp
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=1 soc=87.5
+    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
     PROGRESS SLEEP_ATTEMPT
     POWER pre-sleep-ulp
     CLOUD logLedgerSleepState
@@ -5190,7 +4646,7 @@ S9 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -5203,15 +4659,13 @@ S9 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=5 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S10 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=6 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+S7 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=4 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=1 t=3601007
-    TEARDOWN req=0 eff=0 force=0 err=0
+    TEARDOWN req=1 eff=0 force=0 err=0
     HIB eligible? wakeIn=3600 -> 1
     CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700003600
     CRUMB 24
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause hibernate
     HIB armForSleep 1700000000 3600
     LOG INFO ModemTeardown: radioOn=1 point=hibernate
@@ -5224,13 +4678,42 @@ S10 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=6 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER flushDiagBatch
     CRUMB 27
     CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=-170 pin=65535
+    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=3600000 -> err=-170 pin=65535
     AWAKE recordSleepReturn 0
     HIB abandon
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore hibernate
     LOG WARN HIBERNATE sleep failed err=-170 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
+    EXTWDT stop
+    WATCHDOG pause ulp
+    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
+    PROGRESS SLEEP_ATTEMPT
+    POWER pre-sleep-ulp
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    CRUMB 28
+    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=65535
+    AWAKE recordSleepReturn 1
+    CALL pinMode 4 0
+    CALL pinMode 9 0
+    EXTWDT start
+    WATCHDOG restore ulp
+    PROGRESS WAKE_FROM_SLEEP
+    CRUMB 4
+    POWER flushDiagBatch
+    LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
+    CALL Watchdog.started
+    CALL attachInterrupt 4 2
+    CYCLE resetOnWake ms=3601007
+    MEASURE noteWakeFromLowPowerSleep
+    POWER post-wake
+    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
+    FIELDS eff=0 preserve=0 force=0 err=0
+S8 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+  p0 wakeIn=3600 overnight=0 t=3601000
+    TEARDOWN req=0 eff=0 force=0 err=0
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
     PROGRESS SLEEP_ATTEMPT
@@ -5243,118 +4726,7 @@ S10 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=6 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
-    CALL Watchdog.started
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601007
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S11 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=6 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=1 t=3601007
-    TEARDOWN req=1 eff=0 force=0 err=0
-    HIB eligible? wakeIn=3600 -> 1
-    CALL pinMode 7 2
-    HIB clearStale
-    AB1805 interruptAtTime 1700003600
-    CRUMB 24
-    AB1805 stopWDT
-    WATCHDOG pause hibernate
-    HIB armForSleep 1700000000 3600
-    LOG INFO ModemTeardown: radioOn=1 point=hibernate
-    LOG INFO Sleep: HIBERNATE reason=closed dur=3600s wakePin=7
-    POWER pre-hibernate
-    PROGRESS SLEEP_ATTEMPT
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    POWER flushDiagBatch
-    CRUMB 27
-    CRUMB 28
-    SLEEP mode=HIBERNATE gpio=[7F,4F] net=none dur=none -> err=-170 pin=65535
-    AWAKE recordSleepReturn 0
-    HIB abandon
-    AB1805 resumeWDT
-    WATCHDOG restore hibernate
-    LOG WARN HIBERNATE sleep failed err=-170 - falling back to ULTRA_LOW_POWER
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=3600000 reason=TIMER
-    CALL Watchdog.started
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=3601007
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S12 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=900 overnight=0 t=901000
-    TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=900000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=900000 reason=TIMER
-    CALL Watchdog.started
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=901000
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S13 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=0 t=3601000
-    TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -5367,10 +4739,39 @@ S13 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S14 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
+S9 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=0 sv=1 ser=0/0/0 vb=0 wd=1
+  p0 wakeIn=900 overnight=0 t=901000
+    TEARDOWN req=1 eff=0 force=0 err=0
+    EXTWDT stop
+    WATCHDOG pause ulp
+    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=1 soc=87.5
+    PROGRESS SLEEP_ATTEMPT
+    POWER pre-sleep-ulp
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    CRUMB 28
+    SLEEP mode=ULP gpio=[4F,9R] net=none dur=900000 -> err=0 pin=65535
+    AWAKE recordSleepReturn 1
+    CALL pinMode 4 0
+    CALL pinMode 9 0
+    EXTWDT start
+    WATCHDOG restore ulp
+    PROGRESS WAKE_FROM_SLEEP
+    CRUMB 4
+    POWER flushDiagBatch
+    LOG INFO WakeReturn: elapsed=900000 reason=TIMER
+    CALL Watchdog.started
+    CALL attachInterrupt 4 2
+    CYCLE resetOnWake ms=901000
+    MEASURE noteWakeFromLowPowerSleep
+    POWER post-wake
+    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
+    FIELDS eff=0 preserve=0 force=0 err=0
+S10 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1007
     TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
     PROGRESS SLEEP_ATTEMPT
@@ -5383,7 +4784,7 @@ S14 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -5396,68 +4797,10 @@ S14 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=1 timer=0 label=BUTTON transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S15 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=900 overnight=0 t=1007
-    TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=1 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=900000 -> err=0 pin=4
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=7 reason=BUTTON
-    CALL Watchdog.started
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=1007
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=1 timer=0 label=BUTTON transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S16 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=0 t=1007
-    TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=9
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=7 reason=PIR
-    CALL Watchdog.started
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=1007
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=1 btn=0 timer=0 label=PIR transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S17 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
+S11 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=1 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=1007
     TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
     PROGRESS SLEEP_ATTEMPT
@@ -5466,27 +4809,27 @@ S17 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
     CRUMB 25
     CRUMB 26
     CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=9
+    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=4
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
     POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=7 reason=PIR
+    LOG INFO WakeReturn: elapsed=7 reason=BUTTON
     CALL Watchdog.started
     CALL attachInterrupt 4 2
     CYCLE resetOnWake ms=1007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
-    RET fell=1 pir=1 btn=0 timer=0 label=PIR transitions=0
+    RET fell=1 pir=0 btn=1 timer=0 label=BUTTON transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S18 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=900 overnight=0 t=1014
+S12 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
+  p0 wakeIn=900 overnight=0 t=1007
     TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
     PROGRESS SLEEP_ATTEMPT
@@ -5495,40 +4838,58 @@ S18 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     CRUMB 25
     CRUMB 26
     CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=900000 -> err=-170 pin=65535
-    AWAKE recordSleepReturn 0
-    PROGRESS SLEEP_RETURNED
-    LOG ERROR ULTRA_LOW_POWER sleep failed err=-170 (wakeIn=900 sec, button=4 pir=9) - falling back to STOP
-    ALERT 16
-    CRUMB 24
-    POWER pre-sleep-stop-fallback
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=STOP gpio=[4F,9R] net=none dur=900000 -> err=0 pin=9
+    SLEEP mode=ULP gpio=[4F,9R] net=none dur=900000 -> err=0 pin=9
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
     POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=7 reason=ERROR
+    LOG INFO WakeReturn: elapsed=7 reason=PIR
     CALL Watchdog.started
     CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=1014
+    CYCLE resetOnWake ms=1007
     MEASURE noteWakeFromLowPowerSleep
     POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
+    RET fell=1 pir=1 btn=0 timer=0 label=PIR transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S19 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=0 t=1014
+S13 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=2 sv=1 ser=0/0/0 vb=0 wd=1
+  p0 wakeIn=3600 overnight=0 t=1007
     TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
+    PROGRESS SLEEP_ATTEMPT
+    POWER pre-sleep-ulp
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    CRUMB 28
+    SLEEP mode=ULP gpio=[4F,9R] net=none dur=3600000 -> err=0 pin=9
+    AWAKE recordSleepReturn 1
+    CALL pinMode 4 0
+    CALL pinMode 9 0
+    EXTWDT start
+    WATCHDOG restore ulp
+    PROGRESS WAKE_FROM_SLEEP
+    CRUMB 4
+    POWER flushDiagBatch
+    LOG INFO WakeReturn: elapsed=7 reason=PIR
+    CALL Watchdog.started
+    CALL attachInterrupt 4 2
+    CYCLE resetOnWake ms=1007
+    MEASURE noteWakeFromLowPowerSleep
+    POWER post-wake
+    RET fell=1 pir=1 btn=0 timer=0 label=PIR transitions=0
+    FIELDS eff=0 preserve=0 force=0 err=0
+S14 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
+  p0 wakeIn=3600 overnight=0 t=1014
+    TEARDOWN req=0 eff=0 force=0 err=0
+    EXTWDT stop
+    WATCHDOG pause ulp
+    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
     PROGRESS SLEEP_ATTEMPT
     POWER pre-sleep-ulp
     CLOUD logLedgerSleepState
@@ -5550,7 +4911,7 @@ S19 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -5563,10 +4924,50 @@ S19 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S20 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
+S15 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=3 sv=1 ser=0/0/0 vb=0 wd=1
+  p0 wakeIn=900 overnight=0 t=1014
+    TEARDOWN req=1 eff=0 force=0 err=0
+    EXTWDT stop
+    WATCHDOG pause ulp
+    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=1 soc=87.5
+    PROGRESS SLEEP_ATTEMPT
+    POWER pre-sleep-ulp
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    CRUMB 28
+    SLEEP mode=ULP gpio=[4F,9R] net=none dur=900000 -> err=-170 pin=65535
+    AWAKE recordSleepReturn 0
+    PROGRESS SLEEP_RETURNED
+    LOG ERROR ULTRA_LOW_POWER sleep failed err=-170 (wakeIn=900 sec, button=4 pir=9) - falling back to STOP
+    ALERT 16
+    CRUMB 24
+    POWER pre-sleep-stop-fallback
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    CRUMB 28
+    SLEEP mode=STOP gpio=[4F,9R] net=none dur=900000 -> err=0 pin=9
+    AWAKE recordSleepReturn 1
+    CALL pinMode 4 0
+    CALL pinMode 9 0
+    EXTWDT start
+    WATCHDOG restore ulp
+    PROGRESS WAKE_FROM_SLEEP
+    CRUMB 4
+    POWER flushDiagBatch
+    LOG INFO WakeReturn: elapsed=7 reason=ERROR
+    CALL Watchdog.started
+    CALL attachInterrupt 4 2
+    CYCLE resetOnWake ms=1014
+    MEASURE noteWakeFromLowPowerSleep
+    POWER post-wake
+    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
+    FIELDS eff=0 preserve=0 force=0 err=0
+S16 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3601014
     TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
     PROGRESS SLEEP_ATTEMPT
@@ -5599,7 +5000,7 @@ S20 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 1
     CALL pinMode 4 0
     CALL pinMode 9 0
-    AB1805 resumeWDT
+    EXTWDT start
     WATCHDOG restore ulp
     PROGRESS WAKE_FROM_SLEEP
     CRUMB 4
@@ -5612,61 +5013,12 @@ S20 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
     POWER post-wake
     RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
     FIELDS eff=0 preserve=0 force=0 err=0
-S21 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=900 overnight=0 t=901014
+S17 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=4 sv=1 ser=0/0/0 vb=0 wd=1
+  p0 wakeIn=3600 overnight=0 t=3601014
     TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=1 soc=87.5
-    PROGRESS SLEEP_ATTEMPT
-    POWER pre-sleep-ulp
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=ULP gpio=[4F,9R] net=none dur=900000 -> err=-170 pin=65535
-    AWAKE recordSleepReturn 0
-    PROGRESS SLEEP_RETURNED
-    LOG ERROR ULTRA_LOW_POWER sleep failed err=-170 (wakeIn=900 sec, button=4 pir=9) - falling back to STOP
-    ALERT 16
-    CRUMB 24
-    POWER pre-sleep-stop-fallback
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=STOP gpio=[4F,9R] net=none dur=900000 -> err=-170 pin=65535
-    AWAKE recordSleepReturn 0
-    LOG ERROR STOP sleep fallback failed err=-170 (wakeIn=900 sec) - using timer-only STOP sleep
-    CRUMB 24
-    POWER pre-sleep-stop-timer-only
-    CLOUD logLedgerSleepState
-    CRUMB 25
-    CRUMB 26
-    CRUMB 28
-    SLEEP mode=STOP gpio=[] net=none dur=900000 -> err=0 pin=65535
-    AWAKE recordSleepReturn 1
-    CALL pinMode 4 0
-    CALL pinMode 9 0
-    AB1805 resumeWDT
-    WATCHDOG restore ulp
-    PROGRESS WAKE_FROM_SLEEP
-    CRUMB 4
-    POWER flushDiagBatch
-    LOG INFO WakeReturn: elapsed=7 reason=ERROR
-    CALL Watchdog.started
-    CALL attachInterrupt 4 2
-    CYCLE resetOnWake ms=901014
-    MEASURE noteWakeFromLowPowerSleep
-    POWER post-wake
-    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
-    FIELDS eff=0 preserve=0 force=0 err=0
-S22 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
-  p0 wakeIn=3600 overnight=0 t=3021
-    TEARDOWN req=0 eff=0 force=0 err=0
-    AB1805 stopWDT
-    WATCHDOG pause ulp
-    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=0 soc=87.5
+    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
     PROGRESS SLEEP_ATTEMPT
     POWER pre-sleep-ulp
     CLOUD logLedgerSleepState
@@ -5693,11 +5045,60 @@ S22 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     CRUMB 25
     CRUMB 26
     CRUMB 28
-    SLEEP mode=STOP gpio=[] net=none dur=3600000 -> err=-170 pin=65535
+    SLEEP mode=STOP gpio=[] net=none dur=3600000 -> err=0 pin=65535
+    AWAKE recordSleepReturn 1
+    CALL pinMode 4 0
+    CALL pinMode 9 0
+    EXTWDT start
+    WATCHDOG restore ulp
+    PROGRESS WAKE_FROM_SLEEP
+    CRUMB 4
+    POWER flushDiagBatch
+    LOG INFO WakeReturn: elapsed=7 reason=ERROR
+    CALL Watchdog.started
+    CALL attachInterrupt 4 2
+    CYCLE resetOnWake ms=3601014
+    MEASURE noteWakeFromLowPowerSleep
+    POWER post-wake
+    RET fell=1 pir=0 btn=0 timer=1 label=TIMER transitions=0
+    FIELDS eff=0 preserve=0 force=0 err=0
+S18 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
+  p0 wakeIn=900 overnight=0 t=3021
+    TEARDOWN req=0 eff=0 force=0 err=0
+    EXTWDT stop
+    WATCHDOG pause ulp
+    LOG INFO Sleep: ULP standby=0 reason=scheduled dur=900s occ=0 soc=87.5
+    PROGRESS SLEEP_ATTEMPT
+    POWER pre-sleep-ulp
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    CRUMB 28
+    SLEEP mode=ULP gpio=[4F,9R] net=none dur=900000 -> err=-170 pin=65535
+    AWAKE recordSleepReturn 0
+    PROGRESS SLEEP_RETURNED
+    LOG ERROR ULTRA_LOW_POWER sleep failed err=-170 (wakeIn=900 sec, button=4 pir=9) - falling back to STOP
+    ALERT 16
+    CRUMB 24
+    POWER pre-sleep-stop-fallback
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    CRUMB 28
+    SLEEP mode=STOP gpio=[4F,9R] net=none dur=900000 -> err=-170 pin=65535
+    AWAKE recordSleepReturn 0
+    LOG ERROR STOP sleep fallback failed err=-170 (wakeIn=900 sec) - using timer-only STOP sleep
+    CRUMB 24
+    POWER pre-sleep-stop-timer-only
+    CLOUD logLedgerSleepState
+    CRUMB 25
+    CRUMB 26
+    CRUMB 28
+    SLEEP mode=STOP gpio=[] net=none dur=900000 -> err=-170 pin=65535
     AWAKE recordSleepReturn 0
     LOG INFO ModemTeardown: radioOn=1 point=sleep-attempts-failed-reset
     LOG ERROR All sleep attempts failed err=-170 - immediate reset required
-    AB1805 resumeWDT
+    EXTWDT start
     CALL delay 2000
     LOG INFO Resetting device to clear sleep failure state
     POWER flushDiagBatch
@@ -5705,10 +5106,10 @@ S22 prior=0 req=0 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     TRANSITION 1 sleep-all-attempts-failed
     RET fell=0 pir=0 btn=0 timer=0 label=- transitions=1
     FIELDS eff=0 preserve=0 force=0 err=0
-S23 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
+S19 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
   p0 wakeIn=3600 overnight=0 t=3021
     TEARDOWN req=1 eff=0 force=0 err=0
-    AB1805 stopWDT
+    EXTWDT stop
     WATCHDOG pause ulp
     LOG INFO Sleep: ULP standby=0 reason=scheduled dur=3600s occ=1 soc=87.5
     PROGRESS SLEEP_ATTEMPT
@@ -5741,7 +5142,7 @@ S23 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     AWAKE recordSleepReturn 0
     LOG INFO ModemTeardown: radioOn=1 point=sleep-attempts-failed-reset
     LOG ERROR All sleep attempts failed err=-170 - immediate reset required
-    AB1805 resumeWDT
+    EXTWDT start
     CALL delay 2000
     LOG INFO Resetting device to clear sleep failure state
     POWER flushDiagBatch
@@ -5749,10 +5150,7 @@ S23 prior=0 req=1 conn=1 off=0 unst=0 td=0 hib=0 ulp=5 sv=1 ser=0/0/0 vb=0 wd=1
     TRANSITION 1 sleep-all-attempts-failed
     RET fell=0 pir=0 btn=0 timer=0 label=- transitions=1
     FIELDS eff=0 preserve=0 force=0 err=0
-SCENARIOS 24 PASSES 24 WOKE 22 RETURNED 2 DISTINCT_EVENTS 58
-EVENT AB# interruptAtTime #
-EVENT AB# resumeWDT
-EVENT AB# stopWDT
+SCENARIOS 20 PASSES 20 WOKE 18 RETURNED 2 DISTINCT_EVENTS 54
 EVENT ALERT #
 EVENT AWAKE recordSleepReturn #
 EVENT CALL Watchdog.started
@@ -5762,9 +5160,10 @@ EVENT CALL pinMode # #
 EVENT CLOUD logLedgerSleepState
 EVENT CRUMB #
 EVENT CYCLE resetOnWake ms=#
+EVENT EXTWDT start
+EVENT EXTWDT stop
 EVENT HIB abandon
 EVENT HIB armForSleep # #
-EVENT HIB clearStale
 EVENT HIB eligible? wakeIn=# -> #
 EVENT LOG ERROR All sleep attempts failed err=-# - immediate reset required
 EVENT LOG ERROR STOP sleep fallback failed err=-# (wakeIn=# sec) - using timer-only STOP sleep
@@ -5778,8 +5177,6 @@ EVENT LOG INFO WakeReturn: elapsed=# reason=BUTTON
 EVENT LOG INFO WakeReturn: elapsed=# reason=ERROR
 EVENT LOG INFO WakeReturn: elapsed=# reason=PIR
 EVENT LOG INFO WakeReturn: elapsed=# reason=TIMER
-EVENT LOG WARN HIBERNATE bypass: failed stale interrupt cleanup - falling back to ULTRA_LOW_POWER
-EVENT LOG WARN HIBERNATE bypass: failed to program AB# alarm - falling back to ULTRA_LOW_POWER
 EVENT LOG WARN HIBERNATE bypass: wake pin held low before sleep - falling back to ULTRA_LOW_POWER
 EVENT LOG WARN HIBERNATE sleep failed err=# - falling back to ULTRA_LOW_POWER
 EVENT LOG WARN HIBERNATE sleep failed err=-# - falling back to ULTRA_LOW_POWER
@@ -5794,8 +5191,8 @@ EVENT PROGRESS SLEEP_ATTEMPT
 EVENT PROGRESS SLEEP_RETURNED
 EVENT PROGRESS WAKE_FROM_SLEEP
 EVENT RESET cause=#
-EVENT SLEEP mode=HIBERNATE gpio=[#F,#F] net=none dur=none -> err=# pin=#
-EVENT SLEEP mode=HIBERNATE gpio=[#F,#F] net=none dur=none -> err=-# pin=#
+EVENT SLEEP mode=HIBERNATE gpio=[#F,#F] net=none dur=# -> err=# pin=#
+EVENT SLEEP mode=HIBERNATE gpio=[#F,#F] net=none dur=# -> err=-# pin=#
 EVENT SLEEP mode=STOP gpio=[#F,#R] net=none dur=# -> err=# pin=#
 EVENT SLEEP mode=STOP gpio=[#F,#R] net=none dur=# -> err=-# pin=#
 EVENT SLEEP mode=STOP gpio=[] net=none dur=# -> err=# pin=#

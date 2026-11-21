@@ -22,7 +22,7 @@ instead traces the actual shipped source to prove:
    every later correction. The 2nd review fix removed `clockResyncPending`
    entirely (see point 8 below) - there is no request/pending bookkeeping
    left to reintroduce that kind of latch.
-2. `ab1805.setRtcFromSystem()` (item 7) is called whenever
+2. `ExternalRtc::setFromSystem()` (item 7) is called whenever
    `Particle.timeSyncedLast()` is observed to be nonzero and to have
    advanced past the value the RTC was last written for - never gated on
    `Particle.syncTimeDone()`, which only means "no longer pending" and
@@ -71,7 +71,7 @@ instead traces the actual shipped source to prove:
    control-flow sentinels, not just recorded values.
 10. Round 4 review, Finding 1 (HIGH): the RTC write-back's tracked value
     (`lastRtcWriteSyncedLastMs`) must only advance AFTER a CONFIRMED
-    successful `ab1805.setRtcFromSystem()` call - never before/unconditionally
+    successful `ExternalRtc::setFromSystem()` call - never before/unconditionally
     - so a failed write is retried on the next check rather than being
     permanently (and silently) treated as done.
 11. Round 4 review, Finding 2 (HIGH): `Particle.timeSyncedLast()` must not be
@@ -188,8 +188,8 @@ def main() -> None:
         clock_text, r"void\s+checkClockResync\s*\(\s*\)\s*\{", "checkClockResync", CLOCK_SRC.name
     )
 
-    if "ab1805.setRtcFromSystem()" not in check_fn:
-        fail("checkClockResync() must call ab1805.setRtcFromSystem() (item 7)")
+    if "ExternalRtc::setFromSystem()" not in check_fn:
+        fail("checkClockResync() must call ExternalRtc::setFromSystem() (item 7)")
 
     # --- 2nd review fix: RTC write-back must be a pure function of ---
     # --- OBSERVED timeSyncedLast() state, not of request/pending    ---
@@ -273,7 +273,7 @@ def main() -> None:
 
     # Round 4 review, Finding 1: the tracked value must be updated ONLY
     # AFTER a CONFIRMED successful RTC write (rtcUpdated == true) - never
-    # unconditionally, and never before ab1805.setRtcFromSystem() is even
+    # unconditionally, and never before ExternalRtc::setFromSystem() is even
     # called. A failed write must leave the tracked value untouched so the
     # next check retries. This is the INVERSE of the ordering this test used
     # to require (the pre-Finding-1 defect updated the tracked value BEFORE
@@ -288,7 +288,7 @@ def main() -> None:
         check_fn_stripped,
     )
     gate_idx = write_back_gate_stripped.start() if write_back_gate_stripped else gate_idx
-    rtc_idx = check_fn_stripped.index("ab1805.setRtcFromSystem()")
+    rtc_idx = check_fn_stripped.index("ExternalRtc::setFromSystem()")
     tracked_update_idx = check_fn_stripped.index("lastRtcWriteSyncedLastMs = lastSyncMs")
     stamp_idx = check_fn_stripped.index("SystemConfig::set_lastTimeSync(Time.now())")
     if not (gate_idx < rtc_idx < tracked_update_idx < stamp_idx):
@@ -304,7 +304,7 @@ def main() -> None:
         )
 
     # Round 6 (second follow-up), Stage 7 pass 4 regression check: neither
-    # failure-tracking assignment may appear BEFORE ab1805.setRtcFromSystem()
+    # failure-tracking assignment may appear BEFORE ExternalRtc::setFromSystem()
     # is called (i.e. unconditionally, before the outcome is known) - that
     # is exactly the Stage-7-pass-4 defect (recording an attempt timestamp
     # regardless of success, which re-arms the retry floor on every write
@@ -314,14 +314,14 @@ def main() -> None:
     if failed_attempt_idx != -1 and failed_attempt_idx < rtc_idx:
         fail(
             "lastRtcWriteFailedAttemptMs = nowMs must not appear before "
-            "ab1805.setRtcFromSystem() is called - it must only be set in "
+            "ExternalRtc::setFromSystem() is called - it must only be set in "
             "the failed-write else branch, AFTER the outcome is known "
             "(Round 6 second follow-up regression check, Stage 7 pass 4)"
         )
     if failed_sync_idx != -1 and failed_sync_idx < rtc_idx:
         fail(
             "lastRtcWriteFailedSyncMs = lastSyncMs must not appear before "
-            "ab1805.setRtcFromSystem() is called - it must only be set in "
+            "ExternalRtc::setFromSystem() is called - it must only be set in "
             "the failed-write else branch, AFTER the outcome is known "
             "(Round 6 second follow-up regression check, Stage 7 pass 4)"
         )

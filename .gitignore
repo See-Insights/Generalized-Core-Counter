@@ -46,3 +46,6 @@ loc-by-file.preview.txt
 # Vendor datasheets stay local (public repo); our own datasheet notes go in docs/notes/
 /docs/datasheets/*.pdf
 /docs/datasheets/*.md
+
+__pycache__/
+*.pyc

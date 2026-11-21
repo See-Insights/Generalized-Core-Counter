@@ -20,7 +20,7 @@ using HibernateWakeDiagnostics::gateArmName;
 GateInputs passingInputs() {
   GateInputs in{};
   in.resetReasonIsPowerManagement = true;
-  in.wakeReasonIsAlarm = true;
+  in.wakeReasonIsHibernateWake = true;
   in.rtcReadOk = true;
   in.rtcBefore = 1000;
   in.requestedSleepSec = 3600;
@@ -42,7 +42,7 @@ GateArm classifyGateArmMirror(const GateInputs &in) {
   if (!in.resetReasonIsPowerManagement) {
     return GateArm::kResetReason;
   }
-  if (!in.wakeReasonIsAlarm) {
+  if (!in.wakeReasonIsHibernateWake) {
     return GateArm::kWakeReason;
   }
   if (!in.rtcReadOk) {
@@ -65,104 +65,46 @@ void testGatePassesClassifiesNone() {
   assert(classifyGateArmMirror(in) == GateArm::kNone);
 }
 
-// WO-2026-10-04-001 item C. The AB1805 library labels every wake
-// DEEP_POWER_DOWN while REG_SLEEP_CTRL_SLST is set and never clears it, so
-// after one deepPowerDown() a correct timer wake is mislabelled and the gate
-// reported `fail` with actual/err zeroed. v37 also accepts DEEP_POWER_DOWN,
-// but only inside a 0 to +60 s window around the requested wake time, so an
-// early wake (a button) or a late wake still fails.
-//
-// This is a manually-maintained MIRROR of the in.wakeReasonIsAlarm expression
-// in HibernateCycle.cpp, the same pattern classifyGateArmMirror() above uses,
-// and the .sh fidelity checks pin the real source text verbatim.
-enum class MirrorWakeReason { kAlarm, kDeepPowerDown, kWatchdog, kUnknown };
-
-bool wakeReasonIsAlarmMirror(MirrorWakeReason wakeReason, bool rtcReadOk, int64_t rtcBefore,
-                             uint32_t requestedSleepSec, int64_t rtcAtWake) {
-  const int64_t dpdExpectedWake = rtcBefore + (int64_t)requestedSleepSec;
-  const bool dpdOnTime = rtcReadOk && rtcAtWake >= dpdExpectedWake && rtcAtWake <= dpdExpectedWake + 60;
-  return (wakeReason == MirrorWakeReason::kAlarm) ||
-         (wakeReason == MirrorWakeReason::kDeepPowerDown && dpdOnTime);
-}
-
-// Build the GateInputs for a wake `skewSec` seconds away from the requested
-// wake time, with the wake reason label the AB1805 reported.
-GateInputs wakeInputs(MirrorWakeReason wakeReason, int64_t skewSec, bool rtcReadOk = true) {
+// v50 S2 (WO-2026-11-05-004): the AB1805 wake-reason read is gone. Device OS 6.6.0 programs the
+// chip alarm itself and reports RESET_REASON_POWER_MANAGEMENT (30) for any successful HIBERNATE wake
+// (RTC or GPIO; firmware cannot tell them apart), so
+// in.wakeReasonIsHibernateWake in HibernateCycle.cpp is exactly in.resetReasonIsPowerManagement - there
+// is no DEEP_POWER_DOWN window and no AB1805 label. The .sh fidelity checks pin that text.
+GateInputs wakeInputs(bool powerMgmt, int64_t skewSec, bool rtcReadOk = true) {
   GateInputs in{};
-  in.resetReasonIsPowerManagement = true;
+  in.resetReasonIsPowerManagement = powerMgmt;
   in.rtcReadOk = rtcReadOk;
   in.rtcBefore = 1000;
   in.requestedSleepSec = 3600;
   in.rtcAtWake = 1000 + 3600 + skewSec;
-  in.wakeReasonIsAlarm = wakeReasonIsAlarmMirror(wakeReason, in.rtcReadOk, in.rtcBefore,
-                                                 in.requestedSleepSec, in.rtcAtWake);
+  in.wakeReasonIsHibernateWake = in.resetReasonIsPowerManagement;
   return in;
 }
 
-void testDeepPowerDownOnTimeWakeReportsSuccessWithRealTiming() {
-  const GateInputs in = wakeInputs(MirrorWakeReason::kDeepPowerDown, /*skewSec=*/30);
-  assert(in.wakeReasonIsAlarm);
-  assert(classifyGateArmMirror(in) == GateArm::kNone);
-
-  const uint32_t actual = (uint32_t)(in.rtcAtWake - in.rtcBefore);
-  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30,
-                                          "DEEP_POWER_DOWN", /*hibernateCount=*/11,
-                                          /*actualSleepSecOnSuccess=*/actual,
-                                          /*sleepErrorSecOnSuccess=*/(int32_t)actual - (int32_t)in.requestedSleepSec);
-
-  char payload[256];
-  const int written = buildEventPayload(payload, sizeof(payload), f);
-  assert(written > 0 && (size_t)written < sizeof(payload));
-  assert(strstr(payload, "\"result\":\"ok\"") != nullptr);
-  assert(strstr(payload, "\"wakeReason\":\"DEEP_POWER_DOWN\"") != nullptr);
-  assert(strstr(payload, "\"actual\":3630") != nullptr);  // real timing, not zeroed
-  assert(strstr(payload, "\"err\":30") != nullptr);
-}
-
-void testDeepPowerDownWindowBoundaries() {
-  // Exactly on time and exactly at +60 s are inside the window.
-  assert(wakeInputs(MirrorWakeReason::kDeepPowerDown, 0).wakeReasonIsAlarm);
-  assert(wakeInputs(MirrorWakeReason::kDeepPowerDown, 60).wakeReasonIsAlarm);
-  assert(classifyGateArmMirror(wakeInputs(MirrorWakeReason::kDeepPowerDown, 0)) == GateArm::kNone);
-  assert(classifyGateArmMirror(wakeInputs(MirrorWakeReason::kDeepPowerDown, 60)) == GateArm::kNone);
-
-  // One second late is outside it.
-  const GateInputs late = wakeInputs(MirrorWakeReason::kDeepPowerDown, 61);
-  assert(!late.wakeReasonIsAlarm);
-  assert(classifyGateArmMirror(late) == GateArm::kWakeReason);
-
-  // A button press partway through the sleep is early, and still fails.
-  const GateInputs early = wakeInputs(MirrorWakeReason::kDeepPowerDown, -1800);
-  assert(!early.wakeReasonIsAlarm);
-  assert(classifyGateArmMirror(early) == GateArm::kWakeReason);
-  const GateInputs earlyByOne = wakeInputs(MirrorWakeReason::kDeepPowerDown, -1);
-  assert(!earlyByOne.wakeReasonIsAlarm);
-
-  // Without a trustworthy RTC read there is no window to test against.
-  const GateInputs noRtc = wakeInputs(MirrorWakeReason::kDeepPowerDown, 0, /*rtcReadOk=*/false);
-  assert(!noRtc.wakeReasonIsAlarm);
-  assert(classifyGateArmMirror(noRtc) == GateArm::kWakeReason);
-}
-
-void testOtherWakeReasonsStillFail() {
-  for (const MirrorWakeReason reason : {MirrorWakeReason::kWatchdog, MirrorWakeReason::kUnknown}) {
-    for (const int64_t skewSec : {(int64_t)0, (int64_t)30, (int64_t)-1800}) {
-      const GateInputs in = wakeInputs(reason, skewSec);
-      assert(!in.wakeReasonIsAlarm);
-      assert(classifyGateArmMirror(in) == GateArm::kWakeReason);
-    }
+// Reason 30 is a successful HIBERNATE wake whatever the elapsed time (including a 1,800 s early wake, e.g. a
+// button/GPIO wake); it is not proof of an alarm wake. The bench's actual-vs-requested sleep shows early wakes.
+void testReason30AloneAcceptsAnyTiming() {
+  for (const int64_t skewSec : {(int64_t)0, (int64_t)30, (int64_t)600, (int64_t)-1800}) {
+    const GateInputs in = wakeInputs(true, skewSec);
+    assert(in.wakeReasonIsHibernateWake);
+    assert(classifyGateArmMirror(in) == GateArm::kNone);
   }
-}
-
-void testAlarmHandlingIsUnchangedByTheDeepPowerDownWindow() {
-  // ALARM is accepted regardless of timing, exactly as before v37.
-  for (const int64_t skewSec : {(int64_t)0, (int64_t)600, (int64_t)-1800}) {
-    assert(wakeInputs(MirrorWakeReason::kAlarm, skewSec).wakeReasonIsAlarm);
-  }
-  // ... including with no RTC read, which then fails on the later kRtcRead arm.
-  const GateInputs noRtc = wakeInputs(MirrorWakeReason::kAlarm, 0, /*rtcReadOk=*/false);
-  assert(noRtc.wakeReasonIsAlarm);
+  const GateInputs noRtc = wakeInputs(true, 0, /*rtcReadOk=*/false);
   assert(classifyGateArmMirror(noRtc) == GateArm::kRtcRead);
+}
+
+// A button/GPIO wake from HIBERNATE also reports reason 30; 100 s into a 3600 s sleep it is indistinguishable in
+// firmware from an alarm wake (recorded residual, Amendment 4). The event's actual/err fields carry the evidence.
+void testGpioWakeIsAlsoReason30Success() {
+  const GateInputs in = wakeInputs(true, -3500);
+  assert(in.wakeReasonIsHibernateWake);
+  assert(classifyGateArmMirror(in) == GateArm::kNone);
+}
+
+void testOtherResetReasonsFailOnTheResetReasonArm() {
+  const GateInputs in = wakeInputs(false, 0);
+  assert(!in.wakeReasonIsHibernateWake);
+  assert(classifyGateArmMirror(in) == GateArm::kResetReason);
 }
 
 // buildEventFields() is the exact function production calls immediately
@@ -174,11 +116,12 @@ void testAlarmHandlingIsUnchangedByTheDeepPowerDownWindow() {
 // i.e. setup(), already computed).
 void testBuildEventFieldsOnSuccessReportsProvidedActualAndError() {
   const GateInputs in = passingInputs();
-  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "ALARM",
+  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "POWER_MGMT",
                                           /*hibernateCount=*/7,
                                           /*actualSleepSecOnSuccess=*/3605,
                                           /*sleepErrorSecOnSuccess=*/5);
   assert(f.arm == GateArm::kNone);
+  assert(strcmp(f.wakeReasonName, "POWER_MGMT") == 0); // reason 30 = successful HIBERNATE wake (Amendment 4)
   assert(f.actualSleepSec == 3605);
   assert(f.sleepErrorSec == 5);
   assert(f.hibernateCount == 7);
@@ -191,7 +134,7 @@ void testBuildEventFieldsOnSuccessReportsProvidedActualAndError() {
 void testBuildEventFieldsOnFailureZeroesActualAndErrorRegardlessOfInput() {
   GateInputs in = passingInputs();
   in.rtcReadOk = false; // fails the kRtcRead arm
-  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "ALARM",
+  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "POWER_MGMT",
                                           /*hibernateCount=*/7,
                                           /*actualSleepSecOnSuccess=*/9999,
                                           /*sleepErrorSecOnSuccess=*/9999);
@@ -213,7 +156,7 @@ void testBuildEventFieldsOnFailureZeroesActualAndErrorRegardlessOfInput() {
 void testBuildEventFieldsOnSuccessForwardsEveryForensicInputFaithfully() {
   GateInputs in{};
   in.resetReasonIsPowerManagement = true;
-  in.wakeReasonIsAlarm = true;
+  in.wakeReasonIsHibernateWake = true;
   in.rtcReadOk = true;
   in.rtcBefore = 87654321;         // distinctive int64_t
   in.requestedSleepSec = 424242;   // distinctive uint32_t
@@ -260,7 +203,7 @@ void testBuildEventFieldsOnSuccessForwardsEveryForensicInputFaithfully() {
 void testBuildEventFieldsOnFailureForwardsEveryForensicInputFaithfully() {
   GateInputs in{};
   in.resetReasonIsPowerManagement = true;
-  in.wakeReasonIsAlarm = true;
+  in.wakeReasonIsHibernateWake = true;
   in.rtcReadOk = false;             // fails the kRtcRead arm
   in.rtcBefore = 55555555;         // distinctive int64_t
   in.requestedSleepSec = 808080;   // distinctive uint32_t
@@ -299,7 +242,7 @@ void testBuildEventFieldsOnFailureForwardsEveryForensicInputFaithfully() {
 
 void testGatePassesPayloadReportsSuccess() {
   const GateInputs in = passingInputs();
-  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "ALARM",
+  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "POWER_MGMT",
                                           /*hibernateCount=*/7,
                                           /*actualSleepSecOnSuccess=*/3605,
                                           /*sleepErrorSecOnSuccess=*/5);
@@ -325,7 +268,7 @@ void testEachGateArmFailureIsIdentified() {
   }
   {
     GateInputs in = passingInputs();
-    in.wakeReasonIsAlarm = false;
+    in.wakeReasonIsHibernateWake = false;
     assert(classifyGateArmMirror(in) == GateArm::kWakeReason);
     assert(strcmp(gateArmName(classifyGateArmMirror(in)), "wake_reason") == 0);
   }
@@ -362,7 +305,7 @@ void testEachGateArmFailureIsIdentified() {
 void testFirstFailingArmInEvaluationOrderWins() {
   GateInputs in = passingInputs();
   in.resetReasonIsPowerManagement = false;
-  in.wakeReasonIsAlarm = false;
+  in.wakeReasonIsHibernateWake = false;
   in.rtcReadOk = false;
   assert(classifyGateArmMirror(in) == GateArm::kResetReason);
 }
@@ -390,13 +333,13 @@ void testFirstFailingArmInEvaluationOrderWins() {
 void testAdjacentArmOrdering_ResetReasonBeforeWakeReason() {
   GateInputs in = passingInputs();
   in.resetReasonIsPowerManagement = false; // fails check 1
-  in.wakeReasonIsAlarm = false;             // fails check 2
+  in.wakeReasonIsHibernateWake = false;             // fails check 2
   assert(classifyGateArmMirror(in) == GateArm::kResetReason);
 }
 
 void testAdjacentArmOrdering_WakeReasonBeforeRtcRead() {
   GateInputs in = passingInputs();
-  in.wakeReasonIsAlarm = false; // fails check 2
+  in.wakeReasonIsHibernateWake = false; // fails check 2
   in.rtcReadOk = false;         // fails check 3
   assert(classifyGateArmMirror(in) == GateArm::kWakeReason);
 }
@@ -429,7 +372,7 @@ void testFailurePayloadIdentifiesArmAndOmitsFabricatedTiming() {
   // Same "both outcomes" contract as testBuildEventFieldsOnFailureZeroesActualAndErrorRegardlessOfInput():
   // pass deliberately non-zero success-path values to prove buildEventFields()
   // - not the caller - is what zeroes them on a failed gate.
-  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "ALARM",
+  const EventFields f = buildEventFields(classifyGateArmMirror(in), in, /*osResetReason=*/30, "POWER_MGMT",
                                           /*hibernateCount=*/2,
                                           /*actualSleepSecOnSuccess=*/1234,
                                           /*sleepErrorSecOnSuccess=*/1234);
@@ -457,7 +400,7 @@ void testWorstCasePayloadFitsBudget() {
   EventFields f{};
   f.arm = GateArm::kRtcBeforeZero;    // "rtc_before_zero" - longest gateArm name
   f.osResetReason = std::numeric_limits<int32_t>::min(); // widest plausible int (-2147483648)
-  f.wakeReasonName = "DEEP_POWER_DOWN"; // longest AB1805 wake-reason name (16 chars)
+  f.wakeReasonName = "DEEP_POWER_DOWN"; // longest wake-reason name (16 chars)
   f.rtcReadOk = false;
   f.requestedSleepSec = std::numeric_limits<uint32_t>::max();
   f.rtcBefore = std::numeric_limits<int64_t>::min();
@@ -479,10 +422,9 @@ void testWorstCasePayloadFitsBudget() {
 
 int main() {
   testGatePassesClassifiesNone();
-  testDeepPowerDownOnTimeWakeReportsSuccessWithRealTiming();
-  testDeepPowerDownWindowBoundaries();
-  testOtherWakeReasonsStillFail();
-  testAlarmHandlingIsUnchangedByTheDeepPowerDownWindow();
+  testReason30AloneAcceptsAnyTiming();
+  testGpioWakeIsAlsoReason30Success();
+  testOtherResetReasonsFailOnTheResetReasonArm();
   testBuildEventFieldsOnSuccessReportsProvidedActualAndError();
   testBuildEventFieldsOnFailureZeroesActualAndErrorRegardlessOfInput();
   testBuildEventFieldsOnSuccessForwardsEveryForensicInputFaithfully();

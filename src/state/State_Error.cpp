@@ -6,13 +6,14 @@
 #include "persist/RecoveryState.h"
 #include "persist/SystemConfig.h"
 #include "power/PowerManager.h"
+#include "power/ConnectivityFailsafe.h"
 #include "PublishQueuePosixRK.h"
 #include "sensors/SensorManager.h"
 #include "device_pinout.h"
 #include "sensors/SensorDefinitions.h"
-#include "AB1805_RK.h"
 #include "power/Connectivity.h"
 #include "time/Clock.h"
+#include "time/HibernateWakeDiagnostics.h"
 
 // NOTE:
 // This file was split from StateHandlers.cpp as a mechanical refactor.
@@ -174,8 +175,11 @@ void handleErrorState() {
     // avoid thrashing.
     if (millis() - resetTimer > resetWait) {
       Log.info("Executing deep power down from ERROR_STATE (alert=%d)", RecoveryState::get_alertCode());
+      RecoveryState::set_powerOffRequested(HibernateWakeDiagnostics::kPowerOffSentinel); // persisted evidence: a reason-20 boot after this is a power-up, not a watchdog
       flushAllBeforeReset();
-      ab1805.deepPowerDown();
+      powerOffForRecovery();
+      RecoveryState::set_powerOffRequested(0); SystemConfig::flushNow(); // not expected to return: drop the evidence
+      System.reset(RESET_CAUSE_ERROR_STATE_SOFT);
     }
     break;
 

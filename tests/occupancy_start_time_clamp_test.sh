@@ -61,20 +61,20 @@ if echo "$validate_body" | grep -q "set_occupancyStartTime(now)"; then
 fi
 
 # The relocated function must actually be called once from global setup(),
-# and that call site must come after ab1805.withFOUT(WKP).setup() seeds
+# and that call site must come after ExternalRtc::ensureBound() seeds
 # Time - otherwise this is the same structurally-unreachable bug moved
 # to a new location.
 check_file "$app_src" "revalidateOccupancyStartTimeIfTimeAvailable() called from setup()" \
   "CurrentReadings::revalidateOccupancyStartTimeIfTimeAvailable();"
 
-ab1805_line=$(grep -n "ab1805.withFOUT(WKP).setup();" "$app_src" | head -1 | cut -d: -f1)
+ab1805_line=$(grep -n "ExternalRtc::ensureBound(" "$app_src" | head -1 | cut -d: -f1)
 call_line=$(grep -n "CurrentReadings::revalidateOccupancyStartTimeIfTimeAvailable();" "$app_src" | head -1 | cut -d: -f1)
 if [[ -z "$ab1805_line" || -z "$call_line" ]]; then
-  echo "FIDELITY CHECK FAILED: could not locate both ab1805.setup() and the revalidate call site in $app_src" >&2
+  echo "FIDELITY CHECK FAILED: could not locate both the RTC bind and the revalidate call site in $app_src" >&2
   exit 1
 fi
 if (( call_line <= ab1805_line )); then
-  echo "FIDELITY CHECK FAILED: revalidateOccupancyStartTimeIfTimeAvailable() is called at line $call_line, before ab1805.withFOUT(WKP).setup() at line $ab1805_line seeds Time - it would still be structurally unreachable" >&2
+  echo "FIDELITY CHECK FAILED: revalidateOccupancyStartTimeIfTimeAvailable() is called at line $call_line, before ExternalRtc::ensureBound() at line $ab1805_line seeds Time - it would still be structurally unreachable" >&2
   exit 1
 fi
 

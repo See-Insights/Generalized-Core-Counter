@@ -1,36 +1,6 @@
 #include "time/ClockDiagnostics.h"
 #include "state/State_Common.h"
 #include "LocalTimeRK.h"
-namespace {
-
-// Not Boron-specific: the AB1805 RTC/watchdog chip is used on every supported
-// platform (ab1805.setup()/setWDT() run unconditionally below), so this name
-// lookup must be available generally, not just under the Boron-only hibernate
-// wake-reason path. Named "...Local" because this definition sits inside
-// this file's anonymous namespace (internal linkage) - HibernateCycle.cpp
-// needs it too (WO-2026-09-16 Step 2), so a thin external-linkage wrapper
-// is defined below the namespace, the same pattern already used here for
-// failsafeDeferReasonName()/failsafeDeferReasonNameLocal().
-const char *ab1805WakeReasonNameLocal(AB1805::WakeReason reason) {
-  switch (reason) {
-  case AB1805::WakeReason::WATCHDOG:
-    return "WATCHDOG";
-  case AB1805::WakeReason::DEEP_POWER_DOWN:
-    return "DEEP_POWER_DOWN";
-  case AB1805::WakeReason::COUNTDOWN_TIMER:
-    return "COUNTDOWN_TIMER";
-  case AB1805::WakeReason::ALARM:
-    return "ALARM";
-  case AB1805::WakeReason::UNKNOWN:
-  default:
-    return "UNKNOWN";
-  }
-}
-} // namespace
-
-const char *ab1805WakeReasonName(AB1805::WakeReason reason) {
-  return ab1805WakeReasonNameLocal(reason);
-}
 
 void logTimeDiag(bool isOpen) {
   const char *tz = SystemConfig::get_timeZoneStrCStr();

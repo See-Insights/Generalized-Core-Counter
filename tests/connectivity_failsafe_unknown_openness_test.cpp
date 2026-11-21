@@ -59,7 +59,11 @@ uint8_t stage = 0;
 time_t lastAction = 0;
 inline uint8_t get_connectivityRecoveryStage() { return stage; }
 inline time_t get_lastConnectivityRecoveryAction() { return lastAction; }
+inline void set_connectivityRecoveryStage(uint8_t) {}
+inline void set_powerOffRequested(uint8_t) {}
 } // namespace RecoveryState
+
+namespace HibernateWakeDiagnostics { constexpr uint8_t kPowerOffSentinel = 0xA5; }
 
 namespace SystemConfig {
 enum { CONNECTED, DISCONNECTED };
@@ -92,9 +96,8 @@ struct SystemFake {
   void reset(int) { flushedAfterRecordBeforeAction = flushed; lastActionTaken = RESET; ++actionCount; persistedStageAtAction = persistedStage; throw ActionStop{}; }
 } System;
 
-struct Ab1805Fake {
-  void deepPowerDown() { flushedAfterRecordBeforeAction = flushed; lastActionTaken = DEEP_POWER_DOWN; ++actionCount; persistedStageAtAction = persistedStage; throw ActionStop{}; }
-} ab1805;
+// The shared timed power-off helper: it cuts power and never returns on success.
+void powerOffForRecovery() { flushedAfterRecordBeforeAction = flushed; lastActionTaken = DEEP_POWER_DOWN; ++actionCount; persistedStageAtAction = persistedStage; throw ActionStop{}; }
 
 struct TimeFake {
   time_t current = 0;

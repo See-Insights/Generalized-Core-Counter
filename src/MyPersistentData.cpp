@@ -789,7 +789,7 @@ static int getAlertSeverity(int8_t code) {
         // that merely happened to already be active when the watchdog fired.
         // It needs its own tier, strictly greater than 3, so raiseAlert(19)
         // always supersedes whatever is currently active from that set.
-        case 19: // watchdog reset (Device-OS-detected or AB1805-confirmed PIN_RESET)
+        case 19: // watchdog reset (Device-OS-detected or inferred PIN_RESET)
             return 4; // watchdog / lost-execution - most urgent
 
         case 23: // PMIC battery fault (general)
@@ -1064,6 +1064,9 @@ void set_lastWatchdogResetReasonData(uint32_t value) { sysStatus.set_lastWatchdo
 
 uint8_t get_lastWatchdogSource() { return sysStatus.get_lastWatchdogSource(); }
 void set_lastWatchdogSource(uint8_t value) { sysStatus.set_lastWatchdogSource(value); }
+
+uint8_t get_powerOffRequested() { return sysStatus.getValue<uint8_t>(offsetof(sysStatusData::SysData, reservedUint8_0)); }
+void set_powerOffRequested(uint8_t value) { sysStatus.setValue<uint8_t>(offsetof(sysStatusData::SysData, reservedUint8_0), value); }
 
 // Decision A: alert state is forensics, so it is exposed here - but it is
 // still physically CurrentData, so these forward to `current`, not `sysStatus`.

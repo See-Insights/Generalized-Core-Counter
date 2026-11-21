@@ -35,15 +35,16 @@ SRC = REPO_ROOT / "src"
 RESET_CAUSE_HEADER = SRC / "ResetCause.h"
 MAIN = SRC / "Generalized-Core-Counter.cpp"
 
-EXPECTED_SITE_COUNT = 8
+EXPECTED_SITE_COUNT = 9  # 7 primary sites + the two S3 fallback resets that follow a returned POWER_OFF
 
 # WO-2026-10-02-003 item B: the out-of-memory reset must carry its own code.
 OOM_CAUSE_NAME = "RESET_CAUSE_OUT_OF_MEMORY"
 OOM_CAUSE_VALUE = 7
 
-# WO-2026-11-04-002: the Device OS RTC binding delete resets with its own code.
+S3_FALLBACK_CAUSES = {"RESET_CAUSE_CONNECTIVITY_FAILSAFE", "RESET_CAUSE_ERROR_STATE_SOFT"}
+
+# v50 S1: the binding-delete guard (cause 8) is retired; the code stays reserved.
 BINDING_DELETE_CAUSE_NAME = "RESET_CAUSE_EXRTC_BINDING_DELETE"
-BINDING_DELETE_CAUSE_VALUE = 8
 
 
 def fail(msg: str) -> None:
@@ -116,6 +117,8 @@ def main() -> None:
     for where, argument in sites:
         if argument not in declared:
             fail(f"{where} passes '{argument}', which is not a ResetCause enum value")
+        if argument in used and used[argument].split(":")[0] == where.split(":")[0] and argument in S3_FALLBACK_CAUSES:
+            continue  # S3: a returned POWER_OFF falls back to the same caller's own reset cause
         if argument in used:
             fail(
                 f"{where} reuses the cause code '{argument}' already used by {used[argument]}; "
@@ -135,14 +138,9 @@ def main() -> None:
             "handler's reset must name itself (WO-2026-10-02-003 item B)"
         )
 
-    # --- The binding-delete site carries code 8, and the code is documented ---
-    if declared.get(BINDING_DELETE_CAUSE_NAME) != BINDING_DELETE_CAUSE_VALUE:
-        fail(
-            f"ResetCause.h must declare {BINDING_DELETE_CAUSE_NAME} = {BINDING_DELETE_CAUSE_VALUE} "
-            f"(found {declared.get(BINDING_DELETE_CAUSE_NAME)!r})"
-        )
-    if BINDING_DELETE_CAUSE_NAME not in used:
-        fail(f"no System.reset() site passes {BINDING_DELETE_CAUSE_NAME} (WO-2026-11-04-002)")
+    # --- Code 8 is retired and must not be declared or used -------------------
+    if BINDING_DELETE_CAUSE_NAME in declared or BINDING_DELETE_CAUSE_NAME in used:
+        fail(f"{BINDING_DELETE_CAUSE_NAME} was retired in v50 S1 and must not be declared or used")
     for name in declared:
         if not re.search(rf"{name}\s*=\s*\d+,\s*///<\s*\S", RESET_CAUSE_HEADER.read_text()):
             fail(f"{name} has no trailing `///<` description in ResetCause.h")

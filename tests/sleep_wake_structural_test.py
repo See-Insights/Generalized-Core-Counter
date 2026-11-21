@@ -176,6 +176,7 @@ if base_sleep is None:
 
 # No new src/ file; SleepTeardown.* unchanged.
 ls = subprocess.run(["git", "-C", str(ROOT), "ls-tree", "-r", "--name-only", base, "src"], capture_output=True, text=True).stdout.split()
+ls.extend(["src/time/ExternalRtc.h", "src/time/PreBindRtc.h"])  # S1b adds PreBindRtc.h  # v50 S1 helper header (WO-2026-11-05-003)
 if SRC == ROOT / "src":
     cur_files = sorted(str(p.relative_to(ROOT)) for p in SRC.rglob("*") if p.is_file())
     if sorted(ls) != cur_files:
@@ -195,7 +196,10 @@ if cur_retained != base_retained:
 
 # The S-2 functions, logWakeSummary() and the includes are unchanged; State_Modes.cpp is unchanged above the new
 # owner apart from its three added includes.
-tail_of = lambda t: t[t.index("struct WakeContext {"):t.index("} // namespace\n", t.index("struct WakeContext {"))]
+import s2_hibernate_normalise  # v50 S2 (WO-2026-11-05-004): hibernateAttempt() is compared to the base with only the approved S2 substitutions normalised
+
+
+tail_of = lambda t, is_base=False: s2_hibernate_normalise.normalise(t[t.index("struct WakeContext {"):t.index("} // namespace\n", t.index("struct WakeContext {"))], is_base)
 prefix_of = lambda t: t[:t.index("namespace {")]
 log_of = lambda t: t[t.index("void logWakeSummary("):t.index("\n}\n", t.index("void logWakeSummary(")) + 3]
 # WO-2026-10-25-001: the one intended change, the led= value is already in seconds; mapped back for the compare.
@@ -203,9 +207,9 @@ LED_NEW = "(unsigned long)signalLEDTimeRemaining());"
 LED_BASE = "(unsigned long)(signalLEDTimeRemaining() / 1000UL));"
 if log_of(sleep).count(LED_NEW) != 1:
     fail("logWakeSummary() must print signalLEDTimeRemaining() (seconds) without a further division")
-if tail_of(sleep) != tail_of(base_sleep):
+if tail_of(sleep) != tail_of(base_sleep, True):
     fail("the S-2 functions (struct WakeContext .. end of the anonymous namespace) differ from the base")
-if prefix_of(sleep) != prefix_of(base_sleep):
+if prefix_of(sleep) != prefix_of(base_sleep).replace('#include "AB1805_RK.h"\n', ""):
     fail("the State_Sleep.cpp includes differ from the base")
 if log_of(sleep).replace(LED_NEW, LED_BASE) != log_of(base_sleep):
     fail("logWakeSummary() differs from the base")

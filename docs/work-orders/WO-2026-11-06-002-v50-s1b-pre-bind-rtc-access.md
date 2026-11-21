@@ -1,0 +1,85 @@
+# WO-2026-11-06-002: v50 piece S1b — pre-bind access to the AB1805: seed the clock, set WRTC
+
+**Author:** Claude Code, 6 Nov 2026, DRAFT for Chip's review; not dispatched · **Status:** **APPROVED by Chip, 6 Nov 2026** (rulings after Codex's Stage 7 round 1 on S1); dispatch after S1's Stage 7 round 2
+**Parent:** `WO-2026-11-05-002-v50-ab1805-switch.md` · **Origin:** `WO-2026-11-05-003-stage7-r1-verdict.md` findings 1 and 2; S1 Amendment 4 · **Position:** on `integration/v50-ab1805` **between S1 and S2** (S1 → S1b → S2 → S3, S4)
+**Branch (when dispatched):** `wo/…-v50-s1b-…`, from `integration/v50-ab1805` after S1 has passed Stage 7 round 2 and its PR has been merged to the integration branch; S1b's PR goes to the integration branch, **never to `main` alone**; the set merges to `main` only under the 6 Nov merge gate.
+**Workflow:** `AI_DEVELOPMENT_WORKFLOW.md` §3 Stages 5-8; §4 (SHA rule; the 90-minute Stage 7 time-box once #194 merges); §5 (boot-time hardware and time: Codex xhigh); §12; §13 (c), (j) · **Agents:** Stage 6 Copilot standard/medium (re-run at the dispatched level if a run comes back lower on anything larger than a few lines); Stage 7 Codex `gpt-5.6-sol` **xhigh**, at most two rounds · **Budget:** `src/` at most **+15 net** (removals count); stop and report rather than trim style.
+**Dispatch gate:** S1 reviewed and merged to the integration branch (it needs S1's bind call to sit just after this code).
+
+## Plain goal
+Two defects found in Device OS 6.6.0's built-in AM18x5 driver by S1's Stage 6 and Stage 7 round 1 make the switch unsafe on the real fleet:
+1. **Writes can silently no-op (WRTC).** The chip only accepts writes to its time registers while the control-register write-enable bit **WRTC** is 1. Device OS's `Am18x5::setTime()` never sets it and `writeContinuousRegisters()` ignores every I2C result (`am18x5.cpp:770-788`, `:1350-1359`), so a chip whose WRTC is 0 returns success and keeps its old time. **Every chip the vendored library has touched has WRTC = 0:** the library sets WRTC, writes, then clears it (`lib/AB1805_RK/src/AB1805_RK.cpp:256-295`; `isRTCSet()` is literally "WRTC is clear", `AB1805_RK.h:97`). S1's read-back (Amendment 3) detects the failure; it cannot make the write work.
+2. **The first unbound boot throws the chip time away.** On the first v50 boot after v49 (no stored binding), Device OS's bind copies the internal clock (year 2000, nothing has seeded it) into the chip and never reads the valid chip time into the internal clock (`exrtc_hal.cpp:236-249`). Once WRTC works that overwrite takes effect.
+
+S1b fixes both from the application side, in the one window where the application is the only owner of the chip: **before `Am18x5.enable()`, on a boot where the chip is not bound, one raw I2C access to address 0x69.** (A Device OS issue is drafted for Chip to file; if Device OS fixes it later this piece becomes unnecessary but is harmless.)
+
+## Rulings that bind this piece (Chip, 6 Nov; not reopened)
+1. **Where and when:** on a boot where the chip is **not bound**, strictly **before** `Am18x5.enable()` (S1's `ExternalRtc::ensureBound`, `Generalized-Core-Counter.cpp:~296`); never on a bound boot (Device OS owns the chip then). Single owner: nothing else touches the chip at that moment (`ab1805` is not started: S1 removed `.setup()`).
+2. **(a) Seed:** read the chip's time; **if it is plausible and system `Time` is not valid, seed `Time` from it.**
+3. **(b) WRTC:** **set WRTC = 1** (the chip's power-on default; Device OS never clears it).
+4. **Then S1's `enable()`.** S1's read-back stays as the detector.
+5. **First unbound boot:** with (a), the internal clock is valid before the bind, so the bind's copy writes the same time back (within rounding) and the first v50 boot keeps valid time. (This reverses S1 Amendment 3 ruling 2.)
+
+## The change (lines at the integration head after S1; **re-cite at Step 0**)
+1. A small pure, host-testable decoder (BCD registers 0x00-0x07 → `time_t`, honouring the chip's 12/24-hour bit; year 2000-2099) and a read-modify-write of CONTROL1 (set WRTC, clear the 12/24 bit, keep every other bit: **Amendment 1 supersedes "bit 0 only"**). A new header is allowed if the budget holds (S1 added `time/ExternalRtc.h` the same way).
+2. In `setup()`, immediately before S1's `ensureBound`: `if (!Am18x5.status().bound()) { PreBindRtc::run(...); }` with failures **logged and the boot continued** (never a reset; the bind and the internal-clock fallback still happen).
+3. Plausibility is `Clock::isPlausibleEpoch` (`Clock.cpp:551-555`) or the equivalent already in the tree; no new rule.
+4. **Comments S1 wrote that this piece makes false** are corrected in the same change (comment-only, counted in the budget): S1 documented that the first unbound boot "can miss" the seed (`src/BuildProfile.h`, `src/MyPersistentData.h`, `src/persist/CurrentReadings.h`, `src/Generalized-Core-Counter.cpp` near the bind, `src/time/ClockTrust.h`); with S1b the first unbound boot is seeded before the bind.
+5. Nothing else: no change to the write-back, the payload, the failsafe, `retained` or persisted layouts.
+
+Register facts (Device OS 6.6.0 headers; Step 0 re-verifies): `HUNDREDTHS` at 0x00 (`am18x5.h:39`), `CONTROL1` at 0x10 (`am18x5.h:57`), `CONTROL1_WRTC_MASK` 0x01 (`am18x5_defines.h:67`; the only use of WRTC in the driver), `CONTROL1_1224_MASK` 0x40; the vendored library's `REG_CTRL_1_DEFAULT` is 0x13 (WRTC set), `AB1805_RK.h:795`.
+
+## Step 0 (read-only, inside Stage 6, before editing; stop and report if any answer breaks the plan)
+1. **The I2C window.** Who owns `Wire` at that point in `setup()` (the fuel gauge and PMIC share the bus); whether `Wire.begin()` has run and `WITH_LOCK(Wire)` is needed; whether Device OS's own `enableInterfaceIfNeeded()` (`am18x5.cpp:~1352`) conflicts with an application `Wire` session that ends before `enable()`.
+2. **Decode details:** the time-register layout and the BCD/hour-mode rules (`am18x5.cpp:770-788` is the write side; read the `getTime` side `:791-814`); behaviour on an invalid BCD digit or a chip reading year 00 (not plausible: do not seed).
+3. **Seeding:** `Time.setTime()` versus the HAL clock Device OS seeds; whether setting `Time` before `enable()` is seen by `bindIfNeededAndResync` (it must be, so the bind writes the right time back); no cloud-sync or event side effect of an early `Time.setTime()`.
+4. **WRTC set when already 1** is a no-op; confirm the read-modify-write does not disturb the other CONTROL1 bits (STOP, 12/24, OUT, RSO, PWR2).
+5. **Rollback (ruled by Chip, 6 Nov): accepted, no code change.** After v50 has set WRTC = 1, the vendored library's `isRTCSet()` (WRTC clear = set) reads the chip as unset, so a rollback to v49 waits for the cloud for its time. This is the same bounded exposure as any untrusted boot, and **v49's first sync re-writes the time and clears WRTC.** Step 0 still reads v49's `ab1805.setup()` and the clock code to confirm there is no reset loop and no bad seed (a check, not a reopening), and the answer goes into the rollback bench as the expected result.
+6. **Count** the net `src/` lines per file; if over +15, stop and report the cut.
+
+## Tests (host; the real functions)
+- Decoder table: valid 24 h and 12 h (AM/PM) times, year rollover, leap day, an invalid BCD digit, year 00, all-zero and all-FF registers → not plausible.
+- Seed: plausible chip time and `Time` invalid → seeded; `Time` already valid → not seeded; implausible chip time → not seeded.
+- WRTC: CONTROL1 `0x12` → writes `0x13`; `0x13` → same value; result = `(v | 0x01) & ~0x40` with every other bit preserved (property over all 256 values; **Amendment 1**).
+- Control flow: not run when the chip is bound; runs once, **before** `enable()` (structural, in order); an I2C failure logs and the boot continues to `enable()` with no reset.
+- Mutations (each must fail): WRTC write clears other bits; seed even when `Time` is valid; run on a bound boot; run after `enable()`; skip the plausibility check; wrong I2C address; reset on I2C failure; the 12/24 bit ignored.
+
+## Bench (Chip; part of the integrated head's bench, not alone)
+On **Dev-14 (old-library history: WRTC = 0)** with the spike binary's `settime <epoch> hal`:
+1. **Without S1b** (S1 only): `settime … hal` fails (the read-back catches the no-op) or the chip keeps its old time; record it.
+2. **With S1b:** the same `settime … hal` succeeds and reads back within 2 s.
+3. **First v50 boot after v49** (no stored binding): the chip keeps valid time through the bind (read it before the cloud sync: not year 2000), and `Time` is valid at the first log lines.
+4. **Rollback v50 → v49 (expected result, ruled by Chip):** on the first v49 boot after v50 has set WRTC = 1 the vendored `isRTCSet()` reads the chip as **unset**; v49 has no valid time until the cloud sync (untrusted, like any untrusted boot); **v49's first sync re-writes the chip's time and clears WRTC** (confirm WRTC reads 0 afterwards and a second v49 boot reads the chip as set). No reset loop; no bad seed. A different result is a finding.
+
+## Protected / not in scope
+Device OS source; S1 (the read-back, the bind), S2 (alarm, watchdog, wake classification, `ab1805.loop()`), S3, S4, L, I21; the clock-trust rule; the persisted and `retained` layouts.
+
+## Amendment 1 (Chip, 6 Nov 2026, after Codex's Stage 7 round 2 on S1; supersedes "set bit 0 only")
+Origin: Codex round 2, High design gap. Device OS's `setTime()` always writes the hour as 24-hour BCD (`am18x5.cpp:782`) and the bind changes only ARST (`:616`), so a chip left in 12-hour mode would be decoded correctly but then be written a 24-hour hour and corrupt the first-boot time. Ruling:
+1. **Decode the chip's time in its ORIGINAL 12/24 mode** (as item 1 already says).
+2. **Then read-modify-write CONTROL1: set WRTC and clear the 12/24 bit (`CONTROL1_1224_MASK`, 24-hour mode); preserve every other bit** (STOP, OUT, RSO, PWR2, ...). This replaces "set bit 0 only, keep the other bits" in "The change" item 1 and in Step 0 item 4.
+3. **Wire ownership:** hold `WITH_LOCK(Wire)` across the raw time read AND the CONTROL1 read-modify-write (one critical section), and call `Wire.begin()` first if `Wire` is not enabled. Step 0 item 1 records how `setup()` order guarantees this; a Wire left enabled must not conflict with Device OS's `enableInterfaceIfNeeded()`.
+4. **Tests:** the WRTC property over all 256 CONTROL1 values becomes: result = `(v | 0x01) & ~0x40`, every other bit unchanged (so `0x12` -> `0x13`, `0x52` -> `0x13`, `0x53` -> `0x13`). Add: chip in 12-hour PM mode decodes correctly, and after S1b the chip reads back in 24-hour mode with the same wall time. The existing mutation "12/24 bit ignored" stays; add "12/24 bit not cleared" and "Wire lock not held across the read-modify-write" (structural).
+5. **Budget unchanged: `src/` at most +15 net.** Stop and report if the amendment does not fit.
+
+## Amendment 2 (Chip, 7 Nov 2026, after the Stage 6 budget stop; supersedes Amendment 1's decoder, keeps its CONTROL1 and Wire-lock rules)
+Goal restated: let Device OS write the time, and do not let the bind overwrite good time with year 2000. Origin: Copilot's Stage 6 stop (draft 38 lines + ~4 against +15).
+1. **Use the vendored `AB1805_RK` calls (still linked until L). No custom decoder and no 12/24 decode** (every S1b chip is 24-hour). Pre-bind, on an unbound boot, strictly before `Am18x5.enable()`: read the chip time with the library's own read function (`getRtcAsTm`, `AB1805_RK.h:186`, or the equivalent Step 0 names); **if it is plausible (`Clock::isPlausibleEpoch`) and `Time` is not valid, `Time.setTime()`**.
+2. **Then CONTROL1 `(v | 0x01) & ~0x40`** through the library's register read/write (`readRegister`/`writeRegister`, `AB1805_RK.h:468/522`), **holding the Wire lock** across the read and the read-modify-write. Clearing the 12/24 bit stays as free insurance.
+3. **Step 0 (with file:line):** confirm these calls work without `ab1805.setup()` having run (`Wire` begun? does the read function or any wrapper gate on `isRTCSet()` or setup state? is the library's own lock the right one to hold?). If they do not, stop and report.
+4. **Skipping `hal_i2c_reset()`** (Device OS's `begin()` runs it only when Wire is not yet enabled, `am18x5.cpp:497`) is **accepted**; the bench notes it as an expected difference on the first unbound boot.
+5. **L's WO (v50.2): when the library is deleted, replace these two calls with a minimal raw I2C version so S1b survives L; L stays net-negative.**
+6. **Comment sites to correct** (the "can miss the seed" text; the earlier list was wrong): `src/MyPersistentData.h:631`, `src/persist/CurrentReadings.h:47`, `src/Generalized-Core-Counter.cpp:655`. `BuildProfile.h` and `ClockTrust.h` need no change.
+7. **Budget stays `src/` <= +15 net.** The tests that Amendment 1 item 4 specified for the decoder become tests of the seed rule (plausible and `Time` invalid seeds; `Time` valid does not; implausible does not), the CONTROL1 property `(v | 0x01) & ~0x40` over all 256 values, and the structural order/lock tests; the decoder cases are dropped. Re-dispatch at **medium; the report must state the reasoning level it actually ran, or say it could not be observed**.
+
+## Amendment 3 (Chip, 7 Nov 2026, after Stage 7 round 1 NOT VERIFIED on 89260c9; round-1 High; budget raised to +17)
+Origin: `WO-2026-11-06-002-stage7-r1-verdict.md` finding 1 (High). The vendored time read returns false when WRTC is already 1 (`AB1805_RK.cpp:317-320`), so after S1b sets WRTC=1 a failed bind followed by another unbound boot cannot reseed, and a later successful bind copies year 2000 over a good chip time (`exrtc_hal.cpp:236-248`).
+1. **Operation order, under the existing Wire lock, supersedes Amendment 2 item 2's order:** read CONTROL1 -> **if WRTC is set, clear only WRTC** -> the vendored time read -> **always** write `(c1 | 0x01) & ~0x40` (the saved value, normalised) -> **propagate every transaction result** (any failed register read/write is a failure).
+2. **Medium fix:** if the time read failed, `run()` still completes the mandatory CONTROL1 write, then returns false so the caller logs it.
+3. **Low fix (line-neutral comments):** `Generalized-Core-Counter.cpp:657` (the S1 line saying `ensureBound()` covers the first boot; the earlier list's 655 had shifted) and `:667`, `MyPersistentData.h:631`, `persist/CurrentReadings.h:47` say seeding happens only on a successful plausible pre-bind read (and a valid WRTC=1 chip is now covered by item 1).
+4. **Tests:** add "WRTC=1 with a valid chip time" (WRTC cleared for the read, time read, seeded, CONTROL1 ends normalised) and a retry case (second unbound boot after a failed bind still seeds); time-read-failure returns false after the CONTROL1 write; a failed CONTROL1 read, clear, or final write returns false; mutations: WRTC not cleared before the read, final write skipped on read failure, saved value not restored/normalised, a transaction result ignored.
+5. **Budget: `src/` at most +17 net** (raised from +15; reason: the round-1 High). Stop and report rather than trim.
+6. Copilot at medium; the report states the level actually run, or that it could not be observed. Round 2 of Stage 7 is the last: Codex xhigh, 90-minute box, SHA rule; a failure goes to the architect.
+
+## Rollback
+Revert the S1b commit on the integration branch before the set merges. After the set ships, rollback is to v49.1 (the guard deletes any stored binding); Step 0 item 5 and bench item 4 cover the WRTC state it leaves.

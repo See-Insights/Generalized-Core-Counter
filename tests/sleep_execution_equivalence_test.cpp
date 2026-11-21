@@ -3,8 +3,8 @@
 // by marker text from the base State_Sleep.cpp (wrapped below as base::), (b) is the current
 // effectiveStandby / hibernateAttempt / sleepAndResume and the handler's call-site lines,
 // extracted by marker text from the current file (cur::). Both run one scenario table against
-// the same fakes (tests/stubs/sleep_teardown/SleepExecutionFakes.h); mode "a" writes the frozen
-// fixture, mode "b" must equal it. Build with -DWiring_Cellular=1 -DHAL_PLATFORM_CELLULAR=1
+// the same fakes (tests/stubs/sleep_teardown/SleepExecutionFakes.h); mode "a" (the base) writes the frozen
+// fixture once its transcript has the approved v50 S2 substitutions normalised (tests/s2_transcript_normalise.py), mode "b" must equal it. Build with -DWiring_Cellular=1 -DHAL_PLATFORM_CELLULAR=1
 // (cellular) or without (Wi-Fi), plus -DENABLE_SLEEP_TRACE=1 to compile the trace branch.
 #include <algorithm>
 #include <cstdio>
@@ -90,7 +90,7 @@ static void driveCur(bool useNetworkStandbyRequested, bool overnightFallbackSlee
 struct Sc {
   int prior = 0;     // 0 none, 1 preserved after a normal standby return, 2 pending forced-off (err -170)
   bool req = true, connectOk = true, cellOff = false, unstable = false, tdClears = false, tdWait = false;
-  int hib = 0;       // 0 not overnight, 1 not eligible, 2 pin low, 3 stale clear fails, 4 alarm fails, 5/6 returns ok/err
+  int hib = 0;       // 0 not overnight, 1 not eligible, 2 pin low, 3/4 sleep returns ok/err
   int ulp = 0;       // 0 timer, 1 button, 2 sensor pin, 3 err then STOP ok, 4 err, err, timer-only ok, 5 all fail
   bool sensorValid = true, serialCfg = false, serialPre = false, verbose = false, wdtOk = true, second = false;
   int serialUpAfter = 0;
@@ -139,7 +139,7 @@ static void script(const Sc &s, bool first) {
   x.reconnecting = false;
   x.serialPolls = 0;
   const int hib = first ? s.hib : 0, ulp = first ? s.ulp : 0;
-  if (hib >= 5) x.sleeps.push_back({hib == 5 ? 0 : -170, PIN_INVALID});
+  if (hib >= 3) x.sleeps.push_back({hib == 3 ? 0 : -170, PIN_INVALID});
   const pin_t sensorPin = x.sensorPin;
   switch (ulp) {
     case 0: x.sleeps.push_back({0, PIN_INVALID}); break;
@@ -152,8 +152,6 @@ static void script(const Sc &s, bool first) {
   }
   x.hibEligible = hib >= 2;
   x.hibPinHigh = hib != 2;
-  x.staleClearOk = hib != 3;
-  x.alarmOk = hib != 4;
 }
 
 static void runScenario(const Sc &s, bool useBase, int index) {
@@ -222,7 +220,7 @@ int main(int argc, char **argv) {
   printf("PLATFORM %s\n", cellular ? "cellular" : "wifi");
   const int priors = cellular ? 3 : 1;
   std::vector<Sc> table;
-  for (int hib = 1; hib <= 6; hib++)  // hibernate edges (hib=0 is the ULP table's first row)
+  for (int hib = 1; hib <= 4; hib++)  // hibernate edges (hib=0 is the ULP table's first row)
     for (int prior = 0; prior < priors; prior++)
       for (int req = 0; req < 2; req++) {
         Sc s; s.hib = hib; s.prior = prior; s.req = req; table.push_back(s);
@@ -242,7 +240,7 @@ int main(int argc, char **argv) {
     for (int pre = 0; pre < 2; pre++)  // serial: connected beforehand or not, re-enumerates at once / late / never
       for (int up : {0, 2, -1}) { Sc s; s.serialCfg = true; s.serialPre = pre; s.serialUpAfter = up; table.push_back(s); }
     for (int ulp : {0, 3}) { Sc s; s.verbose = true; s.prior = 1; s.ulp = ulp; table.push_back(s); }
-    { Sc s; s.wdtOk = false; s.hib = 5; table.push_back(s); }
+    { Sc s; s.wdtOk = false; s.hib = 4; table.push_back(s); }
     { Sc s; s.wdtOk = false; s.ulp = 4; table.push_back(s); }
     for (int ulp : {0, 3}) { Sc s; s.prior = 2; s.tdClears = true; s.ulp = ulp; s.second = true; table.push_back(s); }
     for (int why = 0; why < 4; why++) {  // teardown still waiting: the handler returns before the sleep, what do the fields hold?

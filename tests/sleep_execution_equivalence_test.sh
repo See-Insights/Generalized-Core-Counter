@@ -1,19 +1,18 @@
 #!/bin/zsh
 set -euo pipefail
 
-# WO-2026-10-21-001 (Sleep S-2): moving the standby decision, the hibernate attempt and the
-# ULP/STOP sleep cascade out of handleSleepingState() into effectiveStandby(), hibernateAttempt()
-# and sleepAndResume() changes no behaviour. tests/sleep_execution_equivalence_test.cpp runs one
-# scenario table through (a) the blocks extracted by marker text from the base State_Sleep.cpp
-# and (b) the current functions and the handler's call-site lines, extracted by marker text from
-# the current file, against the same fakes (tests/stubs/sleep_teardown/SleepExecutionFakes.h),
-# for cellular and Wi-Fi. Both transcripts must equal, byte for byte, the frozen
-# fixtures/sleep_execution_transcript.txt ('# ' header lines stripped first). The extracted copies
-# the harness compiled are read back and compared with a fresh extraction: COPY_MISMATCH on drift.
-# Step (a) needs the base commit named in the fixture header; without it (a) is skipped and said.
-# Mutants of a private copy of State_Sleep.cpp must each change the transcript.
-# SLEEP_EXECUTION_SRC_ROOT tests another src/ root; SLEEP_EXECUTION_TAMPER_COPY=1 demonstrates
-# COPY_MISMATCH. '--regenerate' rewrites the fixture from the base blocks (a).
+# WO-2026-10-21-001 (Sleep S-2), updated for v50 S2 (WO-2026-11-05-004): tests/sleep_execution_equivalence_test.cpp
+# runs one scenario table through (a) the blocks extracted by marker text from the BASE State_Sleep.cpp (the commit
+# named in the fixture header) and (b) the current functions and the handler's call-site lines, against the same
+# fakes (tests/stubs/sleep_teardown/SleepExecutionFakes.h), for cellular and Wi-Fi. The frozen
+# fixtures/sleep_execution_transcript.txt is the base transcript with only the approved S2 substitutions normalised
+# by tests/s2_transcript_normalise.py (AB1805 alarm pre-arm and watchdog events, the duration on the HIBERNATE call).
+# The current transcript must equal it byte for byte ('# ' header lines stripped first), and so must the normalised
+# base transcript. The extracted copies the harness compiled are read back and compared with a fresh extraction:
+# COPY_MISMATCH on drift. Without the base commit the base check is skipped and said. The retired scenarios (stale-clear
+# failure, alarm-program failure) exist only in the base and are not in the table. Mutants of a private copy of
+# State_Sleep.cpp must each change the transcript. SLEEP_EXECUTION_SRC_ROOT tests another src/ root;
+# SLEEP_EXECUTION_TAMPER_COPY=1 demonstrates COPY_MISMATCH. '--regenerate' rewrites the fixture from the base blocks.
 
 tests_dir="${0:A:h}"
 repo_root="${tests_dir:h}"
@@ -99,7 +98,8 @@ run_all() {
 
 if [[ "${1:-}" == "--regenerate" ]]; then
   (( have_base )) || { echo "NO_BASE_COMMIT: $base"; exit 1; }
-  run_all a "$work/regen.txt" "$work"
+  run_all a "$work/regen_raw.txt" "$work"
+  python3 "$tests_dir/s2_transcript_normalise.py" "$work/regen_raw.txt" > "$work/regen.txt"
   python3 - "$base" "$work/regen.txt" "$fixture" <<'PY'
 import hashlib
 import re
@@ -110,13 +110,12 @@ body = open(body_path).read()
 counts = re.findall(r"^SCENARIOS (\d+) PASSES (\d+) WOKE (\d+) RETURNED (\d+) DISTINCT_EVENTS (\d+)$", body, re.M)
 scen = sum(int(c[0]) for c in counts)
 passes = sum(int(c[1]) for c in counts)
-head = f"""# Frozen output of the pre-change sleep execution (standby decision, hibernate attempt, ULP/STOP cascade): WO-2026-10-21-001 (Sleep S-2).
+head = f"""# Frozen output of the pre-change sleep execution (standby decision, hibernate attempt, ULP/STOP cascade): WO-2026-10-21-001 (Sleep S-2), with the approved v50 S2 substitutions normalised (tests/s2_transcript_normalise.py).
 # Base commit: {base}
 # Scenarios: {scen} (cellular {counts[0][0]} + wifi {counts[1][0]}); passes: {passes}
 # Per-platform summary (scenarios passes WOKE RETURNED distinct-events): cellular {' '.join(counts[0])}; wifi {' '.join(counts[1])}
 # Body sha256: {hashlib.sha256(body.encode()).hexdigest()}
-# Generated once by extracting the blocks by marker text from {base}:src/state/State_Sleep.cpp (git show),
-# wrapping them in tests/sleep_execution_equivalence_test.cpp against tests/stubs/sleep_teardown, and running mode a.
+# Generated with --regenerate: the blocks extracted by marker text from {base}:src/state/State_Sleep.cpp (git show) run in mode a against tests/stubs/sleep_teardown, then normalised.
 """
 open(fixture, "w").write(head + body)
 PY
@@ -155,14 +154,15 @@ done
 diff -u "$work/expected.txt" "$work/new.txt" > "$work/new.diff" || { head -60 "$work/new.diff"; echo "EQUIVALENCE_FAILED: State_Sleep.cpp differs from the frozen transcript"; exit 1; }
 
 if (( have_base )); then
-  run_all a "$work/old.txt" "$work"
-  diff -u "$work/expected.txt" "$work/old.txt" > "$work/old.diff" || { head -60 "$work/old.diff"; echo "FIXTURE_NOT_FROM_BASE: the base blocks differ from the fixture ($base)"; exit 1; }
+  run_all a "$work/old_raw.txt" "$work"
+  python3 "$tests_dir/s2_transcript_normalise.py" "$work/old_raw.txt" > "$work/old.txt"
+  diff -u "$work/expected.txt" "$work/old.txt" > "$work/old.diff" || { head -60 "$work/old.diff"; echo "FIXTURE_NOT_FROM_BASE: the normalised base blocks differ from the fixture ($base)"; exit 1; }
 else
   echo "BASE_CHECK_SKIPPED: commit $base is not in this tree; only the fixture comparison ran"
 fi
 
 # The transcript is not trivial: every branch the moved code has shows up, and so do all outcomes.
-for line in "HIB eligible?" "HIB clearStale" "HIB armForSleep" "HIB abandon" "AB1805 interruptAtTime" \
+for line in "HIB eligible?" "HIB armForSleep" "HIB abandon" "EXTWDT stop" "EXTWDT start" \
             "SLEEP mode=HIBERNATE gpio=[7F,4F]" "SLEEP mode=ULP gpio=[4F,9R] net=3:0 dur=3600000" \
             "SLEEP mode=ULP gpio=[4F,9R] net=none dur=900000" "SLEEP mode=STOP gpio=[4F,9R]" \
             "SLEEP mode=STOP gpio=[] net=none dur=3600000" "SLEEP mode=ULP gpio=[4F] net=3:0" \
@@ -172,8 +172,7 @@ for line in "HIB eligible?" "HIB clearStale" "HIB armForSleep" "HIB abandon" "AB
             "PROGRESS SERIAL_WAIT" "POWER flushDiagBatch" "CYCLE resetOnWake" "MEASURE noteWakeFromLowPowerSleep" \
             "LOG INFO SLEEP: standby sleep returned normally; preserving modem standby" \
             "LOG WARN SLEEP: standby sleep failed; forcing modem-off reason=sleep_error err=-170" \
-            "LOG WARN HIBERNATE bypass: wake pin held low" "LOG WARN HIBERNATE bypass: failed stale interrupt cleanup" \
-            "LOG WARN HIBERNATE bypass: failed to program AB1805 alarm" "LOG WARN HIBERNATE sleep failed err=-170" \
+            "LOG WARN HIBERNATE bypass: wake pin held low" "LOG WARN HIBERNATE sleep failed err=-170" \
             "LOG ERROR ULTRA_LOW_POWER sleep failed err=-170" "LOG ERROR STOP sleep fallback failed" \
             "LOG ERROR All sleep attempts failed err=-170" "LOG WARN Serial did not reconnect within 30s" \
             "LOG INFO SleepCall: standby=1" "LOG WARN SleepCall: watchdog-stop failed" \
@@ -214,13 +213,17 @@ mutate_and_expect_diff "ULP error skips STOP with GPIO" \
 mutate_and_expect_diff "standby error leaves forceModemOff unset" \
   "standbyReturn.forceModemOff = true;" "standbyReturn.forceModemOff = false;"
 mutate_and_expect_diff "returned hibernate not abandoned" \
-  "            HibernateCycle::abandon();
+  "        HibernateCycle::abandon();
 " ""
 mutate_and_expect_diff "WAKE_FROM_SLEEP progress after the serial re-wait" \
   "  thrashGuard.markProgress(\"WAKE_FROM_SLEEP\");
 " "" \
   "  Log.info(\"WakeReturn: elapsed=%lu reason=%s\"," "  thrashGuard.markProgress(\"WAKE_FROM_SLEEP\");
   Log.info(\"WakeReturn: elapsed=%lu reason=%s\","
+mutate_and_expect_diff "hibernate duration scaled wrong" \
+  "          .duration((uint32_t)wakeInSeconds * 1000UL);
+" "          .duration((uint32_t)wakeInSeconds * 100UL);
+"
 mutate_and_expect_diff "standby preserved through an unstable modem" \
   "(!useNetworkStandbyRequested || session.modemUnstable || Cellular.isOff())" "(!useNetworkStandbyRequested || Cellular.isOff())"
 mutate_and_expect_diff "PIR classified from the wrong edge" \
@@ -228,4 +231,4 @@ mutate_and_expect_diff "PIR classified from the wrong edge" \
 mutate_and_expect_diff "post-wake routing handed swapped pir and button" \
   "postWakeRouting(wake.pirWake, wake.buttonWake, wake.timerWake, wake.wakeReasonLabel);" "postWakeRouting(wake.buttonWake, wake.pirWake, wake.timerWake, wake.wakeReasonLabel);"
 
-echo "sleep_execution_equivalence_test: both transcripts match the frozen pre-change output, all mutations detected"
+echo "sleep_execution_equivalence_test: current transcript and normalised base transcript both match the frozen fixture, all mutations detected"

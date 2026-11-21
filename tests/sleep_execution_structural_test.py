@@ -37,6 +37,18 @@ def fail(msg):
     sys.exit(1)
 
 
+def in_function_body(text, pos):
+    """True when pos is inside a brace that is not a namespace / extern "C" block."""
+    stack = []
+    for m in re.finditer(r"[{}]", text[:pos]):
+        if m.group(0) == "{":
+            head = text[:m.start()].rstrip()
+            stack.append(bool(re.search(r'(?:\bnamespace(?:\s+\w+)?|\bextern\s+"C")$', head)))
+        elif stack:
+            stack.pop()
+    return not all(stack)
+
+
 def strip_comments(code):
     code = re.sub(r"/\*.*?\*/", "", code, flags=re.DOTALL)
     return re.sub(r"//[^\n]*", "", code)
@@ -112,12 +124,11 @@ for path in sorted(SRC.rglob("*")):
     for m in re.finditer(r"[^\n]*\bSystemSleepConfiguration\b[^\n]*", text):
         if not re.fullmatch(r"\s+SystemSleepConfiguration\s+\w+;", m.group(0)):
             fail(f"{path.relative_to(REPO_ROOT)}: SystemSleepConfiguration must be a fresh local, found: {m.group(0).strip()}")
-        depth = text[:m.start()].count("{") - text[:m.start()].count("}")
-        if depth < 2:
+        if not in_function_body(text, m.start()):  # a namespace-scope global is rejected; the S3 helper is a file-level function
             fail(f"{path.relative_to(REPO_ROOT)}: SystemSleepConfiguration declared outside a function body")
         fresh += 1
-if fresh != 5:
-    fail(f"expected 5 fresh SystemSleepConfiguration locals (hibernate, ULP, STOP, STOP timer-only, boot storm), found {fresh}")
+if fresh != 6:
+    fail(f"expected 6 fresh SystemSleepConfiguration locals (hibernate, ULP, STOP, STOP timer-only, boot storm, S3 power-off helper), found {fresh}")
 print("PASS: all 5 SystemSleepConfiguration objects are fresh locals")
 
 # ---- 4. against the base commit ----
@@ -136,6 +147,7 @@ if changed:
     fail(f"SleepTeardown.{{h,cpp}} must be unchanged against {base}: {changed}")
 added = git("diff", "--name-status", "--diff-filter=A", base, "--", "src").stdout.split()
 added += git("ls-files", "--others", "--exclude-standard", "--", "src").stdout.split()
+added = [a for a in added if a not in ("A", "src/time/ExternalRtc.h", "src/time/PreBindRtc.h")]  # v50 S1 helper header
 if added:
     fail(f"no new file may appear under src/: {added}")
 for name in git("diff", "--name-only", base, "--", "src").stdout.split():
@@ -181,9 +193,15 @@ for needle, repl in (("  wake = {pirWake, buttonWake, timerWake, wakeReasonLabel
     body = body.replace(needle, repl)
 checks.append(("sleepAndResume", body,
                base_block("  const SensorWakeSource sensorWake = SensorManager", '  PowerDiagnostics::logPowerState("post-wake");\n')))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import s2_hibernate_normalise  # v50 S2 (WO-2026-11-05-004): the approved S2 substitutions are normalised on the base side only
 for name, current, original in checks:
     for new, old in RENAMES:
         current = current.replace(new, old)
+    if name in ("hibernateAttempt", "sleepAndResume"):
+        hib = name == "hibernateAttempt"
+        current = s2_hibernate_normalise.normalise_block(current, False, hib, 1, 1)
+        original = s2_hibernate_normalise.normalise_block(original, True, hib, 1, 1 if hib else 2)
     if current != original:
         diff = "".join(list(difflib.unified_diff(original.splitlines(True), current.splitlines(True), "base", "current"))[:40])
         fail(f"{name}() differs from the base block beyond the listed edits:\n{diff}")

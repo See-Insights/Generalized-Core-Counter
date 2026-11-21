@@ -98,14 +98,14 @@ Device Status describes runtime reality. It does not generally duplicate configu
         "deviceOS": "6.4.1",
         "resetCount": 22
     },
-    "schemaVersion": 2
+    "schemaVersion": 3
 }
 
 ## Field Definitions
 
 | Field | Description |
 |--------|-------------|
-| schemaVersion | Ledger schema version. |
+| schemaVersion | Ledger schema version. v3 (firmware v50): the shared constant moved from 2 to 3 for both the data and status ledgers; the status `osc` keys `oscStatus` and `oscCtrl` are now always `null` (the raw AB1805 registers are not readable through Device OS's driver). `usingRC`, `aos` and `fos` are unchanged. |
 | firmware.version | Running firmware version. |
 | firmware.resetCount | Number of firmware resets recorded by the device. |
 | config.generation | Deterministic identifier representing the effective merged Product Default and Device Settings configuration. |
@@ -196,7 +196,7 @@ The payload is sensor-focused and should remain compact. It should not accumulat
         "occupied": false,
         "totalOccupiedSec": 4574
     },
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "system": {
         "freeHeap": 77768,
         "resetReason": 20,
@@ -209,7 +209,7 @@ The payload is sensor-focused and should remain compact. It should not accumulat
 
 | Field | Description |
 |--------|-------------|
-| schemaVersion | Ledger schema version. |
+| schemaVersion | Ledger schema version. v3 (firmware v50): the shared constant moved from 2 to 3 for both the data and status ledgers; the status `osc` keys `oscStatus` and `oscCtrl` are now always `null` (the raw AB1805 registers are not readable through Device OS's driver). `usingRC`, `aos` and `fos` are unchanged. |
 | timestamp | Epoch timestamp when firmware generated this latest structured observation. It is not a ledger-sync-success timestamp. |
 | occupancy.occupied | Whether the monitored space is currently occupied. |
 | occupancy.totalOccupiedSec | Accumulated occupied duration for the current reporting period, in seconds. |

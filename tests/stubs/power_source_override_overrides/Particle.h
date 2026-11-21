@@ -154,6 +154,10 @@ class JSONBufferWriter {
     return *this;
   }
 
+  JSONBufferWriter &nullValue() {
+    appendRaw("null,");
+    return *this;
+  }
   JSONBufferWriter &value(bool v) {
     g_statusJsonObserver.record(lastName_.c_str(), v);
     appendRaw(v ? "true," : "false,");

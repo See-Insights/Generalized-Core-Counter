@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file.
 
 - (none)
 
+## [v50.1-NativeRTC] - 2026-11-06
+
+### Changed
+
+- v50.1 integration builds (bench version): the AB1805 native-driver set S1-S3 on integration/v50-ab1805; not released.
+
 ## [v49.1-DurableResets] - 2026-11-05
 
 ### Changed

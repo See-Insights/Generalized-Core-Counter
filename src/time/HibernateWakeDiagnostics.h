@@ -38,8 +38,8 @@ namespace HibernateWakeDiagnostics {
 enum class GateArm {
   kNone = 0,
   kResetReason,    // OS reset reason was not RESET_REASON_POWER_MANAGEMENT
-  kWakeReason,     // AB1805 wake reason was not ALARM
-  kRtcRead,        // ab1805.getRtcAsTime() failed
+  kWakeReason,     // unreachable after kResetReason since v50 S2 (reason 30 alone passes)
+  kRtcRead,        // the external RTC read failed
   kRtcBeforeZero,  // retainedHibernateRtcBefore was not > 0
   kRequestedZero,  // retainedHibernateRequestedSleep was not > 0
   kRtcOrder,       // rtcTime on wake was earlier than retainedHibernateRtcBefore
@@ -47,11 +47,11 @@ enum class GateArm {
 
 /// Raw inputs to the gate, exactly as `HibernateCycle::classifyWake()`
 /// reads them. The caller resolves `resetReasonIsPowerManagement` and
-/// `wakeReasonIsAlarm` from Device-OS/AB1805 types before populating this,
+/// `wakeReasonIsHibernateWake` from Device-OS/AB1805 types before populating this,
 /// so this header never needs to know those enums.
 struct GateInputs {
   bool resetReasonIsPowerManagement;
-  bool wakeReasonIsAlarm;
+  bool wakeReasonIsHibernateWake;
   bool rtcReadOk;
   int64_t rtcBefore;
   uint32_t requestedSleepSec;
@@ -159,6 +159,12 @@ inline int buildEventPayload(char *buffer, size_t bufferSize, const EventFields 
       (long long)f.rtcAtWake, (unsigned long)f.actualSleepSec, (long)f.sleepErrorSec,
       (unsigned long)f.hibernateCount);
 }
+
+/// Reason-20 boot: the persisted power-off evidence byte (written by the Error path and failsafe stage 3) means a
+/// power-up wake; none means an inferred watchdog. `retained` is never evidence (a power-down clears it).
+/// The byte counts only when it is exactly this value (0 and the legacy structuresVersion 2 are "no record").
+constexpr uint8_t kPowerOffSentinel = 0xA5;
+inline bool isInferredWatchdog(uint8_t evidenceByte) { return !(evidenceByte == kPowerOffSentinel); }
 
 } // namespace HibernateWakeDiagnostics
 

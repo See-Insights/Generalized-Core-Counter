@@ -30,7 +30,7 @@ this test parses the ACTUAL shipped source files directly and confirms:
   4. src/power/Connectivity.h and .cpp are untouched (git diff scope
      check) - no new teardown function was added anywhere the WO
      forbids it.
-  5. State_Error.cpp's Case 3 (`ab1805.deepPowerDown()` block) was NOT
+  5. State_Error.cpp's Case 3 (`powerOffForRecovery()` block) was NOT
      touched - no ModemTeardown line was added there, since a full
      hardware power-cycle is explicitly out of scope per the WO.
 
@@ -255,24 +255,24 @@ def main() -> None:
     print("PASS: no new blocking call token found immediately adjacent to "
           "the State_Error.cpp ModemTeardown log line (checked before and after)")
 
-    # ---- Check 6: State_Error.cpp Case 3 (ab1805.deepPowerDown()) block
+    # ---- Check 6: State_Error.cpp Case 3 (powerOffForRecovery()) block
     # was NOT touched - no ModemTeardown line added there. Case 3 is a
     # full hardware power-cycle, explicitly out of scope per the WO. ----
     deep_power_down_lines = [
-        i for i, l in enumerate(error_lines) if "ab1805.deepPowerDown();" in l
+        i for i, l in enumerate(error_lines) if "powerOffForRecovery();" in l
     ]
     if len(deep_power_down_lines) != 1:
-        fail(f"expected exactly 1 ab1805.deepPowerDown() call in "
+        fail(f"expected exactly 1 powerOffForRecovery() call in "
              f"State_Error.cpp, found {len(deep_power_down_lines)}")
     dpd_line = deep_power_down_lines[0]
     CASE3_WINDOW = 4
     case3_window_lines = error_lines[max(0, dpd_line - CASE3_WINDOW): dpd_line + 1]
     for wl in case3_window_lines:
         if "ModemTeardown" in wl:
-            fail(f"State_Error.cpp Case 3 (ab1805.deepPowerDown(), line "
+            fail(f"State_Error.cpp Case 3 (powerOffForRecovery(), line "
                  f"{dpd_line + 1}) must remain untouched per WO scope, but "
                  f"a ModemTeardown log line was found nearby: {wl!r}")
-    print("PASS: State_Error.cpp Case 3 (ab1805.deepPowerDown() block) "
+    print("PASS: State_Error.cpp Case 3 (powerOffForRecovery() block) "
           "left untouched - no ModemTeardown line added there")
 
     # ---- Check 7: src/power/Connectivity.h and .cpp are untouched. ----

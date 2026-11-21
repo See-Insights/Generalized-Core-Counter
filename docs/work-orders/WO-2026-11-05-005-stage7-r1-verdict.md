@@ -1,0 +1,46 @@
+UNDER REVIEW: wo/2026-11-05-005-v50-s3-timed-power-off @ 1a5bd128cc56bb7227b29e79ade42feb3b65dfec
+
+NOT VERIFIED for S3 as scoped.
+
+The implementation is structurally correct, builds cleanly, and passes all host tests, but the chip watchdog remains armed during Device OS’s potentially 120-second modem shutdown before the driver disables it. That can defeat the intended stage-3 power cycle.
+
+### Findings
+
+1. **High — watchdog can expire before `POWER_OFF` reaches the AM18x5 driver**
+
+   [ConnectivityFailsafe.cpp:138](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/7fe8279d-ef98-4f2e-a0e5-e3b17bab0abd/scratchpad/wt-s3-r1/src/power/ConnectivityFailsafe.cpp:138) calls `System.sleep()` with the 124-second external watchdog still running. Device OS may wait up to 120 seconds for cellular shutdown at [system_sleep.cpp:93](/Users/chipmc/.particle/toolchains/deviceOS/6.6.0/system/src/system_sleep.cpp:93), before entering the HAL at [system_sleep.cpp:203](/Users/chipmc/.particle/toolchains/deviceOS/6.6.0/system/src/system_sleep.cpp:203). Only then does `Am18x5::sleep()` disable the watchdog at [am18x5.cpp:1053](/Users/chipmc/.particle/toolchains/deviceOS/6.6.0/hal/shared/am18x5.cpp:1053).
+
+   The only application refresh is after both callers in the main loop at [Generalized-Core-Counter.cpp:1132](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/7fe8279d-ef98-4f2e-a0e5-e3b17bab0abd/scratchpad/wt-s3-r1/src/Generalized-Core-Counter.cpp:1132). A slow or wedged modem can therefore consume essentially the entire watchdog window and reset the MCU before the rail is cut—the exact condition this recovery handles. Stage-3 evidence would then survive and could suppress another attempt until a good connection clears it.
+
+   Smallest fix: stop `ExternalWatchdog` immediately before `System.sleep()` and restart it on every return. This is approximately +2–3 `src/` lines, taking the budget from +13 to at most +16, within +20.
+
+2. **Medium, test-only — fresh-local protection was broadened to permit namespace globals**
+
+   [sleep_execution_structural_test.py:115](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/7fe8279d-ef98-4f2e-a0e5-e3b17bab0abd/scratchpad/wt-s3-r1/tests/sleep_execution_structural_test.py:115) now accepts any declaration with brace depth ≥1. A namespace-scoped `SystemSleepConfiguration` therefore looks like a function local. The companion check at [sleep_config_ownership_structural_test.py:332](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/7fe8279d-ef98-4f2e-a0e5-e3b17bab0abd/scratchpad/wt-s3-r1/tests/sleep_config_ownership_structural_test.py:332) has the same blind spot. This weakens protection against long-lived configurations and their orphaned wake-source lists.
+
+   Smallest fix: use function-span/scope detection, or narrowly recognize the helper’s function body while continuing to reject namespace scope. Test-only; no `src/` budget cost.
+
+3. **Low, test-only — a successful result that returns is not exercised**
+
+   The fake treats `sleepError == 0` as a non-returning power cut at [s3_timed_power_off_test.cpp:102](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/7fe8279d-ef98-4f2e-a0e5-e3b17bab0abd/scratchpad/wt-s3-r1/tests/s3_timed_power_off_test.cpp:102), so the “success” cases at [s3_timed_power_off_test.cpp:178](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/7fe8279d-ef98-4f2e-a0e5-e3b17bab0abd/scratchpad/wt-s3-r1/tests/s3_timed_power_off_test.cpp:178) do not test a returned `SystemSleepResult{SYSTEM_ERROR_NONE}`.
+
+   Production code is safe: it logs `err=0`, returns, clears evidence, flushes, and performs the caller’s fallback reset. Device OS 6.6.0’s real AM18x5 path returns `ABORTED` if it returns at all. Still, the binding test case is absent. Add a separate “power cut versus returned result” fake mode; test-only, no budget cost.
+
+### Checks 1–9
+
+| # | Verdict | Evidence |
+|---|---|---|
+| 1 | **PASS** | [ConnectivityFailsafe.cpp:134](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/7fe8279d-ef98-4f2e-a0e5-e3b17bab0abd/scratchpad/wt-s3-r1/src/power/ConnectivityFailsafe.cpp:134) creates a fresh configuration, selects `POWER_OFF`, supplies `30 * 1000` milliseconds, and adds no GPIO. Device OS divides milliseconds by 1000 at [sleep_hal.cpp:1332](/Users/chipmc/.particle/toolchains/deviceOS/6.6.0/hal/src/nRF52840/sleep_hal.cpp:1332). The helper never resets and handles even a returned success safely. |
+| 2 | **PASS** | Stage 3 preserves its persisted stage/action, verbatim log, flush, after-return downgrade/flush and cause at [ConnectivityFailsafe.cpp:319](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/7fe8279d-ef98-4f2e-a0e5-e3b17bab0abd/scratchpad/wt-s3-r1/src/power/ConnectivityFailsafe.cpp:319). ERROR_STATE preserves the 0xA5 sentinel, log, flush, clear/flush and cause at [State_Error.cpp:172](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/7fe8279d-ef98-4f2e-a0e5-e3b17bab0abd/scratchpad/wt-s3-r1/src/state/State_Error.cpp:172). No successful power cut can execute the after-return clears. |
+| 3 | **PASS** under the specified reason-20 assumption | A successful timed power-off requires the chip clock to run to its relative alarm. The stored binding is loaded and external time seeds system time before `setup()` at [rtc_hal.cpp:77](/Users/chipmc/.particle/toolchains/deviceOS/6.6.0/hal/src/nRF52840/rtc_hal.cpp:77); S1/S1b binding precedes classification at [Generalized-Core-Counter.cpp:293](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/7fe8279d-ef98-4f2e-a0e5-e3b17bab0abd/scratchpad/wt-s3-r1/src/Generalized-Core-Counter.cpp:293). Thus stage 3’s action is about 30 seconds old and passes the 600-second valid-clock check at [HibernateWakeDiagnostics.h:169](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/7fe8279d-ef98-4f2e-a0e5-e3b17bab0abd/scratchpad/wt-s3-r1/src/time/HibernateWakeDiagnostics.h:169). Bench must still confirm the actual reason and RTC state. |
+| 4 | **NOT VERIFIED** | `kPowerOffRecoverySec` is 30 at [ConnectivityFailsafe.h:4](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/7fe8279d-ef98-4f2e-a0e5-e3b17bab0abd/scratchpad/wt-s3-r1/src/power/ConnectivityFailsafe.h:4), matching the vendored default at [AB1805_RK.h:325](/private/tmp/claude-501/-Users-chipmc-Documents-Maker-Particle-Projects-Generalized-Core-Counter/7fe8279d-ef98-4f2e-a0e5-e3b17bab0abd/scratchpad/wt-s3-r1/lib/AB1805_RK/src/AB1805_RK.h:325). The vendor comments say 10 seconds is probably sufficient; Device OS only imposes a one-second minimum. Source cannot prove rail/modem discharge. |
+| 5 | **FAIL** | Device OS correctly disables and restores the WDT at [am18x5.cpp:1053](/Users/chipmc/.particle/toolchains/deviceOS/6.6.0/hal/shared/am18x5.cpp:1053) and [am18x5.cpp:1062](/Users/chipmc/.particle/toolchains/deviceOS/6.6.0/hal/shared/am18x5.cpp:1062). After a returned call, callers reset within milliseconds, so the restored 124-second window is safe. The failure is the pre-HAL 120-second teardown described in Finding 1. |
+| 6 | **PASS** | Fresh ELF contains `powerOffForRecovery()` at `0x000bdf1c`; neither `nm` nor objdump contains `deepPowerDown`. Callable `ab1805` use is limited to the S1b `PreBindRtc` path; the object and extern declaration remain for L. `lib/`, S1/S1b/S2, failsafe policy, thresholds, cooldowns and TEST_MODE were unchanged. |
+| 7 | **FAIL** | CI discovery passed **121/121**, and every helper under `tests/` exited zero bare. The thermal structural test also passed on a clean tracked-file export. Six review mutations were caught: fallback removed, GPIO added, duration zero, wrong Error cause, plus new +1 ms duration and wrong stage downgrade. However Findings 2–3 leave required protection incomplete. The diff edits eight existing test files, not nine; all eight were reviewed. |
+| 8 | **PASS** | `src/`: +15/−2 = **+13 net**, within +20. Fresh Boron Device OS 6.6.0 build: **150908 text / 1114 data / 2240 bss**, matching Copilot and −600 text versus the dispatched integration-head figure **151508 / 1114 / 2240**. |
+| 9 | **PASS** | No additional S3 product defect found beyond item 5. The S4 oscillator-fault latch hand-off remains independent and untouched. `git diff --check` passes and the tracked worktree remains clean. |
+
+Model/reasoning: **Codex · gpt-5.6-sol · xhigh**.  
+Interpreter/toolchain: **Python 3.14.6; zsh 5.9; Apple clang++ 14.0.3 (`-std=c++17`); GNU Arm Embedded 10.2.1; Device OS 6.6.0**.
+
+No hardware was available. Chip’s bench must determine whether the rail collapses with USB attached, whether the modem actually loses power, the measured off time, the post-`POWER_OFF` reset reason, and RTC validity on that boot. External PR CI status was not available; only the complete local CI discovery was verified.

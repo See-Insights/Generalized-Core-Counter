@@ -9,6 +9,7 @@
 #include "time/DailyBoundary.h"
 #include "persist/PowerConfig.h"
 #include "ResetCause.h"
+#include "time/HibernateWakeDiagnostics.h"
 namespace {
 const char *batteryTierShortName(BatteryTier tier) {
   switch (tier) {
@@ -129,6 +130,17 @@ const char *failsafeDeferReasonName(FailsafeDeferReason reason) {
 
 bool claimFailsafeDeferLog(FailsafeDeferReason reason) {
   return claimFailsafeDeferLogLocal(reason);
+}
+
+void powerOffForRecovery() {
+  // RTC wake only: no GPIO source, so noise cannot cut the off period short
+  SystemSleepConfiguration cfg;
+  cfg.mode(SystemSleepMode::POWER_OFF).duration(kPowerOffRecoverySec * 1000UL);
+  // Device OS's modem shutdown (up to 120 s) runs before the HAL disables the chip watchdog
+  ExternalWatchdog.stop();
+  const SystemSleepResult result = System.sleep(cfg);
+  ExternalWatchdog.start();
+  Log.error("PowerOff: System.sleep returned err=%d", (int)result.error()); // reached only if power was not cut
 }
 
 void clearConnectivityFailsafeRecovery(const char *reason) {
@@ -312,6 +324,9 @@ void connectivityFailsafeSupervisor() {
   persistConnectivityFailsafeState(3, now, true);
   Log.info("Failsafe: stage=3 action=deep-powerdown age=%lds",
            (long)connectionAgeSec);
+  RecoveryState::set_powerOffRequested(HibernateWakeDiagnostics::kPowerOffSentinel); // persisted evidence: a reason-20 boot after this is a power-up
   flushAllBeforeReset();
-  ab1805.deepPowerDown();
+  powerOffForRecovery();
+  RecoveryState::set_powerOffRequested(0); RecoveryState::set_connectivityRecoveryStage(2); SystemConfig::flushNow(); // not expected to return: no recent stage-3 evidence
+  System.reset(RESET_CAUSE_CONNECTIVITY_FAILSAFE);
 }

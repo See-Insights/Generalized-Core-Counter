@@ -44,7 +44,9 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 
 // Hardware abstraction and device-specific pinouts
 #include "device_pinout.h"           // Platform-specific pin definitions
-#include "AB1805_RK.h"               // RTC and hardware watchdog
+#include "AB1805_RK.h"               // hardware watchdog (S2) and power-off (S3)
+#include "time/ExternalRtc.h"
+#include "time/PreBindRtc.h"
 #include "LocalTimeRK.h"             // Timezone conversion (UTC to local)
 #include "time/ClockTrust.h"         // Sync-recency resync gate and trust signal (WO-2026-08-29-002)
 #include "time/HibernateWakeDiagnostics.h" // Hibernate-wake gate data types/cloud-event rendering (WO-2026-08-29-001)
@@ -112,7 +114,7 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
 static void waitForDebugSerialIfConnected(); // Brief settle delay if a debug terminal is already attached at boot
 void userSwitchISR();         // Interrupt for the user switch
 void publishStartupStatus();  // One-time status summary at boot
-void publishWatchdogForensics(bool ab1805Confirmed = false); // One-time watchdog forensic snapshot at boot
+void publishWatchdogForensics(bool inferred = false); // One-time watchdog forensic snapshot at boot
 // requestClockResync()/checkClockResync()/isClockTrusted()/
 // observedTimeSyncedLastMs()/reportedSyncAgeMs() now declared by
 // time/Clock.h (WO-2026-09-18 Step 3a) - defined in time/Clock.cpp.
@@ -241,24 +243,13 @@ const char *startupHibernateWakeReason = "UNKNOWN";
 uint32_t startupHibernateActualSleepSec = 0;
 int32_t startupHibernateSleepErrorSec = 0;
 
-// AB1805 wake-reason classification captured on a RESET_REASON_PIN_RESET
-// boot (see setup()). Only meaningful when startupPinResetAb1805Checked is
-// true; otherwise the OS reset reason was not PIN_RESET and these fields
-// carry their initialized defaults and are omitted from the status payload.
-bool startupPinResetAb1805Checked = false;
-const char *startupAb1805WakeReasonName = "N/A";
-bool startupAb1805ConfirmedWatchdog = false;
+// Reason-20 (PIN_RESET) boot classification (see setup()). The watchdogSource
+// field is published only when startupPinResetChecked is true.
+bool startupPinResetChecked = false;
+bool startupInferredWatchdog = false;
 
-// WO-2026-08-31-004 Amendment A (cloud follow-up): the AB1805 oscillator
-// state read once at boot in setup(), kept in scope past that single log
-// line so DeviceStatusPublisher.cpp can also publish it. No new I2C read -
-// these are the exact values Amendment A's boot-time read already
-// captured. Defaults are overwritten within milliseconds of boot, long
-// before any cloud publish is possible, so they are never themselves
-// reported.
+// Oscillator state captured once in setup() and published by DeviceStatusPublisher.cpp.
 bool startupOscUsingRC = false;
-uint8_t startupOscStatusReg = 0;
-uint8_t startupOscCtrlReg = 0;
 bool startupOscAos = false;
 bool startupOscFos = false;
 
@@ -299,13 +290,14 @@ void setup() {
   validateRetainedBoot(retainedBoot);
   waitForDebugSerialIfConnected();
 
-  // v49 guard: Device OS must not own the AB1805 that AB1805_RK drives. The reset makes the delete take effect before any use of the chip.
-  if (ExternalTime.status().bound()) {
-    const int r = ExternalTime.disable();
-    Log.warn("AB1805: stored Device OS binding deleted (r=%d)", r);
-    const bool ours = System.resetReason() == RESET_REASON_USER && System.resetReasonData() == RESET_CAUSE_EXRTC_BINDING_DELETE;
-    if (r == 0 && !ExternalTime.status().bound() && !ours) System.reset(RESET_CAUSE_EXRTC_BINDING_DELETE);
-    else if (ours && ExternalTime.status().bound()) Log.warn("AB1805: binding survived the delete");
+  // v50: Device OS owns the AB1805; bind once before anything reads Time.
+  if (!Am18x5.status().bound() && !PreBindRtc::run(ab1805, Wire)) Log.warn("PreBindRtc: chip access failed");
+  ExternalRtc::ensureBound(Am18x5, particle::Am18x5Configuration().i2c(Wire).interruptPin(WKP)
+      .capabilities(particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL).clockSource(particle::RtcClockSource::EXTERNAL)); // no watchdogPin: the feed goes through the chip's WDT register (D5 edges did not feed the chip; WO-2026-11-16-001)
+
+  // Device OS keeps the chip watchdog running across a reset; init() re-arms it.
+  if (ExternalWatchdog.init(WatchdogConfiguration().timeout(124000)) != SYSTEM_ERROR_NONE || ExternalWatchdog.start() != SYSTEM_ERROR_NONE) {
+    Log.warn("ExternalWatchdog: init/start failed");
   }
 
   ensureRetainedLoopForensicsInitialized();
@@ -402,7 +394,9 @@ void setup() {
     SystemSleepConfiguration bootStormSleep;
     bootStormSleep.mode(SystemSleepMode::ULTRA_LOW_POWER).duration(600000UL);
     drainSerialBeforeSleep();
+    ExternalWatchdog.stop();
     System.sleep(bootStormSleep);
+    ExternalWatchdog.start();
     Log.warn("BOOT STORM holdoff sleep returned unexpectedly - continuing boot");
   }
 
@@ -543,8 +537,8 @@ void setup() {
   }
 
   // Watchdog-reset persistence/forensics-publish (Device-OS-detected and
-  // AB1805-confirmed PIN_RESET cases) is handled after AB1805 wake-reason
-  // classification below, once ab1805.setup()/getWakeReason() have run -
+  // inferred PIN_RESET cases) is handled after the wake classification
+  // below (a reason-20 boot with no persisted power-off evidence is inferred) -
   // see the "WATCHDOG RESET CLASSIFICATION" block further down in setup().
 
   // If a boot storm holdoff was triggered on this or the prior boot, surface
@@ -663,41 +657,20 @@ void setup() {
       .withFileQueueSize(800)
       .setup(); // Initialize the publish queue
 
-  // ===== TIME, RTC, AND WATCHDOG CONFIGURATION =====
-  // Initialize AB1805 RTC and hardware watchdog, then restore system time if needed
+  // ===== TIME AND RTC =====
+  // Device OS seeds Time from the chip before setup() when it is already bound; on an unbound boot S1b seeds it only on a successful plausible pre-bind chip read.
   const bool timeValidBeforeRtc = Time.isValid();
-  ab1805.withFOUT(WKP).setup();                // Initialize AB1805 RTC - WKP is D10 on Photon2
 
-  // WO-2026-08-31-004 Amendment A: log AB1805 oscillator state once at
-  // boot. Read-only - no gate, no branch, no retry, no state, nothing
-  // conditional on the result, no build flag; firmware behaves identically
-  // regardless of the answer. Investigates whether the field-observed
-  // rate-halving (56.5%-82.1% across 10 days on Dev-11, never below ~50%
-  // or above ~83%, no settled pattern) correlates with AOS/FOS automatic
-  // oscillator switching rather than a fixed RC-vs-XT misconfiguration - a
-  // fixed divider fault could not produce a varying daily rate, but a part
-  // that spends part of each interval on the wrong oscillator source
-  // could. A single boot-time read is a snapshot, not a definitive answer,
-  // if the part is genuinely switching between reads.
-  //
-  // Amendment A (cloud follow-up): written into the startupOsc* globals
-  // above (not locals) so DeviceStatusPublisher.cpp can also publish this
-  // same boot-time read - no new I2C read added for that.
-  startupOscUsingRC = ab1805.usingRCOscillator();
-  startupOscStatusReg = ab1805.readRegister(AB1805::REG_OSC_STATUS);
-  startupOscCtrlReg = ab1805.readRegister(AB1805::REG_OSC_CTRL);
-  startupOscAos = (startupOscCtrlReg & AB1805::REG_OSC_CTRL_AOS) != 0;
-  startupOscFos = (startupOscCtrlReg & AB1805::REG_OSC_CTRL_FOS) != 0;
-  Log.info("OscState: usingRC=%d oscStatus=0x%02x oscCtrl=0x%02x aos=%d fos=%d",
-           startupOscUsingRC ? 1 : 0, startupOscStatusReg, startupOscCtrlReg,
-           startupOscAos ? 1 : 0, startupOscFos ? 1 : 0);
+  // Oscillator snapshot: usingRC from the live clock source, AOS/FOS from the configuration. The raw OSC registers are not readable through the public API (published as null).
+  startupOscUsingRC = Am18x5.status().clockSource() == particle::RtcClockSource::INTERNAL;
+  const auto oscCaps = Am18x5.getConfig().capabilities();
+  startupOscAos = !!(oscCaps & particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_BATTERY);
+  startupOscFos = !!(oscCaps & particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL);
+  Log.info("OscState: usingRC=%d aos=%d fos=%d", startupOscUsingRC ? 1 : 0, startupOscAos ? 1 : 0, startupOscFos ? 1 : 0);
+  if (startupOscUsingRC) ExternalRtc::oscillatorFaultSeenSinceBind() = true;  // registering the handler clears the chip's fail flag, so it is read first
+  ExternalTime.onEvent(ExternalRtc::onOscillatorEvent);
 
-  // WO-2026-09-22-001: currentStatusData::validate()'s occupancyStartTime
-  // future-date clamp runs earlier in setup(), before ab1805.setup() (just
-  // above) has seeded Time, so it can never fire there. Re-run it once,
-  // right here, now that a time source exists this boot - a no-op if
-  // occupied is false, Time is still not valid, or the stored value is
-  // already plausible.
+    // Re-run the occupancyStartTime future-date clamp once here: Time is valid here only if Device OS or a successful plausible S1b pre-bind read seeded it.
   CurrentReadings::revalidateOccupancyStartTimeIfTimeAvailable();
 
 #if PLATFORM_ID == PLATFORM_BORON && ENABLE_RTC_SKEW_TEST
@@ -705,17 +678,17 @@ void setup() {
   // Compiled in ONLY when ENABLE_RTC_SKEW_TEST=1 (see BuildProfile.h) on
   // Boron. Fires ONCE - not once per boot, but once ever, across resets,
   // until a fresh flash or an explicit reset of retainedRtcSkewTestFired
-  // (Amendment A.2) - right after ab1805.setup() and before the
+  // (Amendment A.2) - right after the bind and before the
   // hibernate-wake classification block below, so the rest of setup() sees
   // exactly the state the field defect produces: a "set" RTC holding a
   // plausible-but-wrong value.
   //
-  // A.3: RTC write only - ab1805.setRtcFromTime() - nothing else. In
-  // particular, no Time.setTime(): ab1805.setup() (above) already seeded
+  // A.3: RTC write only - ExternalRtc::set() - nothing else. In
+  // particular, no Time.setTime(): Device OS already seeded
   // system time from whatever the RTC held BEFORE this hook runs, so this
   // boot's own Time stays whatever it already was. The skewed value only
   // becomes the system's believed time on a LATER boot, when that boot's
-  // own ab1805.setup() reads the now-skewed RTC - matching the bench
+  // own Device OS seeding reads the now-skewed RTC - matching the bench
   // procedure's amended step 3 (verify Time.isValid()/wrong-time belief
   // after the post-flash power-cycle, not on the flashing boot itself).
   //
@@ -751,13 +724,13 @@ void setup() {
     RtcSkewTest::OneShotGuard rtcSkewTestGuard(retainedRtcSkewTestFired);
     if (rtcSkewTestGuard.shouldRun()) {
       time_t rtcSkewRawBefore = 0;
-      const bool rtcSkewReadBeforeOk = ab1805.getRtcAsTime(rtcSkewRawBefore);
+      const bool rtcSkewReadBeforeOk = ExternalRtc::get(rtcSkewRawBefore);
       const time_t rtcSkewAnchor = (time_t)RtcSkewTest::chooseAnchor(rtcSkewRawBefore, rtcSkewReadBeforeOk);
       const time_t rtcSkewAfter = (time_t)RtcSkewTest::applySkew(rtcSkewAnchor);
-      const bool rtcSkewWriteOk = ab1805.setRtcFromTime(rtcSkewAfter);
+      const bool rtcSkewWriteOk = ExternalRtc::set(rtcSkewAfter);
       if (rtcSkewWriteOk) {
         time_t rtcSkewVerify = 0;
-        const bool rtcSkewVerifyReadOk = ab1805.getRtcAsTime(rtcSkewVerify);
+        const bool rtcSkewVerifyReadOk = ExternalRtc::get(rtcSkewVerify);
         Log.warn("RtcSkewTest: ONE-SHOT bench hook fired - before(raw=%ld readOk=%d) anchor=%s "
                  "skew=%ldsec after=%s verify=%s verifyReadOk=%d",
                  (long)rtcSkewRawBefore, rtcSkewReadBeforeOk ? 1 : 0,
@@ -769,7 +742,7 @@ void setup() {
       } else {
         // Write failed - the RTC still holds whatever it held before this
         // hook ran. Do not claim the skew took effect (A.4).
-        Log.error("RtcSkewTest: ONE-SHOT bench hook FAILED - setRtcFromTime() write did not "
+        Log.error("RtcSkewTest: ONE-SHOT bench hook FAILED - ExternalRtc::set() write did not "
                   "succeed; RTC left unchanged (before(raw=%ld readOk=%d) attemptedAfter=%s)",
                   (long)rtcSkewRawBefore, rtcSkewReadBeforeOk ? 1 : 0,
                   Time.format(rtcSkewAfter, TIME_FORMAT_DEFAULT).c_str());
@@ -778,48 +751,32 @@ void setup() {
   }
 #endif
 
-  // ===== AB1805 WAKE-REASON CLASSIFICATION (HibernateCycle) =====
-  // WO-2026-09-16 Step 2: PIN_RESET/AB1805-watchdog confirmation and the
-  // hibernate wake-validation gate both used to read ab1805.getWakeReason()
-  // independently, at two different points in setup(). Both are safe to
-  // call more than once - see HibernateCycle.cpp's own comment for why
-  // (getWakeReason() is a plain getter onto the one destructive
-  // updateWakeReason() call AB1805::setup() already made) - but there is no
-  // longer a reason to keep them apart: HibernateCycle::classifyWake() does
-  // both in one call, here, before setWDT() re-arms the watchdog, exactly
-  // where the PIN_RESET classification used to run alone.
-  const HibernateCycle::WakeVerdict wakeVerdict = HibernateCycle::classifyWake(reason, ab1805);
+  // ===== WAKE CLASSIFICATION (HibernateCycle) =====
+  // Reason 30 is judged by HibernateCycle from the OS reason and the retained
+  // request. Reason 20 is judged from persisted evidence only (a power-down
+  // clears `retained`); no evidence is counted as an inferred watchdog.
+  const HibernateCycle::WakeVerdict wakeVerdict = HibernateCycle::classifyWake(reason);
 
-  bool ab1805ConfirmedWatchdog = false;
-  if (wakeVerdict.pinResetChecked) {
-    startupPinResetAb1805Checked = true;
-    startupAb1805WakeReasonName = wakeVerdict.pinResetWakeReasonName;
-
-    if (wakeVerdict.pinResetConfirmedWatchdog) {
-      ab1805ConfirmedWatchdog = true;
-      Log.warn("PIN_RESET confirmed as AB1805 watchdog reset");
-    } else if (wakeVerdict.pinResetWakeReasonUnknown) {
-      // Explicitly inconclusive - do NOT treat UNKNOWN as "not the AB1805".
-      Log.info("PIN_RESET with AB1805 wake reason UNKNOWN - inconclusive, not ruling out AB1805 watchdog");
-    } else {
-      Log.info("PIN_RESET with AB1805 wake reason=%s - not an AB1805 watchdog reset",
-               startupAb1805WakeReasonName);
-    }
-    startupAb1805ConfirmedWatchdog = ab1805ConfirmedWatchdog;
+  bool inferredWatchdog = false;
+  if (reason == RESET_REASON_PIN_RESET) {
+    startupPinResetChecked = true;
+    inferredWatchdog = HibernateWakeDiagnostics::isInferredWatchdog(RecoveryState::get_powerOffRequested());
+    startupInferredWatchdog = inferredWatchdog;
+    Log.info("PIN_RESET: %s", inferredWatchdog ? "no power-off evidence - inferred watchdog" : "power-off evidence - power-up wake");
   }
-
-  ab1805.setWDT(AB1805::WATCHDOG_MAX_SECONDS); // Enable watchdog
+  RecoveryState::set_powerOffRequested(0);
+  SystemConfig::flushNow(); // consume the evidence durably before anything can reload it
 
   // ===== WATCHDOG RESET PERSISTENCE / FORENSICS =====
   // Moved here (from immediately after SystemConfig::setup(), before AB1805 init)
-  // so it can act on the AB1805 classification above. The publish queue was
+  // so it can act on the classification above. The publish queue was
   // already initialized above, so this is a reordering, not a new
   // dependency. Covers both the Device-OS-detected case
-  // (reason == RESET_REASON_WATCHDOG) and the AB1805-confirmed PIN_RESET
-  // case classified above; both reuse the same lastWatchdog* fields, tagged
+  // (reason == RESET_REASON_WATCHDOG) and the inferred PIN_RESET
+  // case classified above (the "inferred" source); both reuse the same lastWatchdog* fields, tagged
   // with lastWatchdogSource. An inconclusive or non-watchdog PIN_RESET must
   // not overwrite a previously persisted watchdog's forensic data.
-  const bool watchdogClassified = watchdogResetDetected || ab1805ConfirmedWatchdog;
+  const bool watchdogClassified = watchdogResetDetected || inferredWatchdog;
   if (watchdogClassified) {
     const uint16_t priorWatchdogResetCount = RecoveryState::get_watchdogResetCount();
     if (priorWatchdogResetCount < 0xFFFF) {
@@ -828,7 +785,7 @@ void setup() {
     RecoveryState::set_lastWatchdogBreadcrumb(previousBreadcrumb);
     RecoveryState::set_lastWatchdogUptimeMs(previousBreadcrumbMs);
     RecoveryState::set_lastWatchdogResetReasonData(reasonData);
-    RecoveryState::set_lastWatchdogSource(watchdogResetDetected ? RecoveryState::WATCHDOG_SOURCE_DEVICE_OS : RecoveryState::WATCHDOG_SOURCE_AB1805_PIN);
+    RecoveryState::set_lastWatchdogSource(watchdogResetDetected ? RecoveryState::WATCHDOG_SOURCE_DEVICE_OS : RecoveryState::WATCHDOG_SOURCE_INFERRED);
 
     // New watchdog-reset alert code (its own tier, strictly above tier-3;
     // see getAlertSeverity() in MyPersistentData.cpp - this must outrank
@@ -841,15 +798,15 @@ void setup() {
 
     // Queue watchdog forensic event only after PublishQueuePosix setup above
     // initialized its mutex.
-    publishWatchdogForensics(ab1805ConfirmedWatchdog);
+    publishWatchdogForensics(inferredWatchdog);
   }
 
   // wakeVerdict.rtcReadOk/rtcAtWake were computed inside classifyWake()
-  // (called above, before setWDT()) - nothing between that call and here
+  // (called above) - nothing between that call and here
   // touches Time's validity (confirmed: the RtcSkewTest bench hook
-  // explicitly does not call Time.setTime(), and neither setWDT() nor the
+  // explicitly does not call Time.setTime(), and neither the watchdog init nor the
   // watchdog forensics block touches Time), so sampling Time.isValid() here
-  // observes the same transition it always did (seeded by ab1805.setup()
+  // observes the same transition it always did (seeded by Device OS
   // earlier in setup(), not by this read itself).
   const time_t rtcTime = (time_t)wakeVerdict.rtcAtWake;
   const bool rtcReadOk = wakeVerdict.rtcReadOk;
@@ -867,7 +824,7 @@ void setup() {
     }
   } else if (!timeValidAfterRtc) {
     Log.warn("RTC did not restore time (rtcSet=%s rtcReadOk=%s)",
-             ab1805.isRTCSet() ? "true" : "false",
+             ExternalRtc::isSet() ? "true" : "false",
              rtcReadOk ? "true" : "false");
   }
 
@@ -951,7 +908,7 @@ void setup() {
   // Validate time and configure local time converter
   //
   // Finding 3 (WO-2026-08-29-002, Round 4 review): Time.isValid() alone can
-  // be true here with zero confirmed cloud syncs ever - ab1805.setup() seeds
+  // be true here with zero confirmed cloud syncs ever - Device OS seeds
   // system time from the RTC every boot, whether or not the RTC is correct.
   //
   // SystemConfig::get_lastTimeSync() (persisted across reboots, stamped only by
@@ -1173,8 +1130,11 @@ void loop() {
   setLoopStage(LOOP_STAGE_DIAGNOSTICS);
   thrashGuard.loop(state, millis());
 
-  ab1805.loop(); // Keeps the RTC synchronized with the device clock
-  checkClockResync(); // WO-2026-08-29-002: recurring app-side RTC write-back, not gated by ab1805.loop()'s per-boot latch
+  static int lastRefreshRc = SYSTEM_ERROR_NONE;
+  const int refreshRc = ExternalWatchdog.refresh(); // the only refresh source (Device OS does not refresh instance 2)
+  if (refreshRc != lastRefreshRc) Log.warn("ExternalWatchdog: refresh rc=%d", refreshRc);
+  lastRefreshRc = refreshRc;
+  checkClockResync(); // WO-2026-08-29-002: recurring app-side RTC write-back
 
   // Housekeeping for each transit of the main loop
   CurrentReadings::loop();
@@ -1332,22 +1292,11 @@ void publishStartupStatus() {
              (unsigned long)HibernateCycle::currentHibernateCount());
   }
 
-  // Only present when the OS reset reason was PIN_RESET (see the AB1805
-  // classification block in setup()) - surfaces the AB1805's own wake-reason
-  // read result and the resolved watchdogSource so a PIN_RESET boot can be
-  // told apart in cloud telemetry, without requiring serial-log tracing.
-  // No separate "read ok" flag is published: WakeReason::UNKNOWN already and
-  // correctly covers both "chip detection failed" and "no known wake-reason
-  // bit set" (see the classification block above), so a distinct success
-  // flag would be redundant and cannot be obtained without repeating the
-  // destructive updateWakeReason() read that Fix 2 removed.
-  char pinResetAb1805Fields[160] = "";
-  if (startupPinResetAb1805Checked) {
-    snprintf(pinResetAb1805Fields,
-             sizeof(pinResetAb1805Fields),
-             ",\"ab1805WakeReason\":\"%s\",\"watchdogSource\":\"%s\"",
-             startupAb1805WakeReasonName,
-             startupAb1805ConfirmedWatchdog ? "AB1805_PIN" : "NONE");
+  // Only present when the OS reset reason was PIN_RESET (see the wake
+  // classification block in setup()).
+  char pinResetFields[80] = "";
+  if (startupPinResetChecked) {
+    snprintf(pinResetFields, sizeof(pinResetFields), ",\"ab1805WakeReason\":\"N/A\",\"watchdogSource\":\"%s\"", startupInferredWatchdog ? "inferred" : "NONE");
   }
 
 #if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
@@ -1378,7 +1327,7 @@ void publishStartupStatus() {
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
            hibernateFields,
-           pinResetAb1805Fields);
+           pinResetFields);
 #else
   snprintf(status, sizeof(status),
            "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d%s%s}",
@@ -1401,7 +1350,7 @@ void publishStartupStatus() {
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
            hibernateFields,
-           pinResetAb1805Fields);
+           pinResetFields);
 #endif
 
   PublishQueuePosix::instance().publish("status", status, PRIVATE | WITH_ACK);
@@ -1414,23 +1363,23 @@ void publishStartupStatus() {
  * connection age) to pinpoint exactly where the main loop stalled. Essential for
  * diagnosing watchdog timeout root causes in production.
  *
- * @param ab1805Confirmed True when this event is for an AB1805-confirmed external
- *        watchdog reset (Device OS reported RESET_REASON_PIN_RESET, but the AB1805's
- *        own wake-reason register confirmed WakeReason::WATCHDOG). False for the
+ * @param inferred True when this event is for a PIN_RESET with no persisted
+ *        power-off evidence (the label "ab1805_watchdog" is kept for fleet
+ *        queries). False for the
  *        Device-OS-detected case (RESET_REASON_WATCHDOG). Only called for one of
  *        these two classified cases - see the "WATCHDOG RESET PERSISTENCE /
  *        FORENSICS" block in setup(). Forensic data captured from FRAM.
  */
-void publishWatchdogForensics(bool ab1805Confirmed) {
+void publishWatchdogForensics(bool inferred) {
   char payload[224];
   const LoopStage stage = static_cast<LoopStage>(startupPreviousLoopStage);
   const int osResetReason = System.resetReason();
 
-  // "ab1805_watchdog" distinguishes an AB1805-confirmed external reset (OS
-  // reason PIN_RESET) from "watchdog", the Device-OS-detected case (OS
+  // "ab1805_watchdog" distinguishes an inferred PIN_RESET (no persisted
+  // power-off evidence) from "watchdog", the Device-OS-detected case (OS
   // reason RESET_REASON_WATCHDOG) - both land here via the same classified
   // condition in setup().
-  const char *resetLabel = ab1805Confirmed ? "ab1805_watchdog" : "watchdog";
+  const char *resetLabel = inferred ? "ab1805_watchdog" : "watchdog";
 
   snprintf(payload,
            sizeof(payload),
