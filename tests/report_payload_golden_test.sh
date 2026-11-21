@@ -128,6 +128,7 @@ mutate "PIR dailyoccupancy not in minutes" '("/ 60UL", "/ 30UL")' sensors/PIRSen
 mutate "activeSensor null on closed boot" '("if (_sensor) return _sensor;", "return _sensor;")' gen_active_sensor.inc
 mutate "activeSensor skips PIR fallback" '(": SensorFactory::createSensor(SensorType::PIR);", ": nullptr;")' gen_active_sensor.inc
 mutate "activeSensor consults factory over built sensor" '("if (_sensor) return _sensor;", "")' gen_active_sensor.inc
+mutate "key1 Discharging renamed" '("\"Discharging\"", "\"Discharge\"")'
 mutate "PRIVATE dropped from flags" '("PRIVATE | WITH_ACK", "WITH_ACK")'
 mutate "event name changed" '("Cloud::instance().getWebhookName()", "\"wrong-event\"")'
 mutate "buffer size 256 -> 512" '("char data[256];", "char data[512];")'

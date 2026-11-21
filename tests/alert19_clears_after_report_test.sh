@@ -1,8 +1,8 @@
 #!/bin/zsh
 # WO-2026-10-06-001 - event alerts are reported once and then cleared, so none
 # can hide other alerts: 19 (watchdog reset) and, from round 2, 42 (data
-# ledger publish failure / OTA updates pending). 18 (state-machine thrash) is
-# deliberately left sticky; see testThrashStaysSetAfterReport.
+# ledger publish failure / OTA updates pending). WO-2026-11-11-001: 17 (boot
+# storm) and 18 (state-machine thrash) also report once, then clear.
 #
 # Behavioural test: the REAL getAlertSeverity() and raiseAlert()
 # (src/MyPersistentData.cpp), isAutoClearAfterReportAlert() and publishData()'s
@@ -133,18 +133,49 @@ void testNineteenStillOutranksWhileSet() {
   printf("PASS: testNineteenStillOutranksWhileSet\n");
 }
 
-// Alert 18 (state-machine thrash) stays set after a report: it is NOT in the
-// clear list. Round 2's Stage 7 found that clearing it can lose a tier-3 18:
-// ThrashGuard raises 18 and resets at once (ThrashGuard.cpp:150-152), before
-// the 250 ms deferred save (MyPersistentData.cpp:681). Chip dropped 18 from
-// v38 (2026-10-06); this guard fails if 18 is re-added without that fix.
-void testThrashStaysSetAfterReport() {
+// WO-2026-11-11-001: 18 (thrash, tiers 2 and 3) is reported once, then cleared.
+// It stays set (and masks lower codes) until a report is queued; a re-raise after
+// the clear reports again.
+void testThrashReportedOnceThenClears() {
   reset();
   raiseAlert(18);
+  raiseAlert(40);                       // masked while 18 is set
+  assert(g_alertCode == 18);
+  assert(publishReport(false) == 18);   // not queued: stays
+  assert(g_alertCode == 18);
   assert(publishReport(true) == 18);
-  assert(g_alertCode == 18);            // still set
+  assert(g_alertCode == 0);
+  assert(g_lastAlertTime == 0);
+  raiseAlert(18);                       // re-raise reports again
   assert(publishReport(true) == 18);
-  printf("PASS: testThrashStaysSetAfterReport\n");
+  assert(g_alertCode == 0);
+  printf("PASS: testThrashReportedOnceThenClears\n");
+}
+
+// Tier 3 raises 18 then System.reset()s at once. The code is persisted state, so
+// the first report after reboot still carries it (nothing clears it at boot).
+void testTierThreeThrashDeliveredAfterReboot() {
+  reset();
+  raiseAlert(18);                       // tier 3, then reset: g_alertCode is the persisted value
+  assert(publishReport(true) == 18);
+  assert(g_alertCode == 0);
+  printf("PASS: testTierThreeThrashDeliveredAfterReboot\n");
+}
+
+// 17 (boot storm) is a direct set_alertCode(17) at boot, bypassing severity. It
+// stays set until a report is queued, and nothing at connect clears it.
+void testBootStormReportedOnceThenClears() {
+  reset();
+  set_alertCode(17);
+  assert(publishReport(false) == 17);
+  assert(g_alertCode == 17);
+  assert(publishReport(true) == 17);
+  assert(g_alertCode == 0);
+  assert(g_lastAlertTime == 0);
+  set_alertCode(17);                    // re-raise reports again
+  assert(publishReport(true) == 17);
+  assert(g_alertCode == 0);
+  printf("PASS: testBootStormReportedOnceThenClears\n");
 }
 
 // Round 2: alert 42 (data ledger publish failure, or OTA updates pending at the
@@ -166,7 +197,9 @@ int main() {
   testWatchdogReportedOnceThenLaterAlertVisible();
   testUnqueuedReportDoesNotClear();
   testNineteenStillOutranksWhileSet();
-  testThrashStaysSetAfterReport();
+  testThrashReportedOnceThenClears();
+  testTierThreeThrashDeliveredAfterReboot();
+  testBootStormReportedOnceThenClears();
   testLedgerFailureReportedOnceThenLaterAlertVisible();
   printf("Event alerts clear after report test passed\n");
   return 0;
@@ -179,3 +212,9 @@ clang++ -std=c++17 -Wall -Wextra -pedantic -Wno-unused-function \
   -o "$binary"
 
 "$binary"
+
+# 17 must not be cleared at connect before a report can carry it.
+if grep -n 'get_alertCode() == 17' "$repo_root/src/state/State_Connect.cpp"; then
+  print -u2 "FAIL: State_Connect.cpp still clears alert 17 at connect"
+  exit 1
+fi
