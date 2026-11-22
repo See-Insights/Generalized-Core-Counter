@@ -70,6 +70,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0  # tag builds check the tagged commit is on main
+      - name: Tagged commit is on main (before building)
+        if: github.ref_type == 'tag'
+        run: .github/scripts/tag-on-main.sh "$GITHUB_SHA" origin/main
       - name: Tag matches source FIRMWARE_PRODUCT_VERSION (before building)
         if: github.ref_type == 'tag'
         run: |

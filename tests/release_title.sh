@@ -15,12 +15,26 @@ printf 'Title:   \nbody\n' > docs/releases/v1.4-notes.md
 $s v1.4 >/dev/null 2>&1; chk empty-summary "$?" 1
 $s v1.5 >/dev/null 2>&1; chk missing-file "$?" 1
 $s >/dev/null 2>&1; chk no-arg "$?" 1
+long=$(printf 'x%.0s' {1..100}); printf 'Title: %s\n' "$long" > docs/releases/v1.6-notes.md
+$s v1.6 >/dev/null 2>&1; chk too-long "$?" 1
+printf 'Title: %s\n' "${long:0:80}" > docs/releases/v1.7-notes.md
+$s v1.7 >/dev/null 2>&1; chk long-ok "$?" 0
 # the real notes for the current release must pass
 cd $root; for f in docs/releases/v50.1-notes.md; do t=${${f:t}%-notes.md}; chk "repo $t" "$($s $t 2>/dev/null | cut -c1-14)" "Release ${t}:"; done
+# tag-on-main.sh in a scratch repo: a commit on main passes, one only on a side branch fails, a missing ref fails
+m=$root/.github/scripts/tag-on-main.sh; g=$(mktemp -d "${TMPDIR:-/tmp}/tm.XXXXXX"); (
+  cd $g && git init -q -b main . && git -c user.email=a@b -c user.name=t commit -q --allow-empty -m one &&
+  git checkout -q -b side && git -c user.email=a@b -c user.name=t commit -q --allow-empty -m two )
+on=$(git -C $g rev-parse main); off=$(git -C $g rev-parse side)
+(cd $g && $m $on main >/dev/null 2>&1); chk on-main "$?" 0
+(cd $g && $m $off main >/dev/null 2>&1); chk off-main "$?" 1
+(cd $g && $m $on nosuch >/dev/null 2>&1); chk no-ref "$?" 1
+rm -rf $g
 # build.yml wiring: firmware job computes the title for tags; upload takes it from there
 w=$root/.github/workflows/build.yml
 chk wiring-script "$(grep -c 'release-title.sh "$GITHUB_REF_NAME"' $w)" 1
 chk wiring-output "$(grep -c 'title: ${{ steps.title.outputs.title }}' $w)" 1
 chk wiring-upload "$(grep -c 'TITLE: "${{ needs.firmware.outputs.title }}"' $w)" 1
+chk wiring-main "$(grep -c 'tag-on-main.sh "$GITHUB_SHA" origin/main' $w)" 1
 chk no-old-title "$(grep -c 'Development Release' $w)" 0
 exit $fail

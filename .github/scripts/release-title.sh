@@ -8,4 +8,8 @@ f="docs/releases/${tag}-notes.md"
 [ -f "$f" ] || { echo "::error::$f not found; a tag needs its release notes with a Title: line" >&2; exit 1; }
 first=$(head -n 1 "$f" | tr -d '\r')
 [[ "$first" =~ ^Title:[[:space:]]*(.*[^[:space:]])[[:space:]]*$ ]] || { echo "::error::line 1 of $f must be 'Title: <summary>' (got '$first')" >&2; exit 1; }
-printf 'Release %s: %s\n' "$tag" "${BASH_REMATCH[1]}"
+title="Release ${tag}: ${BASH_REMATCH[1]}"
+# Particle documents no maximum for a firmware title (checked 22 Nov 2026), so this cap is ours, not Particle's; existing titles are under 45 characters.
+max=100
+[ "${#title}" -le "$max" ] || { echo "::error::title is ${#title} characters, over our cap of $max: '$title'" >&2; exit 1; }
+printf '%s\n' "$title"
