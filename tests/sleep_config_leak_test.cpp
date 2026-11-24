@@ -1,7 +1,7 @@
 /*
  * WO-2026-10-02-003 (v34-SleepConfigLeak) - per-wake memory leak check.
  *
- * Compiled against Device OS 6.4.1's REAL
+ * Compiled against the shipped Device OS's REAL
  * `system/inc/system_sleep_configuration.h` (see
  * tests/sleep_config_leak_test.sh for the include paths and the two-line
  * host shim). The wake sources configured at each of the four sites are
@@ -102,7 +102,7 @@ void operator delete(void *p, const std::nothrow_t &) noexcept { countingFree(p)
 void operator delete[](void *p, const std::nothrow_t &) noexcept { countingFree(p); }
 
 // ---------------------------------------------------------------------------
-// Device OS 6.4.1, verbatim
+// Device OS header under test (the version in project.properties), verbatim
 // ---------------------------------------------------------------------------
 #include "system_sleep_configuration.h"
 
@@ -240,36 +240,35 @@ int main() {
   }
   check(anySites, "at least one real sleep site was extracted");
 
-  std::printf("\n--- Mutation: one long-lived object reset by move assignment ---\n");
-  bool mutationCaught = true;
+  // Harness sensitivity, independent of the Device OS version: the counting allocator must see an outstanding
+  // (unfreed) block and see it freed again.
+  {
+    const bool wasCounting = g_counting;
+    g_counting = true;
+    const long long before = g_stats.outstandingBlocks;
+    static char *volatile escape;  // escapes through a volatile global: the optimiser cannot elide the allocation
+    escape = new char[64];
+    __asm__ volatile("" ::: "memory");  // clang assumes operator new has no side effects on other globals: force the counter read after it
+    check(g_stats.outstandingBlocks == before + 1, "the counting allocator sees an unfreed block (harness self-check)");
+    delete[] escape;
+    __asm__ volatile("" ::: "memory");
+    check(g_stats.outstandingBlocks == before, "the counting allocator sees the block freed (harness self-check)");
+    g_counting = wasCounting;
+  }
+
+  std::printf("\n--- The old pattern: one long-lived object reset by move assignment ---\n");
+  // Device OS 6.4.1's move assignment orphaned the old wake-source list (one block per source per cycle); later
+  // versions free it, so the old pattern is informational on a fixed header. The assertions that matter are the
+  // fresh-local zero-leak checks above and the harness self-check; this section reports which behaviour the header
+  // under test has, and if the header still orphans per cycle it must leak at least one block per cycle.
   for (const RealSite &site : kRealSites) {
     SiteResult r = runSharedReset(site, cycles, site.hasNetworkStandby);
     const double perCycle = (double)r.leakedBytes / (double)cycles;
-    std::printf("  %-16s leaked=%lld B in %lld blocks over %d cycles (%.1f B/cycle)\n",
-                r.name, r.leakedBytes, r.leakedBlocks, cycles, perCycle);
-    if (r.leakedBytes <= 0) {
-      std::printf("FAILED: the old pattern did not leak at %s - the mutation "
-                  "is not exercising Device OS's move assignment\n", r.name);
-      g_failures++;
-      mutationCaught = false;
-      continue;
-    }
-    // Every cycle orphans the whole list: one block per wake source.
-    if (r.leakedBlocks < (long long)cycles) {
-      std::printf("FAILED: the old pattern leaked %lld blocks over %d cycles at "
-                  "%s - expected at least one orphaned node per cycle\n",
-                  r.leakedBlocks, cycles, r.name);
-      g_failures++;
-      mutationCaught = false;
-    }
-    // The zero-leak assertion, applied to the old pattern, must fail.
-    if (r.leakedBytes == 0) {
-      mutationCaught = false;
-    }
+    const bool orphansPerCycle = r.leakedBlocks >= (long long)cycles;
+    std::printf("  %-16s leaked=%lld B in %lld blocks over %d cycles (%.1f B/cycle) -> %s\n",
+                r.name, r.leakedBytes, r.leakedBlocks, cycles, perCycle,
+                orphansPerCycle ? "header orphans the old list every cycle (bug present)" : "no per-cycle orphaning (fixed in this Device OS)");
   }
-  check(mutationCaught,
-        "the mutation (restoring the long-lived reset object) fails the "
-        "zero-leak assertion");
 
   std::printf("\n");
   if (g_failures) {
@@ -277,6 +276,6 @@ int main() {
     return 1;
   }
   std::printf("sleep_config_leak_test passed: zero bytes lost per cycle with a "
-              "fresh local; the old shared-reset pattern leaks every cycle\n");
+              "fresh local pattern on the shipped Device OS header\n");
   return 0;
 }

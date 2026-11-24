@@ -83,6 +83,7 @@ Recommended production verification:
 - Confirm boot logs show `FailsafeTest=0`.
 - Confirm failsafe timing logs show the production values: `stale=43200s`,
   `cooldown=21600s`, `jitter=1800s`.
+- A `v*` tag build fails before compiling unless `DEV_BUILD` and `CONNECTIVITY_FAILSAFE_TEST_MODE` are 0 (`build.yml`, tested by `tests/release_flags_guard_test.sh`).
 
 ## Bench Setup
 
