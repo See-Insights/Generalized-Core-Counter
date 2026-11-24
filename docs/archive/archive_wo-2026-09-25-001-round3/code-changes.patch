@@ -1,0 +1,3823 @@
+diff --git a/lib/BackgroundPublishRK/src/BackgroundPublishRK.cpp b/lib/BackgroundPublishRK/src/BackgroundPublishRK.cpp
+index bf3ff17..9a03dc8 100644
+--- a/lib/BackgroundPublishRK/src/BackgroundPublishRK.cpp
++++ b/lib/BackgroundPublishRK/src/BackgroundPublishRK.cpp
+@@ -7,6 +7,37 @@
+ 
+ #include "BackgroundPublishRK.h"
+ 
++#include <atomic>
++
++// BENCH ONLY: observe the cloud-status transition without changing publishing.
++// Zero means this build has not observed a connected transition yet.
++static Logger benchLog("app.pubq");
++static std::atomic<unsigned long> benchConnectedAtMs{0};
++static unsigned long benchAttemptId = 0; // Only the publish worker increments this.
++
++static void benchCloudStatus(system_event_t event, int param) {
++    if (event == cloud_status && param == cloud_status_connected) {
++        const unsigned long now = millis();
++        benchConnectedAtMs.store(now);
++        benchLog.trace("PubqConnected: ms=%lu", now);
++    } else if (event == cloud_status && param == cloud_status_disconnected) {
++        benchConnectedAtMs.store(0);
++    }
++}
++
++static uint32_t benchEventHash(const char *name, const char *data) {
++    // FNV-1a of name + NUL + data; recompute from delivered payloads, not a unique ID.
++    uint32_t hash = 2166136261u;
++    for (const unsigned char *s = (const unsigned char *)name; *s; ++s) {
++        hash = (hash ^ *s) * 16777619u;
++    }
++    hash = hash * 16777619u; // NUL separator.
++    for (const unsigned char *s = (const unsigned char *)data; *s; ++s) {
++        hash = (hash ^ *s) * 16777619u;
++    }
++    return hash;
++}
++
+ BackgroundPublishRK *BackgroundPublishRK::_instance;
+ 
+ BackgroundPublishRK::BackgroundPublishRK() {
+@@ -29,6 +60,11 @@ void BackgroundPublishRK::start()
+     if(!thread)
+     {
+         os_mutex_create(&mutex);
++        System.on(cloud_status, benchCloudStatus);
++        // Normally setup starts this worker before any connection exists.
++        if (Particle.connected()) {
++            benchConnectedAtMs.store(millis());
++        }
+ 
+         // use OS_THREAD_PRIORITY_DEFAULT so that application, system, and
+         // background publish thread will all run at the same priority and
+@@ -80,6 +116,13 @@ void BackgroundPublishRK::thread_f()
+         // use the Future<bool> object directly as its default wait
+         // (used by WITH_ACK) short-circuits when not called from the
+         // main application thread
++        const unsigned long attemptId = ++benchAttemptId;
++        const uint32_t eventHash = benchEventHash(event_name, event_data);
++        const unsigned long connectedMs = benchConnectedAtMs.load();
++        const unsigned long attemptMs = millis();
++        // Capture connection age at Particle.publish(), not at Future completion.
++        // The app-thread cloud-status callback may lag the system transition.
++        const unsigned long sinceConnectMs = connectedMs ? attemptMs - connectedMs : 0;
+         auto ok = Particle.publish(event_name, event_data, event_flags);
+ 
+         // then wait for publish to complete
+@@ -89,6 +132,19 @@ void BackgroundPublishRK::thread_f()
+             delay(1);
+         }
+ 
++        const bool done = ok.isDone();
++        const bool succeeded = ok.isSucceeded();
++        const bool explicitAck = (event_flags.value() & WITH_ACK.value()) != 0;
++        const char *ack = !explicitAck ? "not-observed" :
++            (succeeded ? "confirmed" : "unconfirmed");
++        const int error = done && !succeeded ? (int)ok.error().type() : 0;
++        // One result line per actual Particle.publish() attempt. Future success
++        // without explicit WITH_ACK does not establish that a cloud ACK arrived.
++        benchLog.info("PubqAttempt: id=%lu h=%08lx e=%s f=%02x future=%s ack=%s err=%d cObs=%lu ck=%d dur=%lu",
++            attemptId, (unsigned long)eventHash, event_name, (unsigned)event_flags.value(),
++            !done ? "pending" : (succeeded ? "ok" : "failed"), ack, error,
++            sinceConnectMs, connectedMs ? 1 : 0, millis() - attemptMs);
++
+         if(completed_cb)
+         {
+             completed_cb(ok.isSucceeded(),
+diff --git a/lib/PublishQueuePosixRK/src/PublishQueuePosixRK.cpp b/lib/PublishQueuePosixRK/src/PublishQueuePosixRK.cpp
+index 231d9de..eb73950 100644
+--- a/lib/PublishQueuePosixRK/src/PublishQueuePosixRK.cpp
++++ b/lib/PublishQueuePosixRK/src/PublishQueuePosixRK.cpp
+@@ -328,11 +328,31 @@ void PublishQueuePosix::stateWait() {
+         // This message is monitored by the automated test tool. If you edit this, change that too.
+         _log.trace("publishing %s event=%s data=%s", (curFileNum ? "file" : "ram"), curEvent->eventName, curEvent->eventData);
+ 
+-        if (BackgroundPublishRK::instance().publish(curEvent->eventName, curEvent->eventData, curEvent->flags, 
++        // BENCH B: require an API-level ACK before the queue removes an event.
++        // Normalize at dispatch to cover existing persisted PRIVATE-only events.
++        // NO_ACK takes precedence in Device OS, so clear it before setting WITH_ACK.
++        const PublishFlags sendFlags = (curEvent->flags & ~PublishFlags(NO_ACK)) | WITH_ACK;
++        if (BackgroundPublishRK::instance().publish(curEvent->eventName, curEvent->eventData, sendFlags,
+             [this](bool succeeded, const char *eventName, const char *eventData, const void *context) {
+                 publishCompleteCallback(succeeded, eventName, eventData);
+             })) {
+             // Successfully started publish
++            // WO-2026-09-25-001: one Particle.publish() has now been started for this
++            // event. Reported from the application thread, not the publish worker.
++            //
++            // Stage 5 decision 6: an attempt is "in flight" from here until
++            // statePublishWait() has acted on its result, so a sleep/teardown
++            // gate can never abandon it.
++            publishInFlight = true;
++            if (publishAttemptUserCallback) {
++                publishAttemptUserCallback(curEvent->eventName, (uint32_t)sendFlags.value());
++            }
++        }
++        else {
++            // Diagnostic only: preserve the existing state machine on rejection.
++            // No Particle.publish() was started, so no Future or ACK exists.
++            _log.error("PubqDispatch: e=%s f=%02x accepted=0 future=none ack=not-observed",
++                curEvent->eventName, (unsigned)sendFlags.value());
+         }
+     }
+     else {
+@@ -345,6 +365,14 @@ void PublishQueuePosix::statePublishWait() {
+         return;
+     }
+ 
++    // WO-2026-09-25-001: report the attempt's outcome before acting on it.
++    // Under fix B every queued send carries explicit WITH_ACK, so publishSuccess
++    // here means the cloud acknowledged the event; the removal below is therefore
++    // an acknowledged removal, and the retry branch leaves the event queued.
++    if (publishResultUserCallback && curEvent) {
++        publishResultUserCallback(curEvent->eventName, publishSuccess);
++    }
++
+     if (publishSuccess) {
+         // Remove from the queue
+         _log.trace("publish success %d", curFileNum);
+@@ -388,6 +416,10 @@ void PublishQueuePosix::statePublishWait() {
+ 
+     stateHandler = &PublishQueuePosix::stateWait;
+     stateTime = millis();
++    // WO-2026-09-25-001 (Stage 5 decision 6): the attempt's outcome has now been
++    // acted on - the event was either removed on an acknowledgment or put back
++    // and persisted - so nothing is in flight any more.
++    publishInFlight = false;
+ }
+ 
+ 
+diff --git a/lib/PublishQueuePosixRK/src/PublishQueuePosixRK.h b/lib/PublishQueuePosixRK/src/PublishQueuePosixRK.h
+index adc00bc..6bd9239 100644
+--- a/lib/PublishQueuePosixRK/src/PublishQueuePosixRK.h
++++ b/lib/PublishQueuePosixRK/src/PublishQueuePosixRK.h
+@@ -133,6 +133,46 @@ public:
+      */
+     PublishQueuePosix &withPublishCompleteUserCallback(std::function<void(bool succeeded, const char *eventName, const char *eventData)> cb) { publishCompleteUserCallback = cb; return *this; };
+ 
++    /**
++     * @brief Sets a callback to call when a publish attempt is dispatched for a queued event
++     *
++     * @param cb The callback function or C++11 lambda
++     *
++     * The callback has this prototype:
++     *
++     * void callback(const char *eventName, uint32_t flags)
++     *
++     * The parameters are:
++     * - eventName: The event name that is being sent
++     * - flags: The effective publish flags the event is being sent with
++     *
++     * Unlike withPublishCompleteUserCallback(), this callback is invoked from stateWait() on the
++     * application thread (the thread that calls loop()), once per accepted dispatch to the
++     * background publish worker - that is, once per Particle.publish() that is actually started.
++     */
++    PublishQueuePosix &withPublishAttemptUserCallback(std::function<void(const char *eventName, uint32_t flags)> cb) { publishAttemptUserCallback = cb; return *this; };
++
++    /**
++     * @brief Sets a callback to call when a dispatched publish attempt has completed
++     *
++     * @param cb The callback function or C++11 lambda
++     *
++     * The callback has this prototype:
++     *
++     * void callback(const char *eventName, bool acknowledged)
++     *
++     * The parameters are:
++     * - eventName: The event name whose attempt completed
++     * - acknowledged: true if the publish Future succeeded. When the event was sent with an
++     *   explicit WITH_ACK, that means the cloud acknowledged it and the queue is about to remove
++     *   the event; false means the event stays queued for retry.
++     *
++     * Unlike withPublishCompleteUserCallback(), this callback is invoked from statePublishWait()
++     * on the application thread (the thread that calls loop()), at the point the queue decides
++     * between removal and retry.
++     */
++    PublishQueuePosix &withPublishResultUserCallback(std::function<void(const char *eventName, bool acknowledged)> cb) { publishResultUserCallback = cb; return *this; };
++
+ 
+     /**
+      * @brief You must call this from setup() to initialize this library
+@@ -266,6 +306,24 @@ public:
+      */
+     bool getCanSleep() const { return canSleep; };
+ 
++    /**
++     * @brief True while a publish attempt is outstanding for a queued event
++     *
++     * Set when `stateWait()` successfully dispatches an event to
++     * BackgroundPublishRK (a real `Particle.publish()` has been started), and
++     * cleared only once `statePublishWait()` has processed that attempt's
++     * result - i.e. after the event has been removed on an acknowledgment, or
++     * put back and persisted on a failure.
++     *
++     * WO-2026-09-25-001 (Stage 5 decision 6): the sleep/teardown gates read this
++     * so they never abandon an outstanding publish. It is deliberately the
++     * queue's own state rather than an inference from `getCanSleep()` or the
++     * queue depth, and it deliberately stays true between the worker thread
++     * completing the future and the application thread acting on it, so a
++     * failed RAM event cannot be lost in that window.
++     */
++    bool getPublishInFlight() const { return publishInFlight; };
++
+     /**
+      * @brief Gets the total number of events queued
+      * 
+@@ -410,6 +468,7 @@ protected:
+     bool publishSuccess = false; //!< true if the publish succeeded
+     bool pausePublishing = false; //!< flag to pause publishing (used from automated test)
+     bool canSleep = false; //!< returns true if this is a good time to go to sleep
++    bool publishInFlight = false; //!< true from an accepted dispatch until statePublishWait() has processed the result
+ 
+     unsigned long waitAfterConnect = 2000; //!< time to wait after Particle.connected() before publishing
+     unsigned long waitBetweenPublish = 1000; //!< how long to wait in milliseconds between publishes
+@@ -417,6 +476,9 @@ protected:
+ 
+     std::function<void(bool succeeded, const char *eventName, const char *eventData)> publishCompleteUserCallback = 0; //!< User callback for publish complete
+ 
++    std::function<void(const char *eventName, uint32_t flags)> publishAttemptUserCallback = 0; //!< User callback for publish attempt dispatch (application thread)
++    std::function<void(const char *eventName, bool acknowledged)> publishResultUserCallback = 0; //!< User callback for publish attempt result (application thread)
++
+     std::function<void(PublishQueuePosix&)> stateHandler = 0; //!< state handler (stateConnectWait, stateWait, etc).
+ 
+     static void systemEventHandler(system_event_t event, int param); //!< system event handler, used to detect reset events
+diff --git a/project.properties b/project.properties
+index c887fc4..ddc1b72 100644
+--- a/project.properties
++++ b/project.properties
+@@ -3,6 +3,12 @@ name=Generalized-Core-Counter
+ dependencies.StorageHelperRK=0.0.5
+ dependencies.AB1805_RK=0.0.4
+ dependencies.LocalTimeRK=0.1.3
+-dependencies.PublishQueuePosixRK=0.0.7
++# WO-2026-09-25-001: PublishQueuePosixRK is deliberately NOT declared as a
++# registry dependency. The vendored copy in lib/PublishQueuePosixRK carries the
++# explicit-WITH_ACK dispatch fix (and pulls in the vendored BackgroundPublishRK
++# and SequentialFileRK). Declaring it here makes `particle compile` replace
++# lib/ with the unpatched registry 0.0.7 sources, so the fix would be missing
++# from every cloud-built binary while local ARM builds still contained it.
++# dependencies.PublishQueuePosixRK=0.0.7
+ deviceOS=6.4.1
+ platform=p2
+diff --git a/src/Generalized-Core-Counter.cpp b/src/Generalized-Core-Counter.cpp
+index 0ec78d6..29a1f47 100644
+--- a/src/Generalized-Core-Counter.cpp
++++ b/src/Generalized-Core-Counter.cpp
+@@ -64,6 +64,7 @@ PRODUCT_VERSION(FIRMWARE_PRODUCT_VERSION);
+ #include "cloud/Cloud.h"                   // Particle Ledger integration (config + data)
+ #include "PublishQueuePosixRK.h"     // File-backed persistent event queue
+ #include "cloud/Particle_Functions.h"      // Particle.function() and Particle.variable() registration
++#include "cloud/PublishDeliveryCounters.h" // WO-2026-09-25-001: retained publish delivery counters
+ #include "reporting/ReportingPolicy.h"    // Shared cloud-report cadence policy
+ 
+ // Sensor abstraction layer
+@@ -1129,8 +1130,24 @@ void setup() {
+   // across all supported platforms (P2, Boron, Argon). With an
+   // hourly reporting interval, 800 file-backed events provide
+   // headroom over the 720 events needed for a full 30 days.
++  //
++  // WO-2026-09-25-001 (Stage 5 decision 2): the two delivery hooks below are
++  // both invoked on the application thread from PublishQueuePosix::loop() -
++  // attempt from stateWait(), result from statePublishWait() - which is what
++  // lets PublishDeliveryCounters use plain unlocked increments. begin() runs
++  // first so the retained block is validated before anything can dispatch.
++  PublishDeliveryCounters::begin();
+   PublishQueuePosix::instance()
+       .withFileQueueSize(800)
++      .withPublishAttemptUserCallback([](const char *eventName, uint32_t flags) {
++        (void)eventName;
++        (void)flags;
++        PublishDeliveryCounters::noteAttempt();
++      })
++      .withPublishResultUserCallback([](const char *eventName, bool acknowledged) {
++        (void)eventName;
++        PublishDeliveryCounters::noteResult(acknowledged);
++      })
+       .setup(); // Initialize the publish queue
+ 
+   // ===== TIME, RTC, AND WATCHDOG CONFIGURATION =====
+@@ -2162,7 +2179,11 @@ void publishData(time_t stampOverride) {
+  * heap usage, and PMIC anomalies. Critical for diagnosing unexpected resets in field
+  * deployments without physical device access.
+  *
+- * @note Large payload (~896 bytes). Called once during setup(); queued for first connection.
++ * @note Large payload. Measured worst case 896 bytes of the 1023 usable in the
++ *       `char status[1024]` buffer, itself under Device OS 6.4.1's 1024-byte
++ *       event-data limit; a typical cycle is around 702 bytes. See
++ *       tests/status_event_payload_budget_test.py. Called once during setup();
++ *       queued for the first connection.
+  */
+ void publishStartupStatus() {
+   char status[1024];
+@@ -2226,9 +2247,29 @@ void publishStartupStatus() {
+              startupAb1805ConfirmedWatchdog ? "AB1805_PIN" : "NONE");
+   }
+ 
++  // WO-2026-09-25-001 (Stage 5 decisions 2 and 5, acceptance criterion 4):
++  // publish delivery counters. They ride in this `status` event and NOT in the
++  // device-status ledger payload - that payload was already at 831-856 of its
++  // 896-byte cap in the field, whereas this event has roughly 300 bytes of
++  // headroom under both the Device OS 6.4.1 event-data limit
++  // (particle::protocol::MAX_EVENT_DATA_LENGTH = 1024,
++  // communication/inc/protocol_defs.h:94) and PublishQueuePosixRK's own
++  // ceiling, which is that same constant (PublishQueuePosixRK.cpp:106).
++  // See tests/status_event_payload_budget_test.py for the full byte budget.
++  //   d = delivery, a = attempted, k = acKnowledged, f = failed,
++  //   r = retried, q = queued at the last sleep commit,
++  //   s = Sleep commits that carried events over (sleptWithQueued),
++  //   b = aBandoned - attempts whose outcome was lost to a reset.
++  // Each counter saturates at PublishDeliveryCounters::kCounterMax (65535), so
++  // five digits per counter is both the deployed and the structural maximum.
++  // Outside an in-flight attempt and below saturation, a == k + f + b.
++  // The counters live in retained memory, so this boot-time event reports the
++  // accounting carried over from the cycles before this wake.
++  const PublishDeliveryCounters::Snapshot delivery = PublishDeliveryCounters::snapshot();
++
+ #if defined(ENABLE_PMIC_FORENSICS) && ENABLE_PMIC_FORENSICS
+   snprintf(status, sizeof(status),
+-           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"pmicAnomalyCount\":%u,\"lastPmicAnomalySoc\":%.2f,\"lastPmicAnomalyChargeStatus\":%u,\"lastPmicAnomalyAgeSec\":%lu,\"lastPmicAnomalyPowerSource\":%u,\"lastPmicAnomalyVbusStatus\":%u,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d%s%s}",
++           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"pmicAnomalyCount\":%u,\"lastPmicAnomalySoc\":%.2f,\"lastPmicAnomalyChargeStatus\":%u,\"lastPmicAnomalyAgeSec\":%lu,\"lastPmicAnomalyPowerSource\":%u,\"lastPmicAnomalyVbusStatus\":%u,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d,\"d\":{\"a\":%u,\"k\":%u,\"f\":%u,\"r\":%u,\"q\":%u,\"s\":%u,\"b\":%u}%s%s}",
+            FIRMWARE_VERSION,
+            resetReason,
+            (unsigned long)resetReasonData,
+@@ -2253,11 +2294,18 @@ void publishStartupStatus() {
+            lastConnectionAgeSec,
+            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
+            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
++           (unsigned)delivery.attempted,
++           (unsigned)delivery.acknowledged,
++           (unsigned)delivery.failed,
++           (unsigned)delivery.retried,
++           (unsigned)delivery.queuedAtSleep,
++           (unsigned)delivery.sleptWithQueued,
++           (unsigned)delivery.abandoned,
+            hibernateFields,
+            pinResetAb1805Fields);
+ #else
+   snprintf(status, sizeof(status),
+-           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d%s%s}",
++           "{\"version\":\"%s\",\"resetReason\":%d,\"resetReasonData\":%lu,\"alert\":%d,\"lastAlert\":%ld,\"freeHeap\":%lu,\"appBreadcrumb\":%u,\"appBreadcrumbMs\":%lu,\"watchdogResetCount\":%u,\"lastWatchdogBreadcrumb\":%u,\"lastWatchdogUptimeMs\":%lu,\"lastWatchdogResetReasonData\":%lu,\"failsafeStage\":%u,\"failsafeCount\":%u,\"failsafeLastAction\":%ld,\"lastConnectionAgeSec\":%ld,\"failsafeTest\":%d,\"failsafeTestMode\":%d,\"d\":{\"a\":%u,\"k\":%u,\"f\":%u,\"r\":%u,\"q\":%u,\"s\":%u,\"b\":%u}%s%s}",
+            FIRMWARE_VERSION,
+            resetReason,
+            (unsigned long)resetReasonData,
+@@ -2276,6 +2324,13 @@ void publishStartupStatus() {
+            lastConnectionAgeSec,
+            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
+            CONNECTIVITY_FAILSAFE_TEST_MODE ? 1 : 0,
++           (unsigned)delivery.attempted,
++           (unsigned)delivery.acknowledged,
++           (unsigned)delivery.failed,
++           (unsigned)delivery.retried,
++           (unsigned)delivery.queuedAtSleep,
++           (unsigned)delivery.sleptWithQueued,
++           (unsigned)delivery.abandoned,
+            hibernateFields,
+            pinResetAb1805Fields);
+ #endif
+diff --git a/src/Version.cpp b/src/Version.cpp
+index a9c4d52..5861a33 100644
+--- a/src/Version.cpp
++++ b/src/Version.cpp
+@@ -3,5 +3,5 @@
+ // Bump this string and the release notes on each new release.
+ // Keep the value in sync with the Doxyfile PROJECT_NUMBER.
+ 
+-const char* FIRMWARE_VERSION = "v24-Thermal-Inhibit";
+-const char* FIRMWARE_RELEASE_NOTES = "Thermal charge-inhibit (37/0C arm, 35/3C release) + power management consolidation";
++const char* FIRMWARE_VERSION = "v24-Pubq-Ack-B";
++const char* FIRMWARE_RELEASE_NOTES = "Bench B: require explicit WITH_ACK for every queued send, including persisted events; retain bench diagnostics";
+diff --git a/src/cloud/DeviceStatusPublisher.cpp b/src/cloud/DeviceStatusPublisher.cpp
+index 0ce9c8b..2fe7663 100644
+--- a/src/cloud/DeviceStatusPublisher.cpp
++++ b/src/cloud/DeviceStatusPublisher.cpp
+@@ -288,6 +288,14 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
+     writerBase.name("lastResult").value(Observability::toString(cycleStats.connect_result));
+     writerBase.name("elapsedMs").value((int)cycleStats.connect_duration_ms);
+     writerBase.endObject();
++    // WO-2026-09-25-001 Stage 5 decision 5: the publish delivery counters are
++    // NOT emitted here. They go in the `status` event only
++    // (publishStartupStatus() in src/Generalized-Core-Counter.cpp), because
++    // this payload was already measured at 831-856 of its 896-byte cap in the
++    // field, so a counter object here would push ordinary cycles over the cap
++    // and the guard below would then skip the status publish entirely. This
++    // ledger payload's format is therefore unchanged by this WO. The headroom
++    // question itself is WO-2026-09-25-003.
+     // Item 9 (WO-2026-08-29-002): clock trust verdict and sync recency, so
+     // "was this cycle's timestamp trustworthy" is readable from telemetry
+     // instead of reconstructed. trusted uses the same monotonic
+@@ -351,6 +359,22 @@ bool Cloud::writeDeviceStatusToCloud(const char *source) {
+         return false;
+     }
+ 
++    // WO-2026-09-25-001: JSONBufferWriter::dataSize() "can be greater than
++    // buffer size" (Device OS 6.4.1 wiring/inc/spark_wiring_json.h:232) - the
++    // writer silently stops copying but keeps counting. The NUL store below
++    // indexes bufferBase with that count, so an over-capacity payload would
++    // write past this stack buffer AND publish truncated, invalid JSON. This
++    // payload's existing fields already have a deployed worst case above the
++    // 896-byte cap (see tests/device_status_payload_budget_test.py), so refuse
++    // to publish instead, loudly, rather than corrupting the stack.
++    if (writerBase.dataSize() >= sizeof(bufferBase)) {
++        Log.error("LedgerPayloadStatus: overflow bytes=%lu/%lu schema=%d - status not published",
++                  (unsigned long)writerBase.dataSize(),
++                  (unsigned long)DEVICE_STATUS_PAYLOAD_CAPACITY,
++                  kLedgerSchemaVersion);
++        return false;
++    }
++
+     bufferBase[writerBase.dataSize()] = '\0';
+ 
+     // Only publish if the status payload actually changed.
+diff --git a/src/cloud/Particle_Functions.cpp b/src/cloud/Particle_Functions.cpp
+index ce4b735..b6ffc1f 100644
+--- a/src/cloud/Particle_Functions.cpp
++++ b/src/cloud/Particle_Functions.cpp
+@@ -21,12 +21,15 @@ SerialLogHandler logHandler(LOG_LEVEL_WARN);
+ #elif SERIAL_LOG_LEVEL == 3
+ SerialLogHandler logHandler(LOG_LEVEL_INFO,
+                             {// Logging level for non-application messages
++                             {"app.pubq", LOG_LEVEL_TRACE},
++                             {"app.seqfile", LOG_LEVEL_TRACE},
++                             {"comm.coap", LOG_LEVEL_TRACE},
+                              {"mux", LOG_LEVEL_WARN},
+                              {"system.nm", LOG_LEVEL_WARN},
+                              {"system", LOG_LEVEL_WARN},
+-                             {"comm.dtls", LOG_LEVEL_WARN},
++                             {"comm.dtls", LOG_LEVEL_INFO},
+                              {"comm.protocol", LOG_LEVEL_WARN},
+-                             {"comm.protocol.handshake", LOG_LEVEL_WARN},
++                             {"comm.protocol.handshake", LOG_LEVEL_INFO},
+                              {"net.pppncp", LOG_LEVEL_WARN},
+                              {"app.ab1805", LOG_LEVEL_WARN}});
+ #elif SERIAL_LOG_LEVEL == 4
+diff --git a/src/cloud/PublishDeliveryBudget.cpp b/src/cloud/PublishDeliveryBudget.cpp
+new file mode 100644
+index 0000000..2ebbb24
+--- /dev/null
++++ b/src/cloud/PublishDeliveryBudget.cpp
+@@ -0,0 +1,87 @@
++/**
++ * @file PublishDeliveryBudget.cpp
++ * @brief Bounded delivery wait - the decision logic only.
++ *
++ * @details See PublishDeliveryBudget.h for the rule, the budget's start
++ *          condition and why the budget is a compile-time constant.
++ *
++ *          This file deliberately includes nothing from Particle or the publish
++ *          queue, so the host test compiles the shipped logic itself (together
++ *          with the shipped policy constant) rather than a mirror of it. The
++ *          device-side adapter lives in PublishDeliveryGate.cpp.
++ *
++ *          Threading: evaluated from the application thread only - the IDLE
++ *          sleep gate, the IDLE connectivity ceiling and the SLEEPING_STATE
++ *          cloud-sync gate - so the module state below needs no locking.
++ */
++
++#include "cloud/PublishDeliveryBudget.h"
++
++#include "power/ConnectivityPolicy.h"
++
++namespace {
++
++/// millis() at which the budget started; only meaningful while budgetRunning.
++unsigned long budgetStartMs = 0;
++/// True while a budget is running. A separate flag rather than a 0 sentinel on
++/// budgetStartMs, because millis() really is 0 for the first millisecond after
++/// boot and the budget must not be a millisecond short there.
++bool budgetRunning = false;
++/// True once this episode's expiry has been reported to a caller.
++bool expiryReported = false;
++
++} // namespace
++
++namespace PublishDeliveryBudget {
++
++unsigned long budgetMs() {
++  return ConnectivityPolicy::PUBLISH_DELIVERY_BUDGET_MS;
++}
++
++void reset() {
++  budgetStartMs = 0;
++  budgetRunning = false;
++  expiryReported = false;
++}
++
++Verdict evaluate(const Inputs &in) {
++  Verdict out;
++
++  // The queue is empty (and nothing is being dispatched): sleep was always
++  // allowed here, and the budget does not apply.
++  if (in.queueSleepSafe) {
++    reset();
++    out.sleepPermitted = true;
++    return out;
++  }
++
++  // Offline with events queued: this is the ordinary low-power case. The events
++  // are durable and are flushed on the next connection, so sleep is permitted
++  // and no delivery budget is consumed - only connected time counts.
++  if (!in.cloudConnected) {
++    reset();
++    out.sleepPermitted = true;
++    return out;
++  }
++
++  // Cloud-connected with a non-empty queue: the budget runs.
++  if (!budgetRunning) {
++    budgetStartMs = in.nowMs;
++    budgetRunning = true;
++    expiryReported = false;
++  }
++
++  out.elapsedMs = in.nowMs - budgetStartMs;
++  out.budgetExpired = (out.elapsedMs >= budgetMs());
++
++  if (out.budgetExpired && !expiryReported) {
++    out.expiryFirstObserved = true;
++    expiryReported = true;
++  }
++
++  // An outstanding publish attempt is never abandoned, expired budget or not.
++  out.sleepPermitted = out.budgetExpired && !in.publishInFlight;
++  return out;
++}
++
++} // namespace PublishDeliveryBudget
+diff --git a/src/cloud/PublishDeliveryBudget.h b/src/cloud/PublishDeliveryBudget.h
+new file mode 100644
+index 0000000..dfc586a
+--- /dev/null
++++ b/src/cloud/PublishDeliveryBudget.h
+@@ -0,0 +1,102 @@
++#pragma once
++
++/**
++ * @file PublishDeliveryBudget.h
++ * @brief Bounded delivery wait for the publish queue (WO-2026-09-25-001,
++ *        Stage 5 decision 6 / acceptance criterion 11).
++ *
++ * @details Fix B only lets the queue remove an event once the cloud has
++ *          acknowledged it. That closes the loss gap, but it also means a queue
++ *          that never drains keeps the device connected forever: IDLE refuses to
++ *          enter `SLEEPING_STATE` while the queue is non-empty
++ *          (`State_Idle.cpp`), so the `SLEEPING_STATE` gate's own timeout is
++ *          never reached at all (Stage 7 finding P1 - an exact-source
++ *          reproduction stayed connected for a simulated hour).
++ *
++ *          The rule this module implements is:
++ *
++ *          > Sleep is allowed when the queue is empty **or** (the delivery
++ *          > budget has expired **and** no publish is in flight).
++ *
++ *          **Budget start:** the first evaluation at which the device is
++ *          cloud-connected *and* the publish queue is not sleep-safe (i.e. it
++ *          holds at least one event, or is dispatching one). The budget is
++ *          cancelled - and restarts from zero next time - as soon as the queue
++ *          becomes sleep-safe or the cloud connection drops. Offline time never
++ *          consumes the budget, because offline sleep is already permitted:
++ *          queued events are durable and flushed on the next connection.
++ *
++ *          **Budget value:** `ConnectivityPolicy::PUBLISH_DELIVERY_BUDGET_MS`
++ *          (90 s). It is a compile-time named constant in the existing policy
++ *          header rather than a runtime setting: every runtime-configurable
++ *          value on this device lives in a persisted struct, and this work order
++ *          may not change a persisted layout.
++ *
++ *          **In flight:** supplied by the caller from
++ *          `PublishQueuePosix::getPublishInFlight()` - the queue's own state,
++ *          not an inference. An outstanding attempt is never abandoned by a
++ *          disconnect, whatever the budget says.
++ *
++ *          This translation unit is deliberately free of Particle, the publish
++ *          queue and logging, so `tests/publish_delivery_budget_test.cpp`
++ *          exercises the shipped decision logic directly on the host. The
++ *          device-side adapter that collects the inputs, applies the verdict and
++ *          logs expiry lives in `PublishDeliveryGate.h/.cpp`.
++ */
++
++#ifndef __PUBLISH_DELIVERY_BUDGET_H
++#define __PUBLISH_DELIVERY_BUDGET_H
++
++#include <stddef.h>
++#include <stdint.h>
++
++namespace PublishDeliveryBudget {
++
++/// Everything the decision depends on, gathered by the caller.
++struct Inputs {
++  /// Particle.connected()
++  bool cloudConnected = false;
++  /// PublishQueuePosix::getCanSleep() - true when the queue holds nothing and
++  /// is not dispatching.
++  bool queueSleepSafe = false;
++  /// PublishQueuePosix::getPublishInFlight()
++  bool publishInFlight = false;
++  /// Number of events still queued, for the expiry log only.
++  size_t queuedEvents = 0;
++  /// millis()
++  unsigned long nowMs = 0;
++};
++
++struct Verdict {
++  /// The queue term for the sleep/teardown gates: queue empty OR (budget
++  /// expired AND nothing in flight).
++  bool sleepPermitted = false;
++  /// True once the budget has run out for this episode, whether or not a
++  /// publish is still in flight.
++  bool budgetExpired = false;
++  /// True on the single evaluation at which the budget expired, so the caller
++  /// logs each expiry exactly once per episode.
++  bool expiryFirstObserved = false;
++  /// Milliseconds since the budget started (0 while it is not running).
++  unsigned long elapsedMs = 0;
++};
++
++/// The configured budget, in milliseconds.
++unsigned long budgetMs();
++
++/**
++ * @brief Advance the budget and return the current verdict.
++ *
++ * Safe to call several times per loop iteration and from several call sites:
++ * the timer is keyed on wall-clock `millis()`, and `expiryFirstObserved` is
++ * raised for exactly one evaluation per expiry episode.
++ */
++Verdict evaluate(const Inputs &in);
++
++/// Cancel a running budget (used by the tests; the device cancels implicitly by
++/// draining the queue or dropping the connection).
++void reset();
++
++} // namespace PublishDeliveryBudget
++
++#endif // __PUBLISH_DELIVERY_BUDGET_H
+diff --git a/src/cloud/PublishDeliveryCounters.cpp b/src/cloud/PublishDeliveryCounters.cpp
+new file mode 100644
+index 0000000..55decf4
+--- /dev/null
++++ b/src/cloud/PublishDeliveryCounters.cpp
+@@ -0,0 +1,132 @@
++/**
++ * @file PublishDeliveryCounters.cpp
++ * @brief Retained-RAM storage and accounting for the publish delivery counters.
++ *
++ * @details See PublishDeliveryCounters.h for the counter definitions and for
++ *          exactly what survives a hibernate, a reset and a power loss.
++ *
++ *          Threading: `noteAttempt()` and `noteResult()` are invoked from
++ *          `PublishQueuePosix::stateWait()` / `statePublishWait()`, both of
++ *          which run on the application thread inside
++ *          `PublishQueuePosix::instance().loop()`. They are deliberately NOT
++ *          wired to `BackgroundPublishRK`'s own completion callback, which runs
++ *          on the background publish thread - keeping every write on one thread
++ *          is what makes the plain (unlocked, non-atomic) increments below
++ *          correct. `noteQueuedAtSleep()` is called from the sleep path, also on
++ *          the application thread.
++ */
++
++#include "Particle.h"
++#include "cloud/PublishDeliveryCounters.h"
++
++namespace {
++
++// 'PDC' + version nibble. Changing the struct layout must change kRetainedVersion.
++constexpr uint32_t kRetainedMagic = 0x50444301UL;
++// Version 2 (WO-2026-09-25-001 Stage 5 decisions 6 and 7) added sleptWithQueued,
++// abandoned and the outstanding-attempt flag. A device carrying a version-1
++// block re-zeroes on the first boot of this build, which is the intended
++// behaviour for a layout change.
++constexpr uint16_t kRetainedVersion = 2;
++
++struct RetainedPublishDelivery {
++  uint32_t magic;
++  uint16_t version;
++  uint16_t attempted;
++  uint16_t acknowledged;
++  uint16_t failed;
++  uint16_t retried;
++  uint16_t queuedAtSleep;
++  uint16_t sleptWithQueued;
++  uint16_t abandoned;
++  // Set when an attempt completed without an acknowledgment, so the next
++  // attempt (which the queue will make for the same, still-queued event) is
++  // counted as a retry. Retained alongside the counters so a retry that
++  // happens on the far side of a hibernate is still counted.
++  uint8_t retryPending;
++  // Set from noteAttempt() until noteResult() arrives. If the device resets
++  // while it is set, that attempt's outcome was lost with the volatile Future,
++  // so begin() counts it as abandoned.
++  uint8_t attemptOutstanding;
++};
++
++void bump(uint16_t &counter) {
++  if (counter < PublishDeliveryCounters::kCounterMax) {
++    counter++;
++  }
++}
++
++} // namespace
++
++// Separate retained block - no SysData/CurrentData/SensorData layout is
++// involved. Same ownership pattern as HibernateCycle.cpp's retained fields.
++retained RetainedPublishDelivery retainedPublishDelivery = {};
++
++namespace PublishDeliveryCounters {
++
++void begin() {
++  if (retainedPublishDelivery.magic != kRetainedMagic ||
++      retainedPublishDelivery.version != kRetainedVersion) {
++    retainedPublishDelivery = RetainedPublishDelivery{};
++    retainedPublishDelivery.magic = kRetainedMagic;
++    retainedPublishDelivery.version = kRetainedVersion;
++    return;
++  }
++
++  // WO-2026-09-25-001 Stage 5 decision 7 (Stage 7 finding P2): an attempt that
++  // was outstanding when the device reset lost its Future and its callback, so
++  // its outcome will never arrive. Count it once, here, so that
++  // `attempted == acknowledged + failed + abandoned` still holds. The event
++  // itself is still queued - the queue only removes it on an acknowledgment -
++  // so the dispatch that follows this boot is a re-send and must be counted as
++  // a retry.
++  if (retainedPublishDelivery.attemptOutstanding) {
++    bump(retainedPublishDelivery.abandoned);
++    retainedPublishDelivery.attemptOutstanding = 0;
++    retainedPublishDelivery.retryPending = 1;
++  }
++}
++
++void noteAttempt() {
++  if (retainedPublishDelivery.retryPending) {
++    bump(retainedPublishDelivery.retried);
++    retainedPublishDelivery.retryPending = 0;
++  }
++  bump(retainedPublishDelivery.attempted);
++  retainedPublishDelivery.attemptOutstanding = 1;
++}
++
++void noteResult(bool acknowledged) {
++  retainedPublishDelivery.attemptOutstanding = 0;
++  if (acknowledged) {
++    bump(retainedPublishDelivery.acknowledged);
++    retainedPublishDelivery.retryPending = 0;
++  } else {
++    bump(retainedPublishDelivery.failed);
++    // The queue keeps a failed event queued and re-dispatches it after
++    // waitAfterFailure, so the next attempt is a retry.
++    retainedPublishDelivery.retryPending = 1;
++  }
++}
++
++void noteQueuedAtSleep(uint16_t queuedEvents) {
++  retainedPublishDelivery.queuedAtSleep = queuedEvents;
++}
++
++void noteSleptWithQueued() {
++  bump(retainedPublishDelivery.sleptWithQueued);
++}
++
++Snapshot snapshot() {
++  Snapshot out;
++  out.attempted = retainedPublishDelivery.attempted;
++  out.acknowledged = retainedPublishDelivery.acknowledged;
++  out.failed = retainedPublishDelivery.failed;
++  out.retried = retainedPublishDelivery.retried;
++  out.queuedAtSleep = retainedPublishDelivery.queuedAtSleep;
++  out.sleptWithQueued = retainedPublishDelivery.sleptWithQueued;
++  out.abandoned = retainedPublishDelivery.abandoned;
++  return out;
++}
++
++} // namespace PublishDeliveryCounters
+diff --git a/src/cloud/PublishDeliveryCounters.h b/src/cloud/PublishDeliveryCounters.h
+new file mode 100644
+index 0000000..ec6cfc0
+--- /dev/null
++++ b/src/cloud/PublishDeliveryCounters.h
+@@ -0,0 +1,160 @@
++#pragma once
++
++/**
++ * @file PublishDeliveryCounters.h
++ * @brief Single owner of the publish delivery counters reported in the
++ *        `status` event (WO-2026-09-25-001, Stage 5 decisions 2 and 5).
++ *
++ * @note  Decision 5 keeps these counters OUT of the device-status ledger
++ *        payload: that payload was already measured at 831-856 of its 896-byte
++ *        cap in the field, so a counter object there would have pushed ordinary
++ *        cycles over the cap. They are published by `publishStartupStatus()`
++ *        in src/Generalized-Core-Counter.cpp instead - see
++ *        tests/status_event_payload_budget_test.py for that event's byte
++ *        budget.
++ *
++ * @details Fix B makes every queued send go out with explicit `WITH_ACK`, so a
++ *          queue entry is only removed once the cloud acknowledged it. These
++ *          counters turn that guarantee into something measurable fleet-wide:
++ *          without them the only record of a generated-but-undelivered event is
++ *          a USB serial capture, which nine of the twelve production devices do
++ *          not have (see the WO's fleet-scope table).
++ *
++ *          Counter definitions - all four cumulative counters count *publish
++ *          attempts*, not logical events, because an event that needs three
++ *          attempts is exactly the signal the bench is looking for:
++ *
++ *          - `attempted`     one per `Particle.publish()` actually started for a
++ *                            queued event (the queue's dispatch to
++ *                            BackgroundPublishRK was accepted).
++ *          - `acknowledged`  one per attempt whose Future succeeded. Under fix B
++ *                            every queued send carries `WITH_ACK`, so Device OS
++ *                            only completes that Future on a cloud ACK
++ *                            (`communication/src/publisher.cpp:88-98`).
++ *          - `failed`        one per attempt whose Future failed or timed out
++ *                            (20 s ACK timeout). The event stays queued.
++ *          - `retried`       one per attempt that follows an earlier failed
++ *                            attempt - i.e. a re-send, not a first send.
++ *                            `retried` is a subset of `attempted`.
++ *          - `abandoned`     one per attempt that was dispatched but whose
++ *                            outcome never arrived, because the device reset
++ *                            (watchdog, pin, software) or lost power while the
++ *                            attempt was outstanding. Counted at the next
++ *                            `begin()`, from the retained outstanding-attempt
++ *                            flag. This is what keeps the accounting balanced:
++ *
++ *                                attempted == acknowledged + failed + abandoned
++ *
++ *                            outside an in-flight attempt, and below saturation
++ *                            (see `kCounterMax` - once any counter reaches the
++ *                            ceiling the totals are censored and the identity no
++ *                            longer holds).
++ *          - `queuedAtSleep` NOT cumulative: the queue depth observed at the
++ *                            most recent sleep commit. It is the count of events
++ *                            carried over to the next connection.
++ *          - `sleptWithQueued` cumulative count of sleep commits that happened
++ *                            with at least one event still queued - i.e. how
++ *                            often the delivery budget expired (or a gate timed
++ *                            out) rather than the queue draining. Stage 5
++ *                            decision 6.
++ *
++ *          All seven live in retained (backup) SRAM, guarded by a magic and a
++ *          version so a layout change or an uninitialized block is detected
++ *          rather than published as garbage. **No `SysData`, `CurrentData` or
++ *          `SensorData` layout is touched** - this is a separate retained
++ *          block, exactly as `HibernateCycle.cpp` and `ThrashGuard.cpp` already
++ *          do for their own retained state.
++ *
++ *          Survival:
++ *          - HIBERNATE / ULTRA_LOW_POWER sleep and wake: **survives.** Backup
++ *            SRAM is kept powered across both, which is what makes the counters
++ *            usable as a per-device cumulative loss measure.
++ *          - Software/watchdog/pin reset: **survives.** Backup SRAM is not
++ *            cleared by a reset; `begin()` only re-zeroes the block when the
++ *            magic or version does not match.
++ *          - Power loss (battery disconnected / fully drained), a new flash, or
++ *            a firmware build that changes `kRetainedVersion`: **does not
++ *            survive** - the block re-initializes to zero on the next boot.
++ *
++ *          All entry points are called from the application thread only (the
++ *          publish queue's `loop()` and the sleep path), so no locking is
++ *          needed - see the call-site notes in `PublishDeliveryCounters.cpp`.
++ */
++
++#ifndef __PUBLISH_DELIVERY_COUNTERS_H
++#define __PUBLISH_DELIVERY_COUNTERS_H
++
++#include <stdint.h>
++
++namespace PublishDeliveryCounters {
++
++/// Plain value copy of the retained block, for telemetry consumers.
++struct Snapshot {
++  uint16_t attempted = 0;
++  uint16_t acknowledged = 0;
++  uint16_t failed = 0;
++  uint16_t retried = 0;
++  uint16_t queuedAtSleep = 0;
++  uint16_t sleptWithQueued = 0;
++  uint16_t abandoned = 0;
++};
++
++/// Saturating ceiling for the cumulative counters. Chosen so the status event's
++/// worst case is bounded at five digits per counter - see the byte budget in
++/// tests/status_event_payload_budget_test.py. At the ceiling the counters are
++/// censored values: `attempted == acknowledged + failed + abandoned` no longer
++/// holds, because each counter saturates independently.
++constexpr uint16_t kCounterMax = 65535;
++
++/**
++ * @brief Validate (and if necessary zero) the retained block. Call once from
++ *        `setup()`, before the publish queue can dispatch anything.
++ *
++ * Also reconciles an attempt that was outstanding when the device reset: it is
++ * counted as `abandoned`, and the event's next dispatch is marked as a retry,
++ * because the queue still holds that event. Without this, `attempted` stays
++ * permanently ahead of `acknowledged + failed` (Stage 7 finding P2).
++ */
++void begin();
++
++/**
++ * @brief One publish attempt was started for a queued event.
++ *
++ * Also closes out a pending retry: if the previous attempt failed, this attempt
++ * is by definition a re-send, so `retried` is incremented here rather than at
++ * the failure, which keeps `retried` a strict subset of `attempted`. Records the
++ * attempt as outstanding, so a reset before its result arrives is counted as
++ * `abandoned` at the next `begin()`.
++ */
++void noteAttempt();
++
++/**
++ * @brief A publish attempt completed.
++ *
++ * @param acknowledged true when the publish Future succeeded. With fix B's
++ *        explicit `WITH_ACK` that means the cloud acknowledged the event and
++ *        the queue is about to remove it; false means no acknowledgment and the
++ *        event stays queued for retry.
++ */
++void noteResult(bool acknowledged);
++
++/**
++ * @brief Record the queue depth at the moment the device commits to sleep.
++ */
++void noteQueuedAtSleep(uint16_t queuedEvents);
++
++/**
++ * @brief The device is committing to sleep with at least one event still queued.
++ *
++ * Call once per sleep commit that carries events over - Stage 5 decision 6.
++ */
++void noteSleptWithQueued();
++
++/**
++ * @brief Read all counters.
++ */
++Snapshot snapshot();
++
++} // namespace PublishDeliveryCounters
++
++#endif // __PUBLISH_DELIVERY_COUNTERS_H
+diff --git a/src/cloud/PublishDeliveryGate.cpp b/src/cloud/PublishDeliveryGate.cpp
+new file mode 100644
+index 0000000..fb096fa
+--- /dev/null
++++ b/src/cloud/PublishDeliveryGate.cpp
+@@ -0,0 +1,53 @@
++/**
++ * @file PublishDeliveryGate.cpp
++ * @brief Device-side adapter for the bounded delivery wait.
++ *
++ * @details See PublishDeliveryGate.h. The decision itself lives in
++ *          PublishDeliveryBudget.cpp, which is free of Particle and the publish
++ *          queue so it can be host-tested directly; this file only supplies the
++ *          live inputs and does the logging.
++ *
++ *          Threading: called from the application thread only (the IDLE sleep
++ *          gate, the IDLE connectivity ceiling and the SLEEPING_STATE
++ *          cloud-sync gate, all inside `loop()`).
++ */
++
++#include "Particle.h"
++
++#include "cloud/PublishDeliveryGate.h"
++
++#include "PublishQueuePosixRK.h"
++#include "cloud/PublishDeliveryBudget.h"
++
++namespace PublishDeliveryGate {
++
++bool publishInFlight() {
++  return PublishQueuePosix::instance().getPublishInFlight();
++}
++
++bool queuePermitsSleep() {
++  PublishDeliveryBudget::Inputs in;
++  in.cloudConnected = Particle.connected();
++  in.queueSleepSafe = PublishQueuePosix::instance().getCanSleep();
++  in.publishInFlight = PublishQueuePosix::instance().getPublishInFlight();
++  in.queuedEvents = PublishQueuePosix::instance().getNumEvents();
++  in.nowMs = millis();
++
++  const PublishDeliveryBudget::Verdict verdict = PublishDeliveryBudget::evaluate(in);
++
++  if (verdict.expiryFirstObserved) {
++    // WO-2026-09-25-001 Stage 5 decision 6: every budget expiry is logged, with
++    // the queued count, the elapsed time and whether a publish was in flight.
++    // A device that starts sleeping with events queued must say so in a plain
++    // USB capture - `sleptWithQueued` in the status event counts how often.
++    Log.info("DeliveryBudget: expired budget=%lums elapsed=%lums qn=%u inflight=%d",
++             PublishDeliveryBudget::budgetMs(),
++             verdict.elapsedMs,
++             (unsigned)in.queuedEvents,
++             in.publishInFlight ? 1 : 0);
++  }
++
++  return verdict.sleepPermitted;
++}
++
++} // namespace PublishDeliveryGate
+diff --git a/src/cloud/PublishDeliveryGate.h b/src/cloud/PublishDeliveryGate.h
+new file mode 100644
+index 0000000..e077744
+--- /dev/null
++++ b/src/cloud/PublishDeliveryGate.h
+@@ -0,0 +1,51 @@
++#pragma once
++
++/**
++ * @file PublishDeliveryGate.h
++ * @brief Device-side adapter for the bounded delivery wait
++ *        (WO-2026-09-25-001, Stage 5 decision 6 / acceptance criterion 11).
++ *
++ * @details Collects the live inputs - `Particle.connected()`, the publish
++ *          queue's own `getCanSleep()` / `getPublishInFlight()` / `getNumEvents()`
++ *          - feeds them to `PublishDeliveryBudget::evaluate()`, logs each budget
++ *          expiry once, and returns the single queue term used by every gate
++ *          that can put the device to sleep or tear the cloud connection down:
++ *
++ *          - the low-power IDLE sleep gate (`State_Idle.cpp`)
++ *          - the IDLE connectivity ceiling (`State_Idle.cpp`)
++ *          - the SLEEPING_STATE cloud-sync gate (`State_Sleep.cpp`)
++ *
++ *          Keeping the three sites on one function is what makes the rule
++ *          consistent; before this, IDLE's unconditional queue condition made
++ *          the SLEEPING_STATE timeout unreachable (Stage 7 finding P1).
++ */
++
++#ifndef __PUBLISH_DELIVERY_GATE_H
++#define __PUBLISH_DELIVERY_GATE_H
++
++namespace PublishDeliveryGate {
++
++/**
++ * @brief The queue term for a sleep/teardown gate.
++ *
++ * @return true when the publish queue is empty, or the delivery budget has
++ *         expired and no publish attempt is in flight. Never returns true while
++ *         an attempt is outstanding with events still queued.
++ *
++ * Logs one INFO line per budget expiry with the queued count, the elapsed time
++ * and whether a publish was in flight.
++ */
++bool queuePermitsSleep();
++
++/**
++ * @brief True while the publish queue is waiting on a publish future.
++ *
++ * Thin pass-through to `PublishQueuePosix::getPublishInFlight()` so callers do
++ * not have to include the queue header just to honour "never abandon an
++ * in-flight publish".
++ */
++bool publishInFlight();
++
++} // namespace PublishDeliveryGate
++
++#endif // __PUBLISH_DELIVERY_GATE_H
+diff --git a/src/power/ConnectivityPolicy.h b/src/power/ConnectivityPolicy.h
+index 46c58d8..8e65997 100644
+--- a/src/power/ConnectivityPolicy.h
++++ b/src/power/ConnectivityPolicy.h
+@@ -133,6 +133,42 @@ constexpr int8_t CONNECTIVITY_FAILSAFE_ALERT = 45;
+ constexpr unsigned long CLOUD_OPS_GATE_TIMEOUT_MS = 30000UL;
+ constexpr unsigned long CLOUD_OPS_STATUS_LOG_INTERVAL_MS = 5000UL;
+ 
++// ===== Publish delivery budget (WO-2026-09-25-001, Stage 5 decision 6) =====
++// Purpose:
++// - Bound how long the device will stay connected trying to deliver queued
++//   events before it is allowed to sleep with them still queued.
++//
++// Rationale / tradeoffs:
++// - Fix B only removes a queued event once the cloud acknowledged it. A queue
++//   that never drains (repeated ACK failures) would otherwise hold the radio on
++//   forever: IDLE refuses to enter SLEEPING_STATE while the queue is non-empty,
++//   so the SLEEPING_STATE gate's own timeout is never even reached (Stage 7 P1).
++// - The budget starts when the device is cloud-connected with a non-empty
++//   publish queue, and is cancelled as soon as the queue drains or the cloud
++//   connection drops. Once it expires, sleep and cloud teardown are permitted -
++//   but only while no publish is in flight, so an outstanding attempt is never
++//   abandoned.
++// - Queued events are durable: they are moved from RAM to flash before sleep and
++//   retried on the next connection, so expiry delays delivery, it does not drop
++//   events.
++// - 90 s is longer than the Device OS 20 s ACK timeout plus the queue's 30 s
++//   retry backoff, so a single lost ACK still gets a full retry inside the
++//   budget, and it is short enough to bound modem-on battery drain.
++//
++// Configurability (Stage 6 round 3): this is a compile-time named constant, not
++// a runtime setting. Every runtime-configurable value on this device is carried
++// in a persisted struct (SysData/SystemConfig), and this WO is explicitly
++// forbidden from changing a persisted layout, so a runtime knob is out of scope
++// here.
++constexpr unsigned long PUBLISH_DELIVERY_BUDGET_MS = 90000UL;
++
++// Bounded extra hold, after any sleep/teardown gate has already expired, while a
++// publish attempt is still outstanding. Device OS completes a WITH_ACK publish
++// future within SEND_EVENT_ACK_TIMEOUT (20 s,
++// communication/inc/protocol_defs.h:99), so this cap is only a backstop against
++// a future that never completes at all - it must stay above that timeout.
++constexpr unsigned long PUBLISH_IN_FLIGHT_HOLD_MAX_MS = 25000UL;
++
+ // ===== Device-to-cloud ledger egress gate =====
+ // Purpose:
+ // - Allow device-data/device-status ledger writes extra time to finish syncing
+diff --git a/src/state/State_Idle.cpp b/src/state/State_Idle.cpp
+index 70874c5..2b53e6a 100644
+--- a/src/state/State_Idle.cpp
++++ b/src/state/State_Idle.cpp
+@@ -1,6 +1,7 @@
+ #include "state/State_Common.h"
+ #include "../Config.h"
+ #include "cloud/Cloud.h"
++#include "cloud/PublishDeliveryGate.h"
+ #include "LocalTimeRK.h"
+ #include "persist/CurrentReadings.h"
+ #include "persist/SystemConfig.h"
+@@ -226,14 +227,17 @@ void handleIdleState() {
+ 
+     // In low-power mode, once all work for this connection cycle is
+     // complete (no updates pending), we can safely enter SLEEPING_STATE
+-    // to turn off the radio and save power. We only require the publish
+-    // queue to be fully drained when we are actually connected; when
+-    // offline, it's expected to have a non-zero queue and we still want
+-    // to sleep, flushing the queue on the next connection.
+-    bool canSleepGate = true;
+-    if (Particle.connected()) {
+-      canSleepGate = PublishQueuePosix::instance().getCanSleep();
+-    }
++    // to turn off the radio and save power.
++    //
++    // WO-2026-09-25-001 Stage 5 decision 6 (Stage 7 finding P1): the queue term
++    // is now the bounded delivery gate rather than a bare
++    // `PublishQueuePosix::getCanSleep()`. It is true when the queue is empty,
++    // when we are offline (queued events are durable and flush on the next
++    // connection), or when the 90 s delivery budget has expired with no publish
++    // in flight. Without the budget, a queue that never drains - repeated ACK
++    // failures under fix B - kept the device here forever: it never entered
++    // SLEEPING_STATE, so that state's own cloud-sync timeout was unreachable.
++    bool canSleepGate = PublishDeliveryGate::queuePermitsSleep();
+ 
+     if (!updatesPending && canSleepGate) {
+       // If a sensor event is still pending or the BLUE LED is still on
+@@ -254,6 +258,12 @@ void handleIdleState() {
+       if (!Particle.connected() && pending > 0) {
+         Log.info("Low-power idle: offline with %u queued event(s) - sleeping and will flush on next connect",
+                  (unsigned)pending);
++      } else if (pending > 0) {
++        // WO-2026-09-25-001 decision 6: the delivery budget expired while
++        // connected. The events are moved to flash at the sleep commit and
++        // retried on the next connection; `sleptWithQueued` counts this.
++        Log.info("Low-power idle: delivery budget expired with %u queued event(s) - sleeping and will retry on next connect",
++                 (unsigned)pending);
+       } else {
+         Log.info("Low-power idle: queue drained and no updates pending - entering SLEEPING_STATE");
+       }
+@@ -277,7 +287,12 @@ void handleIdleState() {
+ 
+     bool queueCanSleep = true;
+     if (cloudConnected) {
+-      queueCanSleep = PublishQueuePosix::instance().getCanSleep();
++      // WO-2026-09-25-001 Stage 5 decision 6: same bounded delivery gate as the
++      // low-power sleep transition above, so the ceiling cannot be held off
++      // indefinitely by a queue that never drains. It still returns false while
++      // a publish is in flight, so this ceiling never tears down a connection
++      // with an outstanding attempt.
++      queueCanSleep = PublishDeliveryGate::queuePermitsSleep();
+     }
+ 
+     // WO-2026-09-19 Step 3b: Clock::openness() == Open, not
+diff --git a/src/state/State_Sleep.cpp b/src/state/State_Sleep.cpp
+index 6b213ec..845d7ac 100644
+--- a/src/state/State_Sleep.cpp
++++ b/src/state/State_Sleep.cpp
+@@ -2,6 +2,8 @@
+ #include "state/State_Common.h"
+ #include "../Config.h"
+ #include "cloud/Cloud.h"
++#include "cloud/PublishDeliveryCounters.h"
++#include "cloud/PublishDeliveryGate.h"
+ #include "power/Connectivity.h"
+ #include "power/ConnectivityPolicy.h"
+ #include "power/PowerDiagnostics.h"
+@@ -168,6 +170,78 @@ unsigned long computeCloudSyncTimeoutMs(uint16_t queueDepth) {
+ 
+ constexpr unsigned long kGateBlockLogThresholdMs = 10000UL;
+ 
++// WO-2026-09-25-001 decisions 6 and 7: set once the delivery accounting for
++// this sleep has been committed, so a HIBERNATE that fails and falls back to
++// ULTRA_LOW_POWER does not count the same carry-over twice. Cleared on entry to
++// SLEEPING_STATE; a successful HIBERNATE resets the MCU, which clears it too.
++bool sleepDeliveryCommitted = false;
++
++/**
++ * @brief Commit the publish-delivery accounting for this sleep and log it.
++ *
++ * Called from EVERY path that commits to sleep, immediately before
++ * `System.sleep()`. The Boron overnight RTC-alarm HIBERNATE resets the MCU and
++ * never returns, so doing this only in the ULTRA_LOW_POWER block left every
++ * successful hibernate cycle without a queue snapshot and without a
++ * `CycleDelivery` line (Stage 7 finding P2).
++ *
++ * With events still queued it also moves the RAM queue to flash first
++ * (decision 6), so nothing is lost across a hibernate, and counts one
++ * `sleptWithQueued`.
++ *
++ * @param qDepth  queue depth at the sleep commit
++ * @param awakeMs awake time for this cycle, in milliseconds
++ */
++void commitDeliveryAccountingBeforeSleep(uint16_t qDepth, unsigned long awakeMs) {
++  if (qDepth > 0) {
++    // Decision 6: RAM-queue events must be on flash before we sleep. The
++    // disconnect path already triggers this through the library's system-event
++    // handler, but the budget can also expire on a cycle that never
++    // disconnects, and a hibernate never comes back to do it later.
++    // Qualification (Stage 7): writeQueueToFiles() covers the RAM queue, not an
++    // event the queue has already taken into curEvent - the gates above are
++    // what keep an in-flight attempt from reaching this point.
++    PublishQueuePosix::instance().writeQueueToFiles();
++    if (!sleepDeliveryCommitted) {
++      PublishDeliveryCounters::noteSleptWithQueued();
++    }
++  }
++
++  // WO-2026-09-25-001 (Stage 5 decision 2, acceptance criterion 4): the sleep
++  // commit point is the one place that knows how many events are being carried
++  // over to the next connection, so record it here - after the cloud-operations
++  // gate has either drained the queue or timed out.
++  PublishDeliveryCounters::noteQueuedAtSleep(qDepth);
++  sleepDeliveryCommitted = true;
++
++  // WO-2026-09-25-001 acceptance criteria 4 and 6: one INFO line per sleep
++  // commit carrying the awake time and the delivery counters, so both can be
++  // read from a plain USB capture. The existing "CYCLE end awake=..." line
++  // elsewhere also carries awake time but is gated on verboseMode, and
++  // "Sleep: td=..." is only emitted on cycles that actually tore a connection
++  // down - neither is guaranteed to be present on every cycle of a bench run.
++  const PublishDeliveryCounters::Snapshot delivery = PublishDeliveryCounters::snapshot();
++  Log.info("CycleDelivery: awake=%lums a=%u k=%u f=%u r=%u q=%u",
++           awakeMs,
++           (unsigned)delivery.attempted,
++           (unsigned)delivery.acknowledged,
++           (unsigned)delivery.failed,
++           (unsigned)delivery.retried,
++           (unsigned)delivery.queuedAtSleep);
++}
++
++/// Awake time for this cycle, computed the same way
++/// WakeCycleStats::finalizeBeforeSleep() computes it, for sleep paths that
++/// commit before that finalization runs.
++unsigned long awakeMsForSleepCommit() {
++  const uint32_t wakeStartMs = Observability::cycleStats().wake_start_ms;
++  const unsigned long nowMs = millis();
++  if (wakeStartMs == 0 || nowMs < (unsigned long)wakeStartMs) {
++    return 0UL;
++  }
++  return nowMs - (unsigned long)wakeStartMs;
++}
++
+ constexpr uint8_t kGateBlockerQueue = 0x01;
+ constexpr uint8_t kGateBlockerLedger = 0x02;
+ constexpr uint8_t kGateBlockerWebhook = 0x04;
+@@ -421,6 +495,9 @@ void handleSleepingState() {
+   static unsigned long cloudSyncBudgetMs = 0;
+   static uint16_t cloudSyncMaxQueueDepth = 0;
+   static uint16_t lastQueueDepth = 0xFFFF;
++  // WO-2026-09-25-001 decision 6: millis() at which the gate started holding for
++  // an in-flight publish past its budget; 0 when no hold is running.
++  static unsigned long inFlightHoldStartMs = 0;
+ 
+   // ********** Non-blocking disconnect + modem power-down **********
+   // Device OS already manages the asynchronous cloud session teardown once
+@@ -450,6 +527,8 @@ void handleSleepingState() {
+     cloudSyncBudgetMs = 0;
+     cloudSyncMaxQueueDepth = 0;
+     lastQueueDepth = 0xFFFF;
++    inFlightHoldStartMs = 0;
++    sleepDeliveryCommitted = false;
+     lastDisconnectProgressMs = 0;
+     lastGateProgressMs = 0;
+ #if Wiring_WiFi
+@@ -479,6 +558,12 @@ void handleSleepingState() {
+     }
+     // Check prerequisite completion
+     bool queueEmpty = PublishQueuePosix::instance().getCanSleep();
++    // WO-2026-09-25-001 Stage 5 decision 6: the gate's queue term is the bounded
++    // delivery gate, not the raw queue verdict - queue empty OR (the 90 s
++    // delivery budget expired AND no publish in flight). `queueEmpty` itself is
++    // kept for the q= reporting below, where it still means "the queue is
++    // holding something".
++    const bool queuePermitsSleep = PublishDeliveryGate::queuePermitsSleep();
+     bool configLedgersSynced = Cloud::instance().areLedgersSynced();
+     bool outputLedgersSynced = !Cloud::instance().hasPendingOutputLedgerSync();
+     Cloud::LedgerSyncDiagnostics ledgerDiagnostics = Cloud::instance().ledgerSyncDiagnostics();
+@@ -508,7 +593,7 @@ void handleSleepingState() {
+       lastQueueDepth = queueDepth;
+     }
+ 
+-    bool allComplete = queueEmpty && ledgersSynced && updatesChecked && webhookConfirmed;
++    bool allComplete = queuePermitsSleep && ledgersSynced && updatesChecked && webhookConfirmed;
+ 
+     if (!allComplete) {
+       unsigned long elapsedMs = millis() - cloudSyncStartMs;
+@@ -589,13 +674,41 @@ void handleSleepingState() {
+         return; // Stay in SLEEPING_STATE until complete or timeout
+       }
+ 
++      // WO-2026-09-25-001 Stage 5 decision 6: the gate has run out of budget,
++      // but a publish attempt is still outstanding. A teardown here would reset
++      // the CoAP retransmit store and abandon that attempt - exactly the loss
++      // this work order exists to stop - so hold, bounded, until the queue has
++      // processed the attempt's result. Device OS completes a WITH_ACK future
++      // within its 20 s SEND_EVENT_ACK_TIMEOUT, so the cap below is only a
++      // backstop against a future that never completes at all.
++      if (PublishDeliveryGate::publishInFlight()) {
++        const unsigned long nowMs = millis();
++        if (inFlightHoldStartMs == 0) {
++          inFlightHoldStartMs = nowMs;
++          Log.info("SLEEP: gate budget reached with a publish in flight - holding up to %lu ms before teardown",
++                   ConnectivityPolicy::PUBLISH_IN_FLIGHT_HOLD_MAX_MS);
++        }
++        const unsigned long holdElapsedMs = nowMs - inFlightHoldStartMs;
++        if (holdElapsedMs < ConnectivityPolicy::PUBLISH_IN_FLIGHT_HOLD_MAX_MS) {
++          thrashGuard.markProgress("PUBLISH_ACK_HOLD");
++          serviceAwakeWatchdog();
++          Particle.process();
++          return; // Never tear down while an attempt is outstanding
++        }
++        Log.warn("SLEEP: publish still in flight after %lu ms hold - proceeding to teardown",
++                 holdElapsedMs);
++      }
++      inFlightHoldStartMs = 0;
++
+       // Budget exceeded - log incomplete operations and raise ONE alert (priority order)
+        const char *gateFailReason = !queueEmpty ? "queue" :
+         (!ledgersSynced ? "ledger" : (!webhookConfirmed ? "webhook" : "update"));
+-       Log.warn("GateFail: reason=%s timeout=%lu q=%d ledger=%d webhook=%d update=%d",
++       Log.warn("GateFail: reason=%s timeout=%lu elapsed=%lu q=%d qn=%u ledger=%d webhook=%d update=%d",
+           gateFailReason,
+           cloudSyncBudgetMs,
++          elapsedMs,
+           queuePending,
++          (unsigned)queueDepth,
+           ledgerPending,
+           webhookPending,
+           updatePending);
+@@ -607,7 +720,15 @@ void handleSleepingState() {
+ 
+       // Only raise one alert - check in priority order (queue > ledger > updates > webhook)
+       if (!queueEmpty) {
+-        Log.warn("SLEEP: Publish queue not empty - raising alert 43");
++        // WO-2026-09-25-001 acceptance criterion 3: this is the ONE path that
++        // lets the device tear the connection down and sleep with
++        // unacknowledged events still queued. It must say how many and for how
++        // long it waited, so a capture can tell a gate timeout apart from a
++        // silent drop.
++        Log.warn("SLEEP: Publish queue not empty - %u event(s) unacknowledged after %lu ms (budget=%lu ms) - raising alert 43",
++                 (unsigned)queueDepth,
++                 elapsedMs,
++                 cloudSyncBudgetMs);
+         RecoveryState::raiseAlert(43); // Queue drainage failure (highest priority)
+       } else if (!ledgersSynced) {
+         Log.warn("SLEEP: ledger sync incomplete after %lu ms (budget=%lu ms) - raising alert 44",
+@@ -1109,6 +1230,14 @@ void handleSleepingState() {
+ 
+             Log.info("ModemTeardown: radioOn=%d point=hibernate", (int)Connectivity::isRadioPoweredOn());
+             Log.info("Sleep: HIBERNATE reason=closed dur=%ds wakePin=%d", wakeInSeconds, (int)WAKEUP_PIN);
++            // WO-2026-09-25-001 decisions 6 and 7 (Stage 7 finding P2): a
++            // successful HIBERNATE resets the MCU and never returns, so the
++            // RAM->flash flush, the queue snapshot and the CycleDelivery line
++            // have to happen here rather than in the ULTRA_LOW_POWER block
++            // further down, which this path never reaches.
++            commitDeliveryAccountingBeforeSleep(
++                (uint16_t)PublishQueuePosix::instance().getNumEvents(),
++                awakeMsForSleepCommit());
+             PowerDiagnostics::logPowerState("pre-hibernate");
+             thrashGuard.markProgress("SLEEP_ATTEMPT");
+             Cloud::instance().logLedgerSleepState();
+@@ -1206,6 +1335,11 @@ void handleSleepingState() {
+         isCharging,
+         SystemConfig::get_lastConnection());
+ 
++    // WO-2026-09-25-001 (Stage 5 decisions 2, 6 and 7): record the carry-over,
++    // flush the RAM queue to flash, and log the counters. Shared with the
++    // HIBERNATE path above so every sleep commit emits the same line.
++    commitDeliveryAccountingBeforeSleep(qDepth, (unsigned long)Observability::cycleStats().total_awake_ms);
++
+     // Invariants (log-only): detect regressions without affecting behavior.
+     // Ceiling is derived from existing budgets and includes firmware update time.
+     const unsigned long awakeCeilingMs =
+diff --git a/tests/clock_status_republish_test.sh b/tests/clock_status_republish_test.sh
+index 95e1494..ff04cd1 100755
+--- a/tests/clock_status_republish_test.sh
++++ b/tests/clock_status_republish_test.sh
+@@ -5,12 +5,14 @@ repo_root="${0:A:h:h}"
+ binary="$TMPDIR/clock_status_republish_test"
+ 
+ clang++ -std=c++17 -Wall -Wextra -pedantic \
++  -Dretained= \
+   -I"$repo_root/tests/stubs/clock_status_republish_overrides" \
+   -I"$repo_root/tests/stubs/power_source_override_overrides" \
+   -I"$repo_root/src" \
+   "$repo_root/tests/clock_status_republish_test.cpp" \
+   "$repo_root/src/power/PowerManager.cpp" \
+   "$repo_root/src/cloud/DeviceStatusPublisher.cpp" \
++  "$repo_root/src/cloud/PublishDeliveryCounters.cpp" \
+   "$repo_root/src/cloud/Cloud.cpp" \
+   "$repo_root/tests/stubs/clock_status_republish_overrides/CloudLinkStubs.cpp" \
+   -o "$binary"
+diff --git a/tests/device_status_payload_budget_test.py b/tests/device_status_payload_budget_test.py
+new file mode 100644
+index 0000000..ce3355c
+--- /dev/null
++++ b/tests/device_status_payload_budget_test.py
+@@ -0,0 +1,309 @@
++#!/usr/bin/env python3
++"""WO-2026-09-25-001 Stage 6: device-status ledger payload byte budget.
++
++``Cloud::writeDeviceStatusToCloud()`` (src/cloud/DeviceStatusPublisher.cpp)
++serializes the status payload into a ``char[DEVICE_STATUS_PAYLOAD_CAPACITY]``
++stack buffer with ``JSONBufferWriter``. Device OS documents that
++``dataSize()`` "can be greater than buffer size"
++(6.4.1 ``wiring/inc/spark_wiring_json.h:232``), so exceeding the cap means a
++truncated, invalid payload - hence the explicit overflow guard this test also
++checks for.
++
++Stage 5 decision 5 keeps the publish delivery counters OUT of this payload -
++they go in the `status` event instead (see
++tests/status_event_payload_budget_test.py) - precisely because this payload was
++already measured at 831-856 of its 896-byte cap in the field. This test
++therefore also guards that decision: it fails if a `"d"` object, any of the five
++counter keys, or any reference to PublishDeliveryCounters reappears here.
++
++So this test:
++
++  1. parses the actual writer calls out of the shipped source, so a new field
++     cannot be added without updating the width table below (the test fails
++     with "unbudgeted field" instead of silently going stale);
++  2. computes the DEPLOYED worst case - every field at the largest value this
++     firmware can actually produce - and asserts it fits;
++  3. computes and prints the STRUCTURAL worst case - every field at its C type
++     or char[] buffer maximum - which is reported for the record;
++  4. asserts the delivery counters are absent.
++
++This cannot compile the real function on the host (it pulls in Particle,
++PowerManager, SensorManager, Ledger and the persistence layer), so it measures
++the source's own field list rather than a mirror of it.
++"""
++
++import re
++import sys
++from pathlib import Path
++
++REPO = Path(__file__).resolve().parent.parent
++STATUS_SRC = REPO / "src" / "cloud" / "DeviceStatusPublisher.cpp"
++CLOUD_HDR = REPO / "src" / "cloud" / "Cloud.h"
++VERSION_SRC = REPO / "src" / "Version.cpp"
++
++# Observed on-device size of the payload (WO-2026-09-25-001 Stage 6 dispatch:
++# "the last observed size was 839/896"; Stage 5 decision 5 records 831-856 on
++# Dev-14, most often 853). Used to report the real-world headroom.
++OBSERVED_BASELINE_BYTES = 839
++
++# Deployed worst case of this payload, as measured by this test on the
++# WO-2026-09-25-001 Stage 6 tree. Stage 5 decision 5 requires the payload format
++# to be UNCHANGED by this WO, so this figure must not move.
++DEPLOYED_BASELINE_WITHOUT_DELIVERY = 903
++
++# Rendered width (JSON text, including the quotes of a string value) of every
++# field, keyed by its dotted path.
++#
++#   deployed   - the widest value this firmware can actually emit
++#   structural - the widest value the field's C type or char[] buffer allows
++#
++# Justification for each deployed value is in the comment beside it.
++WIDTHS = {
++    # constant kLedgerSchemaVersion == 2
++    "schemaVersion": (1, 1),
++    # FIRMWARE_VERSION, read from src/Version.cpp below (deployed); the startup
++    # snapshot copy is a char[32] (structural).
++    "firmware.version": (None, 33),
++    # RecoveryState::get_resetCount() is uint8_t
++    "firmware.resetCount": (3, 3),
++    # compiledBuildFlags is a uint16_t bitmask, bits 0x0001..0x4000
++    "firmware.flags": (5, 5),
++    # formatConfigGeneration() writes exactly 8 hex digits
++    "config.generation": (10, 10),
++    # (int) of a time_t epoch: 10 digits now, 11 if ever negative
++    "reporting.lastReportEpoch": (10, 11),
++    "reporting.nextReportEpoch": (10, 11),
++    # ConfigApply bounds reportingIntervalSec to 300..86400 (5 digits)
++    "reporting.configuredIntervalSec": (5, 10),
++    # effective = configured * tier multiplier (<=12), still <= 7 digits
++    "reporting.effectiveIntervalSec": (7, 10),
++    # adjustmentReasonName(): "none" | "low-battery"
++    "reporting.adjustmentReason": (13, 13),
++    "reporting.windowOpen": (5, 5),
++    "startup.epoch": (10, 11),
++    # resetReasonName(): longest is "power-management"; field is char[24]
++    "startup.reason": (18, 25),
++    # copy of FIRMWARE_VERSION; field is char[32]
++    "startup.firmware": (None, 33),
++    # System.version(), e.g. "6.4.1"; field is char[24]
++    "startup.deviceOS": (10, 25),
++    # StartupSnapshot::resetCount is uint32_t, fed from a uint8_t counter
++    "startup.resetCount": (3, 10),
++    # powerSourceLabel(): longest is "UNAVAILABLE"/"USB_ADAPTER"
++    "power.source": (13, 13),
++    # inputProfileLabel(): longest is "NotApplicable"
++    "power.profile": (15, 15),
++    "power.overrideActive": (5, 5),
++    # soc(), one decimal: "100.0" / "-1.0"
++    "battery.soc": (5, 6),
++    # vcell, two decimals: "-1.00" / "4.20"
++    "battery.vcell": (5, 6),
++    # compactPmicChargeLabel(): longest is "UNKNOWN"
++    "battery.chargeState": (9, 9),
++    # batteryTierName(): longest is "CONSERVING"
++    "battery.tier": (12, 12),
++    "battery.lowBatteryMode": (5, 5),
++    # vcellSampleStateLabel(): longest is "Unavailable"
++    "battery.vcellState": (13, 13),
++    # socTrustLabel(): longest is "Untrusted"
++    "battery.socTrust": (11, 11),
++    # toString(ConnectResult): longest is "timeout"/"aborted"
++    "connection.lastResult": (9, 9),
++    # connect_duration_ms is uint32_t but bounded by the connect budget
++    "connection.elapsedMs": (7, 11),
++    "clock.trusted": (5, 5),
++    # reportedSyncAgeMs()/1000, or the -1 sentinel
++    "clock.syncAgeSec": (7, 11),
++    "clock.lastSyncEpoch": (10, 11),
++    # Clock::lastSyncCorrectionSec() is a signed seconds delta
++    "clock.correctionSec": (11, 11),
++    "clock.usingRC": (5, 5),
++    # uint8_t AB1805 registers
++    "clock.oscStatus": (3, 3),
++    "clock.oscCtrl": (3, 3),
++    "clock.aos": (5, 5),
++    "clock.fos": (5, 5),
++}
++
++# WO-2026-09-25-001 Stage 5 decision 5: these keys belong in the `status` event,
++# not here. Their presence in this payload is a test failure, not a budget line.
++FORBIDDEN_DELIVERY_KEYS = ("d", "a", "k", "f", "r", "q")
++
++failures = []
++
++
++def fail(message):
++    failures.append(message)
++
++
++def read_capacity():
++    match = re.search(
++        r"DEVICE_STATUS_PAYLOAD_CAPACITY\s*=\s*(\d+)", CLOUD_HDR.read_text()
++    )
++    if not match:
++        fail("could not read DEVICE_STATUS_PAYLOAD_CAPACITY from src/cloud/Cloud.h")
++        return 0
++    return int(match.group(1))
++
++
++def read_firmware_version_width():
++    match = re.search(r'FIRMWARE_VERSION\s*=\s*"([^"]*)"', VERSION_SRC.read_text())
++    if not match:
++        fail("could not read FIRMWARE_VERSION from src/Version.cpp")
++        return 0
++    return len(match.group(1)) + 2  # quotes
++
++
++def parse_writer(text):
++    """Walk the writerBase calls and rebuild the payload's shape as nested
++    ordered lists of (name, children-or-None)."""
++    start = text.find("writerBase.beginObject();")
++    if start < 0:
++        fail("could not find the start of the status payload writer")
++        return None
++    region = text[start:]
++    end = region.find("if (!writerBase.buffer())")
++    if end < 0:
++        fail("could not find the end of the status payload writer")
++        return None
++    region = region[:end]
++
++    tokens = re.findall(
++        r'writerBase\.name\("([A-Za-z]+)"\)\s*(\.beginObject\(\))?|writerBase\.(endObject)\(\)',
++        region,
++    )
++
++    root = []
++    stack = [root]
++    for name, begins, ends in tokens:
++        if ends:
++            if len(stack) > 1:
++                stack.pop()
++            continue
++        if begins:
++            children = []
++            stack[-1].append((name, children))
++            stack.append(children)
++        else:
++            stack[-1].append((name, None))
++    if len(stack) != 1:
++        fail("unbalanced beginObject()/endObject() calls in the status payload writer")
++    return root
++
++
++def collect_paths(node, prefix=""):
++    for name, children in node:
++        path = f"{prefix}{name}"
++        if children is None:
++            yield path
++        else:
++            yield from collect_paths(children, f"{path}.")
++
++
++def render(node, which, version_width, prefix=""):
++    """Render the payload as real JSON with placeholder values of the budgeted
++    width, so the punctuation cost is measured rather than arithmetic-modelled."""
++    parts = []
++    for name, children in node:
++        path = f"{prefix}{name}"
++        if children is not None:
++            parts.append(f'"{name}":{render(children, which, version_width, path + ".")}')
++            continue
++        if path not in WIDTHS:
++            fail(f"unbudgeted field {path!r} in the status payload - add it to WIDTHS")
++            width = 0
++        else:
++            width = WIDTHS[path][which]
++            if width is None:
++                width = version_width
++        parts.append(f'"{name}":' + ("x" * width))
++    return "{" + ",".join(parts) + "}"
++
++
++def main():
++    text = STATUS_SRC.read_text()
++    capacity = read_capacity()
++    version_width = read_firmware_version_width()
++    root = parse_writer(text)
++
++    if not root:
++        for message in failures:
++            print(f"FAIL: {message}", file=sys.stderr)
++        return 1
++
++    paths = list(collect_paths(root))
++
++    # Stage 5 decision 5: no delivery counter may appear in this payload.
++    for key in FORBIDDEN_DELIVERY_KEYS:
++        for path in paths:
++            if path == key or path.startswith(f"{key}."):
++                fail(
++                    f"the device-status ledger payload emits {path!r} - WO-2026-09-25-001 Stage 5 "
++                    "decision 5 requires the delivery counters in the `status` event only, "
++                    "leaving this payload's format unchanged"
++                )
++    if "PublishDeliveryCounters" in text:
++        fail(
++            "src/cloud/DeviceStatusPublisher.cpp references PublishDeliveryCounters - this "
++            "payload must not read the delivery counters at all (Stage 5 decision 5)"
++        )
++
++    deployed = len(render(root, 0, version_width))
++    structural = len(render(root, 1, version_width))
++
++    # The writer must refuse to publish rather than index past the buffer.
++    if "if (writerBase.dataSize() >= sizeof(bufferBase)) {" not in text:
++        fail(
++            "the status writer must guard against dataSize() exceeding the buffer "
++            "before storing the NUL terminator"
++        )
++
++    usable = capacity - 1
++    print(f"device-status payload capacity          : {capacity} bytes")
++    print(f"  usable (one byte reserved for the NUL): {usable} bytes")
++    print(f"  observed size in the field            : {OBSERVED_BASELINE_BYTES} bytes")
++    print(f"  DEPLOYED worst case                   : {deployed} bytes")
++    print(f"  STRUCTURAL worst case (type maxima)   : {structural} bytes")
++
++    if deployed != DEPLOYED_BASELINE_WITHOUT_DELIVERY:
++        fail(
++            f"the device-status payload's deployed worst case is {deployed} B, not the recorded "
++            f"{DEPLOYED_BASELINE_WITHOUT_DELIVERY} B - WO-2026-09-25-001 Stage 5 decision 5 "
++            "requires this payload's format to be unchanged; re-measure the byte budget before "
++            "changing fields"
++        )
++
++    # Pre-existing and independent of WO-2026-09-25-001: the deployed and
++    # structural worst cases already exceed the cap on their own, so these are
++    # reported rather than enforced - enforcing them would fail on the
++    # unmodified baseline too. The dataSize() guard checked above is what makes
++    # those cases safe rather than a stack overwrite.
++    if deployed > usable:
++        print(
++            f"NOTE: the deployed worst case ({deployed} B) exceeds the usable cap ({usable} B). "
++            "Pre-existing; contained by the dataSize() overflow guard. Raising "
++            "DEVICE_STATUS_PAYLOAD_CAPACITY is the clean fix - it is a self-imposed RAM "
++            "constant, not a Particle Ledger limit - but that is WO-2026-09-25-003."
++        )
++    if structural > usable:
++        print(
++            f"NOTE: structural worst case ({structural} B) exceeds the usable cap ({usable} B). "
++            "Reachable only with a firmware version string, reset-reason name or Device OS "
++            "version string far longer than any this fleet uses."
++        )
++
++    if failures:
++        for message in failures:
++            print(f"FAIL: {message}", file=sys.stderr)
++        print(f"device_status_payload_budget_test: {len(failures)} failure(s)", file=sys.stderr)
++        return 1
++
++    print(
++        "device_status_payload_budget_test: the ledger payload format is unchanged and carries "
++        "no delivery counters"
++    )
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/tests/power_source_override_test.sh b/tests/power_source_override_test.sh
+index cccd182..a0a0595 100755
+--- a/tests/power_source_override_test.sh
++++ b/tests/power_source_override_test.sh
+@@ -5,10 +5,12 @@ repo_root="${0:A:h:h}"
+ binary="$TMPDIR/power_source_override_test"
+ 
+ clang++ -std=c++17 -Wall -Wextra -pedantic \
++  -Dretained= \
+   -I"$repo_root/tests/stubs/power_source_override_overrides" -I"$repo_root/src" \
+   "$repo_root/tests/power_source_override_test.cpp" \
+   "$repo_root/src/power/PowerManager.cpp" \
+   "$repo_root/src/cloud/DeviceStatusPublisher.cpp" \
++  "$repo_root/src/cloud/PublishDeliveryCounters.cpp" \
+   "$repo_root/tests/stubs/power_source_override_overrides/cloud/CloudTestShim.cpp" \
+   -o "$binary"
+ 
+diff --git a/tests/publish_ack_sleep_gate_structural_test.py b/tests/publish_ack_sleep_gate_structural_test.py
+new file mode 100644
+index 0000000..3176246
+--- /dev/null
++++ b/tests/publish_ack_sleep_gate_structural_test.py
+@@ -0,0 +1,283 @@
++#!/usr/bin/env python3
++"""WO-2026-09-25-001 acceptance criterion 3: the device must not sleep, and must
++not tear down the cloud connection, while an unacknowledged event is still
++queued - except when the existing cloud-sync gate times out, which must be
++logged with the event count and the elapsed time.
++
++The gate lives in ``handleSleepingState()`` (src/state/State_Sleep.cpp) and the
++low-power entry into it lives in ``handleIdleState()`` (src/state/State_Idle.cpp).
++Neither can be compiled standalone on the host - both pull in Particle,
++PublishQueuePosix, AB1805 and the persistence layer - so this test parses the
++shipped source directly, in the style of the repository's other structural
++tests.
++
++Stage 7 mutation this file is built to catch: (iii) allow sleep with
++unacknowledged events queued.
++
++WO-2026-09-25-001 Stage 5 decision 6 (Stage 7 finding P1): the gate is bounded.
++All three sites now take their verdict from ``PublishDeliveryGate::queuePermitsSleep()``,
++which permits sleep when the queue is sleep-safe, or the device is offline, or a
++bounded delivery budget has expired with no publish in flight. The budget cannot
++be defeated by keeping the queue non-empty, and it can never release the gate
++while an attempt is outstanding.
++"""
++
++import re
++import sys
++from pathlib import Path
++
++REPO = Path(__file__).resolve().parent.parent
++SLEEP_SRC = REPO / "src" / "state" / "State_Sleep.cpp"
++IDLE_SRC = REPO / "src" / "state" / "State_Idle.cpp"
++QUEUE_SRC = REPO / "lib" / "PublishQueuePosixRK" / "src" / "PublishQueuePosixRK.cpp"
++
++failures = []
++
++
++def fail(message):
++    failures.append(message)
++
++
++def require(text, needle, description, source_name):
++    if needle not in text:
++        fail(f"{description} (not found in {source_name}: {needle!r})")
++
++
++def index_of(text, needle):
++    return text.find(needle)
++
++
++def function_body(text, signature, source_name):
++    """Return the body of the function whose definition starts with `signature`."""
++    start = text.find(signature)
++    if start < 0:
++        fail(f"could not find {signature!r} in {source_name}")
++        return ""
++    brace = text.find("{", start)
++    if brace < 0:
++        fail(f"could not find the opening brace of {signature!r} in {source_name}")
++        return ""
++    depth = 0
++    for i in range(brace, len(text)):
++        if text[i] == "{":
++            depth += 1
++        elif text[i] == "}":
++            depth -= 1
++            if depth == 0:
++                return text[brace : i + 1]
++    fail(f"unbalanced braces after {signature!r} in {source_name}")
++    return ""
++
++
++def main():
++    sleep_text = SLEEP_SRC.read_text()
++    idle_text = IDLE_SRC.read_text()
++    queue_text = QUEUE_SRC.read_text()
++
++    # ---------------------------------------------------------------
++    # 1. The sleep gate blocks on the publish queue.
++    # ---------------------------------------------------------------
++    require(
++        sleep_text,
++        "bool queueEmpty = PublishQueuePosix::instance().getCanSleep();",
++        "the sleep gate must read the queue's own sleep-safety verdict",
++        "State_Sleep.cpp",
++    )
++    require(
++        sleep_text,
++        "const bool queuePermitsSleep = PublishDeliveryGate::queuePermitsSleep();",
++        "the sleep gate's queue term must come from the bounded delivery gate",
++        "State_Sleep.cpp",
++    )
++    require(
++        sleep_text,
++        "bool allComplete = queuePermitsSleep && ledgersSynced && updatesChecked && webhookConfirmed;",
++        "the delivery gate's verdict must be one of the conjuncts that release the sleep gate",
++        "State_Sleep.cpp",
++    )
++    require(
++        sleep_text,
++        "if (!allComplete) {",
++        "the gate must branch on allComplete",
++        "State_Sleep.cpp",
++    )
++
++    # While the gate is blocked and inside budget, the handler must RETURN -
++    # i.e. stay in SLEEPING_STATE without disconnecting - rather than fall
++    # through to the disconnect request.
++    gate_block_start = index_of(sleep_text, "if (elapsedMs < cloudSyncBudgetMs) {")
++    gate_return = index_of(sleep_text, "return; // Stay in SLEEPING_STATE until complete or timeout")
++    if gate_block_start < 0 or gate_return < 0 or not gate_block_start < gate_return:
++        fail(
++            "the in-budget branch of the cloud-sync gate must return and stay in "
++            "SLEEPING_STATE instead of proceeding to disconnect"
++        )
++
++    # The gate must only be entered before the disconnect is requested.
++    require(
++        sleep_text,
++        "if (Particle.connected() && !disconnectRequested) {",
++        "the cloud-operations gate must run before the disconnect is requested",
++        "State_Sleep.cpp",
++    )
++
++    # ---------------------------------------------------------------
++    # 1b. Decision 6: the wait is bounded, and the bound can never fire while a
++    #     publish attempt is outstanding.
++    # ---------------------------------------------------------------
++    budget_src = (REPO / "src" / "cloud" / "PublishDeliveryBudget.cpp").read_text()
++    require(
++        budget_src,
++        "if (in.queueSleepSafe) {",
++        "the budget must be cancelled when the queue drains",
++        "PublishDeliveryBudget.cpp",
++    )
++    require(
++        budget_src,
++        "if (!in.cloudConnected) {",
++        "offline time must not consume the delivery budget",
++        "PublishDeliveryBudget.cpp",
++    )
++    require(
++        budget_src,
++        "out.sleepPermitted = out.budgetExpired && !in.publishInFlight;",
++        "an expired budget must only permit sleep when no publish is in flight",
++        "PublishDeliveryBudget.cpp",
++    )
++
++    # The teardown path must hold - bounded - rather than abandon an outstanding
++    # attempt, and the hold must keep the thrash guard and watchdog fed.
++    hold_start = index_of(sleep_text, "if (PublishDeliveryGate::publishInFlight()) {")
++    hold_return = index_of(sleep_text, "return; // Never tear down while an attempt is outstanding")
++    gatefail_line = index_of(sleep_text, 'Log.warn("GateFail: reason=%s')
++    if hold_start < 0 or hold_return < 0 or gatefail_line < 0:
++        fail("the teardown path must hold while a publish attempt is in flight")
++    elif not hold_start < hold_return < gatefail_line:
++        fail("the in-flight hold must sit between the budget expiry and the teardown")
++    require(
++        sleep_text,
++        "ConnectivityPolicy::PUBLISH_IN_FLIGHT_HOLD_MAX_MS",
++        "the in-flight hold must itself be bounded by a named policy constant",
++        "State_Sleep.cpp",
++    )
++    require(
++        sleep_text,
++        'thrashGuard.markProgress("PUBLISH_ACK_HOLD");',
++        "the in-flight hold must report progress so the thrash guard does not fire",
++        "State_Sleep.cpp",
++    )
++
++    # ---------------------------------------------------------------
++    # 2. The one permitted exception - the gate timing out - must be logged
++    #    with the event count and the elapsed time.
++    # ---------------------------------------------------------------
++    gatefail = re.search(r'Log\.warn\("GateFail:[^"]*"', sleep_text)
++    if not gatefail:
++        fail("the gate timeout must still emit a GateFail warning")
++    else:
++        fmt = gatefail.group(0)
++        for token in ("reason=%s", "elapsed=%lu", "qn=%u", "timeout=%lu"):
++            if token not in fmt:
++                fail(f"GateFail must report {token} (got {fmt})")
++
++    alert43 = re.search(r'Log\.warn\("SLEEP: Publish queue not empty[^"]*"', sleep_text)
++    if not alert43:
++        fail("a gate timeout with events still queued must log the queue blocker")
++    else:
++        fmt = alert43.group(0)
++        if "%u event(s) unacknowledged" not in fmt:
++            fail(f"the queue-blocked timeout log must state the event count (got {fmt})")
++        if "after %lu ms" not in fmt:
++            fail(f"the queue-blocked timeout log must state the elapsed time (got {fmt})")
++    require(
++        sleep_text,
++        "RecoveryState::raiseAlert(43);",
++        "a gate timeout with events still queued must still raise alert 43",
++        "State_Sleep.cpp",
++    )
++
++    # ---------------------------------------------------------------
++    # 3. IDLE must not hand the device to SLEEPING_STATE while connected with
++    #    an unacknowledged event queued.
++    # ---------------------------------------------------------------
++    idle_body = function_body(idle_text, "void handleIdleState(", "State_Idle.cpp")
++    require(
++        idle_body,
++        "canSleepGate = PublishDeliveryGate::queuePermitsSleep();",
++        "IDLE must consult the bounded delivery gate before entering SLEEPING_STATE",
++        "State_Idle.cpp",
++    )
++    require(
++        idle_body,
++        "if (!updatesPending && canSleepGate) {",
++        "the low-power sleep transition must be gated on canSleepGate",
++        "State_Idle.cpp",
++    )
++    low_power_gate = index_of(idle_body, "if (!updatesPending && canSleepGate) {")
++    low_power_transition = index_of(idle_body, 'transitionTo(SLEEPING_STATE, "low power idle");')
++    if low_power_gate < 0 or low_power_transition < 0 or not low_power_gate < low_power_transition:
++        fail("the low-power SLEEPING_STATE transition must sit inside the canSleepGate branch")
++
++    # The IDLE connectivity ceiling force-tears-down and sleeps; it must only do
++    # so when there is no meaningful work left, which includes the queue.
++    require(
++        idle_body,
++        "const bool noMeaningfulWorkRemains = !updatesPending && queueCanSleep;",
++        "the IDLE ceiling must treat a non-empty queue as meaningful work",
++        "State_Idle.cpp",
++    )
++    require(
++        idle_body,
++        "queueCanSleep = PublishDeliveryGate::queuePermitsSleep();",
++        "the IDLE ceiling's queue term must come from the bounded delivery gate",
++        "State_Idle.cpp",
++    )
++
++    # All three sites must share one verdict, so a queue that never drains can
++    # never pin the device awake at any of them.
++    for name, text in (("State_Sleep.cpp", sleep_text), ("State_Idle.cpp", idle_text)):
++        if "PublishDeliveryGate::queuePermitsSleep()" not in text:
++            fail(f"{name} must take its sleep verdict from the bounded delivery gate")
++    if idle_text.count("PublishDeliveryGate::queuePermitsSleep()") < 2:
++        fail(
++            "both IDLE sites (the low-power sleep entry and the connectivity ceiling) "
++            "must use the bounded delivery gate"
++        )
++    ceiling_gate = index_of(idle_body, "connectivityPowered &&\n      noMeaningfulWorkRemains &&")
++    if ceiling_gate < 0:
++        fail("the IDLE ceiling must require noMeaningfulWorkRemains before forcing teardown")
++
++    # ---------------------------------------------------------------
++    # 4. The queue's own verdict must stay honest.
++    # ---------------------------------------------------------------
++    state_wait = function_body(queue_text, "void PublishQueuePosix::stateWait()", "PublishQueuePosixRK.cpp")
++    if "canSleep = false;" not in state_wait:
++        fail("stateWait() must mark the queue not sleep-safe once an event is dispatched")
++    if "canSleep = (getNumEvents() == 0);" not in state_wait:
++        fail("stateWait() must derive sleep safety from the queue depth")
++
++    # Stage 4 warning: while pausePublishing is set the queue reports itself
++    # sleep-safe even with events pending, so the application must never use it.
++    for path in sorted((REPO / "src").rglob("*.cpp")) + sorted((REPO / "src").rglob("*.h")):
++        if "setPausePublishing(" in path.read_text():
++            fail(
++                f"{path.relative_to(REPO)} calls setPausePublishing(), which reports the "
++                "queue sleep-safe with events still pending"
++            )
++
++    if failures:
++        for message in failures:
++            print(f"FAIL: {message}", file=sys.stderr)
++        print(f"publish_ack_sleep_gate_structural_test: {len(failures)} failure(s)", file=sys.stderr)
++        return 1
++
++    print(
++        "publish_ack_sleep_gate_structural_test: sleep and cloud teardown stay blocked while "
++        "an unacknowledged event is queued, the wait is bounded and never releases with a "
++        "publish in flight, and the gate timeout logs count and elapsed time"
++    )
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/tests/publish_delivery_budget_test.cpp b/tests/publish_delivery_budget_test.cpp
+new file mode 100644
+index 0000000..c298aaa
+--- /dev/null
++++ b/tests/publish_delivery_budget_test.cpp
+@@ -0,0 +1,244 @@
++// tests/publish_delivery_budget_test.cpp
++//
++// WO-2026-09-25-001, Stage 5 decision 6 / acceptance criterion 11:
++// the bounded delivery wait.
++//
++// This compiles the REAL decision module (src/cloud/PublishDeliveryBudget.cpp)
++// together with the REAL policy constant (src/power/ConnectivityPolicy.h), so
++// these are behavioural checks against shipped code, not a mirror. The rule
++// under test is:
++//
++//     sleep is allowed when the queue is empty
++//     OR (the delivery budget has expired AND no publish is in flight)
++//
++// Stage 7 finding P1 this file is built to catch: a connected device with a
++// queue that never drains stayed connected for a simulated hour, because IDLE
++// refused to enter SLEEPING_STATE while the queue was non-empty and so never
++// reached that state's own timeout.
++
++#include <cstdio>
++
++#include "cloud/PublishDeliveryBudget.h"
++#include "power/ConnectivityPolicy.h"
++
++namespace {
++
++int failures = 0;
++
++void expectEq(const char *what, unsigned long actual, unsigned long expected) {
++    if (actual != expected) {
++        std::printf("FAIL: %s: got %lu, expected %lu\n", what, actual, expected);
++        failures++;
++    }
++}
++
++void expectTrue(const char *what, bool value) {
++    if (!value) {
++        std::printf("FAIL: %s: expected true\n", what);
++        failures++;
++    }
++}
++
++void expectFalse(const char *what, bool value) {
++    if (value) {
++        std::printf("FAIL: %s: expected false\n", what);
++        failures++;
++    }
++}
++
++using PublishDeliveryBudget::Inputs;
++using PublishDeliveryBudget::Verdict;
++
++// A device that is cloud-connected with an undrainable queue and nothing
++// currently in flight (for example, inside the queue's 30 s retry backoff).
++Inputs stuckQueue(unsigned long nowMs, bool inFlight = false) {
++    Inputs in;
++    in.cloudConnected = true;
++    in.queueSleepSafe = false;
++    in.publishInFlight = inFlight;
++    in.queuedEvents = 3;
++    in.nowMs = nowMs;
++    return in;
++}
++
++Inputs drainedQueue(unsigned long nowMs) {
++    Inputs in;
++    in.cloudConnected = true;
++    in.queueSleepSafe = true;
++    in.publishInFlight = false;
++    in.queuedEvents = 0;
++    in.nowMs = nowMs;
++    return in;
++}
++
++Inputs offlineWithQueue(unsigned long nowMs) {
++    Inputs in;
++    in.cloudConnected = false;
++    in.queueSleepSafe = false;
++    in.publishInFlight = false;
++    in.queuedEvents = 3;
++    in.nowMs = nowMs;
++    return in;
++}
++
++// --- the budget itself ------------------------------------------------------
++
++void testBudgetIsTheShippedPolicyConstant() {
++    expectEq("the budget is ConnectivityPolicy::PUBLISH_DELIVERY_BUDGET_MS",
++             PublishDeliveryBudget::budgetMs(),
++             ConnectivityPolicy::PUBLISH_DELIVERY_BUDGET_MS);
++    expectEq("the default budget is 90 s", PublishDeliveryBudget::budgetMs(), 90000UL);
++}
++
++// --- P1: a stuck queue eventually permits sleep -----------------------------
++
++void testStuckQueueEventuallyPermitsSleep() {
++    PublishDeliveryBudget::reset();
++    const unsigned long t0 = 1000UL;
++    const unsigned long budget = PublishDeliveryBudget::budgetMs();
++
++    Verdict v = PublishDeliveryBudget::evaluate(stuckQueue(t0));
++    expectFalse("sleep is refused the moment the budget starts", v.sleepPermitted);
++    expectFalse("the budget has not expired at t0", v.budgetExpired);
++    expectEq("elapsed is 0 at the start", v.elapsedMs, 0);
++
++    v = PublishDeliveryBudget::evaluate(stuckQueue(t0 + budget - 1));
++    expectFalse("sleep is still refused one millisecond before expiry", v.sleepPermitted);
++    expectEq("elapsed tracks wall clock", v.elapsedMs, budget - 1);
++
++    v = PublishDeliveryBudget::evaluate(stuckQueue(t0 + budget));
++    expectTrue("the budget expires exactly at the budget", v.budgetExpired);
++    expectTrue("sleep is permitted once the budget expired with nothing in flight",
++               v.sleepPermitted);
++
++    // Stage 7's reproduction ran for a simulated hour. It must not be possible
++    // to stay connected that long with a stuck queue.
++    v = PublishDeliveryBudget::evaluate(stuckQueue(t0 + 3600000UL));
++    expectTrue("a simulated hour of a stuck queue still permits sleep", v.sleepPermitted);
++}
++
++void testExpiryIsReportedExactlyOncePerEpisode() {
++    PublishDeliveryBudget::reset();
++    const unsigned long t0 = 5000UL;
++    const unsigned long budget = PublishDeliveryBudget::budgetMs();
++
++    unsigned expiries = 0;
++    for (unsigned long t = t0; t <= t0 + budget + 10000UL; t += 1000UL) {
++        if (PublishDeliveryBudget::evaluate(stuckQueue(t)).expiryFirstObserved) {
++            expiries++;
++        }
++    }
++    expectEq("one expiry is reported per episode, however often it is evaluated",
++             expiries, 1);
++
++    // Draining the queue ends the episode; a new backlog starts a new budget
++    // and a new expiry report.
++    PublishDeliveryBudget::evaluate(drainedQueue(t0 + budget + 20000UL));
++    expiries = 0;
++    const unsigned long t1 = t0 + budget + 30000UL;
++    for (unsigned long t = t1; t <= t1 + budget + 5000UL; t += 1000UL) {
++        if (PublishDeliveryBudget::evaluate(stuckQueue(t)).expiryFirstObserved) {
++            expiries++;
++        }
++    }
++    expectEq("a second backlog reports its own expiry", expiries, 1);
++}
++
++// --- an in-flight publish is never abandoned --------------------------------
++
++void testSleepIsNeverPermittedWhileAPublishIsInFlight() {
++    PublishDeliveryBudget::reset();
++    const unsigned long t0 = 1000UL;
++    const unsigned long budget = PublishDeliveryBudget::budgetMs();
++
++    PublishDeliveryBudget::evaluate(stuckQueue(t0, /*inFlight=*/true));
++
++    Verdict v = PublishDeliveryBudget::evaluate(stuckQueue(t0 + budget, /*inFlight=*/true));
++    expectTrue("the budget still expires while a publish is in flight", v.budgetExpired);
++    expectTrue("the expiry is still logged while a publish is in flight", v.expiryFirstObserved);
++    expectFalse("an in-flight publish is never abandoned, expired budget or not",
++                v.sleepPermitted);
++
++    v = PublishDeliveryBudget::evaluate(stuckQueue(t0 + budget + 600000UL, /*inFlight=*/true));
++    expectFalse("ten more minutes in flight still does not permit sleep", v.sleepPermitted);
++
++    // Device OS completes a WITH_ACK future within its 20 s ACK timeout, and
++    // the queue clears in-flight once statePublishWait() has acted on the
++    // result. Sleep is permitted from that point.
++    v = PublishDeliveryBudget::evaluate(stuckQueue(t0 + budget + 600001UL, /*inFlight=*/false));
++    expectTrue("sleep is permitted once the attempt's result has been processed",
++               v.sleepPermitted);
++}
++
++// --- episode boundaries -----------------------------------------------------
++
++void testDrainedQueueAlwaysPermitsSleepAndCancelsTheBudget() {
++    PublishDeliveryBudget::reset();
++    const unsigned long budget = PublishDeliveryBudget::budgetMs();
++
++    expectTrue("an empty queue permits sleep immediately",
++               PublishDeliveryBudget::evaluate(drainedQueue(1000UL)).sleepPermitted);
++
++    // Accumulate most of a budget, then drain: the next backlog must start
++    // from zero rather than inheriting the old elapsed time.
++    PublishDeliveryBudget::evaluate(stuckQueue(2000UL));
++    PublishDeliveryBudget::evaluate(stuckQueue(2000UL + budget - 1000UL));
++    PublishDeliveryBudget::evaluate(drainedQueue(2000UL + budget - 500UL));
++
++    Verdict v = PublishDeliveryBudget::evaluate(stuckQueue(2000UL + budget));
++    expectEq("a drained queue restarts the budget from zero", v.elapsedMs, 0);
++    expectFalse("the inherited elapsed time does not carry over", v.sleepPermitted);
++}
++
++void testOfflineSleepIsPermittedAndConsumesNoBudget() {
++    PublishDeliveryBudget::reset();
++    const unsigned long budget = PublishDeliveryBudget::budgetMs();
++
++    Verdict v = PublishDeliveryBudget::evaluate(offlineWithQueue(1000UL));
++    expectTrue("offline with a queue still permits sleep - the events are durable",
++               v.sleepPermitted);
++    expectEq("offline time does not run the budget", v.elapsedMs, 0);
++
++    // Connect, accumulate, drop the connection, reconnect: the budget restarts.
++    PublishDeliveryBudget::evaluate(stuckQueue(2000UL));
++    PublishDeliveryBudget::evaluate(stuckQueue(2000UL + budget - 1000UL));
++    PublishDeliveryBudget::evaluate(offlineWithQueue(2000UL + budget - 500UL));
++
++    v = PublishDeliveryBudget::evaluate(stuckQueue(2000UL + budget));
++    expectEq("a dropped connection restarts the budget from zero", v.elapsedMs, 0);
++    expectFalse("a reconnect does not inherit the previous connection's elapsed time",
++                v.sleepPermitted);
++}
++
++void testBudgetStartAtMillisZeroStillRuns() {
++    // millis() is 0 for the first millisecond after boot, and 0 is the module's
++    // "not running" sentinel. The budget must still start and expire.
++    PublishDeliveryBudget::reset();
++    const unsigned long budget = PublishDeliveryBudget::budgetMs();
++
++    // millis() is 0 for the first millisecond after boot; the module tracks
++    // "running" with its own flag so the budget is not a millisecond short there.
++    PublishDeliveryBudget::evaluate(stuckQueue(0UL));
++    Verdict v = PublishDeliveryBudget::evaluate(stuckQueue(budget));
++    expectTrue("a budget started at millis()==0 still expires", v.budgetExpired);
++    expectTrue("a budget started at millis()==0 still permits sleep", v.sleepPermitted);
++}
++
++} // namespace
++
++int main() {
++    testBudgetIsTheShippedPolicyConstant();
++    testStuckQueueEventuallyPermitsSleep();
++    testExpiryIsReportedExactlyOncePerEpisode();
++    testSleepIsNeverPermittedWhileAPublishIsInFlight();
++    testDrainedQueueAlwaysPermitsSleepAndCancelsTheBudget();
++    testOfflineSleepIsPermittedAndConsumesNoBudget();
++    testBudgetStartAtMillisZeroStillRuns();
++
++    if (failures != 0) {
++        std::printf("publish_delivery_budget_test: %d failure(s)\n", failures);
++        return 1;
++    }
++    std::printf("publish_delivery_budget_test: all checks passed\n");
++    return 0;
++}
+diff --git a/tests/publish_delivery_budget_test.sh b/tests/publish_delivery_budget_test.sh
+new file mode 100755
+index 0000000..945b5c7
+--- /dev/null
++++ b/tests/publish_delivery_budget_test.sh
+@@ -0,0 +1,179 @@
++#!/bin/zsh
++set -euo pipefail
++
++# WO-2026-09-25-001, Stage 5 decision 6 / acceptance criterion 11:
++# the bounded delivery wait.
++#
++# Part 1 compiles and runs the REAL decision module
++# (src/cloud/PublishDeliveryBudget.cpp) with the REAL policy constant on the host.
++# Part 2 checks the verdict is actually applied at every gate that can sleep or
++# tear the cloud connection down, that an in-flight publish is never abandoned,
++# and that RAM-queue events reach flash before the device sleeps.
++
++repo_root="${0:A:h:h}"
++tmp_dir="$repo_root/build-tmp"
++binary="$tmp_dir/publish_delivery_budget_test_bin"
++
++mkdir -p "$tmp_dir"
++cleanup() { rm -f "$binary"; }
++trap cleanup EXIT
++
++# --- Part 1: behavioural test against the shipped module --------------------
++# ConnectivityPolicy.h uses time_t for two unrelated constants; -include ctime
++# supplies it on the host. Nothing else in that header or in
++# PublishDeliveryBudget.cpp needs Device OS.
++clang++ -std=c++17 -Wall -Wextra -pedantic -Werror \
++  -include ctime \
++  -I"$repo_root/src" \
++  -I"$repo_root/tests/stubs" \
++  "$repo_root/tests/publish_delivery_budget_test.cpp" \
++  "$repo_root/src/cloud/PublishDeliveryBudget.cpp" \
++  -o "$binary"
++"$binary"
++
++# --- Part 2: the verdict is applied at every gate ---------------------------
++policy_hdr="$repo_root/src/power/ConnectivityPolicy.h"
++gate_src="$repo_root/src/cloud/PublishDeliveryGate.cpp"
++idle_src="$repo_root/src/state/State_Idle.cpp"
++sleep_src="$repo_root/src/state/State_Sleep.cpp"
++queue_hdr="$repo_root/lib/PublishQueuePosixRK/src/PublishQueuePosixRK.h"
++queue_src="$repo_root/lib/PublishQueuePosixRK/src/PublishQueuePosixRK.cpp"
++
++check() {
++  local desc="$1"
++  local pattern="$2"
++  local file="$3"
++  if ! grep -q -F -- "$pattern" "$file"; then
++    echo "GATE CHECK FAILED: $desc (pattern not found in $file: $pattern)" >&2
++    exit 1
++  fi
++}
++
++refute() {
++  local desc="$1"
++  local pattern="$2"
++  local file="$3"
++  if grep -q -F -- "$pattern" "$file"; then
++    echo "GATE CHECK FAILED: $desc (pattern MUST NOT appear in $file: $pattern)" >&2
++    exit 1
++  fi
++}
++
++# The budget is a single named constant in the existing policy location.
++check "the delivery budget lives in ConnectivityPolicy" \
++  "constexpr unsigned long PUBLISH_DELIVERY_BUDGET_MS = 90000UL;" "$policy_hdr"
++check "the in-flight hold cap lives in ConnectivityPolicy" \
++  "constexpr unsigned long PUBLISH_IN_FLIGHT_HOLD_MAX_MS = 25000UL;" "$policy_hdr"
++check "the budget module reads that constant, not a literal" \
++  "return ConnectivityPolicy::PUBLISH_DELIVERY_BUDGET_MS;" \
++  "$repo_root/src/cloud/PublishDeliveryBudget.cpp"
++
++# "No publish in flight" comes from the queue's own state.
++check "the queue exposes its in-flight state" \
++  "bool getPublishInFlight() const { return publishInFlight; };" "$queue_hdr"
++check "the queue marks an accepted dispatch in flight" "publishInFlight = true;" "$queue_src"
++check "the queue clears in flight only after the result is processed" \
++  "publishInFlight = false;" "$queue_src"
++check "the gate reads the queue's in-flight state" \
++  "in.publishInFlight = PublishQueuePosix::instance().getPublishInFlight();" "$gate_src"
++check "the gate reads the queue's own sleep verdict" \
++  "in.queueSleepSafe = PublishQueuePosix::instance().getCanSleep();" "$gate_src"
++
++# publishInFlight must be set inside the accepted-dispatch branch of stateWait()
++# (a real Particle.publish() was started), not unconditionally.
++awk '
++  /^void PublishQueuePosix::stateWait\(\)/ { inFn=1; next }
++  inFn && /^void PublishQueuePosix::/ { inFn=0 }
++  inFn {
++    n++
++    if ($0 ~ /if \(BackgroundPublishRK::instance\(\)\.publish\(/ && !dispatch) dispatch=n
++    if ($0 ~ /publishInFlight = true;/ && !mark) mark=n
++    if ($0 ~ /PubqDispatch: e=%s/ && !reject) reject=n
++  }
++  END {
++    if (!dispatch || !mark || !reject) { print "GATE CHECK FAILED: could not locate the stateWait() dispatch anchors" > "/dev/stderr"; exit 1 }
++    if (!(dispatch < mark && mark < reject)) { print "GATE CHECK FAILED: publishInFlight is not set inside the accepted-dispatch branch" > "/dev/stderr"; exit 1 }
++  }
++' "$queue_src"
++
++# publishInFlight must be cleared only after statePublishWait() has acted on the
++# result, so a failed RAM event cannot be lost between the worker completing the
++# future and the application requeueing/persisting it.
++awk '
++  /^void PublishQueuePosix::statePublishWait\(\)/ { inFn=1; next }
++  inFn && /^void PublishQueuePosix::/ { inFn=0 }
++  inFn && /^PublishQueuePosix::PublishQueuePosix\(\)/ { inFn=0 }
++  inFn {
++    n++
++    if ($0 ~ /ramQueue\.push_front\(curEvent\);/ && !requeue) requeue=n
++    if ($0 ~ /writeQueueToFiles\(\);/ && !persist) persist=n
++    if ($0 ~ /publishInFlight = false;/ && !clear) clear=n
++  }
++  END {
++    if (!requeue || !persist || !clear) { print "GATE CHECK FAILED: could not locate the statePublishWait() in-flight anchors" > "/dev/stderr"; exit 1 }
++    if (!(requeue < clear && persist < clear)) { print "GATE CHECK FAILED: in-flight is cleared before the failed event is requeued/persisted" > "/dev/stderr"; exit 1 }
++  }
++' "$queue_src"
++
++# All three gates that can sleep or disconnect use the one shared verdict, and
++# none of them reads the raw queue verdict for that decision any more.
++check "the IDLE low-power sleep gate uses the bounded delivery gate" \
++  "bool canSleepGate = PublishDeliveryGate::queuePermitsSleep();" "$idle_src"
++check "the IDLE connectivity ceiling uses the bounded delivery gate" \
++  "queueCanSleep = PublishDeliveryGate::queuePermitsSleep();" "$idle_src"
++check "the IDLE ceiling still treats a blocking queue as meaningful work" \
++  "const bool noMeaningfulWorkRemains = !updatesPending && queueCanSleep;" "$idle_src"
++check "the SLEEPING_STATE cloud-sync gate uses the bounded delivery gate" \
++  "const bool queuePermitsSleep = PublishDeliveryGate::queuePermitsSleep();" "$sleep_src"
++check "the cloud-sync gate's release condition includes the queue term" \
++  "bool allComplete = queuePermitsSleep && ledgersSynced && updatesChecked && webhookConfirmed;" \
++  "$sleep_src"
++refute "the IDLE gates must not go back to the unbounded raw queue verdict" \
++  "canSleepGate = PublishQueuePosix::instance().getCanSleep();" "$idle_src"
++
++# A gate timeout must never tear the connection down with an attempt outstanding.
++check "the cloud-sync gate holds for an in-flight publish past its budget" \
++  "if (PublishDeliveryGate::publishInFlight()) {" "$sleep_src"
++check "that hold is bounded by the policy cap" \
++  "if (holdElapsedMs < ConnectivityPolicy::PUBLISH_IN_FLIGHT_HOLD_MAX_MS) {" "$sleep_src"
++awk '
++  /if \(PublishDeliveryGate::publishInFlight\(\)\) \{/ && !hold { hold=NR }
++  /Log\.warn\("GateFail: reason=/ && !gatefail { gatefail=NR }
++  END {
++    if (!hold || !gatefail) { print "GATE CHECK FAILED: could not locate the in-flight hold / GateFail anchors" > "/dev/stderr"; exit 1 }
++    if (!(hold < gatefail)) { print "GATE CHECK FAILED: the in-flight hold must run before the gate gives up and tears down" > "/dev/stderr"; exit 1 }
++  }
++' "$sleep_src"
++
++# Every budget expiry is logged at INFO with the queued count, the elapsed time
++# and whether a publish was in flight.
++check "each budget expiry is logged" \
++  'Log.info("DeliveryBudget: expired budget=%lums elapsed=%lums qn=%u inflight=%d",' \
++  "$gate_src"
++check "the expiry log fires once per episode" "if (verdict.expiryFirstObserved) {" "$gate_src"
++
++# Before sleeping with events queued, the RAM queue is moved to flash and
++# sleptWithQueued is counted - on every sleep-commit path.
++check "the sleep commit flushes the RAM queue to flash" \
++  "PublishQueuePosix::instance().writeQueueToFiles();" "$sleep_src"
++check "the sleep commit counts a carry-over" \
++  "PublishDeliveryCounters::noteSleptWithQueued();" "$sleep_src"
++awk '
++  /^void commitDeliveryAccountingBeforeSleep\(uint16_t qDepth, unsigned long awakeMs\) \{/ { inFn=1; next }
++  inFn && /^\}/ { inFn=0 }
++  inFn {
++    n++
++    if ($0 ~ /if \(qDepth > 0\) \{/ && !guard) guard=n
++    if ($0 ~ /writeQueueToFiles\(\);/ && !flush) flush=n
++    if ($0 ~ /noteSleptWithQueued\(\);/ && !slept) slept=n
++    if ($0 ~ /noteQueuedAtSleep\(qDepth\);/ && !snap) snap=n
++    if ($0 ~ /CycleDelivery: awake=/ && !logline) logline=n
++  }
++  END {
++    if (!guard || !flush || !slept || !snap || !logline) { print "GATE CHECK FAILED: the shared sleep-commit helper is missing a step" > "/dev/stderr"; exit 1 }
++    if (!(guard < flush && flush < slept)) { print "GATE CHECK FAILED: the RAM->flash flush must happen inside the queued-events branch, before the counter" > "/dev/stderr"; exit 1 }
++    if (!(slept < snap && snap < logline)) { print "GATE CHECK FAILED: the sleep-commit helper must snapshot then log" > "/dev/stderr"; exit 1 }
++  }
++' "$sleep_src"
++
++echo "Gate checks passed: the delivery budget bounds the wait at every sleep/teardown gate, an in-flight publish is never abandoned, expiries are logged, and queued events reach flash before sleep"
+diff --git a/tests/publish_delivery_counters_test.cpp b/tests/publish_delivery_counters_test.cpp
+new file mode 100644
+index 0000000..cb901fc
+--- /dev/null
++++ b/tests/publish_delivery_counters_test.cpp
+@@ -0,0 +1,232 @@
++// tests/publish_delivery_counters_test.cpp
++//
++// WO-2026-09-25-001, Stage 5 decision 2 / acceptance criterion 4.
++//
++// This compiles the REAL production counter module
++// (src/cloud/PublishDeliveryCounters.cpp) on the host - `retained` is defined
++// away on the compile line, which is the only Particle-ism in that file - so
++// these are behavioural checks against shipped code, not a mirror.
++
++#include <cstdio>
++
++#include "cloud/PublishDeliveryCounters.h"
++
++namespace {
++
++int failures = 0;
++
++void expectEq(const char *what, unsigned long actual, unsigned long expected) {
++    if (actual != expected) {
++        std::printf("FAIL: %s: got %lu, expected %lu\n", what, actual, expected);
++        failures++;
++    }
++}
++
++using PublishDeliveryCounters::Snapshot;
++
++Snapshot reset() {
++    // begin() only re-zeroes when the magic/version does not match, which is
++    // exactly the hibernate/reset survival behaviour. Drain the block to a
++    // known state by calling begin() on a fresh process.
++    PublishDeliveryCounters::begin();
++    return PublishDeliveryCounters::snapshot();
++}
++
++void testStartsAtZero() {
++    const Snapshot s = reset();
++    expectEq("attempted starts at 0", s.attempted, 0);
++    expectEq("acknowledged starts at 0", s.acknowledged, 0);
++    expectEq("failed starts at 0", s.failed, 0);
++    expectEq("retried starts at 0", s.retried, 0);
++    expectEq("queuedAtSleep starts at 0", s.queuedAtSleep, 0);
++    expectEq("sleptWithQueued starts at 0", s.sleptWithQueued, 0);
++    expectEq("abandoned starts at 0", s.abandoned, 0);
++}
++
++void testBeginIsIdempotentOnceInitialized() {
++    PublishDeliveryCounters::noteAttempt();
++    PublishDeliveryCounters::noteResult(true);
++    // A later boot with the same layout must NOT clear the counters - that is
++    // what makes them survive a hibernate wake and a reset.
++    PublishDeliveryCounters::begin();
++    const Snapshot s = PublishDeliveryCounters::snapshot();
++    expectEq("begin() preserves an already-initialized block (attempted)", s.attempted, 1);
++    expectEq("begin() preserves an already-initialized block (acknowledged)", s.acknowledged, 1);
++}
++
++void testAcknowledgedAttempt() {
++    const Snapshot before = PublishDeliveryCounters::snapshot();
++    PublishDeliveryCounters::noteAttempt();
++    PublishDeliveryCounters::noteResult(true);
++    const Snapshot after = PublishDeliveryCounters::snapshot();
++    expectEq("an acknowledged send counts one attempt", after.attempted, before.attempted + 1);
++    expectEq("an acknowledged send counts one acknowledgment", after.acknowledged, before.acknowledged + 1);
++    expectEq("an acknowledged send counts no failure", after.failed, before.failed);
++    expectEq("an acknowledged send counts no retry", after.retried, before.retried);
++}
++
++void testFailedAttemptThenRetry() {
++    const Snapshot before = PublishDeliveryCounters::snapshot();
++
++    PublishDeliveryCounters::noteAttempt();
++    PublishDeliveryCounters::noteResult(false); // no ACK within the 20 s timeout
++    const Snapshot afterFailure = PublishDeliveryCounters::snapshot();
++    expectEq("an unacknowledged send counts one attempt", afterFailure.attempted, before.attempted + 1);
++    expectEq("an unacknowledged send counts one failure", afterFailure.failed, before.failed + 1);
++    expectEq("an unacknowledged send is not itself a retry", afterFailure.retried, before.retried);
++    expectEq("an unacknowledged send counts no acknowledgment", afterFailure.acknowledged, before.acknowledged);
++
++    // The queue keeps the event and re-dispatches it: the NEXT attempt is the retry.
++    PublishDeliveryCounters::noteAttempt();
++    const Snapshot afterRetryDispatch = PublishDeliveryCounters::snapshot();
++    expectEq("the re-send counts as a retry", afterRetryDispatch.retried, before.retried + 1);
++    expectEq("the re-send also counts as an attempt", afterRetryDispatch.attempted, before.attempted + 2);
++
++    PublishDeliveryCounters::noteResult(true);
++    const Snapshot afterRetryAck = PublishDeliveryCounters::snapshot();
++    expectEq("the acknowledged re-send counts one acknowledgment",
++             afterRetryAck.acknowledged, before.acknowledged + 1);
++
++    // A third, first-time send must not be counted as a retry.
++    PublishDeliveryCounters::noteAttempt();
++    const Snapshot afterFresh = PublishDeliveryCounters::snapshot();
++    expectEq("a first-time send after a success is not a retry",
++             afterFresh.retried, before.retried + 1);
++    PublishDeliveryCounters::noteResult(true);
++}
++
++// WO-2026-09-25-001 Stage 5 decision 7 (Stage 7 finding P2): an attempt that was
++// outstanding when the device reset lost its Future and its callback, so its
++// outcome never arrives. Without the `abandoned` reconciliation at boot,
++// `attempted` stayed permanently ahead of `acknowledged + failed`.
++void testResetDuringAnAttemptIsCountedAsAbandoned() {
++    const Snapshot before = PublishDeliveryCounters::snapshot();
++
++    PublishDeliveryCounters::noteAttempt();
++    const Snapshot outstanding = PublishDeliveryCounters::snapshot();
++    expectEq("the interrupted attempt was counted as an attempt",
++             outstanding.attempted, before.attempted + 1);
++    expectEq("nothing is abandoned while the attempt is still outstanding",
++             outstanding.abandoned, before.abandoned);
++
++    // The reset: retained SRAM survives, so begin() sees a valid block with an
++    // attempt still marked outstanding.
++    PublishDeliveryCounters::begin();
++    const Snapshot afterBoot = PublishDeliveryCounters::snapshot();
++    expectEq("a reset during an attempt counts one abandoned",
++             afterBoot.abandoned, before.abandoned + 1);
++    expectEq("the surviving counters are not cleared by the reconciliation",
++             afterBoot.attempted, before.attempted + 1);
++    expectEq("a == k + f + abandoned across the simulated reset",
++             afterBoot.attempted,
++             (unsigned long)afterBoot.acknowledged + (unsigned long)afterBoot.failed +
++                 (unsigned long)afterBoot.abandoned);
++
++    // A second boot must not re-abandon the same attempt.
++    PublishDeliveryCounters::begin();
++    expectEq("begin() does not re-abandon an already-reconciled attempt",
++             PublishDeliveryCounters::snapshot().abandoned, before.abandoned + 1);
++
++    // The queue still holds that event - it is only removed on an
++    // acknowledgment - so the dispatch after the reset is a re-send.
++    PublishDeliveryCounters::noteAttempt();
++    expectEq("the re-send after an abandoned attempt counts as a retry",
++             PublishDeliveryCounters::snapshot().retried, before.retried + 1);
++    PublishDeliveryCounters::noteResult(true);
++}
++
++void testAttemptedEqualsAcknowledgedPlusFailedPlusAbandoned() {
++    const Snapshot s = PublishDeliveryCounters::snapshot();
++    expectEq("attempted == acknowledged + failed + abandoned once nothing is in flight",
++             s.attempted,
++             (unsigned long)s.acknowledged + (unsigned long)s.failed + (unsigned long)s.abandoned);
++    if (s.retried > s.attempted) {
++        std::printf("FAIL: retried (%u) must be a subset of attempted (%u)\n",
++                    (unsigned)s.retried, (unsigned)s.attempted);
++        failures++;
++    }
++}
++
++void testSleptWithQueuedIsCumulative() {
++    const Snapshot before = PublishDeliveryCounters::snapshot();
++    PublishDeliveryCounters::noteSleptWithQueued();
++    expectEq("a sleep commit that carries events over is counted",
++             PublishDeliveryCounters::snapshot().sleptWithQueued, before.sleptWithQueued + 1);
++    PublishDeliveryCounters::noteSleptWithQueued();
++    expectEq("sleptWithQueued accumulates, unlike queuedAtSleep",
++             PublishDeliveryCounters::snapshot().sleptWithQueued, before.sleptWithQueued + 2);
++    // It must not disturb the delivery accounting.
++    const Snapshot after = PublishDeliveryCounters::snapshot();
++    expectEq("counting a carry-over does not change attempted", after.attempted, before.attempted);
++    expectEq("counting a carry-over does not change acknowledged",
++             after.acknowledged, before.acknowledged);
++}
++
++void testQueuedAtSleepIsASnapshotNotACumulativeCount() {
++    PublishDeliveryCounters::noteQueuedAtSleep(3);
++    expectEq("queuedAtSleep records the depth at sleep",
++             PublishDeliveryCounters::snapshot().queuedAtSleep, 3);
++    PublishDeliveryCounters::noteQueuedAtSleep(0);
++    expectEq("queuedAtSleep is replaced, not accumulated",
++             PublishDeliveryCounters::snapshot().queuedAtSleep, 0);
++    PublishDeliveryCounters::noteQueuedAtSleep(1);
++    expectEq("queuedAtSleep tracks the most recent sleep",
++             PublishDeliveryCounters::snapshot().queuedAtSleep, 1);
++}
++
++void testCountersSaturateRatherThanWrap() {
++    // The payload byte budget depends on the counters never exceeding five
++    // digits (see tests/status_event_payload_budget_test.py). Wrapping to 0
++    // would also silently reset a fleet-wide loss measurement.
++    while (PublishDeliveryCounters::snapshot().attempted < PublishDeliveryCounters::kCounterMax ||
++           PublishDeliveryCounters::snapshot().acknowledged < PublishDeliveryCounters::kCounterMax) {
++        PublishDeliveryCounters::noteAttempt();
++        PublishDeliveryCounters::noteResult(true);
++    }
++    const Snapshot s = PublishDeliveryCounters::snapshot();
++    expectEq("attempted saturates at kCounterMax", s.attempted, PublishDeliveryCounters::kCounterMax);
++    expectEq("acknowledged saturates at kCounterMax", s.acknowledged, PublishDeliveryCounters::kCounterMax);
++    PublishDeliveryCounters::noteAttempt();
++    expectEq("attempted stays saturated", PublishDeliveryCounters::snapshot().attempted,
++             PublishDeliveryCounters::kCounterMax);
++    PublishDeliveryCounters::noteResult(true);
++
++    // Each counter saturates independently, so at the ceiling the totals are
++    // censored and `a == k + f + abandoned` no longer holds. That is a declared
++    // limitation, documented in PublishDeliveryCounters.h and in
++    // docs/FIELD_MEANINGS_REFERENCE.md - read 65535 as ">= 65535". This
++    // assertion pins the behaviour so it cannot change silently.
++    const Snapshot censored = PublishDeliveryCounters::snapshot();
++    if (censored.failed != 0 || censored.abandoned != 0) {
++        const unsigned long sum = (unsigned long)censored.acknowledged +
++                                  (unsigned long)censored.failed +
++                                  (unsigned long)censored.abandoned;
++        if (sum <= (unsigned long)censored.attempted) {
++            std::printf("FAIL: at saturation the invariant is expected to be censored, "
++                        "but a=%u >= k+f+b=%lu\n",
++                        (unsigned)censored.attempted, sum);
++            failures++;
++        }
++    }
++}
++
++} // namespace
++
++int main() {
++    testStartsAtZero();
++    testBeginIsIdempotentOnceInitialized();
++    testAcknowledgedAttempt();
++    testFailedAttemptThenRetry();
++    testResetDuringAnAttemptIsCountedAsAbandoned();
++    testAttemptedEqualsAcknowledgedPlusFailedPlusAbandoned();
++    testSleptWithQueuedIsCumulative();
++    testQueuedAtSleepIsASnapshotNotACumulativeCount();
++    testCountersSaturateRatherThanWrap();
++
++    if (failures != 0) {
++        std::printf("publish_delivery_counters_test: %d failure(s)\n", failures);
++        return 1;
++    }
++    std::printf("publish_delivery_counters_test: all checks passed\n");
++    return 0;
++}
+diff --git a/tests/publish_delivery_counters_test.sh b/tests/publish_delivery_counters_test.sh
+new file mode 100755
+index 0000000..b1122c2
+--- /dev/null
++++ b/tests/publish_delivery_counters_test.sh
+@@ -0,0 +1,229 @@
++#!/bin/zsh
++set -euo pipefail
++
++# WO-2026-09-25-001, Stage 5 decision 2 / acceptance criterion 4:
++# publish delivery counters (attempted / acknowledged / failed / retried /
++# queued-at-sleep).
++#
++# Part 1 compiles and runs the REAL src/cloud/PublishDeliveryCounters.cpp on the
++# host (`retained` defined away, stub Particle.h).
++# Part 2 checks the increment sites are wired to the production code paths -
++# the host test can prove the accounting is right but not that anything calls it.
++
++repo_root="${0:A:h:h}"
++tmp_dir="$repo_root/build-tmp"
++binary="$tmp_dir/publish_delivery_counters_test_bin"
++
++mkdir -p "$tmp_dir"
++cleanup() { rm -f "$binary"; }
++trap cleanup EXIT
++
++# --- Part 1: behavioural test against the shipped module --------------------
++# -Dretained= removes the only Particle-ism in PublishDeliveryCounters.cpp.
++# On the host the block is ordinary static storage, which is zero-initialized,
++# so begin() sees a mismatched magic exactly as it would on a power-loss boot.
++clang++ -std=c++17 -Wall -Wextra -pedantic -Werror \
++  -Dretained= \
++  -I"$repo_root/src" \
++  -I"$repo_root/tests/stubs" \
++  "$repo_root/tests/publish_delivery_counters_test.cpp" \
++  "$repo_root/src/cloud/PublishDeliveryCounters.cpp" \
++  -o "$binary"
++"$binary"
++
++# --- Part 2: increment-site wiring -----------------------------------------
++queue_src="$repo_root/lib/PublishQueuePosixRK/src/PublishQueuePosixRK.cpp"
++queue_hdr="$repo_root/lib/PublishQueuePosixRK/src/PublishQueuePosixRK.h"
++app_src="$repo_root/src/Generalized-Core-Counter.cpp"
++sleep_src="$repo_root/src/state/State_Sleep.cpp"
++status_src="$repo_root/src/cloud/DeviceStatusPublisher.cpp"
++counters_src="$repo_root/src/cloud/PublishDeliveryCounters.cpp"
++
++check() {
++  local desc="$1"
++  local pattern="$2"
++  local file="$3"
++  if ! grep -q -F -- "$pattern" "$file"; then
++    echo "WIRING CHECK FAILED: $desc (pattern not found in $file: $pattern)" >&2
++    exit 1
++  fi
++}
++
++refute() {
++  local desc="$1"
++  local pattern="$2"
++  local file="$3"
++  if grep -q -F -- "$pattern" "$file"; then
++    echo "WIRING CHECK FAILED: $desc (pattern MUST NOT appear in $file: $pattern)" >&2
++    exit 1
++  fi
++}
++
++# The queue exposes both hooks, and both are invoked from the application
++# thread - stateWait()/statePublishWait() - not from the background publish
++# worker. That is what lets the counters use plain unlocked increments.
++check "queue exposes the dispatch hook" "withPublishAttemptUserCallback" "$queue_hdr"
++check "queue exposes the result hook" "withPublishResultUserCallback" "$queue_hdr"
++check "attempt hook is fired with the effective send flags" \
++  "publishAttemptUserCallback(curEvent->eventName, (uint32_t)sendFlags.value());" \
++  "$queue_src"
++check "result hook is fired with the Future's own result" \
++  "publishResultUserCallback(curEvent->eventName, publishSuccess);" \
++  "$queue_src"
++
++# The attempt hook must fire only on an ACCEPTED dispatch (a Particle.publish()
++# that actually started), i.e. inside the `if (...publish(...))` true branch and
++# before the rejection `else` that logs PubqDispatch.
++awk '
++  /^void PublishQueuePosix::stateWait\(\)/ { inFn=1; next }
++  inFn && /^void PublishQueuePosix::/ { inFn=0 }
++  inFn {
++    n++
++    if ($0 ~ /if \(BackgroundPublishRK::instance\(\)\.publish\(/ && !dispatch) dispatch=n
++    if ($0 ~ /publishAttemptUserCallback\(curEvent->eventName/ && !hook) hook=n
++    if ($0 ~ /PubqDispatch: e=%s/ && !reject) reject=n
++  }
++  END {
++    if (!dispatch || !hook || !reject) { print "WIRING CHECK FAILED: could not locate the stateWait() dispatch anchors" > "/dev/stderr"; exit 1 }
++    if (!(dispatch < hook && hook < reject)) { print "WIRING CHECK FAILED: the attempt hook is not inside the accepted-dispatch branch" > "/dev/stderr"; exit 1 }
++  }
++' "$queue_src"
++
++# The result hook must fire BEFORE the removal/retry decision acts on it, so a
++# mutation that removes the entry early still gets counted honestly.
++awk '
++  /^void PublishQueuePosix::statePublishWait\(\)/ { inFn=1; next }
++  inFn && /^void PublishQueuePosix::/ { inFn=0 }
++  inFn && /^PublishQueuePosix::PublishQueuePosix\(\)/ { inFn=0 }
++  inFn {
++    n++
++    if ($0 ~ /publishResultUserCallback\(curEvent->eventName, publishSuccess\);/ && !hook) hook=n
++    if ($0 ~ /if \(publishSuccess\) \{/ && !success) success=n
++  }
++  END {
++    if (!hook || !success) { print "WIRING CHECK FAILED: could not locate the statePublishWait() result anchors" > "/dev/stderr"; exit 1 }
++    if (!(hook < success)) { print "WIRING CHECK FAILED: the result hook does not precede the removal decision" > "/dev/stderr"; exit 1 }
++  }
++' "$queue_src"
++
++# Application registration: begin() before setup(), both hooks bound to the
++# counter module.
++check "retained block is validated at boot" "PublishDeliveryCounters::begin();" "$app_src"
++check "attempt hook is registered" ".withPublishAttemptUserCallback(" "$app_src"
++check "result hook is registered" ".withPublishResultUserCallback(" "$app_src"
++check "attempt hook increments 'attempted'" "PublishDeliveryCounters::noteAttempt();" "$app_src"
++check "result hook increments 'acknowledged'/'failed'" "PublishDeliveryCounters::noteResult(acknowledged);" "$app_src"
++
++awk '
++  /PublishDeliveryCounters::begin\(\);/ && !begun { begun=NR }
++  /\.withFileQueueSize\(800\)/ && !inst { inst=NR }
++  END {
++    if (!begun || !inst) { print "WIRING CHECK FAILED: could not locate setup() anchors" > "/dev/stderr"; exit 1 }
++    if (!(begun < inst)) { print "WIRING CHECK FAILED: begin() must run before the publish queue is configured" > "/dev/stderr"; exit 1 }
++  }
++' "$app_src"
++
++# queued-at-sleep is recorded at the sleep commit point, from the same queue
++# depth the cycle stats use.
++check "queued-at-sleep is recorded at the sleep commit point" \
++  "PublishDeliveryCounters::noteQueuedAtSleep(qDepth);" \
++  "$sleep_src"
++check "qDepth is the real queue depth" \
++  "const uint16_t qDepth = (uint16_t)PublishQueuePosix::instance().getNumEvents();" \
++  "$sleep_src"
++check "carry-over sleeps are counted at the same commit point" \
++  "PublishDeliveryCounters::noteSleptWithQueued();" \
++  "$sleep_src"
++
++# Acceptance criterion 6: awake time per cycle must be readable from a plain USB
++# capture, so this line is unconditional (the existing "CYCLE end awake=" line
++# is gated on verboseMode).
++check "awake time and counters are logged once per cycle" \
++  "Log.info(\"CycleDelivery: awake=%lums a=%u k=%u f=%u r=%u q=%u\"," \
++  "$sleep_src"
++
++# WO-2026-09-25-001 decision 7 (Stage 7 finding P2): a successful Boron overnight
++# HIBERNATE resets the MCU without returning, so the accounting has to be
++# committed on BOTH real sleep-commit paths - before System.sleep(), not after.
++# One shared helper serves both; each System.sleep() call that commits this
++# cycle must be preceded by it.
++awk '
++  /^void commitDeliveryAccountingBeforeSleep\(/ { helper=NR }
++  /commitDeliveryAccountingBeforeSleep\($/ { calls++; if (!firstCall) firstCall=NR }
++  /commitDeliveryAccountingBeforeSleep\(qDepth,/ { calls++; if (!firstCall) firstCall=NR }
++  /System\.sleep\(config\)/ { if (!firstSleep) firstSleep=NR }
++  /SystemSleepResult hibernateResult = System\.sleep\(config\)/ { hibernate=NR }
++  END {
++    if (!helper) { print "WIRING CHECK FAILED: the shared sleep-commit helper is missing" > "/dev/stderr"; exit 1 }
++    if (calls < 2) { printf "WIRING CHECK FAILED: the sleep-commit helper is called %d time(s); both the HIBERNATE and the ULTRA_LOW_POWER path must call it\n", calls > "/dev/stderr"; exit 1 }
++    if (!hibernate) { print "WIRING CHECK FAILED: could not locate the HIBERNATE System.sleep() call" > "/dev/stderr"; exit 1 }
++    if (!(firstCall < hibernate)) { print "WIRING CHECK FAILED: the HIBERNATE path commits the delivery accounting AFTER System.sleep(), which never returns" > "/dev/stderr"; exit 1 }
++  }
++' "$sleep_src"
++
++# The counters module must reconcile an attempt interrupted by a reset, so
++# a == k + f + abandoned holds across a watchdog/pin/software reset.
++check "an outstanding attempt is recorded" "retainedPublishDelivery.attemptOutstanding = 1;" "$counters_src"
++check "boot counts an interrupted attempt as abandoned" "bump(retainedPublishDelivery.abandoned);" "$counters_src"
++awk '
++  /^void begin\(\) \{/ { inFn=1; next }
++  inFn && /^\}/ { inFn=0 }
++  inFn {
++    n++
++    if ($0 ~ /attemptOutstanding\) \{/ && !guard) guard=n
++    if ($0 ~ /bump\(retainedPublishDelivery\.abandoned\);/ && !bump) bump=n
++    if ($0 ~ /retryPending = 1;/ && !retry) retry=n
++  }
++  END {
++    if (!guard || !bump || !retry) { print "WIRING CHECK FAILED: begin() does not reconcile an interrupted attempt into abandoned + retryPending" > "/dev/stderr"; exit 1 }
++    if (!(guard < bump && bump < retry)) { print "WIRING CHECK FAILED: the abandoned reconciliation is not inside the outstanding-attempt branch" > "/dev/stderr"; exit 1 }
++  }
++' "$counters_src"
++
++# Criterion 4 as amended by Stage 5 decision 5: the counters ride in the
++# `status` event, NOT in the device-status ledger payload.
++check "status event reads the counters, not literals" \
++  "const PublishDeliveryCounters::Snapshot delivery = PublishDeliveryCounters::snapshot();" \
++  "$app_src"
++
++# Both build variants of the event (ENABLE_PMIC_FORENSICS 1 and 0) must carry
++# the object, and both must be in the snprintf() that feeds publish("status").
++delivery_format=',\"d\":{\"a\":%u,\"k\":%u,\"f\":%u,\"r\":%u,\"q\":%u,\"s\":%u,\"b\":%u}'
++variant_count=$(grep -c -F -- "$delivery_format" "$app_src" || true)
++if [[ "$variant_count" != "2" ]]; then
++  echo "WIRING CHECK FAILED: expected the delivery-counter object in both status-event format strings (PMIC and non-PMIC), found $variant_count" >&2
++  exit 1
++fi
++for field in attempted acknowledged failed retried queuedAtSleep sleptWithQueued abandoned; do
++  arg_count=$(grep -c -F -- "(unsigned)delivery.$field," "$app_src" || true)
++  if [[ "$arg_count" != "2" ]]; then
++    echo "WIRING CHECK FAILED: counter '$field' is not passed to both status-event snprintf() calls (found $arg_count)" >&2
++    exit 1
++  fi
++done
++check "the counters go out on the status event" \
++  "PublishQueuePosix::instance().publish(\"status\", status, PRIVATE);" \
++  "$app_src"
++
++# Decision 5: the ledger payload format is unchanged - a mutation that puts the
++# counters back into the ledger must fail here.
++refute "the ledger payload must not open a delivery object" \
++  "writerBase.name(\"d\")" "$status_src"
++for key in a k f r q s b; do
++  refute "the ledger payload must not emit delivery key '$key'" \
++    "writerBase.name(\"$key\")" "$status_src"
++done
++refute "the ledger payload must not read the counters at all" \
++  "PublishDeliveryCounters" "$status_src"
++
++# The counters must live in their own retained block: no SysData / CurrentData /
++# SensorData layout may be involved (WO-2026-09-25-001 Stage 6 constraint).
++check "counters live in a dedicated retained block" "retained RetainedPublishDelivery retainedPublishDelivery" "$counters_src"
++for forbidden in 'SysData::' 'CurrentData::' 'SensorData::' 'MyPersistentData.h'; do
++  if grep -q -F -- "$forbidden" "$counters_src" || grep -q -F -- "$forbidden" "$repo_root/src/cloud/PublishDeliveryCounters.h"; then
++    echo "WIRING CHECK FAILED: PublishDeliveryCounters references $forbidden - persisted layouts must not be involved" >&2
++    exit 1
++  fi
++done
++
++echo "Wiring checks passed: attempt/result hooks fire on the application thread at the right sites, the sleep commit is captured on both sleep paths, interrupted attempts are reconciled as abandoned, all seven counters reach the status event, and none reaches the ledger payload"
+diff --git a/tests/publish_with_ack_queue_test.cpp b/tests/publish_with_ack_queue_test.cpp
+new file mode 100644
+index 0000000..f7b5705
+--- /dev/null
++++ b/tests/publish_with_ack_queue_test.cpp
+@@ -0,0 +1,264 @@
++// tests/publish_with_ack_queue_test.cpp
++//
++// WO-2026-09-25-001 (fix B) host mirror for the two delivery guarantees that
++// PublishQueuePosixRK.cpp cannot be compiled on the host to demonstrate (it
++// pulls in Particle, SequentialFileRK and a POSIX flash file system):
++//
++//   1. Every queued send is dispatched with explicit WITH_ACK, with NO_ACK
++//      cleared first, whatever flags the event was enqueued with - including
++//      events already persisted by an older, PRIVATE-only build.
++//   2. A queue entry is removed only after its publish's Future succeeded.
++//      A failed/unacknowledged attempt leaves the event queued, and the queue
++//      does not report itself sleep-safe while it is still there.
++//
++// The companion zsh script cross-checks this mirror against the real source so
++// it cannot silently drift. Stage 7 mutations this file is built to catch:
++//   (i)   drop WITH_ACK from the dispatch flags
++//   (ii)  remove the queue entry on dispatch or on the publish call returning
++//   (iii) report canSleep == true while an unacknowledged event is queued
++
++#include <cassert>
++#include <cstdint>
++#include <cstdio>
++#include <deque>
++#include <string>
++
++namespace {
++
++int failures = 0;
++
++void expectEq(const char *what, unsigned long actual, unsigned long expected) {
++    if (actual != expected) {
++        std::printf("FAIL: %s: got %lu, expected %lu\n", what, actual, expected);
++        failures++;
++    }
++}
++
++void expectTrue(const char *what, bool value) {
++    if (!value) {
++        std::printf("FAIL: %s: expected true\n", what);
++        failures++;
++    }
++}
++
++void expectFalse(const char *what, bool value) {
++    if (value) {
++        std::printf("FAIL: %s: expected false\n", what);
++        failures++;
++    }
++}
++
++// ---------------------------------------------------------------------------
++// Mirror of the Device OS publish flag constants (system/inc/system_cloud.h:178-181)
++// ---------------------------------------------------------------------------
++constexpr uint32_t kPublic = 0x00;
++constexpr uint32_t kPrivate = 0x01;
++constexpr uint32_t kNoAck = 0x02;
++constexpr uint32_t kWithAck = 0x08;
++
++// Mirror of PublishQueuePosix::stateWait()'s dispatch normalization:
++//   const PublishFlags sendFlags = (curEvent->flags & ~PublishFlags(NO_ACK)) | WITH_ACK;
++// NO_ACK takes precedence over WITH_ACK in Device OS
++// (communication/src/publisher.cpp:49-57), so it has to be cleared, not just
++// OR-ed over.
++uint32_t normalizeSendFlags(uint32_t queuedFlags) {
++    return (queuedFlags & ~kNoAck) | kWithAck;
++}
++
++// ---------------------------------------------------------------------------
++// Mirror of the queue's publish state machine, reduced to the removal decision
++// ---------------------------------------------------------------------------
++class QueueMirror {
++public:
++    void enqueue(const std::string &name, uint32_t flags) {
++        events_.push_back({name, flags});
++        canSleep_ = false;
++    }
++
++    // Mirror of stateWait(): take the head event, dispatch it with normalized
++    // flags, and mark the queue not sleep-safe for the duration.
++    bool dispatch() {
++        if (inFlight_) {
++            return false;
++        }
++        if (events_.empty()) {
++            canSleep_ = true; // stateWait(): "No events, can sleep"
++            return false;
++        }
++        inFlight_ = true;
++        publishComplete_ = false;
++        publishSuccess_ = false;
++        canSleep_ = false; // stateWait() sets canSleep = false on dispatch
++        lastSendFlags_ = normalizeSendFlags(events_.front().flags);
++        attempts_++;
++        return true;
++    }
++
++    // Mirror of BackgroundPublishRK's worker completing the Future, then
++    // PublishQueuePosix::publishCompleteCallback().
++    void completeAttempt(bool futureSucceeded) {
++        assert(inFlight_);
++        publishComplete_ = true;
++        publishSuccess_ = futureSucceeded;
++    }
++
++    // Mirror of statePublishWait(): removal ONLY on publishSuccess.
++    void serviceCompletion() {
++        if (!publishComplete_) {
++            return; // statePublishWait() early-returns; nothing is removed
++        }
++        if (publishSuccess_) {
++            events_.pop_front();
++        }
++        // else: the event stays queued (file left in place / RAM event
++        // push_front-ed and re-persisted), and is retried after waitAfterFailure.
++        inFlight_ = false;
++        publishComplete_ = false;
++        canSleep_ = events_.empty();
++    }
++
++    size_t depth() const { return events_.size(); }
++    bool canSleep() const { return canSleep_; }
++    uint32_t lastSendFlags() const { return lastSendFlags_; }
++    unsigned attempts() const { return attempts_; }
++    std::string headName() const { return events_.empty() ? std::string() : events_.front().name; }
++
++private:
++    struct Event {
++        std::string name;
++        uint32_t flags;
++    };
++
++    std::deque<Event> events_;
++    bool inFlight_ = false;
++    bool publishComplete_ = false;
++    bool publishSuccess_ = false;
++    bool canSleep_ = false;
++    uint32_t lastSendFlags_ = 0;
++    unsigned attempts_ = 0;
++};
++
++// --- (i) explicit WITH_ACK on every queued send -----------------------------
++
++void testEveryQueuedSendCarriesExplicitWithAck() {
++    // The app enqueues everything PRIVATE-only today (report, status, pdiag,
++    // watchdog, hibernate_wake).
++    expectEq("PRIVATE-only event is sent PRIVATE|WITH_ACK",
++             normalizeSendFlags(kPrivate), kPrivate | kWithAck);
++
++    // An event persisted to the file queue by an older build carries whatever
++    // flags that build used; normalization happens at dispatch, so those are
++    // covered too.
++    expectEq("persisted PRIVATE-only event is sent PRIVATE|WITH_ACK",
++             normalizeSendFlags(kPrivate), 0x09u);
++    expectEq("PUBLIC event is sent with WITH_ACK too",
++             normalizeSendFlags(kPublic), kWithAck);
++
++    // NO_ACK wins over WITH_ACK in Device OS, so it must be cleared.
++    expectEq("NO_ACK is cleared, not merely OR-ed over",
++             normalizeSendFlags(kPrivate | kNoAck), kPrivate | kWithAck);
++    expectFalse("NO_ACK is absent from the effective send flags",
++                (normalizeSendFlags(kPrivate | kNoAck) & kNoAck) != 0);
++
++    // Already-explicit WITH_ACK is idempotent.
++    expectEq("WITH_ACK is idempotent",
++             normalizeSendFlags(kPrivate | kWithAck), kPrivate | kWithAck);
++
++    // And the dispatch path actually uses it.
++    QueueMirror q;
++    q.enqueue("report", kPrivate);
++    expectTrue("dispatch accepted", q.dispatch());
++    expectEq("dispatched flags carry WITH_ACK", q.lastSendFlags() & kWithAck, kWithAck);
++    expectEq("dispatched flags preserve PRIVATE", q.lastSendFlags() & kPrivate, kPrivate);
++}
++
++// --- (ii) removal only after an acknowledged Future -------------------------
++
++void testEventIsNotRemovedBeforeAcknowledgment() {
++    QueueMirror q;
++    q.enqueue("report", kPrivate);
++    expectEq("one event queued", q.depth(), 1);
++
++    q.dispatch();
++    expectEq("dispatch alone does not remove the event", q.depth(), 1);
++
++    q.serviceCompletion(); // Future still pending
++    expectEq("a pending Future does not remove the event", q.depth(), 1);
++
++    q.completeAttempt(true);
++    q.serviceCompletion();
++    expectEq("an acknowledged Future removes the event", q.depth(), 0);
++}
++
++void testFailedAttemptLeavesEventQueuedForRetry() {
++    QueueMirror q;
++    q.enqueue("report", kPrivate);
++
++    q.dispatch();
++    q.completeAttempt(false); // no ACK within the 20 s timeout
++    q.serviceCompletion();
++    expectEq("unacknowledged publish leaves the event queued", q.depth(), 1);
++    expectEq("the same event is still at the head", q.headName() == "report" ? 1u : 0u, 1u);
++
++    // Retry, this time acknowledged.
++    q.dispatch();
++    expectEq("the retry is a second attempt for the same event", q.attempts(), 2);
++    q.completeAttempt(true);
++    q.serviceCompletion();
++    expectEq("the acknowledged retry removes the event", q.depth(), 0);
++}
++
++void testOrderingIsPreservedAcrossAFailure() {
++    QueueMirror q;
++    q.enqueue("report", kPrivate);
++    q.enqueue("status", kPrivate);
++
++    q.dispatch();
++    q.completeAttempt(false);
++    q.serviceCompletion();
++    expectEq("both events still queued after a failure", q.depth(), 2);
++    expectEq("the failed event stays at the head", q.headName() == "report" ? 1u : 0u, 1u);
++}
++
++// --- (iii) sleep safety while an unacknowledged event is queued -------------
++
++void testQueueIsNotSleepSafeWhileAnEventIsUnacknowledged() {
++    QueueMirror q;
++    expectTrue("empty queue that has never dispatched can sleep after a poll",
++               (q.dispatch(), q.canSleep()));
++
++    q.enqueue("report", kPrivate);
++    expectFalse("queued event makes the queue not sleep-safe", q.canSleep());
++
++    q.dispatch();
++    expectFalse("in-flight publish is not sleep-safe", q.canSleep());
++
++    q.serviceCompletion(); // still pending
++    expectFalse("pending Future is not sleep-safe", q.canSleep());
++
++    q.completeAttempt(false);
++    q.serviceCompletion();
++    expectFalse("unacknowledged event left queued is not sleep-safe", q.canSleep());
++
++    q.dispatch();
++    q.completeAttempt(true);
++    q.serviceCompletion();
++    expectTrue("drained queue is sleep-safe", q.canSleep());
++}
++
++} // namespace
++
++int main() {
++    testEveryQueuedSendCarriesExplicitWithAck();
++    testEventIsNotRemovedBeforeAcknowledgment();
++    testFailedAttemptLeavesEventQueuedForRetry();
++    testOrderingIsPreservedAcrossAFailure();
++    testQueueIsNotSleepSafeWhileAnEventIsUnacknowledged();
++
++    if (failures != 0) {
++        std::printf("publish_with_ack_queue_test: %d failure(s)\n", failures);
++        return 1;
++    }
++    std::printf("publish_with_ack_queue_test: all checks passed\n");
++    return 0;
++}
+diff --git a/tests/publish_with_ack_queue_test.sh b/tests/publish_with_ack_queue_test.sh
+new file mode 100755
+index 0000000..8370610
+--- /dev/null
++++ b/tests/publish_with_ack_queue_test.sh
+@@ -0,0 +1,147 @@
++#!/bin/zsh
++set -euo pipefail
++
++# WO-2026-09-25-001 (fix B): explicit WITH_ACK on every queued send, and queue
++# removal only after an acknowledged publish Future.
++#
++# Part 1 runs the host mirror (tests/publish_with_ack_queue_test.cpp).
++# Part 2 anchors that mirror to the real library source, so neither can drift.
++
++repo_root="${0:A:h:h}"
++tmp_dir="$repo_root/build-tmp"
++binary="$tmp_dir/publish_with_ack_queue_test_bin"
++
++mkdir -p "$tmp_dir"
++cleanup() { rm -f "$binary"; }
++trap cleanup EXIT
++
++# --- Part 1: host mirror ----------------------------------------------------
++clang++ -std=c++17 -Wall -Wextra -pedantic \
++  "$repo_root/tests/publish_with_ack_queue_test.cpp" \
++  -o "$binary"
++"$binary"
++
++# --- Part 2: fidelity checks against the real source ------------------------
++queue_src="$repo_root/lib/PublishQueuePosixRK/src/PublishQueuePosixRK.cpp"
++
++check() {
++  local desc="$1"
++  local pattern="$2"
++  local file="$3"
++  if ! grep -q -F -- "$pattern" "$file"; then
++    echo "FIDELITY CHECK FAILED: $desc (pattern not found in $file: $pattern)" >&2
++    exit 1
++  fi
++}
++
++refute() {
++  local desc="$1"
++  local pattern="$2"
++  local file="$3"
++  if grep -q -F -- "$pattern" "$file"; then
++    echo "FIDELITY CHECK FAILED: $desc (pattern unexpectedly present in $file: $pattern)" >&2
++    exit 1
++  fi
++}
++
++# --- Mutation (i): drop WITH_ACK -------------------------------------------
++# The normalization must clear NO_ACK (which takes precedence in Device OS,
++# communication/src/publisher.cpp:49-57) and set WITH_ACK, at DISPATCH so that
++# events already persisted by an older PRIVATE-only build are covered too.
++check "dispatch normalizes queued flags to explicit WITH_ACK with NO_ACK cleared" \
++  "const PublishFlags sendFlags = (curEvent->flags & ~PublishFlags(NO_ACK)) | WITH_ACK;" \
++  "$queue_src"
++check "the normalized sendFlags - not the queued flags - are what is published" \
++  "if (BackgroundPublishRK::instance().publish(curEvent->eventName, curEvent->eventData, sendFlags," \
++  "$queue_src"
++refute "the un-normalized PRIVATE-only dispatch must not come back" \
++  "BackgroundPublishRK::instance().publish(curEvent->eventName, curEvent->eventData, curEvent->flags," \
++  "$queue_src"
++
++# --- Mutation (ii): remove the queue entry before the acknowledgment --------
++# statePublishWait() must (a) refuse to act at all until the Future completed,
++# and (b) perform every removal INSIDE the publishSuccess branch.
++awk '
++  /^void PublishQueuePosix::statePublishWait\(\)/ { inFn=1; next }
++  inFn && /^void PublishQueuePosix::/ { inFn=0 }
++  inFn && /^PublishQueuePosix::PublishQueuePosix\(\)/ { inFn=0 }
++  inFn {
++    n++
++    if ($0 ~ /if \(!publishComplete\)/ && !guard) guard=n
++    if ($0 ~ /if \(publishSuccess\) \{/ && !success) success=n
++    if ($0 ~ /^    else \{/ && success && !elseLine) elseLine=n
++    if ($0 ~ /fileQueue\.removeFileNum\(fileNum, false\);/ && !removeFile) removeFile=n
++    if ($0 ~ /durationMs = waitBetweenPublish;/ && !dequeue) dequeue=n
++    if ($0 ~ /ramQueue\.push_front\(curEvent\);/ && !requeue) requeue=n
++    if ($0 ~ /durationMs = waitAfterFailure;/ && !backoff) backoff=n
++    # Mutation (iv): any statement that discards the event must be confined to
++    # the success branch. The failure branch may free the RAM copy of an event
++    # that is already on flash (delete curEvent / curEvent = NULL), but it must
++    # never touch the file queue or forget which file the event came from.
++    if (elseLine) {
++      if ($0 ~ /removeFileNum\(/) { badRemove=n; badRemoveText=$0 }
++      if ($0 ~ /getFileFromQueue\(/) { badDequeue=n; badDequeueText=$0 }
++      if ($0 ~ /curFileNum = 0;/) { badForget=n; badForgetText=$0 }
++    }
++  }
++  END {
++    if (!guard)  { print "FIDELITY CHECK FAILED: statePublishWait() no longer early-returns on !publishComplete" > "/dev/stderr"; exit 1 }
++    if (!success){ print "FIDELITY CHECK FAILED: statePublishWait() no longer branches on publishSuccess" > "/dev/stderr"; exit 1 }
++    if (!elseLine){ print "FIDELITY CHECK FAILED: statePublishWait() has no retry (else) branch" > "/dev/stderr"; exit 1 }
++    if (!removeFile || !dequeue) { print "FIDELITY CHECK FAILED: statePublishWait() removal statements not found" > "/dev/stderr"; exit 1 }
++    if (!requeue || !backoff) { print "FIDELITY CHECK FAILED: statePublishWait() retry statements not found" > "/dev/stderr"; exit 1 }
++    if (!(guard < success)) { print "FIDELITY CHECK FAILED: the !publishComplete guard no longer precedes the publishSuccess branch" > "/dev/stderr"; exit 1 }
++    if (!(success < removeFile && removeFile < elseLine)) { print "FIDELITY CHECK FAILED: file removal is not inside the publishSuccess branch" > "/dev/stderr"; exit 1 }
++    if (!(success < dequeue && dequeue < elseLine)) { print "FIDELITY CHECK FAILED: event dequeue is not inside the publishSuccess branch" > "/dev/stderr"; exit 1 }
++    if (!(elseLine < requeue)) { print "FIDELITY CHECK FAILED: the RAM requeue is not inside the retry branch" > "/dev/stderr"; exit 1 }
++    if (!(elseLine < backoff)) { print "FIDELITY CHECK FAILED: waitAfterFailure backoff is not inside the retry branch" > "/dev/stderr"; exit 1 }
++    if (badRemove) { printf "FIDELITY CHECK FAILED: the failure branch of statePublishWait() removes the queue file - a failed or unacknowledged publish must leave the event queued (offending line:%s)\n", badRemoveText > "/dev/stderr"; exit 1 }
++    if (badDequeue) { printf "FIDELITY CHECK FAILED: the failure branch of statePublishWait() dequeues from the file queue - a failed or unacknowledged publish must leave the event queued (offending line:%s)\n", badDequeueText > "/dev/stderr"; exit 1 }
++    if (badForget) { printf "FIDELITY CHECK FAILED: the failure branch of statePublishWait() clears curFileNum, losing the event'"'"'s file identity (offending line:%s)\n", badForgetText > "/dev/stderr"; exit 1 }
++  }
++' "$queue_src"
++
++# A dispatch must not remove anything. The ONLY removal allowed inside
++# stateWait() is the corrupted-file discard, which happens when readQueueFile()
++# returned null - i.e. for a file that was never dispatched at all.
++awk '
++  /^void PublishQueuePosix::stateWait\(\)/ { inFn=1; next }
++  inFn && /^void PublishQueuePosix::/ { inFn=0 }
++  inFn {
++    n++
++    if ($0 ~ /discarding corrupted file/) discard=n
++    if ($0 ~ /removeFileNum\(/) { removals++; if (!firstRemoval) firstRemoval=n }
++    if ($0 ~ /delete curEvent;/) deletes++
++  }
++  END {
++    if (deletes) { print "FIDELITY CHECK FAILED: stateWait() deletes the in-flight event on dispatch" > "/dev/stderr"; exit 1 }
++    if (removals != 1) { printf "FIDELITY CHECK FAILED: stateWait() has %d removeFileNum() call(s); only the corrupted-file discard is allowed\n", removals > "/dev/stderr"; exit 1 }
++    if (!discard || !(discard < firstRemoval)) { print "FIDELITY CHECK FAILED: stateWait()'"'"'s only removal is not the corrupted-file discard" > "/dev/stderr"; exit 1 }
++  }
++' "$queue_src"
++
++# The success flag the removal branch reads must be the Future'"'"'s own result,
++# not a hard-coded true.
++check "publishCompleteCallback records the Future result verbatim" \
++  "publishSuccess = succeeded;" \
++  "$queue_src"
++refute "publishSuccess must not be hard-coded true" \
++  "publishSuccess = true;" \
++  "$queue_src"
++
++# --- Mutation (iii): sleep with unacknowledged events queued ---------------
++# The library must not report itself sleep-safe while an event is in flight.
++check "dispatch marks the queue not sleep-safe" "canSleep = false;" "$queue_src"
++check "sleep-safety is derived from the queue depth, not assumed" \
++  "canSleep = (getNumEvents() == 0);" \
++  "$queue_src"
++
++# Stage 4 warning: setPausePublishing() makes the queue report itself sleep-safe
++# with events still pending (PublishQueuePosixRK.cpp:290-293). The application
++# must never call it.
++if grep -rn --include='*.cpp' --include='*.h' -F 'setPausePublishing(' "$repo_root/src" >/dev/null 2>&1; then
++  echo "FIDELITY CHECK FAILED: application code calls setPausePublishing(), which reports the queue sleep-safe with events pending" >&2
++  exit 1
++fi
++
++echo "Fidelity checks passed: queued sends are normalized to explicit WITH_ACK, removal is gated on an acknowledged Future, and the queue is never sleep-safe with an unacknowledged event"
+diff --git a/tests/status_event_payload_budget_test.py b/tests/status_event_payload_budget_test.py
+new file mode 100644
+index 0000000..9d95ac9
+--- /dev/null
++++ b/tests/status_event_payload_budget_test.py
+@@ -0,0 +1,390 @@
++#!/usr/bin/env python3
++"""WO-2026-09-25-001 Stage 5 decision 5: `status` event byte budget.
++
++Decision 5 moved the publish delivery counters out of the device-status ledger
++payload and into the ``status`` event built by ``publishStartupStatus()``
++(src/Generalized-Core-Counter.cpp) and published through
++``PublishQueuePosix::instance().publish("status", status, PRIVATE)``.
++
++That event has to fit under three separate ceilings:
++
++  1. ``char status[1024]`` - the app's own ``snprintf`` buffer. Exceeding it
++     truncates: safe for memory, but the event becomes invalid JSON.
++  2. ``particle::protocol::MAX_EVENT_DATA_LENGTH`` = 1024 - the Device OS 6.4.1
++     event-data limit (``communication/inc/protocol_defs.h:94``).
++  3. PublishQueuePosixRK's own ceiling, which is that *same* constant:
++     ``PublishQueuePosixRK.cpp:106`` rejects the publish outright when
++     ``strlen(eventData) > particle::protocol::MAX_EVENT_DATA_LENGTH``.
++     (The "255 bytes maximum, 622 bytes in system firmware 0.8.0-rc.4 and
++     later" figure in the library's doc comments - and the "~622-byte event
++     ceiling" comment in src/power/PowerDiagnostics.cpp - is stale prose from
++     an older Device OS; it is not what this library enforces.)
++
++Like tests/device_status_payload_budget_test.py, this parses the real format
++strings out of the shipped source rather than mirroring them, so a new field
++cannot be added without updating the width table below (the test fails with
++"unbudgeted field" instead of silently going stale). It then renders real JSON
++with placeholder values of the budgeted width, so punctuation is measured
++rather than arithmetic-modelled.
++
++Three profiles are reported:
++
++  observed    - a typical in-service cycle. NOTE: this is a modelled profile,
++                not a device capture; no full `status` payload capture exists
++                in this repository. It is the field-width profile a healthy
++                Dev-14 cycle produces.
++  deployed    - every field at the widest value this firmware can actually
++                produce. This is the binding worst case.
++  structural  - every field at its C type / buffer maximum, reported for the
++                record.
++"""
++
++import re
++import sys
++from pathlib import Path
++
++REPO = Path(__file__).resolve().parent.parent
++APP_SRC = REPO / "src" / "Generalized-Core-Counter.cpp"
++VERSION_SRC = REPO / "src" / "Version.cpp"
++QUEUE_SRC = REPO / "lib" / "PublishQueuePosixRK" / "src" / "PublishQueuePosixRK.cpp"
++LEDGER_SRC = REPO / "src" / "cloud" / "DeviceStatusPublisher.cpp"
++
++# Device OS 6.4.1 communication/inc/protocol_defs.h:94. Asserted against the
++# toolchain header when one is present (see check_device_os_limit()).
++MAX_EVENT_DATA_LENGTH = 1024
++
++OBSERVED, DEPLOYED, STRUCTURAL = 0, 1, 2
++
++# Rendered width (JSON text, including the quotes of a string value) of every
++# field, keyed by its JSON key: (observed, deployed, structural).
++#
++# None means "read FIRMWARE_VERSION from src/Version.cpp".
++WIDTHS = {
++    # FIRMWARE_VERSION string literal; structural is the 32-char ceiling this
++    # test enforces on that literal below.
++    "version": (None, None, 34),
++    # System.resetReason() - Device OS RESET_REASON_* values run to 140
++    "resetReason": (2, 3, 11),
++    # System.resetReasonData() is uint32_t
++    "resetReasonData": (1, 10, 10),
++    # RecoveryState::get_alertCode() is int8_t
++    "alert": (1, 4, 4),
++    # time_t epoch
++    "lastAlert": (10, 10, 11),
++    # System.freeMemory() on a Boron (256 KB SRAM) never reaches 7 digits
++    "freeHeap": (6, 6, 10),
++    # AppBreadcrumb enum stored as uint8_t
++    "appBreadcrumb": (2, 3, 3),
++    # uint32_t millis() snapshot
++    "appBreadcrumbMs": (6, 10, 10),
++    # RecoveryState::get_watchdogResetCount() is uint16_t
++    "watchdogResetCount": (1, 5, 5),
++    "lastWatchdogBreadcrumb": (1, 3, 3),  # uint8_t
++    "lastWatchdogUptimeMs": (1, 10, 10),  # uint32_t
++    "lastWatchdogResetReasonData": (1, 10, 10),  # uint32_t
++    # --- PMIC forensics variant only (ENABLE_PMIC_FORENSICS defaults to 1) ---
++    "pmicAnomalyCount": (1, 5, 5),  # uint16_t
++    # %.2f of a float: "-1.00" when unset, "100.00" at full charge. The
++    # structural figure is the widest %.2f a float can render (FLT_MAX),
++    # reachable only from a corrupt float.
++    "lastPmicAnomalySoc": (5, 6, 42),
++    "lastPmicAnomalyChargeStatus": (1, 3, 3),  # uint8_t
++    "lastPmicAnomalyAgeSec": (1, 10, 10),  # uint32_t
++    "lastPmicAnomalyPowerSource": (1, 3, 3),  # uint8_t
++    "lastPmicAnomalyVbusStatus": (1, 3, 3),  # uint8_t
++    # ------------------------------------------------------------------------
++    "failsafeStage": (1, 3, 3),  # uint8_t
++    "failsafeCount": (1, 3, 3),  # uint8_t
++    "failsafeLastAction": (1, 10, 11),  # time_t
++    "lastConnectionAgeSec": (4, 10, 11),  # long, or the -1 sentinel
++    "failsafeTest": (1, 1, 1),  # 0 or 1
++    "failsafeTestMode": (1, 1, 1),  # 0 or 1
++    # WO-2026-09-25-001 delivery counters - uint16_t saturating at
++    # PublishDeliveryCounters::kCounterMax (65535), so five digits is both the
++    # deployed and the structural maximum.
++    "a": (3, 5, 5),
++    "k": (3, 5, 5),
++    "f": (1, 5, 5),
++    "r": (1, 5, 5),
++    "q": (1, 5, 5),
++    "s": (1, 5, 5),
++    "b": (1, 5, 5),
++}
++
++# Widths for the two optional trailing field groups, which are built by their
++# own snprintf() calls into fixed buffers and appended with %s%s.
++HIBERNATE_WIDTHS = {
++    # ab1805WakeReasonNameLocal(): longest is "DEEP_POWER_DOWN"
++    "wakeReason": (9, 17, 17),
++    "actualSleep": (4, 10, 10),  # uint32_t seconds
++    "sleepError": (2, 11, 11),  # signed seconds delta
++    "hibernateCount": (3, 10, 10),  # uint32_t
++}
++
++PIN_RESET_WIDTHS = {
++    # ab1805WakeReasonNameLocal(): longest is "DEEP_POWER_DOWN"
++    "ab1805WakeReason": (10, 17, 17),
++    # "AB1805_PIN" or "NONE"
++    "watchdogSource": (6, 12, 12),
++}
++
++DELIVERY_KEYS = ("a", "k", "f", "r", "q", "s", "b")
++DELIVERY_FORMAT = '"d":{"a":%u,"k":%u,"f":%u,"r":%u,"q":%u,"s":%u,"b":%u}'
++
++failures = []
++
++
++def fail(message):
++    failures.append(message)
++
++
++def unescape(literal):
++    return literal.replace('\\"', '"').replace("\\\\", "\\")
++
++
++def read_function(text, signature):
++    start = text.find(signature)
++    if start < 0:
++        fail(f"could not find {signature!r} in {APP_SRC.name}")
++        return ""
++    depth = 0
++    for index in range(start, len(text)):
++        if text[index] == "{":
++            depth += 1
++        elif text[index] == "}":
++            depth -= 1
++            if depth == 0:
++                return text[start : index + 1]
++    fail(f"could not find the end of {signature!r}")
++    return ""
++
++
++def format_literals(body, anchor):
++    """Return every concatenation-free C string literal passed as the format
++    argument of an snprintf() whose target is `anchor`."""
++    literals = []
++    for match in re.finditer(
++        r"snprintf\(\s*" + re.escape(anchor) + r"\s*,\s*sizeof\([^)]*\)\s*,\s*\"((?:[^\"\\]|\\.)*)\"",
++        body,
++    ):
++        literals.append(unescape(match.group(1)))
++    return literals
++
++
++def render(fmt, widths, which, version_width, trailing=()):
++    """Render a printf format string as JSON, replacing every conversion with a
++    placeholder of the budgeted width. `trailing` supplies the rendered text for
++    the trailing %s conversions, in order.
++
++    Budgeted widths include the quotes of a string value; when the format itself
++    already wraps the conversion in quotes (`"key":"%s"`), those two bytes are
++    subtracted so they are not counted twice."""
++    specs = list(re.finditer(r"%(?:\.\d+)?l{0,2}[dufs]", fmt))
++    if not specs:
++        fail(f"no conversions found in format {fmt[:40]!r}")
++        return ""
++
++    trailing = list(trailing)
++    first_trailing = len(specs) - len(trailing)
++    out = []
++    cursor = 0
++    for index, spec in enumerate(specs):
++        out.append(fmt[cursor : spec.start()])
++        cursor = spec.end()
++        if trailing and index >= first_trailing:
++            out.append(trailing[index - first_trailing])
++            continue
++        prefix = fmt[: spec.start()]
++        name_match = None
++        for name_match in re.finditer(r'"([A-Za-z0-9]+)"\s*:', prefix):
++            pass
++        if not name_match:
++            fail(f"could not attribute conversion {spec.group(0)!r} to a JSON key")
++            continue
++        key = name_match.group(1)
++        if key not in widths:
++            fail(f"unbudgeted field {key!r} in the status event - add it to the width table")
++            continue
++        width = widths[key][which]
++        if width is None:
++            width = version_width
++        quoted = prefix.endswith('"') and fmt[spec.end() : spec.end() + 1] == '"'
++        out.append("x" * (width - 2 if quoted else width))
++    out.append(fmt[cursor:])
++    return "".join(out)
++
++
++def main():
++    text = APP_SRC.read_text()
++    body = read_function(text, "void publishStartupStatus() {")
++    if not body:
++        for message in failures:
++            print(f"FAIL: {message}", file=sys.stderr)
++        return 1
++
++    version_match = re.search(r'FIRMWARE_VERSION\s*=\s*"([^"]*)"', VERSION_SRC.read_text())
++    if not version_match:
++        fail("could not read FIRMWARE_VERSION from src/Version.cpp")
++        version_literal = ""
++    else:
++        version_literal = version_match.group(1)
++    if len(version_literal) > 32:
++        fail(
++            f"FIRMWARE_VERSION is {len(version_literal)} chars, above the 32-char ceiling this "
++            "budget assumes"
++        )
++    version_width = len(version_literal) + 2  # quotes
++
++    status_formats = format_literals(body, "status")
++    if len(status_formats) != 2:
++        fail(
++            f"expected 2 status snprintf() format strings (PMIC and non-PMIC), found "
++            f"{len(status_formats)}"
++        )
++        for message in failures:
++            print(f"FAIL: {message}", file=sys.stderr)
++        return 1
++    pmic_format, plain_format = status_formats
++
++    hibernate_formats = format_literals(body, "hibernateFields")
++    pin_reset_formats = format_literals(body, "pinResetAb1805Fields")
++    if len(hibernate_formats) != 1 or len(pin_reset_formats) != 1:
++        fail("expected exactly one hibernateFields and one pinResetAb1805Fields format string")
++        for message in failures:
++            print(f"FAIL: {message}", file=sys.stderr)
++        return 1
++
++    # Criterion 4: the counters are in the status event, in both build variants.
++    for label, fmt in (("PMIC", pmic_format), ("non-PMIC", plain_format)):
++        if DELIVERY_FORMAT not in fmt:
++            fail(
++                f"the {label} status event format is missing the delivery-counter object "
++                f"{DELIVERY_FORMAT!r}"
++            )
++
++    # Decision 5: and they are NOT in the device-status ledger payload.
++    ledger = LEDGER_SRC.read_text()
++    if 'writerBase.name("d")' in ledger:
++        fail(
++            'the device-status ledger payload emits a "d" object - Stage 5 decision 5 requires '
++            "the delivery counters in the status event only, leaving the ledger payload format "
++            "unchanged"
++        )
++    for key in DELIVERY_KEYS:
++        if f'writerBase.name("{key}")' in ledger:
++            fail(
++                f'the device-status ledger payload emits delivery counter "{key}" - Stage 5 '
++                "decision 5 requires the ledger payload format to be unchanged"
++            )
++    if "PublishDeliveryCounters" in ledger:
++        fail(
++            "src/cloud/DeviceStatusPublisher.cpp still references PublishDeliveryCounters - the "
++            "ledger payload must not read the counters at all (Stage 5 decision 5)"
++        )
++
++    # The counters must be read from the module, not hard-coded.
++    if "PublishDeliveryCounters::snapshot();" not in body:
++        fail("publishStartupStatus() does not read PublishDeliveryCounters::snapshot()")
++    for field in (
++        "attempted",
++        "acknowledged",
++        "failed",
++        "retried",
++        "queuedAtSleep",
++        "sleptWithQueued",
++        "abandoned",
++    ):
++        if f"delivery.{field}" not in body:
++            fail(f"the status event does not publish the {field!r} counter")
++
++    # The library ceiling is MAX_EVENT_DATA_LENGTH, not the stale ~622 prose.
++    queue = QUEUE_SRC.read_text()
++    if "strlen(eventData) > particle::protocol::MAX_EVENT_DATA_LENGTH" not in queue:
++        fail(
++            "PublishQueuePosixRK no longer rejects on "
++            "particle::protocol::MAX_EVENT_DATA_LENGTH - re-derive the event-size ceiling"
++        )
++
++    buffer_match = re.search(r"char status\[(\d+)\];", body)
++    if not buffer_match:
++        fail("could not read the status[] buffer size")
++        for message in failures:
++            print(f"FAIL: {message}", file=sys.stderr)
++        return 1
++    buffer_size = int(buffer_match.group(1))
++
++    results = {}
++    for which, label in ((OBSERVED, "observed"), (DEPLOYED, "deployed"), (STRUCTURAL, "structural")):
++        hibernate = render(hibernate_formats[0], HIBERNATE_WIDTHS, which, version_width)
++        pin_reset = render(pin_reset_formats[0], PIN_RESET_WIDTHS, which, version_width)
++        if len(hibernate) > 191:
++            fail(f"hibernateFields ({label}) renders {len(hibernate)} B, above its 192 B buffer")
++        if len(pin_reset) > 159:
++            fail(
++                f"pinResetAb1805Fields ({label}) renders {len(pin_reset)} B, above its 160 B buffer"
++            )
++        for variant, fmt in (("pmic", pmic_format), ("plain", plain_format)):
++            # Worst case assumes both optional groups are present; the observed
++            # profile is a hibernate wake, which is the common in-service case.
++            appended = (hibernate, pin_reset) if which != OBSERVED else (hibernate, "")
++            results[(label, variant)] = len(render(fmt, WIDTHS, which, version_width, appended))
++
++    # ENABLE_PMIC_FORENSICS defaults to 1 (src/BuildProfile.h:109), so the pmic
++    # variant is the shipped one and the binding figure.
++    limit = min(buffer_size - 1, MAX_EVENT_DATA_LENGTH)
++
++    print(f"status event limits")
++    print(f"  app snprintf buffer (char status[])   : {buffer_size} bytes ({buffer_size - 1} usable)")
++    print(f"  Device OS 6.4.1 MAX_EVENT_DATA_LENGTH : {MAX_EVENT_DATA_LENGTH} bytes")
++    print(f"  PublishQueuePosixRK ceiling           : {MAX_EVENT_DATA_LENGTH} bytes (same constant)")
++    print(f"  binding limit                         : {limit} bytes")
++    print(f"status event size, with the delivery counters (shipped PMIC-forensics variant)")
++    for label in ("observed", "deployed", "structural"):
++        size = results[(label, "pmic")]
++        print(f"  {label:<10} : {size:>5} bytes   headroom {limit - size:>5} bytes")
++    print(f"status event size, ENABLE_PMIC_FORENSICS=0 variant")
++    for label in ("observed", "deployed", "structural"):
++        size = results[(label, "plain")]
++        print(f"  {label:<10} : {size:>5} bytes   headroom {limit - size:>5} bytes")
++
++    counter_cost = (
++        len(DELIVERY_FORMAT)
++        - len("%u") * len(DELIVERY_KEYS)
++        + 5 * len(DELIVERY_KEYS)
++        + 1
++    )  # + leading comma
++    print(f"delivery-counter object cost, worst case: {counter_cost} bytes")
++
++    for label in ("observed", "deployed"):
++        for variant in ("pmic", "plain"):
++            size = results[(label, variant)]
++            if size > limit:
++                fail(
++                    f"the {label} {variant} status event is {size} B, above the binding "
++                    f"{limit} B limit - the delivery counters do not fit"
++                )
++
++    for variant in ("pmic", "plain"):
++        size = results[("structural", variant)]
++        if size > limit:
++            print(
++                f"NOTE: the structural worst case of the {variant} variant ({size} B) exceeds the "
++                f"{limit} B limit. Reachable only from a corrupt float in lastPmicAnomalySoc "
++                "(%.2f of FLT_MAX is 42 characters); every real value is at most 6."
++            )
++
++    if failures:
++        for message in failures:
++            print(f"FAIL: {message}", file=sys.stderr)
++        print(f"status_event_payload_budget_test: {len(failures)} failure(s)", file=sys.stderr)
++        return 1
++
++    print(
++        "status_event_payload_budget_test: the delivery counters are in the status event, absent "
++        f"from the ledger payload, and fit the {limit}-byte limit"
++    )
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/tests/stubs/Particle.h b/tests/stubs/Particle.h
+index f2a0d57..0b36257 100644
+--- a/tests/stubs/Particle.h
++++ b/tests/stubs/Particle.h
+@@ -11,6 +11,11 @@ struct TestLog {
+ 
+   template <typename... Args>
+   void warn(const char *, Args...) {}
++
++  // WO-2026-09-25-001: DeviceStatusPublisher.cpp's payload overflow guard logs
++  // at error level.
++  template <typename... Args>
++  void error(const char *, Args...) {}
+ };
+ 
+ inline TestLog Log;
+\ No newline at end of file
+diff --git a/tests/stubs/clock_status_republish_overrides/Particle.h b/tests/stubs/clock_status_republish_overrides/Particle.h
+index 7f7e723..1bd4951 100644
+--- a/tests/stubs/clock_status_republish_overrides/Particle.h
++++ b/tests/stubs/clock_status_republish_overrides/Particle.h
+@@ -31,6 +31,11 @@ struct TestLog {
+ 
+   template <typename... Args>
+   void warn(const char *, Args...) {}
++
++  // WO-2026-09-25-001: DeviceStatusPublisher.cpp's payload overflow guard logs
++  // at error level.
++  template <typename... Args>
++  void error(const char *, Args...) {}
+ };
+ 
+ inline TestLog Log;
+diff --git a/tests/stubs/power_source_override_overrides/Particle.h b/tests/stubs/power_source_override_overrides/Particle.h
+index 4f17f47..6c02d8f 100644
+--- a/tests/stubs/power_source_override_overrides/Particle.h
++++ b/tests/stubs/power_source_override_overrides/Particle.h
+@@ -23,6 +23,11 @@ struct TestLog {
+ 
+   template <typename... Args>
+   void warn(const char *, Args...) {}
++
++  // WO-2026-09-25-001: DeviceStatusPublisher.cpp's payload overflow guard logs
++  // at error level.
++  template <typename... Args>
++  void error(const char *, Args...) {}
+ };
+ 
+ inline TestLog Log;
