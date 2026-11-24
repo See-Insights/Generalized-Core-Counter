@@ -336,18 +336,12 @@ void setup() {
   bootInProgress = true;
 
   bool qualifiesForStormCount = false;
+  // The RESET_REASON_* names are enumerators: an #ifdef on them is always false.
   switch (reason) {
   case RESET_REASON_NONE:
-#ifdef RESET_REASON_PANIC
   case RESET_REASON_PANIC:
-#endif
   case RESET_REASON_WATCHDOG:
-#ifdef RESET_REASON_UNKNOWN
   case RESET_REASON_UNKNOWN:
-#endif
-#ifdef RESET_REASON_USER_APPLICATION
-  case RESET_REASON_USER_APPLICATION:
-#endif
     qualifiesForStormCount = true;
     break;
   default:
@@ -756,6 +750,8 @@ void setup() {
   // request. Reason 20 is judged from persisted evidence only (a power-down
   // clears `retained`); no evidence is counted as an inferred watchdog.
   const HibernateCycle::WakeVerdict wakeVerdict = HibernateCycle::classifyWake(reason);
+  if (HibernateWakeDiagnostics::isRtcArm(wakeVerdict.gateArm)) { SystemConfig::set_lastTimeSync(0); SystemConfig::flushNow(); }  // I21: no trust carry after a failed RTC arm; revoked durably before anything else runs
+  evaluateClockCarry();
 
   bool inferredWatchdog = false;
   if (reason == RESET_REASON_PIN_RESET) {

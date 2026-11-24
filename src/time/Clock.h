@@ -100,6 +100,7 @@ void checkClockResync();
  * @return true when Time.now() should be treated as trustworthy.
  */
 bool isClockTrusted();
+void evaluateClockCarry();  // I21: capture the persisted carry stamp once per boot (setup, after the latch seed and verdict zeroing)
 
 /**
  * @brief Non-blocking substitute for Particle.timeSyncedLast().
