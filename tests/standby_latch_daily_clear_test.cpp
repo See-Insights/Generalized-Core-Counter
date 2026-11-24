@@ -19,7 +19,6 @@ struct SessionState {
   bool modemStandbySuppressed = false;
   uint8_t modemUnstableReason = 0;
   uint8_t modemConnectTimeoutCount = 0;
-  unsigned long lastTeardownEndMs = 0;
   unsigned long occupancyStartMs = 0;
   bool pieceUntrusted = false;
 };
@@ -95,12 +94,11 @@ static void latch() {
   session.modemStandbySuppressed = true;
   session.modemUnstableReason = 1;
   session.modemConnectTimeoutCount = 2;
-  session.lastTeardownEndMs = 777;
   logs.clear();
 }
 
 int main() {
-  // latched at the boundary: all four fields clear, one line, nothing else touched
+  // latched at the boundary: all four fields clear, one line
   latch();
   dailyCloseBlock(true);
   CHECK("latched:modemUnstable", session.modemUnstable == false);
@@ -109,9 +107,10 @@ int main() {
   CHECK("latched:timeoutCount", session.modemConnectTimeoutCount == 0);
   CHECK("latched:logOnce", countLogs(kLine) == 1);
   CHECK("latched:logTotal", logs.size() == 1);
-  CHECK("latched:lastTeardownEndMs", session.lastTeardownEndMs == 777);
 
-  // not latched at the boundary: nothing logged, fields as they were
+  // not latched at the boundary: nothing logged, the latch fields as they were. The timeout
+  // count clears all the same (WO-2026-11-19-001 ruling 4: the close always starts a fresh
+  // day, so the close report is never held by the connect hold).
   session = SessionState();
   session.modemStandbySuppressed = true;
   session.modemUnstableReason = 2;
@@ -121,7 +120,7 @@ int main() {
   CHECK("unlatched:noLog", logs.empty());
   CHECK("unlatched:suppressedKept", session.modemStandbySuppressed == true);
   CHECK("unlatched:reasonKept", session.modemUnstableReason == 2);
-  CHECK("unlatched:countKept", session.modemConnectTimeoutCount == 1);
+  CHECK("unlatched:countCleared", session.modemConnectTimeoutCount == 0);
 
   // due false: no clear, no log
   latch();

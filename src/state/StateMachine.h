@@ -43,7 +43,7 @@ void userSwitchISR();
  * @brief RAM-only session flags that coordinate behavior across state handlers.
  *
  * These values are intentionally not persisted. They describe the current wake
- * cycle, in-flight webhook expectations, modem teardown timing, and temporary
+ * cycle, in-flight webhook expectations, modem health, the connect hold, and temporary
  * suppression or diagnostic state.
  */
 struct SessionState {
@@ -62,10 +62,7 @@ struct SessionState {
   bool modemStandbySuppressed = false;    // Tracks whether standby suppression is active/logged
   uint8_t modemUnstableReason = 0;        // 0=none, 1=slow_teardown, 2=connect_timeout
   uint8_t modemConnectTimeoutCount = 0;   // Consecutive connect timeout counter (RAM-only)
-  unsigned long lastTeardownEndMs = 0;    // millis() when teardown last completed
-  uint32_t lastCloudDisconnectElapsedMs = 0;
-  uint32_t lastModemOffElapsedMs = 0;
-  uint32_t lastTotalTeardownElapsedMs = 0;
+  uint32_t lastConnectFailMs = 0;         // millis() at the last connect timeout: the connect hold's clock
   uint32_t failsafeDeferLogMask = 0;      // One-shot failsafe defer reasons logged this boot
   uint32_t occupancyStartMs = 0;         // millis() when the current piece opened (0 = boot for a straddler)
   bool pieceUntrusted = false;           // piece opened with an untrusted clock: credited on millis() until it closes

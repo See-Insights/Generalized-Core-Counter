@@ -80,6 +80,12 @@ constexpr uint16_t CONNECT_BUDGET_CONFIG_MAX_SEC = 900;
 constexpr uint8_t DEEP_ATTEMPT_COUNTER_THRESHOLD = 3; // deep when attemptCounter >= 3
 constexpr float DEEP_ATTEMPT_SOC_THRESHOLD = 50.0f;   // deep when SoC > 50%
 
+// ===== Hold after a failed connect (WO-2026-11-19-001, power/ConnectDecision) =====
+// How often we attempt after a timeout: a report waits HOLD_BASE_MS, doubling per consecutive
+// failure up to HOLD_MAX_MS. The budgets above still set how long each attempt lasts.
+constexpr unsigned long HOLD_BASE_MS = 60UL * 60UL * 1000UL;      // 1 hour
+constexpr unsigned long HOLD_MAX_MS = 6UL * 60UL * 60UL * 1000UL; // 6 hours
+
 // ===== Firmware update (stay-connected) no-progress window =====
 // Purpose:
 // - Upper-bound how long we remain in a firmware-update dwell state WITHOUT a

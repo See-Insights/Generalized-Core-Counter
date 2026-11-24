@@ -169,9 +169,13 @@ Revert the PR. This is behaviour only: nothing persisted, nothing in the ledgers
 7. **F5:** not confirmed, because the bench logs couldn't show mode 0. The fleet runs mode 3. Step 1 doesn't touch S6, so F5 is left for step 2.
 8. **The 660 s rule above 50 %:** unchanged, by Chip's decision of 19 Nov.
 
-## Closing record
+## Closing record (19 Nov 2026)
+**Stage 6:** Copilot (`claude-fable-5.2`), committed as `230cce7`. **Stage 7:** round 1 on `230cce7` (Codex `gpt-6-astra`, xhigh; `gpt-6.1-sol` is rejected on this account): VERIFIED WITH FIXES, one Low (the Stage 6 report's "no warning" claim; two inherited warnings from files identical to the base, corrected in the report), no finding in `src/` or the tests; head `4ad117d`. **Stage 8:** passed (architect, 19 Nov); the zero-warning clause is met (no new warnings). Backlog for steps 2-5: the two inherited warnings (`ConnectivityFailsafeTest.cpp:18`, `SensorManager.cpp:978`) and the stale trace-flag comment at `BuildProfile.h:53`.
+**Controller checks on `230cce7`:** suite 125/125 (sh via zsh, py via python3, full history); Codex's independent run 125/125 and 195,840 decision cases under UBSan; twelve mutations caught. Local build text/data/bss `151116/1114/2248` against base `151124/1114/2264` (-8/0/-16).
+
 | Item | Budget | Raised to (reason) | Actual net `src/` lines | Tests |
 |---|---|---|---|---|
-| Connect decision + hold | ≤ 0 (cap +10) | — | | |
+| Connect decision + hold | ≤ 0 (cap +10) | — | **0** (+88 / −88) | 2 new tests and 1 helper (`connect_decision_test`, `connect_hold_wiring_test`, `connect_hold_base_delta.py`); 10 existing tests updated, each no wider than its reason |
 
-Running one-place total after this step: ____.
+Running one-place total after this step: **0**.
+**Merge:** HOLD for v50.2; merge only after v50.1 is tagged (architect, 19 Nov).

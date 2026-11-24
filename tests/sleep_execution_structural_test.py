@@ -142,12 +142,15 @@ if not base_text:
     print("sleep_execution_structural_test: all available invariants hold")
     sys.exit(0)
 
-changed = git("diff", "--name-only", base, "--", "src/state/SleepTeardown.h", "src/state/SleepTeardown.cpp").stdout.split()
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import connect_hold_base_delta  # WO-2026-11-19-001: the pure connect decision's two files, and the four session writes deleted from SleepTeardown.cpp
+changed = [rel for rel in ("src/state/SleepTeardown.h", "src/state/SleepTeardown.cpp")
+           if (REPO_ROOT / rel).read_text() != connect_hold_base_delta.teardown_base(rel, git("show", f"{base}:{rel}").stdout)]
 if changed:
     fail(f"SleepTeardown.{{h,cpp}} must be unchanged against {base}: {changed}")
 added = git("diff", "--name-status", "--diff-filter=A", base, "--", "src").stdout.split()
 added += git("ls-files", "--others", "--exclude-standard", "--", "src").stdout.split()
-added = [a for a in added if a not in ("A", "src/time/ExternalRtc.h", "src/time/PreBindRtc.h")]  # v50 S1 helper header
+added = [a for a in added if a not in ["A", "src/time/ExternalRtc.h", "src/time/PreBindRtc.h"] + connect_hold_base_delta.NEW_SRC_FILES]  # v50 S1 helper header
 if added:
     fail(f"no new file may appear under src/: {added}")
 for name in git("diff", "--name-only", base, "--", "src").stdout.split():

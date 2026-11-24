@@ -7,6 +7,8 @@ set -euo pipefail
 # fields and every log line with its level) must equal, byte for byte, the
 # frozen output of the pre-move code in fixtures/modem_health_transcript.txt
 # (its '# ' header lines are stripped first). No old source is needed here.
+# One decision has changed since, on purpose: WO-2026-11-19-001 clears the timeout
+# count at every daily close (six rows; the fixture header records the edit).
 # Mutants of a private copy of ModemHealth.cpp must each make the transcript
 # differ from the fixture. Set MODEM_HEALTH_SRC_ROOT to test another src/ root.
 
@@ -60,7 +62,12 @@ PY
 mutate_and_expect_diff "connect timeout threshold 3" "THRESHOLD = 2;" "THRESHOLD = 3;"
 mutate_and_expect_diff "recovery limit 6000" "RECOVERY_TEARDOWN_MS = 5000UL" "RECOVERY_TEARDOWN_MS = 6000UL"
 mutate_and_expect_diff "count not saturated" "if (session.modemConnectTimeoutCount < 0xFF) {" "if (true) {"
-mutate_and_expect_diff "daily close skips count" "    session.modemConnectTimeoutCount = 0;
-    Log.info(\"MODEM_POLICY: standby re-allowed" "    Log.info(\"MODEM_POLICY: standby re-allowed"
+# WO-2026-11-19-001 ruling 4: the count clears at every close, latched or not (six fixture rows; see the fixture header).
+count_clear="  session.modemConnectTimeoutCount = 0;  // every close starts a fresh day: its report is never held
+"
+mutate_and_expect_diff "daily close skips count" "$count_clear" ""
+mutate_and_expect_diff "daily close clears the count only when latched" "$count_clear  if (session.modemUnstable) {
+" "  if (session.modemUnstable) {
+  $count_clear"
 
 echo "modem_health_equivalence_test: transcript matches the frozen pre-move output (176 cases), all mutations detected"

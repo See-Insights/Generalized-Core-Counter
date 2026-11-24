@@ -69,11 +69,11 @@ void noteConnectSuccess() {
 }
 
 void clearAtDailyClose() {
+  session.modemConnectTimeoutCount = 0;  // every close starts a fresh day: its report is never held
   if (session.modemUnstable) {
     session.modemUnstable = false;
     session.modemStandbySuppressed = false;
     session.modemUnstableReason = 0;
-    session.modemConnectTimeoutCount = 0;
     Log.info("MODEM_POLICY: standby re-allowed at daily close; night modem-off decides");
   }
 }

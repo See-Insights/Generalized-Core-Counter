@@ -237,10 +237,6 @@ struct Teardown {
          connectionModeLabel(static_cast<SystemConfig::ConnectionMode>(PowerManager::instance().effectiveConnectionMode())),
              batteryTierLabel(PowerConfig::get_currentBatteryTier()),
              CurrentReadings::get_occupied() ? 1 : 0);
-    session.lastCloudDisconnectElapsedMs = cloudDisconnectElapsedMs;
-    session.lastModemOffElapsedMs = modemOffElapsedMs;
-    session.lastTotalTeardownElapsedMs = teardownElapsedMs;
-    session.lastTeardownEndMs = millis();
     if (teardownElapsedMs > MODEM_UNSTABLE_SLOW_TEARDOWN_MS) {
       markModemUnstable(MODEM_UNSTABLE_REASON_SLOW_TEARDOWN, teardownElapsedMs);
     } else {

@@ -3,9 +3,13 @@
 # This is the output of the pre-change latch code (Sleep markModemUnstable/maybeClearModemUnstable, Connect markModemUnstableFromConnectTimeout and success reset, Report daily-close block) run on the 176 cases of tests/modem_health_equivalence_test.cpp.
 # Cases: 176 (the last body line is "CASES 176")
 # Body lines (non-comment lines): 257
-# Body sha256: 23c67545a76899405bcdf96b1edaddd51403396a9108616daecf367fccf2bb76
+# Body sha256: b727fdf7b9a90b6364b5bcc61ab8f8a015aa5b487a6775aabaf06079d4dc35bc
 # Generated once by extracting those pieces from db9e9e1 (git show db9e9e1:src/state/State_{Sleep,Connect,Report}.cpp),
 # building the harness's old-code variant against the host stubs in tests/stubs/modem_health, and running it.
+# WO-2026-11-19-001 (Step 0 ruling 4) changed one decision on purpose: clearAtDailyClose() zeroes the timeout count at every
+# close, latched or not. The six "dailyClose 0 <suppressed> <reason> 2" rows therefore end count=0 where the pre-change code
+# left count=2. Those six rows were edited by hand (the sha256 above covers the edited body); every other line is the
+# pre-change output, byte for byte.
 # Do not regenerate this file to make a test pass: regenerating requires the old code from a commit before the ModemHealth change.
 connectTimeout 0 0 0 0 -> unstable=0 suppressed=0 reason=0 count=1
 connectTimeout 0 0 1 0 -> unstable=0 suppressed=1 reason=0 count=1
@@ -72,17 +76,17 @@ connectSuccess 1 1 0 0 -> unstable=1 suppressed=1 reason=1 count=0
 connectSuccess 255 0 0 0 -> unstable=0 suppressed=0 reason=0 count=0
 connectSuccess 255 1 0 0 -> unstable=1 suppressed=1 reason=1 count=0
 dailyClose 0 0 0 0 -> unstable=0 suppressed=0 reason=0 count=0
-dailyClose 0 0 0 2 -> unstable=0 suppressed=0 reason=0 count=2
+dailyClose 0 0 0 2 -> unstable=0 suppressed=0 reason=0 count=0
 dailyClose 0 0 1 0 -> unstable=0 suppressed=0 reason=1 count=0
-dailyClose 0 0 1 2 -> unstable=0 suppressed=0 reason=1 count=2
+dailyClose 0 0 1 2 -> unstable=0 suppressed=0 reason=1 count=0
 dailyClose 0 0 2 0 -> unstable=0 suppressed=0 reason=2 count=0
-dailyClose 0 0 2 2 -> unstable=0 suppressed=0 reason=2 count=2
+dailyClose 0 0 2 2 -> unstable=0 suppressed=0 reason=2 count=0
 dailyClose 0 1 0 0 -> unstable=0 suppressed=1 reason=0 count=0
-dailyClose 0 1 0 2 -> unstable=0 suppressed=1 reason=0 count=2
+dailyClose 0 1 0 2 -> unstable=0 suppressed=1 reason=0 count=0
 dailyClose 0 1 1 0 -> unstable=0 suppressed=1 reason=1 count=0
-dailyClose 0 1 1 2 -> unstable=0 suppressed=1 reason=1 count=2
+dailyClose 0 1 1 2 -> unstable=0 suppressed=1 reason=1 count=0
 dailyClose 0 1 2 0 -> unstable=0 suppressed=1 reason=2 count=0
-dailyClose 0 1 2 2 -> unstable=0 suppressed=1 reason=2 count=2
+dailyClose 0 1 2 2 -> unstable=0 suppressed=1 reason=2 count=0
 dailyClose 1 0 0 0 -> unstable=0 suppressed=0 reason=0 count=0
   LOG INFO MODEM_POLICY: standby re-allowed at daily close; night modem-off decides
 dailyClose 1 0 0 2 -> unstable=0 suppressed=0 reason=0 count=0
