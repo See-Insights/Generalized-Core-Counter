@@ -292,8 +292,8 @@ void setup() {
 
   // v50: Device OS owns the AB1805; bind once before anything reads Time.
   if (!Am18x5.status().bound() && !PreBindRtc::run(ab1805, Wire)) Log.warn("PreBindRtc: chip access failed");
-  ExternalRtc::ensureBound(Am18x5, particle::Am18x5Configuration().i2c(Wire).interruptPin(WKP).watchdogPin(WATCHDOG_DONE_PIN)
-      .capabilities(particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL).clockSource(particle::RtcClockSource::EXTERNAL));
+  ExternalRtc::ensureBound(Am18x5, particle::Am18x5Configuration().i2c(Wire).interruptPin(WKP)
+      .capabilities(particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL).clockSource(particle::RtcClockSource::EXTERNAL)); // no watchdogPin: the feed goes through the chip's WDT register (D5 edges did not feed the chip; WO-2026-11-16-001)
 
   // Device OS keeps the chip watchdog running across a reset; init() re-arms it.
   if (ExternalWatchdog.init(WatchdogConfiguration().timeout(124000)) != SYSTEM_ERROR_NONE || ExternalWatchdog.start() != SYSTEM_ERROR_NONE) {
@@ -1132,7 +1132,10 @@ void loop() {
   setLoopStage(LOOP_STAGE_DIAGNOSTICS);
   thrashGuard.loop(state, millis());
 
-  ExternalWatchdog.refresh(); // the only refresh source (Device OS does not refresh instance 2)
+  static int lastRefreshRc = SYSTEM_ERROR_NONE;
+  const int refreshRc = ExternalWatchdog.refresh(); // the only refresh source (Device OS does not refresh instance 2)
+  if (refreshRc != lastRefreshRc) Log.warn("ExternalWatchdog: refresh rc=%d", refreshRc);
+  lastRefreshRc = refreshRc;
   checkClockResync(); // WO-2026-08-29-002: recurring app-side RTC write-back
 
   // Housekeeping for each transit of the main loop

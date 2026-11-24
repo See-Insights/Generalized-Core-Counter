@@ -33,8 +33,8 @@ def structural(main_text, hdr_text, resetcause_text, publisher_text):
         errs.append("set() does not read the chip back after hal_rtc_set_time")
     if "ExternalRtc::ensureBound(Am18x5" not in m:
         errs.append("setup() does not call ExternalRtc::ensureBound(Am18x5, ...)")
-    if not re.search(r"\.i2c\(Wire\)\.interruptPin\(WKP\)\.watchdogPin\(WATCHDOG_DONE_PIN\)", m):
-        errs.append("fleet config is not Wire/WKP/D5")
+    if not re.search(r"\.i2c\(Wire\)\.interruptPin\(WKP\)\s*\.capabilities", m) or ".watchdogPin(" in m:
+        errs.append("fleet config is not Wire/WKP with no watchdog pin (the feed goes through the WDT register)")
     if ".capabilities(particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL)" not in m:
         errs.append("fallback capability missing from the fleet config")
     if ".clockSource(particle::RtcClockSource::EXTERNAL)" not in m:
@@ -137,6 +137,7 @@ def main():
         "readback-before-set": (main_text, rc, pub, hdr.replace("hal_rtc_set_time(&tv, &opt) != 0) return false;\n  time_t back = 0;\n  return get(back)", "time_t back = 0; get(back);\n  if (hal_rtc_set_time(&tv, &opt) != 0) return false;\n  return true && get(back)", 1)),
         "setup-left-in": (main_text.replace("ExternalRtc::ensureBound(Am18x5", "ab1805.withFOUT(WKP).setup(); ExternalRtc::ensureBound(Am18x5", 1), rc, pub),
         "guard-kept": (main_text + "\nRESET_CAUSE_EXRTC_BINDING_DELETE", rc, pub),
+        "pin-restored": (main_text.replace(".interruptPin(WKP)", ".interruptPin(WKP).watchdogPin(WATCHDOG_DONE_PIN)", 1), rc, pub),
         "wrong-pin": (main_text.replace("interruptPin(WKP)", "interruptPin(D4)", 1), rc, pub),
         "no-fallback-cap": (main_text.replace(".capabilities(particle::RtcCap::AUTO_CLOCK_SOURCE_INTERNAL_ON_FAIL)", ".capabilities(particle::RtcCap::NONE)", 1), rc, pub),
         "no-clock-source": (main_text.replace(".clockSource(particle::RtcClockSource::EXTERNAL)", "", 1), rc, pub),
