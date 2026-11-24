@@ -1,0 +1,409 @@
+# Field Meanings Reference
+
+This document captures source-traced interpretations of logging fields and patterns observed in field telemetry. These are established through code inspection and live testing, not pattern-matching — intended to prevent repeated re-derivation and misreading across health checks and investigations.
+
+## Sleep and Teardown Logging
+
+### `Sleep: td=Xms cloud=Xms modem=Xms standby=Y/Y mode=Z tier=W occ=V`
+
+**Source:** `State_Sleep.cpp` lines ~1085, disconnect-detection branch  
+**Represents:** Teardown-completion measurement, fired **BEFORE** actual sleep-mode decision (not the sleep mode itself)
+
+**Components:**
+- `td=` = total teardown elapsed (disconnect request to ready-to-sleep)
+- `cloud=` = cloud disconnect elapsed
+- `modem=` = modem-off elapsed
+- `standby=Y/Y` = network standby requested/effective flags
+- `mode=` = **connectivity mode** (INT=INTERMITTENT, IKA=INTERMITTENT_KEEP_ALIVE, DISC=DISCONNECTED, CONN=CONNECTED), **NOT sleep mode**
+- `tier=` = battery reporting tier (H/HEALTHY, C/CONSERVING, CR/CRITICAL, S/SURVIVAL)
+- `occ=` = occupancy state
+
+**When HIBERNATE actually occurs:** Logged separately as `Sleep: HIBERNATE reason=closed dur=Xs wakePin=X` (source line ~1085, after teardown measurement).
+
+**Important:** A standard `Sleep: td=...` line with `mode=INT` does NOT indicate INTERMITTENT sleep mode; it indicates INTERMITTENT connectivity mode at the time of teardown measurement. The actual sleep decision happens after this line fires. **To distinguish HIBERNATE from INTERMITTENT sleep, check uptime counter behavior at wake, not this teardown log.**
+
+---
+
+### `CycleDelivery: awake=Xms a=A k=K f=F r=R q=Q`
+
+**Source:** `State_Sleep.cpp` line ~1234, at the sleep-commit point
+**Represents:** Per-cycle awake time and cumulative publish-delivery accounting. Fires **unconditionally** on every cycle that commits to sleep — unlike `CYCLE end awake=...`, which is gated on verbose mode, and unlike `Sleep: td=...`, which only fires on cycles that actually tear down a connection. This is therefore the reliable way to read awake time per cycle from an ordinary field log.
+
+**Components:**
+- `awake=` = milliseconds from wake to the sleep commit for **this** cycle
+- `a=` = `attempted` — cumulative publishes started for a queued event
+- `k=` = `acknowledged` — cumulative cloud acknowledgements (every queued publish uses explicit `WITH_ACK`, so this is a real cloud ACK)
+- `f=` = `failed` — cumulative attempts that failed or timed out waiting for the ACK
+- `r=` = `retried` — cumulative attempts that followed an earlier failed attempt
+- `q=` = events still queued at this sleep commit (a **snapshot**, not a cumulative total)
+
+`a`, `k`, `f`, and `r` are retained-memory counters: they survive hibernate wake and resets, reset to zero on power loss or reflash, and saturate at 65535 rather than wrapping. These five values, plus `sleptWithQueued` and `abandoned`, are published in the `status` **event**'s `d` object — not in the device-status ledger payload (WO-2026-09-25-001 Stage 5 decision 5). See "Publish Delivery Counters in the `status` Event" below.
+
+**Fires on every sleep commit,** including the Boron overnight RTC-alarm HIBERNATE, which resets the MCU without returning (WO-2026-09-25-001 decision 7). Both sleep paths call the same helper immediately before `System.sleep()`.
+
+**Reading it:** `a == k` with `f=0 r=0 q=0` is a healthy device. A rising `f`/`r` means acknowledgements are being lost or delayed. A non-zero `q` means the device slept with unacknowledged events still on disk — those are retried on the next connection, not dropped.
+
+---
+
+### `DeliveryBudget: expired budget=Xms elapsed=Yms qn=N inflight=Z`
+
+**Source:** `PublishDeliveryGate.cpp` (`src/cloud/`), reached from the IDLE sleep gate, the IDLE connectivity ceiling and the SLEEPING_STATE cloud-sync gate
+**Represents:** The bounded delivery wait (WO-2026-09-25-001 Stage 5 decision 6) ran out. Sleep and cloud teardown are now permitted even though events are still queued — but only while nothing is in flight.
+
+**Components:**
+- `budget=` = `ConnectivityPolicy::PUBLISH_DELIVERY_BUDGET_MS` (90000 by default; a compile-time constant, not a device setting)
+- `elapsed=` = milliseconds since the budget started
+- `qn=` = events still queued at expiry
+- `inflight=` = 1 when a publish attempt was still outstanding. While this is 1 the device still does **not** sleep or disconnect; the attempt is never abandoned.
+
+The budget starts at the first evaluation where the device is cloud-connected **and** the publish queue is not sleep-safe, and is cancelled as soon as the queue drains or the connection drops. Offline time never consumes it: sleeping offline with a queue was always allowed. One line is logged per expiry episode. Each expiry that actually reaches a sleep commit with events queued also increments `d.s` (`sleptWithQueued`) in the `status` event.
+
+---
+
+### `GateFail: reason=... timeout=X elapsed=Y q=Z qn=N ledger=... webhook=... update=...`
+
+**Source:** `State_Sleep.cpp` line ~596, cloud-sync gate
+**Represents:** The cloud-sync budget expired before all pre-sleep work completed, so the device is going to sleep anyway.
+
+**Components:**
+- `reason=` = which conjunct of the gate was still unsatisfied
+- `timeout=` = the cloud-sync budget in ms
+- `elapsed=` = how long the gate actually waited before giving up
+- `q=` = whether the publish queue was **blocking** the gate: `queuePending = queueEmpty ? 0 : 1`, so **`q=1` means the queue still held events** (it is the inverse of the queue's `getCanSleep()` verdict, not that verdict)
+- `qn=` = the number of events still in the publish queue
+- `ledger=` / `webhook=` / `update=` = the other gate conjuncts
+
+`q=1` together with `qn>0` is the normal shape when the queue is holding unacknowledged events; those events are durable on disk and are retried after the next connection. This condition also raises alert 43. The `ledger=`, `webhook=` and `update=` fields use the same polarity: 1 means "still pending", 0 means "satisfied".
+
+---
+
+### `PubqAttempt: id=... h=... e=... f=... future=... ack=... err=... cObs=... ck=... dur=...`
+
+**Source:** `BackgroundPublishRK.cpp` line ~143 (`app.pubq` category)
+**Represents:** One line per real `Particle.publish()` attempt made for a queued event. Bench/diagnostic tracing.
+
+**Components:**
+- `id=` = attempt sequence number; `h=` = FNV-1a hash of the event payload, so the same logical event can be followed across retries
+- `e=` = event name; `f=` = the publish flags actually used (expect bit `0x08` = `WITH_ACK` set and bit `0x02` = `NO_ACK` clear)
+- `future=` / `ack=` = whether the publish future completed and whether the cloud acknowledged
+- `err=` = Device OS error code; `cObs=` / `ck=` = cloud-connection observations at the time of the attempt; `dur=` = attempt duration in ms
+
+A repeated `h=` value across several `id=` values is a retry of the same event — expected when an ACK is lost, and the reason `r=` in `CycleDelivery` rises.
+
+---
+
+### `PubqDispatch: e=... f=... accepted=0 future=none ack=not-observed`
+
+**Source:** `PublishQueuePosixRK.cpp` line ~349
+**Represents:** The background publisher **refused** the dispatch, so no publish attempt was made at all. The event stays queued and is retried. This is logged at error level because a rejected dispatch never produces a `PubqAttempt` line and would otherwise be invisible.
+
+---
+
+**Represents:** Time diagnostic check at state transition (not sleep-mode related)  
+**Components:**
+- `isOpen` = whether currently within business hours (open/close window); 0=closed, 1=open
+- `open=` and `close=` = configured business hours (6-22 by default)
+- `utc=` and `local=` = time readings in both zones
+
+---
+
+### `LoopStage: stage=SLEEP_PREP elapsed=Xms state=Y q=Z connMs=...`
+
+**Represents:** Sleep-preparation-span timing measurement (how long the SLEEP_PREP stage took)  
+**Components:**
+- `elapsed=` = time since SLEEP_PREP began
+- `connMs=` = connection attempt duration in this cycle
+- `q=` = queue depth at time of measurement
+
+---
+
+### `HibernateDiag: ...`
+
+**Represents:** HIBERNATE eligibility check (various conditions logged as pass/fail)  
+**Patterns:**
+- `HibernateDiag: pass` = all checks passed, HIBERNATE will be attempted
+- `HibernateDiag: fail=REASON` = HIBERNATE blocked by reason (e.g., `fail=disabled`, `fail=rtc_invalid`, `fail=duration requested=X`)
+
+---
+
+## Serial Communication and Disconnect Patterns
+
+### USB CDC Disconnection After Sleep Modes
+
+**Mechanism:** The `Sleep: td=...` log followed by rapid `SERIAL_DISCONNECTED` event indicates a **CDC peripheral power-down race condition**.
+
+The USB CDC connection drops as part of sleep (HIBERNATE or other low-power modes) power-down sequence — the MCU cuts power to peripherals during entry. Any log line printed immediately before disconnect competes with the USB link shutdown; may or may not reach the forwarder's buffer before the connection is lost.
+
+**This is NOT a cloud transmission issue.** The serial forwarder reads USB CDC locally and independently of cellular/cloud connectivity. Expected behavior: last received log may be incomplete or missing in timeline when device powers down hard.
+
+---
+
+## Reset Codes and Boot Paths
+
+### `Boot: reset=X` Codes
+
+**Source:** Device OS boot diagnostics  
+**Meanings:**
+- **30 (POWER_MANAGEMENT):** Proper wake from HIBERNATE (expected after HIBERNATE cycle)
+- **20 (PIN_RESET):** External pin reset or other wake source (not HIBERNATE)
+- **40 (WATCHDOG):** Watchdog timer expired (device stalled/hung)
+- **Other codes:** See Device OS documentation for complete reference
+
+**Important:** Uptime counter behavior distinguishes sleep modes reliably:
+- **Continuous climb:** Device running without reboot (INTERMITTENT sleep, cloud operations, etc.)
+- **Reset to low value:** MCU reboot occurred (HIBERNATE exit, watchdog reset, hard reset)
+- **Interpretation:** If uptime **decreases** between two timestamped log entries, an MCU reboot definitely occurred between them. HIBERNATE causes MCU reset on wake; INTERMITTENT sleep never resets uptime.
+
+---
+
+## Power Source and Profile Selection
+
+### PowerDiag Fields: `source=` and `profile=`
+
+**Sources (from Device OS `System.powerSource()`):**
+- `USB_HOST` = USB enumerated + VBUS present (code 2)
+- `USB_ADAPTER` = USB adapter (code 3)
+- `VIN` = VIN line power (code 1)
+- `UNKNOWN` = Power source unrecognized (code 0)
+- `UNAVAILABLE` = Initial/transient state before first valid reading
+
+**Profiles (PMIC power configuration):**
+- `UsbBench` = USB charging profile (3.88V min, 4.112V charge, 896mA limit)
+- `Solar` = Solar charging profile (5.08V min, 4.208V charge, 900mA limit)
+- `NotApplicable` = No PMIC or uninitialized state
+
+**Selection Logic (PowerManager.cpp):**
+- VIN source → always select Solar profile
+- USB source → always select UsbBench profile
+- BATTERY or UNKNOWN source → use last-applied profile (if valid), else fallback to configured default (Solar if `solarPowerMode` enabled, else UsbBench)
+
+---
+
+### `ChargeDiag src=` Is Raw; `PowerDiag source=` Is Effective
+
+`ChargeDiag`'s `src=` field is the **raw, uncorrected** PMIC sample, deliberately
+kept independent of `PowerSourceOverride` so it survives as ground-truth
+evidence. `PowerDiag`'s `source=` is the **corrected, effective** value actually
+used for profile selection and cloud telemetry. The two diverging in adjacent
+log lines is expected, not a defect.
+
+Read `source=` for analysis. See the section "Mixed Corrected/Raw Power Source
+Values: `ChargeDiag src=` vs `PowerDiag source=`" below for the full
+explanation and a confirmed instance.
+
+---
+
+### VIN/Solar Reading on a USB-Powered Device
+
+A USB-powered device can report `source=VIN profile=Solar`. **Two distinct behaviors share this symptom.** They are not the same thing and must not be read interchangeably: one is benign and self-correcting, the other is an unresolved defect with a measurable charge cost. Determine which case you are looking at before drawing any conclusion.
+
+What is shared is the surface reading: `source=VIN profile=Solar` on a device that is physically on USB. The underlying register state is **not** known to be identical between the two cases, and should not be assumed so — in Case 1 enumeration is still in progress, whereas Case 2 was observed with USB fully enumerated (`usbAddr=0x4`) and the Nordic USB regulator ready (`usbReg=0x3`). The simultaneous `vbus=0` is a separate BQ24195 PMIC `VBUS_STAT` reading; it is not the override's VBUS predicate.
+
+**The distinguishing question:** does the reading correct itself on the next `PowerDiag`, or does it persist?
+
+---
+
+#### Case 1 — Transient, immediately post-reset (benign)
+
+**Pattern:** A single `PowerDiag` reading immediately after a reset (including HIBERNATE wake) shows `source=VIN profile=Solar`, then corrects on the next reading.
+
+**Mechanism:** USB re-enumeration takes ~1-2 seconds after MCU reset. During that window `System.powerSource()` may return VIN (or UNKNOWN/unavailable) before USB VBUS presence is confirmed by Nordic hardware.
+
+**Mitigation:** Beginning with v23-Diag-Soak, the Boron USB source override is compiled unconditionally on Boron and checks Nordic USB registers directly:
+- Condition: `source==VIN/UNKNOWN && usbAddr!=0 && VBUS present && usbReg ready`
+- If met: override to USB_HOST, apply UsbBench profile
+- If not met: wait for next power reading
+
+**Expected behavior:** Lasts ~1 PowerDiag reading, no lasting effect once VBUS stabilizes. **Not a defect** in this form — expected Device OS behavior with a purpose-built workaround.
+
+**Scope of this claim:** "Not a defect" applies *only* to the transient case — a reading that demonstrably self-corrects within a cycle or two of a reset. It does not extend to Case 2.
+
+---
+
+#### Case 2 — Persistent, multi-hour (confirmed defect, corrective failure explained)
+
+**Pattern:** The same `source=VIN profile=Solar` reading persists for hours and does **not** self-correct. Critically, it has been observed beginning *well after* a clean boot rather than immediately following one — the device first reads USB correctly, then degrades to VIN and stays there.
+
+**Confirmed on Boron-Dev-09, 2026-08-13** (v22-Diag-Soak, Device OS 6.4.1), telemetry-verified:
+- Session booted 08:45:41 SGT; `ChargeDiag` at 08:52 correctly read `src=USB_HOST prof=USB vcell=4.157`.
+- By 09:52 it had reverted to `src=VIN prof=SOLAR` and remained there until 16:50 — approximately **7 hours** in a single session, with no self-correction.
+- Across the 24-hour window, 32 of 43 `ChargeDiag` readings reported `src=VIN prof=SOLAR`; ~10h50m total spanning two sessions.
+- The override did not engage: `PowerDiag[1271]: source=VIN profile=Solar vbus=0 pg=1 usbAddr=0x4 usbReg=0x3`. This was **not** an unsatisfied-precondition case. `vbus=0` is the BQ24195 PMIC's `VBUS_STAT` field and is not used by the override. The actual Nordic predicate was satisfied: `usbAddr & 0x7f != 0` and `usbReg & 0x03 == 0x03`. Disassembly of the exact deployed v22 artifact (`app_hash 64188ac3...`) confirmed that the override had been compiled out, so that binary never evaluated the satisfied predicate.
+
+**This is not benign — it has a measurable charge cost.** Observed on Dev-09: while on the Solar profile, the PMIC reported fast-charging but the battery net-discharged, producing 7 escalating `PMIC: Stuck in Fast Charging for 6+ hours with no material gain` errors (14:56–16:50 SGT) with `vcell` declining 3.961V → 3.885V. A watchdog reset at 16:56:43 cleared the condition; the device re-detected USB_HOST, `vcell` recovered to 4.101V and SOC rose 70.4% → 81.2%.
+
+The charge failure is *consistent with* the Solar profile's 5.08V minimum input exceeding what a USB supply provides (see the profile table above), but that link has not been independently confirmed on hardware and is stated here as a plausible reading of the numbers, not an established mechanism.
+
+**Root cause of the failed correction: confirmed.** The deployed v22 binary did not contain the override because its build guard compiled it out. The v23-Diag-Soak fix removes that optional guard and compiles the override unconditionally on Boron, so this specific silent compile-out failure mode should not recur. The upstream reason Device OS changed its raw source from a correct USB_HOST reading to VIN remains unknown; that is separate from why the application failed to correct the reading.
+
+**Why this matters:** A Solar profile reading does not indicate actual solar operation when USB is connected. In Case 1 it reflects enumeration timing and is harmless. In Case 2 the upstream source degradation remains unexplained, but the prolonged Solar-profile consequence is explained by the override being absent from that deployed binary. On battery-backed field units, unlike a USB bench unit, that consequence has no benign failure mode.
+
+---
+
+## Ledger Synchronization
+
+### `LedgerCb: kind=DATA|STATUS seq=X globalSeq=Y ...`
+
+**Represents:** Ledger callback after cloud sync attempt  
+**Components:**
+- `kind=DATA` or `kind=STATUS` = ledger type synced
+- `seq=X globalSeq=Y` = sequence numbers
+- `found=1` = ledger found in cloud
+- `age=Xms` = how long ago the ledger was updated
+- `countBefore=X countAfter=Y` = pending items before/after sync
+- `pendingData=` and `pendingStatus=` = items still awaiting sync
+
+**Healthy patterns:**
+- `pendingData=0 pendingStatus=0` = all synced, clean
+- One entry with `pending=1` on the other kind = normal, will sync on next opportunity
+- Age values in seconds range = recent, not stale
+
+**Warning patterns:**
+- `LedgerDuplicateStillInflight` = same item sync attempted multiple times without clearing; may indicate stuck inflight request
+- `pending=1` for both DATA and STATUS across multiple cycles = ledger sync falling behind
+
+---
+
+## Ledger Payload Sizes
+
+### `LedgerPayloadData: bytes=X/512 schema=Y` and `LedgerPayloadStatus: bytes=X/896 schema=Y`
+
+**Represents:** Snapshot of ledger size in current cycle  
+**Components:**
+- `bytes=X/512` = used/total for DATA ledger
+- `bytes=X/896` = used/total for STATUS ledger
+- `schema=Y` = ledger schema version
+
+**Typical healthy ranges:**
+- DATA: 200-350 bytes used (schema 2)
+- STATUS: 450-600 bytes used (schema 2)
+- Schema version: should be consistent (typically 2 for current builds)
+
+**`LedgerPayloadStatus: overflow bytes=X/896 schema=Y - status not published`** (WO-2026-09-25-001): `JSONBufferWriter::dataSize()` "can be greater than buffer size" (Device OS 6.4.1 `wiring/inc/spark_wiring_json.h:232`) — the writer stops copying but keeps counting. When the count reaches the buffer size the publisher now refuses to publish instead of storing the NUL terminator past the end of its stack buffer. Seeing this line means the device-status payload outgrew its 896-byte cap for that cycle and no status was sent; the payload's deployed worst case is 903 bytes, which is why the guard exists. Raising the cap is WO-2026-09-25-003.
+
+---
+
+## Publish Delivery Counters in the `status` Event
+
+### `"d": {"a": ..., "k": ..., "f": ..., "r": ..., "q": ..., "s": ..., "b": ...}`
+
+**Source:** `publishStartupStatus()` in `src/Generalized-Core-Counter.cpp`, published as `PublishQueuePosix::instance().publish("status", status, PRIVATE)`
+**Represents:** The publish-delivery counters, carried in cloud telemetry so the fleet-wide delivery rate is measurable on devices with no serial capture (WO-2026-09-25-001, Stage 5 decisions 2, 5, 6 and 7). The first five are the same values as the `CycleDelivery:` log line.
+
+| Key | Meaning |
+|---|---|
+| `d.a` | `attempted` — publishes started for a queued event since the counters were last zeroed. |
+| `d.k` | `acknowledged` — attempts the Particle cloud acknowledged. Every queued publish uses explicit `WITH_ACK`, so this is a real cloud acknowledgement, not a local hand-off. |
+| `d.f` | `failed` — attempts that failed or timed out waiting for the acknowledgement. The event stays queued and is retried. |
+| `d.r` | `retried` — attempts that followed an earlier failed attempt. A persistently non-zero and rising `d.r` means acknowledgements are being lost or delayed. |
+| `d.q` | `queuedAtSleep` — events still queued at the most recent sleep commit. A snapshot, not a cumulative total. A non-zero value means the device slept with unacknowledged events still on disk; they are retried on the next connection. |
+| `d.s` | `sleptWithQueued` — cumulative count of sleep commits that carried at least one event over, i.e. how often the delivery budget expired (or a sleep gate timed out) instead of the queue draining. |
+| `d.b` | `abandoned` — cumulative count of attempts that were dispatched but whose outcome never arrived because the device reset while they were outstanding. Counted once, at the next boot, from a retained flag. |
+
+**The accounting identity is `d.a == d.k + d.f + d.b`,** outside an in-flight attempt and below saturation. Before `d.b` existed, a watchdog/pin/software reset during an attempt left `d.a` permanently ahead of `d.k + d.f` (WO-2026-09-25-001 decision 7). Each counter saturates independently at 65535, so once any of them reaches the ceiling all of them are censored values and the identity no longer holds.
+
+**Why the event and not the device-status ledger:** the ledger payload was already observed at 831–856 bytes of its 896-byte cap, so a counter object there would have pushed ordinary cycles over the cap and suppressed the status publish. The `status` event has room: its measured deployed worst case with all seven counters is well inside the 1023 usable bytes of the `char status[1024]` buffer, and Device OS 6.4.1 allows 1024 (`particle::protocol::MAX_EVENT_DATA_LENGTH`, `communication/inc/protocol_defs.h:94`), which is also the ceiling `PublishQueuePosixRK` itself enforces (`PublishQueuePosixRK.cpp:106`). The "622-byte" figure in that library's doc comments is stale prose from Device OS 0.8.0-era and is not enforced anywhere. `tests/status_event_payload_budget_test.py` re-derives the figure from the shipped format strings.
+
+**Reading it:** the counters live in retained memory, so a `status` event published at boot reports the accounting carried over from the cycles *before* this wake. They survive hibernate wake and resets; they reset to zero on power loss, reflash, or a retained-layout version change; and they saturate at 65535 rather than wrapping, so a value of 65535 must be read as "≥ 65535".
+
+---
+
+## Timing and Measurement
+
+### `SLEEP_PREP` Elapsed Time
+
+The `LoopStage: stage=SLEEP_PREP elapsed=Xms` measurement tracks time spent in sleep preparation (cloud ops gate, disconnect, radio off). This is not the sleep duration itself, but the pre-sleep work duration.
+
+**Typical ranges** — ⚠️ *unverified, treat with caution:*
+- Normal cycle: 5-15 seconds
+- Ledger-heavy cycle: 20-60 seconds
+- Timeout/gate-blocked cycle: approaches cloud sync budget (60-120 seconds)
+
+These ranges were recorded during the same investigation that produced the retracted 24-hour assessment and have **not** been re-confirmed against telemetry. The only `SLEEP_PREP` sample in the verified Boron-Dev-09 window (2026-08-13) was `elapsed=1644182` — about 27 minutes, roughly 13× the stated maximum:
+
+```
+17:28:04  LoopStage: stage=SLEEP_PREP elapsed=1644182 state=3 q=7 connMs=0
+```
+
+Whether that indicates the ranges are wrong, or that a long dwell is simply expected in `INTERMITTENT_KEEP_ALIVE` where the sleep path is rarely exercised, is **not established** — one sample cannot distinguish them. Do not treat these ranges as a threshold for raising or dismissing a concern until they are re-derived from a window with real sleep cycles.
+
+**Regression indicator:** Same cycle number appearing multiple times with similar elapsed values = SLEEP_PREP logging is firing more than once per cycle (should be once). Check `WO-2026-08-11-001` regression status if this appears.
+
+---
+
+## Mixed Corrected/Raw Power Source Values: `ChargeDiag src=` vs `PowerDiag source=`
+
+**Observed pattern:** Serial output and a single published `pdiag` batch can
+both legitimately contain BOTH a corrected `source=` value (from `PowerDiag`
+entries and ordinary pdiag entries, sourced from
+`powerReport.reading.powerSource` after `PowerSourceOverride` has run) AND a
+raw, uncorrected `source=` value (from `ChargeDiag` entries and reason-10 pdiag
+entries, sourced directly from `System.powerSource()` /
+`PowerPlatform::readPowerSource()` before any override is applied). See
+`src/power/PmicFaultMonitor.cpp` (`logChargeDiag()` — ChargeDiag / reason-10
+sampling site) and `src/power/PowerManager.cpp` (`PowerSourceOverride`
+correction) for the two respective sampling points.
+
+> **Note:** the ChargeDiag emission site moved from `src/sensors/SensorManager.cpp`
+> to `src/power/PmicFaultMonitor.cpp` in the v24 power-management consolidation
+> (commit `516332a`, WO-2026-08-25-001). Older work orders and investigations
+> citing the SensorManager path predate that move.
+
+**This applies to serial logs, not only pdiag batches.** The divergence is
+visible directly in a serial capture, where a `PowerSourceOverride` WARN line
+is normally the adjacent giveaway:
+
+```text
+21:09:36.250  WARN: PowerSourceOverride: source=VIN usbAddr=0x04 usbReg=0x03 -> USB_HOST reason=usb_enumerated
+21:09:37.199  INFO: PowerDiag[250]: post-refreshInputProfile source=USB_HOST ... vbus=0 pg=1
+21:09:38.425  INFO: ChargeDiag: chg=DONE(3) ... vbus=NONE pg=1 ... src=VIN prof=USB
+```
+
+Within one second, `PowerDiag` reports the corrected `USB_HOST` and `ChargeDiag`
+reports the raw `VIN`. Both are correct for what they represent.
+
+**This is intentional, not an inconsistency to debug.** The two entry types
+serve different purposes:
+- `PowerDiag` / ordinary pdiag entries report the corrected, override-applied
+  source — the value actually used for profile selection and cloud telemetry.
+- `ChargeDiag` / reason-10 pdiag entries deliberately report the raw,
+  pre-override source — preserved as independent ground-truth evidence. This
+  raw value is what made the original VIN/Solar power-source root-cause
+  investigation possible, and removing it (by folding it into the corrected
+  value) would remove the diagnostic signal a future instance of this bug
+  class would need to be investigated the same way.
+
+**What to expect:** Within the same pdiag batch, it is normal and expected for
+a `ChargeDiag`/reason-10 entry's `src=` field to differ from a `PowerDiag`/
+ordinary entry's `source=` field in the same or an adjacent cycle (for
+example, during any window where the raw hardware-reported source and the
+override-corrected source temporarily diverge). Do not treat this divergence
+alone as a bug signal; confirm which entry type (corrected vs. raw) is being
+compared before concluding there is a genuine reporting defect.
+
+**For soak and field analysis, read `PowerDiag source=`, not `ChargeDiag src=`.**
+Any dashboard, log review, or automated analysis that treats `ChargeDiag src=`
+as the effective power source will report phantom `VIN` / `UNKNOWN` sources on
+any device, indefinitely.
+
+**Confirmed instance (2026-08-28, Boron-Dev-09).** Two apparent "power
+disturbances" (13:09 UTC 08-27 and 00:08 UTC 08-28) were investigated and found
+to be no such thing. The first was nine transient post-connect PMIC
+misclassifications, each corrected by `PowerSourceOverride` within ~1 s of
+`ConnSummary: ok` (measured spread 0.90–1.39 s, 9 of 9). The second was not an
+event at all. Battery telemetry was byte-identical across every sample —
+`vcell=4.021`, `soc=78.8`, `pg=1`, `chg=DONE(3)` — which is not possible if USB
+power had actually been lost. The misreading came entirely from treating
+`ChargeDiag src=VIN` as the effective source. A separate signature,
+`vbus=USB` with `src=UNKNOWN`, was observed at 06:59:50 SGT 08-28 on the same
+post-connect path. Root cause of the underlying `VBUS_STAT` misread is not
+established and is deferred (would need `ENABLE_PMIC_REGISTER_DUMP`).
+
+---
+
+## References and Related Work Orders
+
+- **WO-2026-08-12-001:** Radio-off confirmation logging at HIBERNATE entry (depends on HIBERNATE actually occurring; validate via uptime reset)
+- **WO-2026-08-11-001:** SLEEP_PREP regression check — **status: UNRESOLVED.** A previous entry here recorded this as "confirmed holding clean; no flooding". That claim originated in the retracted 24-hour assessment and is not supported by telemetry. The redone assessment (Boron-Dev-09, 2026-08-13) found exactly **one** `SLEEP_PREP` line in 24 hours, which is too few samples to demonstrate either a regression or its absence. The device spent that window in `INTERMITTENT_KEEP_ALIVE` with multi-hour continuous sessions, so it was rarely exercising the sleep path at all. Re-run over a window containing real sleep cycles before recording any verdict.
+- **Boron USB source override:** Beginning with v23-Diag-Soak, the workaround is compiled unconditionally on Boron. The Dev-09 2026-08-13 episode did not demonstrate a failed runtime predicate: `usbAddr=0x4` and `usbReg=0x3` satisfied it, but disassembly confirmed the override was absent from the deployed v22 binary. See "VIN/Solar Reading on a USB-Powered Device", Case 2.
+- **OPEN — upstream persistent VIN/Solar misdetection (unnumbered, root cause unknown):** Why Device OS changes the raw source from a correct USB_HOST reading to VIN mid-session remains unresolved. The concurrent PMIC `vbus=0` value is not the Nordic override predicate and must not be used to infer that the predicate failed. Evidence: Boron-Dev-09 24-hour soak assessment, 2026-08-13.
