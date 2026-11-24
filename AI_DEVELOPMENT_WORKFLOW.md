@@ -384,6 +384,8 @@ Claude Code performs workflow completeness checks and compares the resulting beh
 
 Dispatch Codex with codex exec <dispatch>; codex review --uncommitted rejects custom instructions (CLI 0.154.0).
 
+The verdict is one of VERIFIED, VERIFIED WITH FIXES or NOT VERIFIED, with a two-line header (§4, "Stage 7 verdicts").
+
 Any WO that adds, removes or changes how an alert is raised, ranked or cleared updates `docs/reference/alert-codes.md` in the same PR. Stage 7 checks it.
 
 #### Mandatory: linkage verification
@@ -577,6 +579,41 @@ Every report from Copilot, Codex, or Claude Code states:
 
 A Codex verdict's first line quotes the `UNDER REVIEW` SHA. A missing or mismatched SHA invalidates the verdict: not counted as a round, archived, rerun.
 
+### Stage 7 verdicts (Chip, 11 Nov 2026)
+
+A Stage 7 verdict has three possible values (it replaces the earlier two-value PASS / NOT VERIFIED), and a fixed two-line header:
+
+- **Line 1:** the verdict, plus the full SHA under review (the SHA rule above is unchanged: a missing or mismatched SHA invalidates the verdict).
+- **Line 2:** the finding counts, each tagged by area, for example `1 High (src), 2 Medium (test/docs), 1 Low`.
+
+| Verdict | When | What happens next |
+|---|---|---|
+| **VERIFIED** | No finding needs a change. | Go to Stage 8. |
+| **VERIFIED WITH FIXES** | Only Low findings, or Medium findings outside `src/` behaviour (tests, docs, tooling). | Copilot applies the fixes. Claude Code re-runs the full suite and the named mutations, and the architect reads the diff. **No further Codex round.** |
+| **NOT VERIFIED** | Any High, or any Medium that affects `src/` behaviour. | The architect rules, then Codex round 2. |
+
+There are still **at most two Codex rounds**. Constructed evasions of test tooling remain **documented limits, not findings** ("Findings against test tooling" below). This applies from the next Stage 7 dispatch after 11 Nov 2026; a round already dispatched or ruled under the earlier two-value rule finishes under it.
+
+### Stage 7 time-box (standing rule, Chip, 6 Nov 2026)
+
+A Codex Stage 7 round has a **90-minute time-box** from the moment it is dispatched. The controller registers a completion watcher for the run at dispatch (tested once before it is backgrounded) with a deadline 90 minutes out. If no verdict has been delivered by the deadline:
+
+1. **Stop the run** (kill only the `codex exec` process the controller started).
+2. **Archive the partial output** under `docs/work-orders/` with a name that marks it partial (for example `<WO>-stage7-r<N>-partial.md`); it is a record, **not a verdict, and the round is not counted** against the two-round limit.
+3. **Re-dispatch the round** with a new dispatch file (the names are never reused, §4 Commands) on the same commit, or on the newer commit if the code has changed meanwhile; the `UNDER REVIEW` SHA rule is unchanged.
+
+The time-box applies to the round, not to a single tool call. **Chip may extend it** for a named reason (for example an outage of the network or the vendor service, as on 6 Nov 2026 when a round on `ce2e597` stalled during an internet outage); the extension and its end time are written into the next dispatch's header. A round that delivers a verdict inside the box is judged on the verdict only; speed is not a criterion.
+
+### Findings against test tooling
+
+When a reviewer finds that a **test or its tooling** (an extractor, a structural scan, a guard check) can be defeated, the finding is classified before it costs a round:
+
+- A **deliberately constructed evasion** (a decoy helper that copies the code under test, a directive split in the middle of a token, a macro alias built to hide an enumerator) is a **documented limit**: record it in the test's header and in the Work Order close-out. It is not fixed unless the evasion is **plausibly accidental**, meaning an ordinary refactor or an edit a maintainer could make without intending to defeat the test.
+- A **plausibly accidental** gap is fixed, as before.
+- **Firmware-behavior findings stay fully adversarial.** Reviewers keep trying to break the shipped behavior; this rule applies to test tooling only.
+
+Reason: a structural test is a guardrail, not a parser. Each round spent closing a constructed evasion buys no field safety and moves the next evasion one step further out (Work Order 2026-11-09-001: both Stage 7 rounds returned such test findings after the firmware fix had passed).
+
 ### Records
 
 Dispatches and verdicts are saved under `docs/work-orders/`, never only in a scratchpad. The verdict file is the record that a Work Order passed review.
@@ -724,6 +761,8 @@ Why this is a rule: agents running the tests under bash have produced false fail
 
 Reporting: any report of test results states the interpreter used, e.g. `43/43 (sh via zsh, py via python3)`.
 
+**Discovery matches CI (added 2026-11-07).** The local suite runs exactly CI's discovery: every `tests/*.sh` via zsh and every `tests/*.py` via python3. Not `*_test.*`. Local green must equal CI green, so helper scripts under `tests/` count: a helper that is not a test must exit 0 when run with no arguments (or live outside `tests/*.py`). Before reporting "ready", confirm CI is green on the PR (`gh pr checks <PR>`), not just the local suite. (Origin: S2 PR #201, where `tests/s2_transcript_normalise.py`, a helper that needs an argument, passed a `*_test.py` loop and failed CI's `tests/*.py` loop.)
+
 ## 11. Success criteria for the workflow
 
 The workflow is successful if it produces:
@@ -746,7 +785,7 @@ Added after WO-2026-09-25-001, where three review rounds grew a restoration of a
 2. **A plain-language goal at the top of every WO.** One short paragraph, no jargon, saying what should be true when the work is done. Every dispatch and review is checked against it.
 3. **A size budget in every dispatch.** Each dispatch states the expected size of the change (lines of `src/` and `lib/`, and tests). Going over the budget means stopping and reporting, not continuing. **Don't compress code to meet a budget:** no combined declarations, packed lines, or dropped braces to save a line. Write the code as the surrounding code would, and report an honest overage instead. (Added 2026-10-02 after WO-2026-10-02-002, where two declarations were joined on one line to land on the budget.)
    **Record budget versus actual.** Every WO's closing record includes a table with one row per item: budget, raised to (if raised, with its recorded reason), and actual net `src/` lines (tests listed separately). Review the tables every few WOs: a kind of change that keeps going over points to a structural problem, not just a budget to raise.
-4. **The two-round rule.** If two implementation rounds each add new mechanisms, or two rounds pass without VERIFIED, stop. The architect and the user restate the goal in plain language before any third round. **Exception (2026-10-08):** if the second round's verdict is NOT VERIFIED only on edge cases that are not regressions against main, the architect may accept them at Stage 8. The closing record then says "NOT VERIFIED, accepted by the architect" and gives the reason. Any new finding goes to the recovery plan, not into a third round.
+4. **The two-round rule.** If two implementation rounds each add new mechanisms, or two rounds pass without VERIFIED or VERIFIED WITH FIXES (§4, "Stage 7 verdicts"), stop. The architect and the user restate the goal in plain language before any third round. **Exception (2026-10-08):** if the second round's verdict is NOT VERIFIED only on edge cases that are not regressions against main, the architect may accept them at Stage 8. The closing record then says "NOT VERIFIED, accepted by the architect" and gives the reason. Any new finding goes to the recovery plan, not into a third round.
 5. **Verify the binary, not the source, for anything involving vendored libraries.** A library that is both vendored in `lib/` and listed in `project.properties` may be replaced by the registry copy in a cloud build. Confirm the change is present in the binary that will be flashed (disassembly, symbols, or strings), not only in the source tree. Local and cloud builds may use different library copies. Bench-test the build type the fleet will receive. The cloud compile that checks this runs once per release, on the release branch head (§3, "Release gate").
 6. **Read `resetReasonData` before attributing any reason-140 reset.** Its code (`src/ResetCause.h`) says which part of the firmware reset the device.
 

@@ -108,8 +108,8 @@ def _problems(files):
     if not re.search(r"ExternalWatchdog\.stop\(\);\s*System\.sleep\(bootStormSleep\);\s*ExternalWatchdog\.start\(\);", setup_all):
         p.append("the boot-storm System.sleep must be bracketed by ExternalWatchdog.stop()/start()")
     loop = gcc[gcc.index("void loop()"):]
-    if loop.index("ExternalWatchdog.refresh()") > loop.index("checkClockResync()"):
-        p.append("refresh must precede checkClockResync() (the old ab1805.loop() slot)")
+    if not (loop.index("thrashGuard.loop(state, millis())") < loop.index("ExternalWatchdog.refresh()") < loop.index("checkClockResync()")):
+        p.append("loop order must be thrashGuard.loop(state, millis()) < ExternalWatchdog.refresh() < checkClockResync(): the refresh sits after the whole state switch so every state feeds the chip")
 
     hib = fn_body(sleep, "bool hibernateAttempt(") if "bool hibernateAttempt(" in sleep else fn_body(sleep, "void hibernateAttempt(")
     ulp_i = sleep.index("sleepAndResume(")
@@ -163,6 +163,18 @@ def mutated(label, old, new, count=1):
     return f
 
 
+def refresh_in_idle_case():
+    f = dict(raw)
+    g = f["gcc"]
+    a = g.index("  static int lastRefreshRc")
+    end = "lastRefreshRc = refreshRc;\n"
+    b = g.index(end) + len(end)
+    blk = g[a:b]
+    g = g[:a] + g[b:]
+    f["gcc"] = g.replace("  case IDLE_STATE:\n    handleIdleState();\n", "  case IDLE_STATE:\n" + blk + "    handleIdleState();\n", 1)
+    return f
+
+
 def moved_init():
     init = "  // Device OS keeps the chip watchdog running across a reset; init() re-arms it.\n  if (ExternalWatchdog.init(WatchdogConfiguration().timeout(124000)) != SYSTEM_ERROR_NONE || ExternalWatchdog.start() != SYSTEM_ERROR_NONE) {\n    Log.warn(\"ExternalWatchdog: init/start failed\");\n  }\n"
     anchor = "  // Wait for serial connection only in explicit DEV builds\n"
@@ -193,6 +205,7 @@ probes = {
     "no watchdog stop before hibernate": mutated("sleep", "const bool watchdogStopped = (ExternalWatchdog.stop() == SYSTEM_ERROR_NONE);\n        pauseAwakeWatchdogForSleep",
                                                   "const bool watchdogStopped = true;\n        pauseAwakeWatchdogForSleep"),
     "refresh missing": mutated("gcc", "ExternalWatchdog.refresh();", ""),
+    "refresh block moved into case IDLE_STATE": refresh_in_idle_case(),
     "hibernate fallback restart removed": mutated("sleep", "HibernateCycle::abandon();\n        ExternalWatchdog.start();", "HibernateCycle::abandon();"),
     "ab1805 stale clear back": dict(raw, elig="bool clearAb1805StaleAlarmInterrupts();\n" + raw["elig"]),
 }

@@ -118,7 +118,7 @@ SHA7 = "abcdef1"
 CANON = "gcc-v49.1-boron-dos6.6.0-" + SHA7 + ".bin"
 
 
-def stub_run(script, tag, message, objtype="tag", bins=("a.bin",), good_hash=True):
+def stub_run(script, tag, message, objtype="tag", bins=("a.bin",), good_hash=True, title_env=None):
     d = tempfile.mkdtemp()
     try:
         bd = os.path.join(d, "bin")
@@ -140,7 +140,7 @@ def stub_run(script, tag, message, objtype="tag", bins=("a.bin",), good_hash=Tru
         open(os.path.join(d, "msg"), "w").write(message + "\n")
         outp = os.path.join(d, "out")
         open(outp, "w").close()
-        env = dict(os.environ, PATH=bd + os.pathsep + os.environ["PATH"], GH_TOKEN="x", TAG=tag,
+        env = dict(os.environ, PATH=bd + os.pathsep + os.environ["PATH"], GH_TOKEN="x", TAG=tag, TITLE=title_env if title_env is not None else "Release %s: Test summary" % tag,
                    WANT_SHA=want, GITHUB_REPOSITORY="o/r", GITHUB_SERVER_URL="https://example.test", GITHUB_OUTPUT=outp,
                    OS="6.6.0", GITHUB_SHA=SHA7 + "0123456789abcdef0123456789abcdef", STUB_TYPE=objtype, STUB_MSG=os.path.join(d, "msg"))
         r = subprocess.run(["bash", "-c", script], cwd=d, env=env, capture_output=True, text=True)
@@ -188,7 +188,7 @@ def main():
     check(r.returncode == 0, "bash -n of meta step: " + r.stderr)
 
     link = "[GitHub Release](https://example.test/o/r/releases/tag/v49.1)"
-    title = "Development Release - v49.1"
+    title = "Release v49.1: Test summary"
     hostile = ("Title $(id) `id`\n\nEOF\ndescription<<abc\nabc\n::set-output name=x::y\n"
                "version=9999\n$(id) `id` ${HOME}\n::add-mask::x\nEOF")
     below = "SECRET-BELOW\nverification $(id) `id`\nEOF\nversion=9999"
@@ -223,7 +223,7 @@ def main():
     check(code != 0 and raw == "", "near-miss separators must not count")
 
     muts = {
-        "title from first line": ('echo "title=Development Release - $TAG"', 'echo "title=$TAG: ${msg%%$\'\\n\'*}"'),
+        "title ignored": ('echo "title=$TITLE"', 'echo "title=Development Release - $TAG"'),
         "description includes below": ("sed '/^---$/,$d' <<<\"$msg\"", 'echo "$msg"'),
         "no fail-closed check": ("grep -qx -- '---' <<<\"$msg\" ||", "false ||"),
         "link missing": ('echo "[GitHub Release]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG)"; ', ""),
@@ -246,6 +246,9 @@ def main():
         if code == 0:
             ok = False
         check(not ok, "script mutation %r not detected" % name)
+    for bad in ("", "Release v49.1: ", "Release v49.1:", "Development Release - v49.1", "Release v50.1: other tag", "Release v49.1: a\nb"):
+        code, _, raw = stub_run(script, "v49.1", "T\n---", title_env=bad)
+        check(code != 0 and raw == "", "bad TITLE %r must fail with no outputs (code %s)" % (bad, code))
     code, out, _ = stub_run(script, "v7.12", "T\n---")
     check(code == 0 and out["version"] == "712", "v7.12 should give 712")
     code, out, _ = stub_run(script, "v10.01", "T\n---")

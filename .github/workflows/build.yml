@@ -11,6 +11,8 @@ permissions:
 
 jobs:
   host-tests:
+    # Bench branches (bench/**, NEVER RELEASE) are built for the firmware only: their host tests fail by design. Tags (v*) and every other branch still run them.
+    if: ${{ !startsWith(github.ref_name, 'bench/') }}
     runs-on: ubuntu-latest
     outputs:
       tests: ${{ steps.tests.outputs.result }}
@@ -63,10 +65,15 @@ jobs:
       sha256: ${{ steps.rec.outputs.sha256 }}
       digest: ${{ steps.rec.outputs.digest }}
       os: ${{ steps.props.outputs.os }}
+      title: ${{ steps.title.outputs.title }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0  # tag builds check the tagged commit is on main
+      - name: Tagged commit is on main (before building)
+        if: github.ref_type == 'tag'
+        run: .github/scripts/tag-on-main.sh "$GITHUB_SHA" origin/main
       - name: Tag matches source FIRMWARE_PRODUCT_VERSION (before building)
         if: github.ref_type == 'tag'
         run: |
@@ -75,6 +82,22 @@ jobs:
           want=$((10#${BASH_REMATCH[1]} * 100 + 10#${BASH_REMATCH[2]}))
           got=$(echo FIRMWARE_PRODUCT_VERSION | cc -E -P -x c++ -include src/FirmwareVersion.h - | tail -n 1)  # the active macro, as the compiler sees it
           [ "$got" = "$want" ] || { echo "::error::source FIRMWARE_PRODUCT_VERSION '$got' != $want from tag $GITHUB_REF_NAME; not building"; exit 1; }
+      - name: Release flags DEV_BUILD and CONNECTIVITY_FAILSAFE_TEST_MODE are 0 (before building)
+        if: github.ref_type == 'tag'
+        run: |
+          set -euo pipefail
+          out=$(echo DEV_BUILD CONNECTIVITY_FAILSAFE_TEST_MODE | cc -E -P -x c++ -include src/BuildProfile.h - | tr '\n' ' ') || { echo "::error::preprocessing src/BuildProfile.h failed; not building"; exit 1; }  # the active macros, as the compiler sees them
+          read -r dev fs extra <<<"$out"
+          [ -n "$dev" ] && [ -n "$fs" ] && [ -z "$extra" ] || { echo "::error::could not read DEV_BUILD and CONNECTIVITY_FAILSAFE_TEST_MODE from the preprocessor (got '$out'); not building"; exit 1; }
+          [ "$dev" = 0 ] || { echo "::error::DEV_BUILD is '$dev', must be 0 for a tag build; not building"; exit 1; }
+          [ "$fs" = 0 ] || { echo "::error::CONNECTIVITY_FAILSAFE_TEST_MODE is '$fs', must be 0 for a tag build; not building"; exit 1; }
+      - name: Particle title from docs/releases/<tag>-notes.md line 1 "Title:" (before building)
+        id: title
+        if: github.ref_type == 'tag'
+        run: |
+          set -euo pipefail
+          title=$(.github/scripts/release-title.sh "$GITHUB_REF_NAME")  # its own statement: a failure stops the job
+          echo "title=$title" >> "$GITHUB_OUTPUT"
       - name: Read Device OS version from project.properties
         id: props
         run: echo "os=$(sed -n 's/^deviceOS=//p' project.properties)" >> "$GITHUB_OUTPUT"
@@ -163,17 +186,18 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with: {name: firmware-boron, path: fw}
       - id: meta
-        env: {GH_TOKEN: "${{ github.token }}", TAG: "${{ github.ref_name }}", WANT_SHA: "${{ needs.firmware.outputs.sha256 }}", OS: "${{ needs.firmware.outputs.os }}"}
+        env: {GH_TOKEN: "${{ github.token }}", TAG: "${{ github.ref_name }}", WANT_SHA: "${{ needs.firmware.outputs.sha256 }}", OS: "${{ needs.firmware.outputs.os }}", TITLE: "${{ needs.firmware.outputs.title }}"}
         run: |
           set -euo pipefail
           [[ "$TAG" =~ ^v([0-9]{1,2})\.([0-9]{1,2})$ ]] || { echo "::error::tag '$TAG' is not v<major>.<iteration>"; exit 1; }
+          [[ "$TITLE" == "Release $TAG: "?* && "$TITLE" != *$'\n'* ]] || { echo "::error::no Particle title for $TAG (line 1 of docs/releases/$TAG-notes.md must be 'Title: <summary>'); not uploading"; exit 1; }
           ver=$((10#${BASH_REMATCH[1]} * 100 + 10#${BASH_REMATCH[2]})); bin=$(find fw -name '*.bin')
           [ -n "$bin" ] && [ "$(wc -l <<<"$bin")" -eq 1 ] || { echo "::error::expected exactly one .bin"; exit 1; }
           [ "$(sha256sum "$bin" | cut -d' ' -f1)" = "$WANT_SHA" ] || { echo "::error::artifact SHA-256 differs from the firmware job's"; exit 1; }; new="$(dirname "$bin")/gcc-$TAG-boron-dos$OS-${GITHUB_SHA::7}.bin"; mv "$bin" "$new"; bin=$new
           api=repos/$GITHUB_REPOSITORY/git; ref=$(gh api "$api/ref/tags/$TAG" --jq '.object.type + " " + .object.sha')
           [ "${ref%% *}" = tag ] || { echo "::error::$TAG is not an annotated tag"; exit 1; }
           msg=$(gh api "$api/tags/${ref##* }" --jq .message); d=$(openssl rand -hex 8); grep -qx -- '---' <<<"$msg" || { echo "::error::tag message has no --- line"; exit 1; }
-          { echo "bin=$bin"; echo "version=$ver"; echo "title=Development Release - $TAG"; echo "description<<$d"; sed '/^---$/,$d' <<<"$msg"; echo; echo "[GitHub Release]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG)"; echo "$d"; } >> "$GITHUB_OUTPUT"
+          { echo "bin=$bin"; echo "version=$ver"; echo "title=$TITLE"; echo "description<<$d"; sed '/^---$/,$d' <<<"$msg"; echo; echo "[GitHub Release]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG)"; echo "$d"; } >> "$GITHUB_OUTPUT"
       - uses: particle-iot/firmware-upload-action@9e393d6b362208488db91339ab72ee1d7e2e6ada # v1.0.4
         with: {particle-access-token: "${{ secrets.PARTICLE_ACCESS_TOKEN }}", firmware-path: "${{ steps.meta.outputs.bin }}", firmware-version: "${{ steps.meta.outputs.version }}",
           product-id: 42131, title: "${{ steps.meta.outputs.title }}", description: "${{ steps.meta.outputs.description }}"}
