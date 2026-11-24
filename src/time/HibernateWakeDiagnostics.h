@@ -45,6 +45,8 @@ enum class GateArm {
   kRtcOrder,       // rtcTime on wake was earlier than retainedHibernateRtcBefore
 };
 
+inline bool isRtcArm(GateArm a) { return a == GateArm::kRtcRead || a == GateArm::kRtcBeforeZero || a == GateArm::kRtcOrder; }  // I21: the gate failed on the RTC
+
 /// Raw inputs to the gate, exactly as `HibernateCycle::classifyWake()`
 /// reads them. The caller resolves `resetReasonIsPowerManagement` and
 /// `wakeReasonIsHibernateWake` from Device-OS/AB1805 types before populating this,

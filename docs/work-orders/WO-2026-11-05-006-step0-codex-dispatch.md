@@ -1,0 +1,8 @@
+AGENT: Codex · MODEL: gpt-5.6-sol · REASONING: high
+AUTHORIZATION SCOPE: READ-ONLY. Read the repo and git objects (including `git show origin/<ref>:<path>` for the two held C1/C2 branches named in the WO); run no build, no network, no device, no commit, no file write. Part A only.
+BASE: wo/2026-11-05-006-item21-step0 @ main 41d9911 (v49.1 + #190 + #191)
+
+# Stage 4 dispatch: recovery item 21, clock trust survives a restart and is withdrawn on evidence: Step 0 Part A (read-only)
+Read `docs/work-orders/WO-2026-11-05-006-item21-clock-trust-step0.md` first: the plain goal, the context list and **Part A questions 1-8** are your task. Part B (fleet data) is not yours.
+**Report format:** put the COMPLETE report in your FINAL message (the harness stores only the last message), **at most 150 lines**, in this order: the first line states the model and reasoning level you actually used and the BASE commit you read; then Answers 1-8 (each: OBSERVATION with file:line, then INFERENCE; for C1/C2 files say which tree, e.g. `[C2] src/state/State_Common.h:NNN`); then the ranking of candidate designs, the stop decision (STOP / PROCEED) and the smallest I21 WO shape with its `src/` line estimate. Do not flag report length.
+**Rules:** cite lines you read on the BASE commit (the recovery plan's line numbers are stale). Keep observation and inference apart. Where a Device OS 6.6.0 fact is needed (`ExternalTime.onEvent`, `TimeClass(EXTERNAL)`, events carried), say whether you read it in the vendored sources or are relying on a WO/spike record, and cite which. Do not choose the threshold (Part B supplies the data).

@@ -60,7 +60,7 @@ def _problems(files):
     if re.search(r"retained\w*", hc) and "PIN_RESET" in hc:
         pass
     setup = gcc[gcc.index("classifyWake(reason)"):]
-    block = setup[:setup.index("SystemConfig::flushNow();") + 25]
+    block = setup[:setup.index("SystemConfig::flushNow();", setup.index("set_powerOffRequested(0)")) + 25]  # I21: the failed-arm flush precedes the S2 evidence flush
     if "isInferredWatchdog(" not in block or "get_powerOffRequested()" not in block:
         p.append("reason-20 classification must use isInferredWatchdog with the persisted byte")
     if re.search(r"\bretained\w*", block):
