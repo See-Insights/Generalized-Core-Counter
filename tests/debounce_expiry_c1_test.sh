@@ -32,7 +32,7 @@ namespace CurrentReadings {
   void set_lastOccupancyEvent(uint32_t v) { lastEvt = v; }
 }
 namespace SystemConfig { namespace SensorSettings { uint32_t get_sensorSetting1() { return set1; } } }
-namespace Config { uint32_t occupancyDebounceMsForRuntime() { return 3600000; } }
+namespace Config { uint32_t occupancyDebounceMsForRuntime() { return set1 == 0 ? 3600000 : set1; } }
 #include "pred.inc"
 static int fails = 0;
 static void expect(const char* n, uint32_t got, uint32_t want) {
