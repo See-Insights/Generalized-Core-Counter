@@ -41,3 +41,25 @@ A GCC alert reaches Slack only when someone needs to visit or act. Every code cl
 
 ## Closing record
 Record budget against actual for each item, any increase with its reason, and the Stage 7 SHA and verdict.
+
+## Amendment 1 (architect, 11 Nov): Stage 7 round 1 findings, fixed in one last round (round 2 of 2)
+Stage 7 round 1 (`007504c`, `docs/work-orders/WO-2026-11-11-001-stage7-r1-verdict.md`) was NOT VERIFIED: the change passed items 1, 3 and 5-8; two PMIC alert-20 lifecycle findings (item 2) came back. Ruling: fix both, in one last round.
+
+**Goal: a PMIC code clears when its condition is gone, never before.**
+- **2a (High).** The new "clear 20 when no NTC fault" line (`PmicFaultMonitor.cpp:390-393`) also requires `consecutiveFaults == 0`, so it cannot run during an unfinished remediation cycle. About +1 `src/` line.
+- **2b (Medium; older behaviour, in scope).** The broad "charging resumed" clear for 20-23 (`:363-379`) does not clear 20 while `ntcFaultCode != 0`. About +1 `src/` line.
+- **Tests (two real-function scenarios):** (a) a thermal 0x02 fault raises 20; 20 stays through the first clean poll and clears only after the cycle completes; (b) a combined charge and NTC fault raises 20; 20 stays on the next poll that shows only the NTC fault, and clears once NTC clears.
+- **Mutation:** removing either guard must fail one of the two scenarios.
+- **Budget:** `src/` at most **+2 on top of round 1** (net about +1 against `f00aa04`). If either guard needs more than 2 lines, stop and report.
+- **Stage 6 round 2:** Copilot (standard model, medium), only the two guards and the two scenarios. **Stage 7 round 2:** Codex `gpt-5.6-sol` at high, the SHA in the dispatch header; the last round.
+- **New findings in round 2:** anything outside these two lines is recorded as a known gap in `alert-codes.md` and in this WO's closing record. There is no round 3.
+- The merge stays held until RC1 is tagged.
+
+## Closing record (Claude Code, 11 Nov)
+- **Branch and commits:** `wo/2026-11-11-001-alert-reporting-p`; round 1 `007504c` (Stage 7 round 1 NOT VERIFIED, `...-stage7-r1-verdict.md`), round 2 `467eea7` (Amendment 1), Stage 7 round 2 **PASS** on `467eea70e9e9ff9572c041305d9168fbc8e528e2` (`...-stage7-r2-verdict.md`, Codex `gpt-5.6-sol` high; the verdict's first line quotes the full SHA). Suite 118/118 (sh via zsh, py via python3), controller-run on both commits. **Merge held until RC1 is tagged.**
+- **Budget against actual (`src/`, `git diff --numstat f00aa04`):** total **+12/−13, net −1** against the ≤ +10 budget and the +2 estimate (round 2 itself net 0, inside its +2). By file: `cloud/ReportPublisher.cpp` +2 (items 1 and 2, `case 18` and `case 17`); `state/State_Connect.cpp` −10 (item 2: the connect clear for 17 and the write-only `ledgerPublishOk`; the WO estimated about −5); `power/PmicFaultMonitor.cpp` +9/−3 (item 3's two-predicate block, item 4's full-pack skip, and the two Amendment 1 guards, which are edits of existing lines); `power/PmicFaultMonitor.h` +1 (item 4's constant `kPmicFullPackVcell`). Item 3 and item 4 exceeded their estimates (+2 and +2) because the predicate is one block and the full-pack skip joins the ambiguous-load branch (a warning and a 6 h window restart); the total stayed negative because of item 2. Build (Device OS 6.6.0): text 153108 → 153172, data 1114, bss 2240.
+- **Increases with reasons:** none over budget. Deviations recorded in Copilot's reports: `ledgerPublishOk` removed; the alert-21 skip restarts the 6 h window; the 23 predicate not widened (BAT_FAULT never touches `consecutiveFaults`).
+- **Fixed after Stage 7 (architect ruling 12 Nov, VERIFIED WITH FIXES path; no Codex round 3):** (1) the `uint8_t` wrap: `PmicFaultMonitor.cpp:208` is now `if (consecutiveFaults < UINT8_MAX) consecutiveFaults++;` (Copilot, standard model, low; `src/` +1/−1, net 0 against a +1 budget; total against `f00aa04` is now +13/−14, net −1); new scenario 16 holds alert 20 for 509 polls of a frozen cycle (3 + 509 = 512 would wrap), and removing the saturation fails it. (2) the test gap: scenario 15 is parameterized over NTC codes `0x01`, `0x05` and `0x07` (controller edit under the test-only pre-authorization, about 20 lines), and a guard narrowed to `ntcFaultCode == 1` now fails. Build text 153172 → 153180 (+8), data 1114, bss 2240 (Copilot). Mutations re-run by the controller: no saturation, guard 2b narrowed to `== 1`, guard 2a without the NTC term: all caught; Copilot's table covers the rest.
+- **Known gap (recorded, historical):** `CHANGELOG.md:116` still says 18 "stays sticky" (a historical entry).
+- **Follow-ups outside this WO:** X1 (`ats`) after RC1's soak; the Ubidots checklist `docs/handover/2026-11-11-ubidots-gcc-devices-checklist.md` (Chip).
+
